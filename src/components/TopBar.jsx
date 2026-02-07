@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, User, Bell, Wallet } from 'lucide-react';
+import { Heart, Search, User, Bell, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
@@ -53,7 +53,7 @@ const TopBar = () => {
           )}
         </div>
 
-        <MessageCircle size={24} className="text-black dark:text-white" />
+        <Search size={24} className="text-black dark:text-white" />
 
         <Link to="/profile">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink p-[1.5px]">
