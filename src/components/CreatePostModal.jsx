@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
-import { Image, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, MapPin, UserPlus, ChevronDown, ChevronUp, Smile, Sun, Moon, Droplet, Thermometer, Cloud, Circle, Sliders } from 'lucide-react';
+import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, MapPin, UserPlus, ChevronDown, ChevronUp, Smile, Sun, Moon, Droplet, Thermometer, Cloud, Circle, Sliders } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
 // Filter Definitions
@@ -536,8 +536,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div className="mb-6">
-              <svg aria-label="Icon to represent media such as images or videos" className="text-gray-800 dark:text-white" color="currentColor" fill="currentColor" height="77" role="img" viewBox="0 0 97.6 77.3" width="96">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 blur-xl rounded-full bg-gradient-to-tr from-purple-500/20 to-blue-500/20"></div>
+              <div className="relative flex items-center justify-center w-24 h-24 rounded-xl bg-gray-100 dark:bg-gray-800">
+                <Images size={56} className="text-gray-800 dark:text-white" />
+              </div>
+              <svg aria-label="Icon to represent media such as images or videos" className="hidden" color="currentColor" fill="currentColor" height="77" role="img" viewBox="0 0 97.6 77.3" width="96">
                 <path d="M16.3 24h.3c2.8-.2 4.9-2.6 4.8-5.4-.2-2.8-2.6-4.9-5.4-4.8s-4.9 2.6-4.8 5.4c.1 2.7 2.4 4.8 5.1 4.8zm-2.4-7.2c.5-.6 1.3-1 2.1-1h.2c1.7 0 3.1 1.4 3.1 3.1 0 1.7-1.4 3.1-3.1 3.1-1.7 0-3.1-1.4-3.1-3.1 0-.8.3-1.5.8-2.1z" fill="currentColor"></path>
                 <path d="M84.7 18.4 58 16.9l-.2-3c-.3-5.7-5.2-10.1-11-9.8L12.9 6c-5.7.3-10.1 5.3-9.8 11L5 51v.8c.7 5.2 5.1 9.1 10.3 9.1h.6l21.7-1.2v.6c-.3 5.7 4 10.7 9.8 11l34 2h.6c5.5 0 10.1-4.3 10.4-9.8l2-34c.4-5.8-4-10.7-9.7-11.1zM7.2 10.8C8.7 9.1 10.8 8.1 13 8l34-1.9c4.6-.3 8.6 3.3 8.9 7.9l.2 2.8-5.3-.3c-5.7-.3-10.7 4-11 9.8l-.6 9.5-9.5 10.7c-.2.3-.6.4-1 .5-.4 0-.7-.1-1-.4l-7.8-7c-1.4-1.3-3.5-1.1-4.9.3L7 45.5c-1.7-3.5-1.5-7.5.9-10.8l1.4-1.8c.5-.7.4-1.6-.2-2.2-.7-.5-1.6-.4-2.2.2L6 32.1c-2.6-3.3-3.6-7.6-2.5-11.7.9-3.7 3.2-7 6.6-8.9l-.9-1.3c-.6-.7-.5-1.6.2-2.2.6-.5 1.5-.5 2.1.2l1.6 1.8c.8.8 1.9 1.2 3.1 1.2.4 0 .9-.1 1.3-.2.9-.2 1.5-1 1.5-1.9 0-1.1-.9-2-2-1.9zm-2.1 7.2c.4-.4.7-1 1-1.6.1-.2.2-.4.4-.5.3-.2.6-.3.9-.2.2.1.3.2.3.4 0 .2-.1.3-.2.4-.1.1-.2.2-.3.3-.3.4-.6.9-.9 1.3-.1.1-.1.2-.1.3 0 .1.1.2.2.2.1 0 .2 0 .3-.1 1.1-.7 2.3-1.2 3.6-1.4 2.8-.4 5.6.5 7.6 2.4s2.9 4.7 2.5 7.5c-.2 1.3-.8 2.5-1.5 3.5-.1.1-.2.2-.2.3 0 .1.1.2.2.2.1 0 .2 0 .3-.1 1.3-.8 2.7-1.3 4.2-1.5 1.5-.2 3.1-.1 4.5.4 1.5.5 2.8 1.4 3.8 2.6s1.6 2.6 1.9 4.1c.1.7.1 1.4 0 2.1-.1.4-.2.8-.3 1.2-.1.3-.1.5.1.7.2.2.5.2.7.1.5-.3.9-.7 1.3-1.1.8-.9 1.5-2 1.9-3.1.2-.4.4-.8.5-1.3 0-.1.1-.2.2-.3.1 0 .2 0 .3.1.5.4 1 .9 1.3 1.4.3.5.6 1.1.7 1.6.1.4.3.7.6.9.3.2.7.2 1-.1.4-.5.8-1 1.1-1.6.3-.5.5-1.1.7-1.7.1-.5.6-.9 1.1-.8.5.1.9.6.8 1.1-.2.8-.4 1.5-.8 2.2-.3.7-.8 1.4-1.3 2-.2.2-.3.5-.3.8 0 .3.2.5.5.6.8.2 1.5.6 2.2 1.1.7.5 1.3 1.1 1.8 1.8.2.3.5.5.9.5.1 0 .2 0 .3-.1.4-.2.6-.7.5-1.1-.3-.9-.7-1.7-1.3-2.5-.5-.8-1.2-1.5-1.9-2.1-.3-.2-.5-.6-.5-.9 0-.3.2-.6.5-.7.8-.3 1.6-.5 2.4-.6.8-.1 1.6-.1 2.4.1.4.1.7-.1.9-.5.1-.4-.1-.8-.5-.9-.9-.3-1.9-.4-2.8-.3-1 .1-1.9.3-2.8.7-.3.1-.6.1-.8-.2-.3-.3-.4-.7-.2-1 .5-.9 1.1-1.7 1.9-2.4.7-.6 1.6-1.1 2.5-1.4.4-.1.6-.5.5-.9-.1-.4-.5-.6-.9-.5-1.1.3-2.1.8-2.9 1.5-.9.7-1.6 1.6-2.1 2.6-.2.3-.5.4-.8.4-.1 0-.2 0-.3-.1-.4-.2-.6-.6-.5-1 .3-1.1.8-2.1 1.5-2.9.7-.9 1.6-1.6 2.6-2.1.4-.2.5-.6.3-1-.2-.4-.6-.5-1-.3-1.1.5-2.1 1.3-2.9 2.3-.8.9-1.4 2-1.8 3.2-.1.4-.5.6-.9.5-.4-.1-.6-.5-.5-.9.4-1.2 1-2.3 1.9-3.2.8-1 1.9-1.7 3-2.2.4-.2.6-.6.4-1-.2-.4-.6-.6-1-.4-1.3.5-2.4 1.3-3.4 2.4-.9 1.1-1.6 2.3-2 3.6-.1.4-.5.6-.9.5-.4-.1-.6-.5-.5-.9.5-1.3 1.2-2.5 2.2-3.6 1-1 2.2-1.8 3.5-2.3.4-.2.6-.6.4-1-.2-.4-.6-.6-1-.4-1.5.6-2.8 1.4-3.9 2.6-1.1 1.1-1.9 2.5-2.5 3.9-.2.4-.6.6-1 .4-.4-.2-.6-.6-.4-1 .7-1.6 1.6-3.1 2.9-4.3 1.2-1.2 2.7-2.1 4.3-2.7.4-.2.6-.6.4-1-.2-.4-.6-.6-1-.4-1.8.6-3.4 1.6-4.8 2.9-1.4 1.4-2.4 3-3 4.8-.1.4-.5.6-.9.5-.4-.1-.6-.5-.5-.9.7-2 1.9-3.7 3.4-5.2 1.6-1.4 3.4-2.5 5.5-3.2.4-.1.7.1.8.5.1.4-.1.7-.5.8-1.8.6-3.4 1.6-4.8 2.8-1.4 1.3-2.4 2.9-3 4.6-.1.4-.5.6-.9.5-.4-.1-.6-.5-.5-.9.7-1.9 1.8-3.6 3.2-5 .2-.2.4-.4.6-.6.3-.2.7-.2.9.1.2.3.2.7-.1.9zm-8.8 32.6-3.7 3.3c-.1.1-.2.2-.4.2-.2 0-.3-.1-.4-.2l-5.6-6.3c-.6-.7-1.7-.7-2.3 0L37.7 54h35.7l-15.1-17.8c-.7-.8-1.9-.8-2.6 0z" fill="currentColor"></path>
               </svg>
@@ -636,9 +640,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           </div>
         ) : step === 'edit' ? (
           /* EDIT STEP */
-          <div className="flex-1 flex flex-row overflow-hidden">
+          <div className="flex-1 flex lg:flex-row flex-col lg:overflow-hidden overflow-y-auto">
             {/* Left: Image Preview */}
-            <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center w-full flex-1 h-auto flex-[2]">
+            <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center w-full flex-1 h-auto">
               {currentMedia && (
                 currentMedia.type === 'video' ? (
                   <video
@@ -653,7 +657,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                 ) : (
                   <img
                     src={currentMedia.croppedUrl || currentMedia.url}
-                    className="max-w-full max-h-full object-contain transition-all duration-200"
+                    className="lg:max-w-full lg:max-h-full object-contain w-[400px] h-[500px]  transition-all duration-200"
                     style={getFilterStyle(currentMedia)}
                     alt="Edit"
                   />
@@ -674,7 +678,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             </div>
 
             {/* Right: Tools */}
-            <div className="bg-white dark:bg-black border-l border-gray-200 dark:border-gray-800 flex flex-col w-[340px] min-w-[340px] flex-none">
+            <div className="bg-white dark:bg-black border-l border-gray-200 dark:border-gray-800 flex flex-col lg:w-[340px] w-full min-w-[340px] flex-none">
               {/* Tabs */}
               <div className="flex border-b border-gray-200 dark:border-gray-800">
                 <button
@@ -761,7 +765,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           </div>
         ) : (
           /* SHARE STEP */
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          <div className="flex-1 flex flex-col md:flex-row lg:overflow-hidden overflow-y-auto">
             {/* Left: Final Image Preview */}
             <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center select-none w-full h-[40%] md:h-auto md:flex-[2]">
               {currentMedia && (
