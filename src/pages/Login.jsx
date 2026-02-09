@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { supabase } from '../lib/supabase';
+import { useSelector, useDispatch } from 'react-redux';
+import api from '../lib/api';
+import { setUser } from '../store/authSlice';
 import { ArrowLeft, Mail, Lock, User, Phone, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((state) => state.auth);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -27,34 +29,27 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const response = await api.post('/auth/login', {
         email: identifier,
         password
       });
-      if (signInError) throw signInError;
-      // Navigation is handled by useEffect on isAuthenticated
+
+      const { token, user } = response.data;
+      localStorage.setItem('token', token);
+      dispatch(setUser(user));
+      navigate('/');
     } catch (err) {
-      if (err.message === 'Email not confirmed') {
-        setError('Please verify your email address. Check your inbox for the confirmation link.');
-      } else {
-        setError(err.message || 'Login failed');
-      }
+      setError(err.response?.data?.message || 'Login failed');
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`,
-        },
-      });
-      if (error) throw error;
-    } catch (err) {
-      setError(err.message || 'Google login failed');
-    }
+  const handleGoogleLogin = () => {
+    const baseURL = api.defaults.baseURL || 'http://localhost:5000/api';
+    const authUrl = `${baseURL}/auth/google?scope=email%20profile`;
+
+    // Open in same tab
+    window.location.href = authUrl;
   };
 
   return (

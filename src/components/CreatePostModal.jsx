@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { supabase } from '../lib/supabase';
+import api from '../lib/api';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, MapPin, UserPlus, ChevronDown, ChevronUp, Smile, Sun, Moon, Droplet, Thermometer, Cloud, Circle, Sliders } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
@@ -285,8 +285,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
       setIsSubmitting(true);
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        if (!userObject) {
           alert("Please log in to share a post.");
           return;
         }
@@ -298,53 +297,77 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           const blob = await response.blob();
 
           const fileExt = blob.type.split('/')[1] || 'jpg';
-          const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+          const fileName = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+          const file = new File([blob], fileName, { type: blob.type });
 
-          const { error: uploadError } = await supabase.storage
-            .from('post_images')
-            .upload(fileName, blob);
+          const formData = new FormData();
+          formData.append('file', file);
 
-          if (uploadError) throw uploadError;
+          const uploadResponse = await api.post('/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('post_images')
-            .getPublicUrl(fileName);
+          const fileUrl = uploadResponse.data.fileUrl;
+
+          // Generate Filter CSS
+          const filterDef = FILTERS.find(f => f.name === item.filter);
+          const baseFilter = filterDef ? filterDef.style : '';
+          const adj = item.adjustments;
+          const brightness = `brightness(${100 + adj.brightness}%)`;
+          const contrast = `contrast(${100 + adj.contrast}%)`;
+          const saturate = `saturate(${100 + adj.saturate}%)`;
+          const sepia = adj.sepia !== 0 ? `sepia(${Math.abs(adj.sepia)}%)` : '';
+          const hue = adj.sepia < 0 ? `hue-rotate(-${Math.abs(adj.sepia)}deg)` : (adj.sepia > 0 ? `hue-rotate(${adj.sepia}deg)` : '');
+
+          const filterCss = `${baseFilter} ${brightness} ${contrast} ${saturate} ${sepia} ${hue}`.trim();
 
           return {
-            image: publicUrl,
-            ratio: item.aspect,
-            zoom: item.zoom,
-            filter: item.filter,
-            adjustments: item.adjustments
+            fileName: fileName,
+            type: item.type === 'video' ? 'video' : 'image',
+            fileUrl: fileUrl,
+            crop: {
+              mode: "original",
+              zoom: item.zoom,
+              x: item.crop.x,
+              y: item.crop.y
+            },
+            filter: {
+              name: item.filter,
+              css: filterCss
+            },
+            adjustments: {
+              brightness: item.adjustments.brightness,
+              contrast: item.adjustments.contrast,
+              saturation: item.adjustments.saturate,
+              temperature: item.adjustments.sepia,
+              fade: item.adjustments.opacity,
+              vignette: item.adjustments.vignette
+            }
           };
         }));
 
-        // Insert post
-        const { data: insertedPost, error: insertError } = await supabase
-          .from('posts')
-          .insert({
-            user_id: user.id,
-            caption,
-            location,
-            media: processedMedia,
-            tags,
-            hide_likes_count: hideLikes,
-            turn_off_commenting: turnOffCommenting,
-            type: postType
-          })
-          .select()
-          .single();
+        // Extract hashtags from caption
+        const hashtags = caption.match(/#[a-zA-Z0-9_]+/g) || [];
 
-        if (insertError) throw insertError;
+        const payload = {
+          caption,
+          location,
+          media: processedMedia,
+          tags: hashtags,
+          people_tags: tags.map(t => ({
+            user_id: t.user.id,
+            username: t.user.username,
+            x: t.x,
+            y: t.y
+          })),
+          hide_likes_count: hideLikes,
+          turn_off_commenting: turnOffCommenting,
+          type: postType
+        };
 
-        // Append post ID to user's posts array
-        const { error: updateError } = await supabase
-          .rpc('append_post_id', {
-            post_id: insertedPost.id,
-            user_id_param: user.id
-          });
-
-        if (updateError) console.error("Error updating user post list:", updateError);
+        await api.post('/posts', payload);
 
         handleClose();
         // clear state
@@ -389,21 +412,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const fetchUsers = async (query) => {
     setIsSearchingUsers(true);
     try {
-      let queryBuilder = supabase
-        .from('users')
-        .select('id, username, avatar_url, full_name')
-        .limit(20);
-
-      if (query) {
-        queryBuilder = queryBuilder.ilike('username', `%${query}%`);
-      }
-
-      const { data, error } = await queryBuilder;
-
-      if (error) throw error;
+      const { data } = await api.get(`/users/search?q=${query}`);
       setSearchResults(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
+      setSearchResults([]);
     } finally {
       setIsSearchingUsers(false);
     }

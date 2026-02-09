@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { supabase } from '../lib/supabase';
 import { logout } from '../store/authSlice';
 import { toggleTheme } from '../store/themeSlice';
 import {
@@ -82,7 +81,8 @@ const Settings = () => {
   const handleLogout = async () => {
     try {
       setLoggingOut(true);
-      await supabase.auth.signOut();
+      // Remove token from local storage
+      localStorage.removeItem('token');
       dispatch(logout());
       navigate('/login');
     } catch (error) {
