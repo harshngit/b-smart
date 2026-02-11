@@ -292,9 +292,15 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
 
         // Upload images and prepare media array
         const processedMedia = await Promise.all(media.map(async (item) => {
-          // Fetch blob from blob URL
-          const response = await fetch(item.croppedUrl || item.url);
-          const blob = await response.blob();
+          // Fetch blob from blob URL or generate filtered blob
+          let blob;
+          try {
+            blob = await applyFiltersToImage(item);
+          } catch (e) {
+            console.error("Error applying filters, falling back to original", e);
+            const response = await fetch(item.croppedUrl || item.url);
+            blob = await response.blob();
+          }
 
           const fileExt = blob.type.split('/')[1] || 'jpg';
           const fileName = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
@@ -309,7 +315,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             },
           });
 
-          const fileUrl = uploadResponse.data.fileUrl;
+          const { fileUrl, fileName: serverFileName } = uploadResponse.data;
 
           // Generate Filter CSS
           const filterDef = FILTERS.find(f => f.name === item.filter);
@@ -324,7 +330,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           const filterCss = `${baseFilter} ${brightness} ${contrast} ${saturate} ${sepia} ${hue}`.trim();
 
           return {
-            fileName: fileName,
+            fileName: serverFileName || fileName,
             type: item.type === 'video' ? 'video' : 'image',
             fileUrl: fileUrl,
             crop: {
@@ -494,6 +500,43 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
       filter: `${baseFilter} ${brightness} ${contrast} ${saturate} ${sepia} ${hue}`.trim(),
       opacity: (100 - adj.opacity) / 100
     };
+  };
+
+  const applyFiltersToImage = async (item) => {
+    const imageUrl = item.croppedUrl || item.url;
+    if (item.type === 'video') return await (await fetch(imageUrl)).blob();
+
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+
+        // Apply filters
+        const filterStyle = getFilterStyle(item);
+        if (filterStyle.filter) {
+          ctx.filter = filterStyle.filter;
+        }
+        if (filterStyle.opacity !== undefined && filterStyle.opacity !== 1) {
+          ctx.globalAlpha = filterStyle.opacity;
+        }
+
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Canvas to Blob conversion failed'));
+          }
+        }, 'image/jpeg', 0.95);
+      };
+      img.onerror = (e) => reject(e);
+      img.src = imageUrl;
+    });
   };
 
   if (!isOpen) return null;

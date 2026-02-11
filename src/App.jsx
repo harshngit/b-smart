@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { setUser, setLoading } from './store/authSlice';
+import { fetchMe, setLoading } from './store/authSlice';
 import api from './lib/api';
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -33,24 +33,12 @@ function App() {
   }, [mode]);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const response = await api.get('/auth/me');
-          dispatch(setUser(response.data));
-        } catch (error) {
-          console.error('Auth check failed:', error);
-          localStorage.removeItem('token');
-          dispatch(setUser(null));
-        }
-      } else {
-        dispatch(setUser(null));
-      }
+    const token = localStorage.getItem('token');
+    if (token) {
+      dispatch(fetchMe());
+    } else {
       dispatch(setLoading(false));
-    };
-
-    checkAuth();
+    }
   }, [dispatch]);
 
   return (

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import api from '../lib/api';
-import { setUser } from '../store/authSlice';
+import authService from '../services/authService';
+import { login, fetchMe, setUser } from '../store/authSlice';
 import { ArrowLeft, Mail, Lock, User, Phone, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
 
 const Login = () => {
@@ -29,17 +30,19 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/login', {
+      const resultAction = await dispatch(login({
         email: identifier,
         password
-      });
+      }));
 
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      dispatch(setUser(user));
-      navigate('/');
+      if (login.fulfilled.match(resultAction)) {
+        navigate('/');
+      } else {
+        setError(resultAction.payload || 'Login failed');
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError('An unexpected error occurred');
+    } finally {
       setLoading(false);
     }
   };
@@ -48,8 +51,53 @@ const Login = () => {
     const baseURL = api.defaults.baseURL || 'http://localhost:5000/api';
     const authUrl = `${baseURL}/auth/google?scope=email%20profile`;
 
-    // Open in same tab
-    window.location.href = authUrl;
+    // Calculate center position for the popup
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    const popup = window.open(
+      authUrl,
+      'google-login',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    const handleMessage = async (event) => {
+      // Verify origin if needed, but for now we accept from self/subdomains
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+        const { token } = event.data;
+        if (token) {
+          authService.setSession(token);
+          setLoading(true);
+
+          try {
+            // Fetch user details since we only got the token
+            await dispatch(fetchMe()).unwrap();
+            navigate('/');
+          } catch (err) {
+            console.error('Failed to fetch user details:', err);
+            setError('Authentication successful but failed to load user data');
+          } finally {
+            setLoading(false);
+          }
+        }
+        window.removeEventListener('message', handleMessage);
+      } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
+        setError(event.data.error || 'Google authentication failed');
+        window.removeEventListener('message', handleMessage);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Clean up listener if popup is closed manually (optional polling)
+    const timer = setInterval(() => {
+      if (popup && popup.closed) {
+        clearInterval(timer);
+        window.removeEventListener('message', handleMessage);
+      }
+    }, 1000);
   };
 
   return (

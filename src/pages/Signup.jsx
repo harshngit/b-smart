@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import api from '../lib/api';
+import authService from '../services/authService';
 import { setUser } from '../store/authSlice';
 import { ArrowLeft, User, Mail, Phone, Lock, Sparkles } from 'lucide-react';
 
@@ -46,7 +47,7 @@ const Signup = () => {
       });
 
       const { token, user } = response.data;
-      localStorage.setItem('token', token);
+      authService.setSession(token);
       dispatch(setUser(user));
       navigate('/');
     } catch (err) {
@@ -60,8 +61,51 @@ const Signup = () => {
     const baseURL = api.defaults.baseURL || 'http://localhost:5000/api';
     const authUrl = `${baseURL}/auth/google?scope=email%20profile`;
 
-    // Open in same tab
-    window.location.href = authUrl;
+    // Calculate center position for the popup
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    const popup = window.open(
+      authUrl,
+      'google-login',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    const handleMessage = async (event) => {
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+        const { token } = event.data;
+        if (token) {
+          authService.setSession(token);
+          setLoading(true);
+
+          try {
+            const response = await api.get('/auth/me');
+            dispatch(setUser(response.data));
+            navigate('/');
+          } catch (err) {
+            console.error('Failed to fetch user details:', err);
+            setError('Authentication successful but failed to load user data');
+          } finally {
+            setLoading(false);
+          }
+        }
+        window.removeEventListener('message', handleMessage);
+      } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
+        setError(event.data.error || 'Google authentication failed');
+        window.removeEventListener('message', handleMessage);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    const timer = setInterval(() => {
+      if (popup && popup.closed) {
+        clearInterval(timer);
+        window.removeEventListener('message', handleMessage);
+      }
+    }, 1000);
   };
 
   return (

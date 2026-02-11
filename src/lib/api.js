@@ -28,10 +28,8 @@ api.interceptors.response.use(
 	(error) => {
 		if (error.response && error.response.status === 401) {
 			// Handle unauthorized access (e.g., clear token and redirect to login)
-			// We can't use useNavigate here directly as it's outside a component
-			// But we can clear the token
-			// localStorage.removeItem('token');
-			// window.location.href = '/login'; // Force redirect if needed
+			localStorage.removeItem('token');
+			window.location.href = '/login'; // Force redirect
 		}
 		return Promise.reject(error);
 	}

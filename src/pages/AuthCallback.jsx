@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { setUser, setLoading } from '../store/authSlice';
 import api from '../lib/api';
+import authService from '../services/authService';
 
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
@@ -14,8 +15,15 @@ const AuthCallback = () => {
 
     const handleCallback = async () => {
       if (token) {
-        localStorage.setItem('token', token);
-        
+        // If inside a popup, send token to opener
+        if (window.opener) {
+          window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', token }, '*');
+          window.close();
+          return;
+        }
+
+        authService.setSession(token);
+
         try {
           const response = await api.get('/auth/me');
           dispatch(setUser(response.data));
@@ -25,7 +33,14 @@ const AuthCallback = () => {
           navigate('/login', { state: { message: 'Authentication failed' } });
         }
       } else {
-        navigate('/login', { state: { message: 'No token received' } });
+        // Handle error param if present
+        const error = searchParams.get('error');
+        if (window.opener) {
+          window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', error }, '*');
+          window.close();
+          return;
+        }
+        navigate('/login', { state: { message: error || 'No token received' } });
       }
       dispatch(setLoading(false));
     };
