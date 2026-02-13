@@ -3,6 +3,7 @@ import { Settings, Video, Menu, Grid, Bookmark, Plus, Heart, MessageCircle, Wall
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
+import api from '../lib/api';
 import PostDetailModal from '../components/PostDetailModal';
 
 const Profile = () => {
@@ -27,16 +28,19 @@ const Profile = () => {
                 setProfileUser(currentUser);
             } else {
                 try {
-                    const { data, error } = await supabase
-                        .from('users')
-                        .select('*')
-                        .eq('id', userId)
-                        .single();
-
-                    if (error) throw error;
-                    setProfileUser(data);
+                    const response = await api.get(`/users/${userId}`);
+                    setProfileUser(response.data);
                 } catch (error) {
                     console.error('Error fetching user profile:', error);
+                    // Fallback to Supabase if API fails (optional, but good for stability)
+                    try {
+                        const { data, error: supError } = await supabase
+                            .from('users')
+                            .select('*')
+                            .eq('id', userId)
+                            .single();
+                        if (!supError && data) setProfileUser(data);
+                    } catch (e) { console.error(e); }
                 }
             }
         };
@@ -57,16 +61,20 @@ const Profile = () => {
             if (profileUser?.id) {
                 try {
                     setLoadingPosts(true);
-                    const { data, error } = await supabase
-                        .from('posts')
-                        .select('*')
-                        .eq('user_id', profileUser.id)
-                        .order('created_at', { ascending: false });
-
-                    if (error) throw error;
-                    setUserPosts(data || []);
+                    // Use API to fetch user posts
+                    const response = await api.get(`/users/${profileUser.id}/posts`);
+                    setUserPosts(response.data || []);
                 } catch (error) {
                     console.error('Error fetching posts:', error);
+                    // Fallback to Supabase
+                    try {
+                        const { data, error: supError } = await supabase
+                            .from('posts')
+                            .select('*')
+                            .eq('user_id', profileUser.id)
+                            .order('created_at', { ascending: false });
+                        if (!supError) setUserPosts(data || []);
+                    } catch (e) { console.error(e); }
                 } finally {
                     setLoadingPosts(false);
                 }
@@ -143,7 +151,7 @@ const Profile = () => {
                                             className="w-full h-full object-cover"
                                         />
                                     ) : (
-                                        <div className="w-full h-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-2xl font-bold text-gray-500 dark:text-gray-400">
+                                        <div className="w-full h-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-2xl font-bold text-white">
                                             {getInitials(profileUser.full_name)}
                                         </div>
                                     )}
@@ -192,7 +200,7 @@ const Profile = () => {
                             </>
                         ) : (
                             <>
-                                <button className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold py-1.5 rounded-md">
+                                <button className="flex-1 bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink hover:opacity-90 text-white text-sm font-semibold py-1.5 rounded-md transition-opacity">
                                     Follow
                                 </button>
                                 <button className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-md">
@@ -298,7 +306,7 @@ const Profile = () => {
                                 {profileUser.avatar_url ? (
                                     <img src={profileUser.avatar_url} className="w-full h-full rounded-full object-cover" alt="Profile" />
                                 ) : (
-                                    <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-5xl font-bold text-gray-500 dark:text-gray-400">
+                                    <div className="w-full h-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-5xl font-bold text-white">
                                         {getInitials(profileUser.full_name || profileUser.username)}
                                     </div>
                                 )}
@@ -347,7 +355,7 @@ const Profile = () => {
                                 </>
                             ) : (
                                 <>
-                                    <button className="px-6 py-1.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg text-sm transition-colors min-w-[120px]">
+                                    <button className="px-6 py-1.5 bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink hover:opacity-90 text-white font-semibold rounded-lg text-sm transition-opacity min-w-[120px]">
                                         Follow
                                     </button>
                                     <button className="px-6 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors min-w-[120px]">

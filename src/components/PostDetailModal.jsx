@@ -1,9 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { X, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Smile, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Smile, ChevronLeft, ChevronRight, Trash2, Edit } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSelector } from 'react-redux';
 import api from '../lib/api';
 import commentService from '../services/commentService';
+
+const DeleteModal = ({ isOpen, onClose, onConfirm, isDeleting }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 transform transition-all scale-100">
+                {isDeleting ? (
+                    <div className="flex flex-col items-center justify-center py-8">
+                        <div className="animate-spin w-12 h-12 border-4 border-gray-200 border-t-red-500 rounded-full mb-4"></div>
+                        <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse">Deleting post...</p>
+                    </div>
+                ) : (
+                    <>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Delete Post?</h3>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
+                            Are you sure you want to delete this post? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={onConfirm}
+                                className="flex-1 px-4 py-2.5 rounded-lg bg-red-500 text-white font-medium hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
     const { userObject } = useSelector((state) => state.auth);
@@ -18,6 +55,15 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
     const [likeCount, setLikeCount] = useState(0);
     const [postUser, setPostUser] = useState(null);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [showOptions, setShowOptions] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Check if current user is the post owner
+    const isPostOwner = userObject && post && (
+        (userObject.id && (post.user_id || post.user?.id) && String(userObject.id) === String(post.user_id || post.user?.id)) ||
+        (userObject._id && (post.user_id || post.user?._id) && String(userObject._id) === String(post.user_id || post.user?._id))
+    );
 
     useEffect(() => {
         if (isOpen && initialPost) {
@@ -244,6 +290,26 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
         }
     };
 
+    const handleDeletePost = async () => {
+        setIsDeleting(true);
+        try {
+            const id = post._id || post.id;
+            const token = localStorage.getItem('token');
+            await api.delete(`/posts/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            // Wait a bit
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            onClose(); // Close modal
+            window.location.reload(); // Refresh to update list
+        } catch (error) {
+            console.error('Error deleting post:', error);
+            alert('Failed to delete post');
+            setIsDeleting(false);
+            setShowDeleteModal(false);
+        }
+    };
+
     if (!isOpen || !post) return null;
 
     // Format date relative (simple version)
@@ -262,6 +328,16 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
         return `${Math.floor(diffInSeconds / 604800)}w`;
     };
 
+    const handleDeleteComment = async (commentId) => {
+        if (!window.confirm('Are you sure you want to delete this comment?')) return;
+        try {
+            await api.delete(`/comments/${commentId}`);
+            await fetchComments();
+        } catch (error) {
+            console.error('Error deleting comment:', error);
+        }
+    };
+
     const renderComment = (comment, isReply = false) => {
         const commentId = comment._id || comment.id;
         const user = comment.user || comment.users;
@@ -278,6 +354,11 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
 
         // Check for replies
         const hasReplies = comment.reply_count > 0 || (replies[commentId] && replies[commentId].length > 0) || (comment.replies && comment.replies.length > 0);
+
+        const isOwner = userId && (
+            (user && (String(user._id) === String(userId) || String(user.id) === String(userId))) ||
+            (comment.user_id && String(comment.user_id) === String(userId))
+        );
 
         return (
             <div key={commentId} className={`flex gap-3 mb-4 ${isReply ? 'ml-12' : ''}`}>
@@ -310,12 +391,23 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                                 </button>
                             </div>
                         </div>
-                        <button
-                            onClick={() => handleLikeComment(commentId, isLikedByMe)}
-                            className={`${isLikedByMe ? 'text-red-500' : 'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400'} transition-colors flex items-center gap-1`}
-                        >
-                            <Heart size={12} fill={isLikedByMe ? "currentColor" : "none"} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => handleLikeComment(commentId, isLikedByMe)}
+                                className={`${isLikedByMe ? 'text-red-500' : 'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400'} transition-colors flex items-center gap-1`}
+                            >
+                                <Heart size={12} fill={isLikedByMe ? "currentColor" : "none"} />
+                            </button>
+                            {isOwner && (
+                                <button
+                                    onClick={() => handleDeleteComment(commentId)}
+                                    className="text-gray-400 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                    title="Delete comment"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* View Replies Button */}
@@ -441,7 +533,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                                             className="w-full h-full rounded-full object-cover"
                                         />
                                     ) : (
-                                        <div className="w-full h-full rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-700 dark:text-gray-300">
+                                        <div className="w-full h-full rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-xs font-bold text-white">
                                             {postUser?.username ? postUser.username.charAt(0).toUpperCase() : 'U'}
                                         </div>
                                     )}
@@ -456,10 +548,49 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                                 )}
                             </div>
                         </div>
-                        <button className="text-gray-900 dark:text-white hover:opacity-50">
-                            <MoreHorizontal size={20} />
-                        </button>
+                        <div className="relative">
+                            {isPostOwner && (
+                                <button
+                                    onClick={() => setShowOptions(!showOptions)}
+                                    className="text-gray-900 dark:text-white hover:opacity-50 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    <MoreHorizontal size={20} />
+                                </button>
+                            )}
+
+                            {showOptions && isPostOwner && (
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50 animate-fade-in">
+                                    <button
+                                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors"
+                                        onClick={() => {
+                                            setShowOptions(false);
+                                            alert('Edit functionality coming soon');
+                                        }}
+                                    >
+                                        <Edit size={16} />
+                                        <span>Edit Post</span>
+                                    </button>
+                                    <button
+                                        className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors border-t border-gray-50 dark:border-gray-800"
+                                        onClick={() => {
+                                            setShowOptions(false);
+                                            setShowDeleteModal(true);
+                                        }}
+                                    >
+                                        <Trash2 size={16} />
+                                        <span>Delete Post</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
+
+                    <DeleteModal
+                        isOpen={showDeleteModal}
+                        onClose={() => setShowDeleteModal(false)}
+                        onConfirm={handleDeletePost}
+                        isDeleting={isDeleting}
+                    />
 
                     {/* Comments & Caption Scroll Area */}
                     <div className="flex-1 overflow-y-auto p-3 md:p-4 scrollbar-hide">
@@ -474,7 +605,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                                             className="w-full h-full rounded-full object-cover"
                                         />
                                     ) : (
-                                        <div className="w-full h-full rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-700 dark:text-gray-300">
+                                        <div className="w-full h-full rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-xs font-bold text-white">
                                             {postUser?.username ? postUser.username.charAt(0).toUpperCase() : 'U'}
                                         </div>
                                     )}

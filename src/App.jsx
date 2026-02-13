@@ -16,6 +16,7 @@ import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyOtp from './pages/VerifyOtp';
 import EditProfile from './pages/EditProfile';
+import WalletDetails from './pages/WalletDetails';
 import MobilePostDetail from './pages/MobilePostDetail';
 import AuthCallback from './pages/AuthCallback';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -63,6 +64,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/:userId" element={<Profile />} />
           <Route path="/edit-profile" element={<EditProfile />} />
+          <Route path="/wallet" element={<WalletDetails />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
 
