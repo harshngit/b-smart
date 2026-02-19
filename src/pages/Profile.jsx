@@ -49,8 +49,9 @@ const Profile = () => {
     }, [userId, currentUser, isOwnProfile]);
 
     const handlePostClick = (post) => {
-        if (window.innerWidth < 768) {
-            navigate(`/post/${post.id}`);
+        const id = post._id || post.id;
+        if (window.innerWidth < 768 && id) {
+            navigate(`/post/${id}`);
         } else {
             setSelectedPost(post);
         }
@@ -283,7 +284,7 @@ const Profile = () => {
                                 onClick={() => handlePostClick(post)}
                             >
                                 <img
-                                    src={post.media?.[0]?.image || 'https://via.placeholder.com/300'}
+                                    src={post.media?.[0]?.fileUrl || post.media?.[0]?.image || 'https://via.placeholder.com/300'}
                                     alt="Post"
                                     className="w-full h-full object-cover"
                                 />
@@ -437,12 +438,12 @@ const Profile = () => {
                     ) : (
                         userPosts.map((post) => (
                             <div
-                                key={post.id}
+                                key={post._id || post.id}
                                 className="aspect-square bg-gray-100 dark:bg-gray-900 relative group cursor-pointer overflow-hidden"
                                 onClick={() => handlePostClick(post)}
                             >
                                 <img
-                                    src={post.media?.[0]?.image || 'https://via.placeholder.com/300'}
+                                    src={post.media?.[0]?.fileUrl || post.media?.[0]?.image || 'https://via.placeholder.com/300'}
                                     alt="Post"
                                     className="w-full h-full object-cover"
                                 />
