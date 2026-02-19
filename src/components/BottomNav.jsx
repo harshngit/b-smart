@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Home, Target, Clapperboard, Plus, Megaphone, Image, Video } from 'lucide-react';
 
 const BottomNav = ({ onOpenCreateModal }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  // userObject is available if needed, but we are following the 5-icon layout request
-  // const { userObject } = useSelector((state) => state.auth);
+  const navigate = useNavigate();
+  const { userObject } = useSelector((state) => state.auth);
+  const [showVendorNotValidated, setShowVendorNotValidated] = useState(false);
 
   const isActive = (path) => location.pathname === path;
 
@@ -20,6 +21,17 @@ const BottomNav = ({ onOpenCreateModal }) => {
   };
 
   const handleOptionClick = (type) => {
+    if (type === 'ad') {
+      if (userObject?.role === 'vendor') {
+        if (!userObject.vendor_validated) {
+          setShowVendorNotValidated(true);
+        } else {
+          navigate('/ads');
+        }
+      }
+      setIsMenuOpen(false);
+      return;
+    }
     onOpenCreateModal(type);
     setIsMenuOpen(false);
   };
@@ -53,6 +65,18 @@ const BottomNav = ({ onOpenCreateModal }) => {
               <Video size={20} className="text-pink-600" />
               <span className="font-semibold text-gray-700 dark:text-gray-200">Upload Reel</span>
             </button>
+            {userObject?.role === 'vendor' && (
+              <>
+                <div className="h-px bg-gray-100 dark:bg-gray-700 mx-2" />
+                <button
+                  onClick={() => handleOptionClick('ad')}
+                  className="flex items-center gap-3 w-full p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors text-left"
+                >
+                  <Megaphone size={20} className="text-blue-600" />
+                  <span className="font-semibold text-gray-700 dark:text-gray-200">Upload Ad</span>
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -75,6 +99,26 @@ const BottomNav = ({ onOpenCreateModal }) => {
       <Link to="/reels" className={`${isActive('/reels') ? activeColor : inactiveColor}`}>
         <Clapperboard size={28} strokeWidth={isActive('/reels') ? 2.5 : 2} />
       </Link>
+      {showVendorNotValidated && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">
+              Vendor verification pending
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
+              Your vendor account is not yet validated. Please refresh this page or wait 2–3 working days for verification before uploading ads.
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowVendorNotValidated(false)}
+                className="px-4 py-2.5 rounded-lg bg-insta-pink text-white font-medium hover:bg-insta-purple transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
