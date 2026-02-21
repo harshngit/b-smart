@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import api from '../lib/api';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, MapPin, UserPlus, ChevronDown, ChevronUp, Smile, Sun, Moon, Droplet, Thermometer, Cloud, Circle, Sliders } from 'lucide-react';
@@ -117,7 +117,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [showZoomSlider, setShowZoomSlider] = useState(false);
   const [showMultiSelect, setShowMultiSelect] = useState(false);
   const [activeTab, setActiveTab] = useState('filters'); // 'filters', 'adjustments'
-  const [activeAdjustment, setActiveAdjustment] = useState(null);
 
   const ADJUSTMENT_ICONS = {
     'Brightness': Sun,
@@ -168,38 +167,67 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
 
     const newMedia = await Promise.all(validFiles.map(async (file) => {
       const url = URL.createObjectURL(file);
-      let aspect = 1;
-      let originalAspect = null;
-
       if (file.type.startsWith('image/')) {
+        let aspect = 1;
+        let originalAspect = null;
         try {
           const img = await createImage(url);
           originalAspect = img.width / img.height;
           aspect = originalAspect;
-        } catch (e) {
-          console.error("Error loading image dimensions", e);
+        } catch {
+          aspect = 1;
+          originalAspect = null;
         }
+        return {
+          id: Math.random().toString(36).substr(2, 9),
+          url,
+          type: 'image',
+          crop: { x: 0, y: 0 },
+          zoom: 1,
+          aspect,
+          originalAspect,
+          croppedAreaPixels: null,
+          filter: 'Original',
+          adjustments: {
+            brightness: 0,
+            contrast: 0,
+            saturate: 0,
+            sepia: 0,
+            opacity: 0,
+            vignette: 0
+          }
+        };
+      } else {
+        const video = document.createElement('video');
+        video.src = url;
+        await new Promise((resolve) => {
+          video.onloadedmetadata = resolve;
+        });
+        const originalAspect = (video.videoWidth && video.videoHeight) ? (video.videoWidth / video.videoHeight) : 1;
+        const duration = isFinite(video.duration) ? video.duration : 0;
+        return {
+          id: Math.random().toString(36).substr(2, 9),
+          url,
+          type: 'video',
+          crop: { x: 0, y: 0 },
+          zoom: 1,
+          aspect: originalAspect || 1,
+          originalAspect: originalAspect || 1,
+          duration,
+          coverUrl: null,
+          thumbnails: null,
+          croppedAreaPixels: null,
+          filter: 'Original',
+          adjustments: {
+            brightness: 0,
+            contrast: 0,
+            saturate: 0,
+            sepia: 0,
+            opacity: 0,
+            vignette: 0
+          }
+        };
       }
-
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        url,
-        type: file.type.startsWith('image/') ? 'image' : 'video',
-        crop: { x: 0, y: 0 },
-        zoom: 1,
-        aspect,
-        originalAspect,
-        croppedAreaPixels: null,
-        filter: 'Original',
-        adjustments: {
-          brightness: 0,
-          contrast: 0,
-          saturate: 0,
-          sepia: 0,
-          opacity: 0,
-          vignette: 0
-        }
-      };
     }));
 
     if (step === 'select') {
@@ -265,18 +293,26 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
 
   const handleNextStep = async () => {
     if (step === 'crop') {
-      // Generate cropped images
-      const newMedia = await Promise.all(media.map(async (item) => {
-        try {
-          const croppedUrl = await getCroppedImg(item.url, item.croppedAreaPixels);
-          return { ...item, croppedUrl };
-        } catch (e) {
-          console.error("Crop error", e);
-          return { ...item, croppedUrl: item.url };
-        }
-      }));
-      setMedia(newMedia);
-      setStep('edit');
+      if (media.some(m => m.type === 'video')) {
+        setStep('cover');
+      } else {
+        const newMedia = await Promise.all(media.map(async (item) => {
+          try {
+            const croppedUrl = await getCroppedImg(item.url, item.croppedAreaPixels);
+            return { ...item, croppedUrl };
+          } catch {
+            return { ...item, croppedUrl: item.url };
+          }
+        }));
+        setMedia(newMedia);
+        setStep('edit');
+      }
+    } else if (step === 'cover') {
+      if (postType === 'reel') {
+        setStep('share');
+      } else {
+        setStep('edit');
+      }
     } else if (step === 'edit') {
       setStep('share');
     } else if (step === 'share') {
@@ -539,6 +575,47 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
     });
   };
 
+  const formatDuration = (d) => {
+    if (!d || !isFinite(d)) return '00:00';
+    const m = Math.floor(d / 60);
+    const s = Math.floor(d % 60);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    if (step !== 'cover') return;
+    const item = currentMedia;
+    if (!item || item.type !== 'video') return;
+    if (item.thumbnails && Array.isArray(item.thumbnails)) return;
+    const v = document.createElement('video');
+    v.crossOrigin = 'anonymous';
+    v.src = item.croppedUrl || item.url;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const run = async () => {
+      await new Promise(res => { v.onloadedmetadata = res; });
+      const duration = isFinite(v.duration) ? v.duration : 0;
+      const frames = [];
+      const count = 8;
+      const width = 240;
+      const height = 240;
+      canvas.width = width;
+      canvas.height = height;
+      for (let i = 0; i < count; i++) {
+        const t = duration > 0 ? (i * duration) / (count - 1) : 0;
+        await new Promise(res => {
+          v.currentTime = t;
+          v.onseeked = res;
+        });
+        ctx.drawImage(v, 0, 0, width, height);
+        const url = canvas.toDataURL('image/jpeg', 0.9);
+        frames.push(url);
+      }
+      updateCurrentMedia({ thumbnails: frames, coverUrl: frames[0] });
+    };
+    run();
+  }, [step, currentMedia, updateCurrentMedia]);
+
   if (!isOpen) return null;
 
   return (
@@ -574,7 +651,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                   <ArrowLeft size={24} />
                 </button>
               </div>
-              <h2 className="font-semibold text-base text-center dark:text-white flex-1">{step === 'crop' ? 'Crop' : step === 'edit' ? 'Edit' : 'Create new post'}</h2>
+              <h2 className="font-semibold text-base text-center dark:text-white flex-1">{step === 'crop' ? 'Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Edit' : 'Create new post'}</h2>
               <div className="w-20 flex justify-end">
                 <button onClick={handleNextStep} className="text-[#0095f6] hover:text-[#00376b] dark:hover:text-blue-400 font-semibold text-sm transition-colors">
                   {step === 'share' ? 'Share' : 'Next'}
@@ -614,33 +691,54 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           <div className="flex-1 bg-[#f0f0f0] dark:bg-[#121212] relative flex items-center justify-center overflow-hidden">
             {currentMedia && (
               <div className="relative w-full h-full">
-                <Cropper
-                  image={currentMedia.url}
-                  crop={currentMedia.crop}
-                  zoom={currentMedia.zoom}
-                  aspect={currentMedia.aspect || 1}
-                  onCropChange={onCropChange}
-                  onCropComplete={onCropComplete}
-                  onZoomChange={onZoomChange}
-                  onMediaLoaded={(mediaSize) => {
-                    const { naturalWidth, naturalHeight } = mediaSize;
-                    if (naturalWidth && naturalHeight) {
-                      const originalAspect = naturalWidth / naturalHeight;
-                      if (!currentMedia.originalAspect || Math.abs(currentMedia.originalAspect - originalAspect) > 0.01) {
-                        updateCurrentMedia({
-                          originalAspect,
-                          aspect: (!currentMedia.originalAspect && currentMedia.aspect === 1) ? originalAspect : currentMedia.aspect
-                        });
+                {currentMedia.type === 'video' ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="relative max-w-full max-h-full">
+                      <video
+                        src={currentMedia.url}
+                        className="object-contain"
+                        style={{ transform: `scale(${currentMedia.zoom || 1})` }}
+                        controls
+                        autoPlay
+                        loop
+                        muted
+                      />
+                      {currentMedia.duration !== undefined && (
+                        <div className="absolute bottom-3 left-3 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                          {formatDuration(currentMedia.duration)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <Cropper
+                    image={currentMedia.url}
+                    crop={currentMedia.crop}
+                    zoom={currentMedia.zoom}
+                    aspect={currentMedia.aspect || 1}
+                    onCropChange={onCropChange}
+                    onCropComplete={onCropComplete}
+                    onZoomChange={onZoomChange}
+                    onMediaLoaded={(mediaSize) => {
+                      const { naturalWidth, naturalHeight } = mediaSize;
+                      if (naturalWidth && naturalHeight) {
+                        const originalAspect = naturalWidth / naturalHeight;
+                        if (!currentMedia.originalAspect || Math.abs(currentMedia.originalAspect - originalAspect) > 0.01) {
+                          updateCurrentMedia({
+                            originalAspect,
+                            aspect: (!currentMedia.originalAspect && currentMedia.aspect === 1) ? originalAspect : currentMedia.aspect
+                          });
+                        }
                       }
-                    }
-                  }}
-                  objectFit="contain"
-                  showGrid={false}
-                  style={{
-                    containerStyle: { background: 'transparent' },
-                    cropAreaStyle: { border: '1px solid rgba(255, 255, 255, 0.5)' }
-                  }}
-                />
+                    }}
+                    objectFit="contain"
+                    showGrid={false}
+                    style={{
+                      containerStyle: { background: 'transparent' },
+                      cropAreaStyle: { border: '1px solid rgba(255, 255, 255, 0.5)' }
+                    }}
+                  />
+                )}
               </div>
             )}
             {/* ... Navigation Arrows & Controls (omitted for brevity, assume same as before but keeping concise here) ... */}
@@ -691,6 +789,43 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                   </div>
                 )}
                 <button onClick={() => { setShowMultiSelect(!showMultiSelect); setShowRatioMenu(false); setShowZoomSlider(false); }} className={`w-8 h-8 rounded-full ${showMultiSelect ? 'bg-white text-black' : 'bg-black/70 text-white'} hover:bg-white hover:text-black flex items-center justify-center transition-colors`}><Copy size={16} /></button>
+              </div>
+            </div>
+          </div>
+        ) : step === 'cover' ? (
+          <div className="flex-1 flex lg:flex-row flex-col lg:overflow-hidden overflow-y-auto">
+            <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center w-full flex-1 h-auto">
+              {currentMedia && currentMedia.type === 'video' && (
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <img
+                    src={currentMedia.coverUrl || (currentMedia.thumbnails && currentMedia.thumbnails[0]) || ''}
+                    className="max-w-full max-h-full object-contain"
+                    alt=""
+                  />
+                  {currentMedia.duration !== undefined && (
+                    <div className="absolute bottom-3 left-3 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                      {formatDuration(currentMedia.duration)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="bg-white dark:bg-black border-l border-gray-200 dark:border-gray-800 flex flex-col lg:w-[340px] w-full min-w-[340px] flex-none">
+              <div className="p-4">
+                <div className="grid grid-cols-3 gap-3">
+                  {(currentMedia?.thumbnails || []).map((thumb, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => updateCurrentMedia({ coverUrl: thumb })}
+                      className={`relative w-full aspect-square rounded overflow-hidden border-2 ${currentMedia.coverUrl === thumb ? 'border-[#0095f6]' : 'border-transparent'}`}
+                    >
+                      <img src={thumb} className="w-full h-full object-cover" alt="" />
+                    </button>
+                  ))}
+                </div>
+                {!currentMedia?.thumbnails && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">Generating thumbnails...</div>
+                )}
               </div>
             </div>
           </div>

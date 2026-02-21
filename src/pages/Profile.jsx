@@ -464,7 +464,7 @@ const Profile = () => {
                         </div>
                         <div className="flex flex-col">
                             <span className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Balance</span>
-                            <span className="text-base font-bold text-gray-900 dark:text-white">{currentUser?.wallet?.currency || '$'} {currentUser?.wallet?.balance || '0.00'}</span>
+                            <span className="text-base font-bold text-gray-900 dark:text-white">Coins {currentUser?.wallet?.balance ? Math.floor(Number(currentUser.wallet.balance)) : 0}</span>
                         </div>
                     </div>
                 </div>

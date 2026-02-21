@@ -24,7 +24,7 @@ const TopBar = () => {
           </div>
           <div className="flex flex-col items-start justify-center h-full">
             <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium leading-none mb-0.5">Balance</span>
-            <span className="text-xs font-bold text-gray-900 dark:text-white leading-none">Coins 1,250</span>
+            <span className="text-xs font-bold text-gray-900 dark:text-white leading-none">Coins {userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0}</span>
           </div>
         </Link>
 
