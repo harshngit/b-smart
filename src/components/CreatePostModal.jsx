@@ -114,6 +114,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [showVendorNotValidated, setShowVendorNotValidated] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [isLoadingAllUsers, setIsLoadingAllUsers] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const POPULAR_EMOJIS = ['😂', '😮', '😍', '😢', '👏', '🔥', '🎉', '💯', '❤️', '🤣', '🥰', '😘', '😭', '😊'];
 
@@ -496,23 +497,21 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
 
           const filterCss = `${baseFilter} ${brightness} ${contrast} ${saturate} ${sepia} ${hue}`.trim();
 
-          // Upload thumbnails (video only)
+          // Upload selected thumbnail only (video)
           let uploadedThumbs = null;
           let thumbnailTime = 0;
           if (item.type === 'video') {
             const thumbs = item.thumbnails || [];
-            if (thumbs.length > 0) {
+            const cover = item.coverUrl;
+            if (cover) {
               const thumbForm = new FormData();
-              // append all thumbnails as 'files'
-              for (let i = 0; i < thumbs.length; i++) {
-                const url = thumbs[i];
-                const imgBlob = await (async () => {
-                  const img = await fetch(url);
-                  return await img.blob();
-                })();
-                const tFile = new File([imgBlob], `thumb_${i}_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                thumbForm.append('files', tFile);
-              }
+              const imgBlob = await (async () => {
+                const img = await fetch(cover);
+                return await img.blob();
+              })();
+              const tFile = new File([imgBlob], `thumb_${Date.now()}.jpg`, { type: 'image/jpeg' });
+              // API supports single file param
+              thumbForm.append('file', tFile);
               try {
                 const thumbRes = await api.post('https://bsmart.asynk.store/api/upload/thumbnail', thumbForm, {
                   headers: { 'Content-Type': 'multipart/form-data' }
@@ -522,7 +521,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                 uploadedThumbs = null;
               }
               const count = thumbs.length;
-              const idx = Math.max(0, thumbs.findIndex(t => t === item.coverUrl));
+              const idx = Math.max(0, thumbs.findIndex(t => t === cover));
               const dur = item.duration || 0;
               thumbnailTime = (count > 1 && dur > 0) ? (idx * dur) / (count - 1) : 0;
             }
@@ -587,6 +586,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             turn_off_commenting: turnOffCommenting
           };
           await api.post('https://bsmart.asynk.store/api/posts/reels', payload);
+          setShowSuccess(true);
         } else {
           const payload = {
             caption,
@@ -606,14 +606,14 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           await api.post('/posts', payload);
         }
 
-        handleClose();
-        // clear state
-        setMedia([]);
-        setCaption('');
-        setLocation('');
-        setTags([]);
-        // Optional: Trigger a feed refresh or show success toast
-        alert("Post shared successfully!");
+        if (!showSuccess) {
+          handleClose();
+          setMedia([]);
+          setCaption('');
+          setLocation('');
+          setTags([]);
+          alert("Post shared successfully!");
+        }
 
       } catch (error) {
         console.error("Error creating post:", error);
@@ -1090,7 +1090,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             </div>
           </div>
         ) : step === 'cover' ? (
-          <div className="flex-1 flex lg:flex-row flex-col lg:overflow-hidden overflow-y-auto">
+          <div className="flex-1 flex lg:flex-row flex-col lg:overflow-hidden overflow-y-auto overflow-x-hidden">
             <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center w-full flex-1 h-auto">
               {currentMedia && currentMedia.type === 'video' && (
                 <div className="relative w-full h-full flex items-center justify-center">
@@ -1131,7 +1131,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           </div>
         ) : step === 'edit' ? (
           /* EDIT STEP */
-          <div className="flex-1 flex lg:flex-row flex-col lg:overflow-hidden overflow-y-auto">
+          <div className="flex-1 flex lg:flex-row flex-col lg:overflow-hidden overflow-y-auto overflow-x-hidden">
             {/* Left: Image Preview */}
             <div ref={editContainerRef} className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center w-full flex-1 h-auto">
               {currentMedia && (
@@ -1408,7 +1408,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           </div>
         ) : (
           /* SHARE STEP */
-          <div className="flex-1 flex flex-col md:flex-row lg:overflow-hidden overflow-y-auto">
+          <div className="flex-1 flex flex-col md:flex-row lg:overflow-hidden overflow-y-auto overflow-x-hidden">
             {/* Left: Final Image Preview */}
             <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center select-none w-full h-auto md:flex-[2]">
               {currentMedia && (
@@ -1418,7 +1418,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                       <video
                         src={currentMedia.croppedUrl || currentMedia.url}
                         className="w-full h-full object-cover"
-                        controls
+                        controls={false}
                         autoPlay
                         muted={!currentMedia.soundOn}
                         onLoadedMetadata={(e) => {
@@ -1428,7 +1428,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                           const v = e.currentTarget;
                           const end = currentMedia.trimEnd || 0;
                           if (end > 0 && v.currentTime > end) {
-                            v.currentTime = currentMedia.trimStart || 0;
+                            v.pause();
+                            v.currentTime = end;
                           }
                         }}
                       />
@@ -1581,7 +1582,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                 <div
                   className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900"
                   onClick={() => {
-                    setTagCoordinates({ x: 50, y: 50 });
+                    setTagCoordinates({ x: 85, y: 85 });
                     setShowTagSearch(true);
                     setSearchQuery('');
                     fetchUsers('');
@@ -1602,7 +1603,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                         key={u.id}
                         className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 rounded-md px-2 py-1"
                         onClick={() => {
-                          setTagCoordinates({ x: 50, y: 50 });
+                          setTagCoordinates({ x: 85, y: 85 });
                           handleTagUser(u);
                         }}
                       >
@@ -1694,6 +1695,29 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                 className="px-4 py-2.5 rounded-lg bg-insta-pink text-white font-medium hover:bg-insta-purple transition-colors"
               >
                 OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showSuccess && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">
+              Reel uploaded successfully
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
+              Your reel has been created. You can close this window or continue editing.
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => {
+                  setShowSuccess(false);
+                  handleClose();
+                }}
+                className="px-4 py-2.5 rounded-lg bg-insta-pink text-white font-medium hover:bg-insta-purple transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>
