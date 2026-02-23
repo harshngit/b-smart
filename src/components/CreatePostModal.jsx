@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, MapPin, UserPlus, ChevronDown, ChevronUp, Smile, Sun, Moon, Droplet, Thermometer, Cloud, Circle, Sliders, Megaphone } from 'lucide-react';
+import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
 // Filter Definitions
@@ -96,7 +96,9 @@ async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParam
     document.body.appendChild(video);
 
     const cleanup = () => {
-      try { document.body.removeChild(video); } catch {}
+      try { document.body.removeChild(video); } catch (err) {
+        console.warn('Video element cleanup failed', err);
+      }
       URL.revokeObjectURL(objectUrl);
     };
 
@@ -208,6 +210,37 @@ async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParam
   });
 }
 
+// SuccessCountdown — thin line depletes over 5s then auto-navigates
+function SuccessCountdown({ onDone }) {
+  const [elapsed, setElapsed] = React.useState(0);
+  const TOTAL = 5000; // ms
+  const STEP  = 50;
+  const onDoneRef = React.useRef(onDone);
+  React.useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
+  React.useEffect(() => {
+    if (elapsed >= TOTAL) { onDoneRef.current(); return; }
+    const t = setTimeout(() => setElapsed(e => e + STEP), STEP);
+    return () => clearTimeout(t);
+  }, [elapsed]);
+  const progress = Math.min(1, elapsed / TOTAL); // 0→1
+  return (
+    <div className="flex flex-col items-center gap-2 w-full">
+      {/* Thin depleting bar */}
+      <div className="w-full h-0.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${(1 - progress) * 100}%`,
+            background: 'linear-gradient(90deg,#feda75,#fa7e1e,#d62976,#962fbf)',
+            transition: `width ${STEP}ms linear`
+          }}
+        />
+      </div>
+      <p className="text-xs text-white/40">Redirecting to home…</p>
+    </div>
+  );
+}
+
 const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
@@ -236,7 +269,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [tags, setTags] = useState([]); // { id, x, y, user: { id, username, avatar_url } }
   const [showTagSearch, setShowTagSearch] = useState(false);
-  const [tagCoordinates, setTagCoordinates] = useState({ x: 0, y: 0 });
+  // tagCoordinates removed — tags now always spawn at center (50,50)
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
@@ -249,6 +282,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [uploadStage, setUploadStage] = useState('idle'); // 'idle' | 'converting' | 'uploading' | 'posting' | 'done' | 'error'
   const [uploadProgress, setUploadProgress] = useState(0); // 0-100
   const [uploadError, setUploadError] = useState('');
+  // Dragging tag state
+  const [draggingTagId, setDraggingTagId] = useState(null);
+  // dragOffset removed — not needed
 
   const POPULAR_EMOJIS = ['😂', '😮', '😍', '😢', '👏', '🔥', '🎉', '💯', '❤️', '🤣', '🥰', '😘', '😭', '😊'];
 
@@ -257,15 +293,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [showZoomSlider, setShowZoomSlider] = useState(false);
   const [showMultiSelect, setShowMultiSelect] = useState(false);
   const [activeTab, setActiveTab] = useState('filters'); // 'filters', 'adjustments'
-
-  const ADJUSTMENT_ICONS = {
-    'Brightness': Sun,
-    'Contrast': Moon,
-    'Saturation': Droplet,
-    'Temperature': Thermometer,
-    'Fade': Cloud,
-    'Vignette': Circle
-  };
 
   const fileInputRef = useRef(null);
   const cropContainerRef = useRef(null);
@@ -492,11 +519,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
     }
   };
 
-  const updateCurrentMedia = (updates) => {
+  const updateCurrentMedia = useCallback((updates) => {
     setMedia(prev => prev.map((item, index) =>
       index === currentIndex ? { ...item, ...updates } : item
     ));
-  };
+  }, [currentIndex]);
 
   const onCropChange = (crop) => {
     updateCurrentMedia({ crop });
@@ -712,6 +739,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
               uploadMimeType = blob.type;
             }
           } catch (e) {
+            // eslint-disable-next-line no-console
             console.error('Error processing media, falling back to original', e);
             const response = await fetch(item.croppedUrl || item.url);
             blob = await response.blob();
@@ -867,6 +895,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
         setShowSuccess(true);
 
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Error creating post:', error);
         setUploadStage('error');
         setUploadError(error?.response?.data?.message || error?.message || 'Failed to upload. Please try again.');
@@ -884,15 +913,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
 
   const handleImageClick = (e) => {
     if (step !== 'share') return;
-
-    // Don't trigger if clicking on an existing tag or close button
     if (e.target.closest('.tag-item')) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    setTagCoordinates({ x, y });
+    if (draggingTagId) return; // don't open search if just finished dragging
     setShowTagSearch(true);
     setSearchQuery('');
     fetchUsers('');
@@ -947,10 +969,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   }, [step]);
 
   const handleTagUser = (user) => {
+    // Always spawn at center of the media — user can drag to position
     const newTag = {
       id: Math.random().toString(36).substr(2, 9),
-      x: tagCoordinates.x,
-      y: tagCoordinates.y,
+      x: 50,
+      y: 50,
       user
     };
     setTags([...tags, newTag]);
@@ -1078,25 +1101,31 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
       await new Promise(res => { v.onloadedmetadata = res; });
       const duration = isFinite(v.duration) ? v.duration : 0;
       const frames = [];
-      const baseCount = 7;
-      const maxCount = 24;
+      // 1 frame per second, so frame[i] = second i. Max 30 frames.
       const count = duration > 0
-        ? Math.min(maxCount, Math.max(baseCount, Math.round(duration / 3)))
-        : baseCount;
-      const width = 240;
-      const height = 240;
-      canvas.width = width;
+        ? Math.min(30, Math.max(2, Math.ceil(duration)))
+        : 7;
+      // Use video's natural aspect ratio for sharp thumbnails
+      const natW = v.videoWidth  || 640;
+      const natH = v.videoHeight || 360;
+      const aspect = natW / natH;
+      // Fixed height of 120px (enough for filmstrip), width matches aspect
+      const height = 120;
+      const width  = Math.round(height * aspect);
+      canvas.width  = width;
       canvas.height = height;
       for (let i = 0; i < count; i++) {
-        const t = duration > 0 ? (i * duration) / (count - 1) : 0;
+        // Exact second timestamp: 0s, 1s, 2s, 3s, ...
+        const t = duration > 0 ? Math.min(duration - 0.01, i) : 0;
         await new Promise(res => {
           v.currentTime = t;
           v.onseeked = res;
         });
         ctx.drawImage(v, 0, 0, width, height);
-        const url = canvas.toDataURL('image/jpeg', 0.9);
+        const url = canvas.toDataURL('image/jpeg', 0.92);
         frames.push(url);
       }
+      // Default cover = frame at second 0
       updateCurrentMedia({ thumbnails: frames, coverUrl: frames[0] });
     };
     run();
@@ -1392,48 +1421,47 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             <div ref={editContainerRef} className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center w-full flex-1 h-auto">
               {currentMedia && (
                 currentMedia.type === 'video' ? (
-                  <div style={{ width: editBoxSize.w, height: editBoxSize.h }} className="overflow-hidden bg-black/10 rounded">
-                      <video
-                        src={currentMedia.croppedUrl || currentMedia.url}
-                        className="w-full h-full object-cover transition-all duration-200"
-                        controls
-                        autoPlay
-                        muted={!currentMedia.soundOn}
-                        loop={false}
-                        ref={editVideoRef}
-                        onLoadedMetadata={(e) => {
+                  /* Show cover thumbnail on left; trim scrubber drives trimPlayTime */
+                  <div style={{ width: editBoxSize.w, height: editBoxSize.h }} className="relative overflow-hidden bg-black rounded">
+                    {/* Hidden video drives trimPlayTime for the scrubber */}
+                    <video
+                      src={currentMedia.croppedUrl || currentMedia.url}
+                      className="hidden"
+                      ref={editVideoRef}
+                      muted
+                      preload="metadata"
+                      onLoadedMetadata={(e) => {
+                        e.currentTarget.currentTime = currentMedia.trimStart || 0;
+                      }}
+                      onTimeUpdate={(e) => {
+                        setTrimPlayTime(e.currentTarget.currentTime);
+                        const d = currentMedia.duration || 0;
+                        const end = currentMedia.trimEnd && currentMedia.trimEnd > 0 ? currentMedia.trimEnd : d;
+                        if (end > 0 && e.currentTarget.currentTime >= end) {
                           e.currentTarget.currentTime = currentMedia.trimStart || 0;
-                        }}
-                        onSeeking={(e) => {
-                          const v = e.currentTarget;
-                          const s = currentMedia.trimStart || 0;
-                          const d = currentMedia.duration || 0;
-                          const end = currentMedia.trimEnd && currentMedia.trimEnd > 0 ? currentMedia.trimEnd : d;
-                          if (v.currentTime < s) v.currentTime = s;
-                          if (end > 0 && v.currentTime > end) v.currentTime = end;
-                        }}
-                        onSeeked={(e) => {
-                          const v = e.currentTarget;
-                          const s = currentMedia.trimStart || 0;
-                          const d = currentMedia.duration || 0;
-                          const end = currentMedia.trimEnd && currentMedia.trimEnd > 0 ? currentMedia.trimEnd : d;
-                          if (v.currentTime < s) v.currentTime = s;
-                          if (end > 0 && v.currentTime > end) v.currentTime = end;
-                        }}
-                        onTimeUpdate={(e) => {
-                          const v = e.currentTarget;
-                          setTrimPlayTime(v.currentTime);
-                          const d = currentMedia.duration || 0;
-                          const end = currentMedia.trimEnd && currentMedia.trimEnd > 0 ? currentMedia.trimEnd : d;
-                          if (end > 0 && v.currentTime >= end) {
-                            v.currentTime = currentMedia.trimStart || 0;
-                          }
-                        }}
-                        onEnded={(e) => {
-                          e.currentTarget.currentTime = currentMedia.trimStart || 0;
-                          e.currentTarget.play();
-                        }}
-                      />
+                        }
+                      }}
+                    />
+                    {/* Visible: selected cover thumbnail */}
+                    <img
+                      src={currentMedia.coverUrl || (currentMedia.thumbnails && currentMedia.thumbnails[0]) || currentMedia.croppedUrl || currentMedia.url}
+                      className="w-full h-full object-cover"
+                      alt="Cover"
+                    />
+                    {/* Play icon overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-14 h-14 rounded-full bg-black/40 flex items-center justify-center">
+                        <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
+                    </div>
+                    {/* Duration badge */}
+                    {currentMedia.duration > 0 && (
+                      <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs font-mono px-2 py-0.5 rounded">
+                        {formatDuration((currentMedia.trimEnd && currentMedia.trimEnd > 0 ? currentMedia.trimEnd : currentMedia.duration) - (currentMedia.trimStart || 0))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <img
@@ -1545,127 +1573,341 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                   </div>
                 ) : (
                   (currentMedia?.thumbnails && currentMedia.duration !== undefined) ? (
-                  <div className="flex flex-col gap-6 pb-4">
+                  <div className="flex flex-col gap-5 pb-4">
+
+                    {/* ── Cover Photo — horizontal filmstrip ── */}
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-semibold dark:text-white">Cover photo</div>
-                        <button className="text-sm font-semibold text-[#0095f6]" onClick={() => coverInputRef.current?.click()}>Select From Computer</button>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-semibold dark:text-white">Cover photo</span>
+                        <button
+                          className="text-sm font-bold text-[#0095f6] hover:text-blue-400 transition-colors"
+                          onClick={() => coverInputRef.current?.click()}
+                        >
+                          Select From Computer
+                        </button>
                         <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
                           const url = URL.createObjectURL(f);
-                          updateCurrentMedia({ coverUrl: url });
+                          // Store uploaded image separately so it shows in gallery
+                          updateCurrentMedia({ coverUrl: url, uploadedCoverUrl: url });
                           e.target.value = '';
                         }} />
                       </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        {(currentMedia?.thumbnails || []).map((thumb, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => updateCurrentMedia({ coverUrl: thumb })}
-                            className={`relative w-full aspect-square rounded overflow-hidden border-2 ${currentMedia.coverUrl === thumb ? 'border-[#0095f6]' : 'border-transparent'}`}
+
+                      {/* Filmstrip row — drag to pick cover frame */}
+                      {(() => {
+                        const thumbs = currentMedia?.thumbnails || [];
+                        const selIdx = Math.max(0, thumbs.findIndex(t => t === currentMedia.coverUrl));
+                        const frameW = thumbs.length > 0 ? 100 / thumbs.length : 100;
+                        return (
+                          <div
+                            className="relative w-full rounded-xl overflow-hidden bg-black select-none cursor-grab active:cursor-grabbing"
+                            style={{ height: 72 }}
+                            onMouseDown={(startE) => {
+                              startE.preventDefault();
+                              const strip = startE.currentTarget;
+                              const rect  = strip.getBoundingClientRect();
+                              const pick  = (clientX) => {
+                                const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+                                const idx   = Math.min(thumbs.length - 1, Math.floor(ratio * thumbs.length));
+                                if (thumbs[idx]) updateCurrentMedia({ coverUrl: thumbs[idx] });
+                              };
+                              pick(startE.clientX);
+                              const onMove = (e) => pick(e.clientX);
+                              const onUp   = () => {
+                                window.removeEventListener('mousemove', onMove);
+                                window.removeEventListener('mouseup', onUp);
+                              };
+                              window.addEventListener('mousemove', onMove);
+                              window.addEventListener('mouseup', onUp);
+                            }}
+                            onTouchStart={(startE) => {
+                              const strip = startE.currentTarget;
+                              const rect  = strip.getBoundingClientRect();
+                              const pick  = (clientX) => {
+                                const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+                                const idx   = Math.min(thumbs.length - 1, Math.floor(ratio * thumbs.length));
+                                if (thumbs[idx]) updateCurrentMedia({ coverUrl: thumbs[idx] });
+                              };
+                              pick(startE.touches[0].clientX);
+                              const onMove = (e) => pick(e.touches[0].clientX);
+                              const onEnd  = () => {
+                                window.removeEventListener('touchmove', onMove);
+                                window.removeEventListener('touchend', onEnd);
+                              };
+                              window.addEventListener('touchmove', onMove, { passive: true });
+                              window.addEventListener('touchend', onEnd);
+                            }}
                           >
-                            <img src={thumb} className="w-full h-full object-cover" alt="" />
-                          </button>
-                        ))}
-                      </div>
+                            {/* Frames */}
+                            <div className="flex h-full pointer-events-none">
+                              {thumbs.map((thumb, idx) => (
+                                <div key={idx} className="relative flex-1 h-full overflow-hidden" style={{ minWidth: 0 }}>
+                                  <img src={thumb} className="w-full h-full object-cover" alt="" draggable={false} />
+                                </div>
+                              ))}
+                            </div>
+                            {/* Moving white selection box */}
+                            <div
+                              className="absolute top-0 bottom-0 pointer-events-none z-10 transition-all duration-100"
+                              style={{
+                                left: `${selIdx * frameW}%`,
+                                width: `${frameW}%`,
+                                border: '3px solid white',
+                                borderRadius: 4,
+                                boxShadow: '0 0 0 1.5px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.3)'
+                              }}
+                            />
+                            {/* Dim outside selection */}
+                            <div className="absolute top-0 bottom-0 left-0 bg-black/40 pointer-events-none transition-all duration-100" style={{ width: `${selIdx * frameW}%` }} />
+                            <div className="absolute top-0 bottom-0 right-0 bg-black/40 pointer-events-none transition-all duration-100" style={{ width: `${(thumbs.length - selIdx - 1) * frameW}%` }} />
+                            {/* Drag hint — only show when nothing selected yet */}
+                            {selIdx === 0 && (
+                              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-white/50 pointer-events-none whitespace-nowrap px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.5)' }}>
+                                Hold & drag to pick cover
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Second labels below cover filmstrip */}
+                      {(() => {
+                        const thumbs = currentMedia?.thumbnails || [];
+                        if (thumbs.length === 0) return null;
+                        return (
+                          <div className="relative w-full mt-1" style={{ height: 14 }}>
+                            {thumbs.map((_, idx) => {
+                              const pct = ((idx + 0.5) / thumbs.length) * 100;
+                              return (
+                                <span
+                                  key={idx}
+                                  className="absolute text-[9px] text-gray-400 dark:text-gray-500 font-mono"
+                                  style={{ left: `${pct}%`, transform: 'translateX(-50%)', top: 0 }}
+                                >
+                                  {idx}s
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
+
+                    {/* ── Selected cover preview + uploaded image ── */}
+                    {(() => {
+                      const thumbs = currentMedia?.thumbnails || [];
+                      const uploadedCover = currentMedia?.uploadedCoverUrl;
+                      const selectedCover = currentMedia?.coverUrl;
+                      // All selectable covers: uploaded image first (if any), then filmstrip frames
+                      const allCovers = uploadedCover
+                        ? [{ url: uploadedCover, label: 'Uploaded', isUploaded: true },
+                           ...thumbs.map((t, i) => ({ url: t, label: `${i}s`, isUploaded: false }))]
+                        : thumbs.map((t, i) => ({ url: t, label: `${i}s`, isUploaded: false }));
+
+                      if (allCovers.length === 0) return null;
+
+                      return (
+                        <div className="flex flex-col gap-2">
+                          {/* Big selected preview */}
+                          <div className="relative w-full rounded-xl overflow-hidden bg-black" style={{ height: 140 }}>
+                            <img
+                              src={selectedCover || allCovers[0]?.url}
+                              className="w-full h-full object-cover"
+                              alt="Selected cover"
+                              style={{ imageRendering: 'auto' }}
+                            />
+                            {/* "Cover" badge */}
+                            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                              Cover
+                            </div>
+                          </div>
+
+                          {/* Horizontal scroll row — show uploaded image if exists */}
+                          {uploadedCover && (
+                            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                              {allCovers.filter(c => c.isUploaded).map((cover, i) => (
+                                <button
+                                  key={`uploaded-${i}`}
+                                  onClick={() => updateCurrentMedia({ coverUrl: cover.url })}
+                                  className="relative flex-shrink-0 rounded-lg overflow-hidden focus:outline-none"
+                                  style={{ width: 60, height: 60 }}
+                                >
+                                  <img src={cover.url} className="w-full h-full object-cover" alt="" draggable={false} />
+                                  {/* Selected ring */}
+                                  {selectedCover === cover.url && (
+                                    <div className="absolute inset-0 rounded-lg border-[2.5px] border-white pointer-events-none" />
+                                  )}
+                                  {/* "Photo" label */}
+                                  <div className="absolute bottom-0 left-0 right-0 text-[9px] font-semibold text-white text-center py-0.5"
+                                    style={{ background: 'rgba(0,0,0,0.55)' }}>
+                                    Photo
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── Trim ── */}
                     <div>
-                      <div className="text-sm font-semibold mb-2 dark:text-white">Trim</div>
-                      {currentMedia?.thumbnails ? (
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-semibold dark:text-white">Trim</span>
+                        {(() => {
+                          const dur = currentMedia.duration || 0;
+                          const s   = currentMedia.trimStart || 0;
+                          const e2  = (currentMedia.trimEnd && currentMedia.trimEnd > 0) ? currentMedia.trimEnd : dur;
+                          const len = Math.max(0, e2 - s);
+                          return (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                              {formatDuration(len)} selected
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      {currentMedia?.thumbnails && (
                         <div
-                          className="relative w-full h-20 rounded bg-black/10 dark:bg-white/5 overflow-visible select-none"
+                          className="relative select-none"
+                          style={{ paddingBottom: 20 }}
                           onMouseMove={(e) => {
                             if (!dragHandle) return;
                             const rect = trimTrackRef.current.getBoundingClientRect();
                             const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
                             const t = ratio * (currentMedia.duration || 0);
                             if (dragHandle === 'start') {
-                              const val = Math.min(t, (currentMedia.trimEnd || 0) - 0.1);
-                              updateCurrentMedia({ trimStart: Math.max(0, val) });
+                              updateCurrentMedia({ trimStart: Math.max(0, Math.min(t, (currentMedia.trimEnd || 0) - 0.5)) });
                             } else {
-                              const val = Math.max(t, (currentMedia.trimStart || 0) + 0.1);
-                              updateCurrentMedia({ trimEnd: Math.min(currentMedia.duration || 0, val) });
+                              updateCurrentMedia({ trimEnd: Math.min(currentMedia.duration || 0, Math.max(t, (currentMedia.trimStart || 0) + 0.5)) });
                             }
                           }}
                           onMouseLeave={() => setDragHandle(null)}
                           onMouseUp={() => setDragHandle(null)}
+                          onTouchMove={(e) => {
+                            if (!dragHandle) return;
+                            e.preventDefault();
+                            const touch = e.touches[0];
+                            const rect = trimTrackRef.current.getBoundingClientRect();
+                            const ratio = Math.min(1, Math.max(0, (touch.clientX - rect.left) / rect.width));
+                            const t = ratio * (currentMedia.duration || 0);
+                            if (dragHandle === 'start') {
+                              updateCurrentMedia({ trimStart: Math.max(0, Math.min(t, (currentMedia.trimEnd || 0) - 0.5)) });
+                            } else {
+                              updateCurrentMedia({ trimEnd: Math.min(currentMedia.duration || 0, Math.max(t, (currentMedia.trimStart || 0) + 0.5)) });
+                            }
+                          }}
+                          onTouchEnd={() => setDragHandle(null)}
                         >
+                          {/* Filmstrip track */}
                           <div
                             ref={trimTrackRef}
-                            className="absolute top-2 bottom-2 left-4 right-4 bg-black overflow-hidden"
-                            style={{
-                              backgroundImage: currentMedia?.coverUrl
-                                ? `url(${currentMedia.coverUrl})`
-                                : (currentMedia?.thumbnails && currentMedia.thumbnails[0]
-                                  ? `url(${currentMedia.thumbnails[0]})`
-                                  : (currentMedia?.croppedUrl || currentMedia?.url
-                                    ? `url(${currentMedia.croppedUrl || currentMedia.url})`
-                                    : undefined)),
-                              backgroundSize: 'cover',
-                              backgroundPosition: 'center'
-                            }}
+                            className="relative w-full rounded-xl overflow-hidden"
+                            style={{ height: 64 }}
                           >
-                            <div className="absolute inset-0">
-                              {(() => {
-                                const dur = currentMedia.duration || 0;
-                                const s = (currentMedia.trimStart || 0) / (dur || 1);
-                                const e = (currentMedia.trimEnd || 0) / (dur || 1);
-                                const progress = dur > 0 ? Math.min(1, Math.max(0, (trimPlayTime || 0) / dur)) : 0;
-                                const left = `${s * 100}%`;
-                                const width = `${Math.max(e - s, 0) * 100}%`;
-                                const progressLeft = `${progress * 100}%`;
-                                return (
-                                  <>
-                                    <div
-                                      className="absolute top-0 bottom-0 w-[3px] bg-white z-20 shadow-[0_0_6px_rgba(255,255,255,0.9)]"
-                                      style={{ left: `calc(${progressLeft} - 1.5px)` }}
-                                    />
-                                    <div className="absolute top-0 bottom-0 bg-black/40" style={{ left: 0, right: `calc(100% - ${left})` }} />
-                                    <div className="absolute top-0 bottom-0 bg-black/40" style={{ left: `${e * 100}%`, right: 0 }} />
-                                    <div
-                                      className="absolute top-0 bottom-0 border-2 border-white rounded pointer-events-none z-10"
-                                      style={{ left, width }}
-                                    />
-                                    <div
-                                      className="absolute top-0 bottom-0 w-3 bg-white rounded-lg cursor-ew-resize ring-1 ring-black/30 z-20"
-                                      style={{ left }}
-                                      onMouseDown={() => setDragHandle('start')}
-                                    />
-                                    <div
-                                      className="absolute top-0 bottom-0 w-3 bg-white rounded-lg cursor-ew-resize ring-1 ring-black/30 z-20"
-                                      style={{ left: `calc(${e * 100}% - 0.5rem)` }}
-                                      onMouseDown={() => setDragHandle('end')}
-                                    />
-                                  </>
-                                );
-                              })()}
+                            {/* Thumbnail frames */}
+                            <div className="flex h-full">
+                              {(currentMedia.thumbnails || []).map((thumb, idx) => (
+                                <div key={idx} className="flex-1 h-full overflow-hidden" style={{ minWidth: 0 }}>
+                                  <img src={thumb} className="w-full h-full object-cover" alt="" draggable={false} />
+                                </div>
+                              ))}
                             </div>
+
+                            {/* Dimmed regions outside trim */}
                             {(() => {
                               const dur = currentMedia.duration || 0;
-                              const endVal = (currentMedia.trimEnd && currentMedia.trimEnd > 0) ? currentMedia.trimEnd : dur;
-                              const startVal = currentMedia.trimStart || 0;
-                              const trimLen = Math.max(0, endVal - startVal);
+                              const s   = (currentMedia.trimStart || 0) / (dur || 1);
+                              const e2  = ((currentMedia.trimEnd && currentMedia.trimEnd > 0) ? currentMedia.trimEnd : dur) / (dur || 1);
                               return (
                                 <>
-                                  <div className="absolute -top-5 left-4 text-xs font-mono text-white px-2 py-0.5 rounded-full bg-black/80 pointer-events-none">
-                                    {formatDuration(startVal)}
+                                  {/* Left dim */}
+                                  <div className="absolute top-0 bottom-0 left-0 bg-black/55 pointer-events-none" style={{ width: `${s * 100}%` }} />
+                                  {/* Right dim */}
+                                  <div className="absolute top-0 bottom-0 right-0 bg-black/55 pointer-events-none" style={{ width: `${(1 - e2) * 100}%` }} />
+                                  {/* White selection border */}
+                                  <div
+                                    className="absolute top-0 bottom-0 border-t-[3px] border-b-[3px] border-white pointer-events-none z-10"
+                                    style={{ left: `${s * 100}%`, width: `${Math.max(0, e2 - s) * 100}%` }}
+                                  />
+                                  {/* Playhead */}
+                                  <div
+                                    className="absolute top-0 bottom-0 w-[2px] bg-white z-20"
+                                    style={{
+                                      left: `${Math.min(1, Math.max(0, (trimPlayTime || 0) / (dur || 1))) * 100}%`,
+                                      boxShadow: '0 0 4px rgba(255,255,255,0.8)'
+                                    }}
+                                  />
+                                  {/* Left drag handle */}
+                                  <div
+                                    className="absolute top-0 bottom-0 z-30 flex items-center justify-center cursor-ew-resize"
+                                    style={{ left: `${s * 100}%`, width: 20, transform: 'translateX(-4px)' }}
+                                    onMouseDown={(e) => { e.preventDefault(); setDragHandle('start'); }}
+                                    onTouchStart={(e) => { e.preventDefault(); setDragHandle('start'); }}
+                                  >
+                                    <div className="w-[14px] h-full rounded-l-lg flex items-center justify-center" style={{ background: 'white' }}>
+                                      <div className="flex flex-col gap-[3px]">
+                                        <div className="w-[2px] h-3 bg-gray-400 rounded-full" />
+                                        <div className="w-[2px] h-3 bg-gray-400 rounded-full" />
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="absolute -top-5 right-4 text-xs font-mono text-white px-2 py-0.5 rounded-full bg-black/80 pointer-events-none">
-                                    {formatDuration(endVal)}
-                                  </div>
-                                  <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs font-semibold text-white px-3 py-1 rounded-full bg-black/80">
-                                    {formatDuration(trimLen)}
+                                  {/* Right drag handle */}
+                                  <div
+                                    className="absolute top-0 bottom-0 z-30 flex items-center justify-center cursor-ew-resize"
+                                    style={{ left: `${e2 * 100}%`, width: 20, transform: 'translateX(-16px)' }}
+                                    onMouseDown={(e2e) => { e2e.preventDefault(); setDragHandle('end'); }}
+                                    onTouchStart={(e2e) => { e2e.preventDefault(); setDragHandle('end'); }}
+                                  >
+                                    <div className="w-[14px] h-full rounded-r-lg flex items-center justify-center" style={{ background: 'white' }}>
+                                      <div className="flex flex-col gap-[3px]">
+                                        <div className="w-[2px] h-3 bg-gray-400 rounded-full" />
+                                        <div className="w-[2px] h-3 bg-gray-400 rounded-full" />
+                                      </div>
+                                    </div>
                                   </div>
                                 </>
                               );
                             })()}
                           </div>
+
+                          {/* Time markers below filmstrip */}
+                          {(() => {
+                            const dur = currentMedia.duration || 0;
+                            if (dur <= 0) return null;
+                            // Show ~5 evenly spaced time labels
+                            const steps = Math.min(5, Math.floor(dur));
+                            return (
+                              <div className="relative w-full mt-1" style={{ height: 16 }}>
+                                {Array.from({ length: steps + 1 }).map((_, i) => {
+                                  const t   = (i / steps) * dur;
+                                  const pct = (i / steps) * 100;
+                                  return (
+                                    <span
+                                      key={i}
+                                      className="absolute text-[10px] text-gray-400 dark:text-gray-500 font-mono"
+                                      style={{
+                                        left: `${pct}%`,
+                                        transform: i === 0 ? 'none' : i === steps ? 'translateX(-100%)' : 'translateX(-50%)',
+                                        top: 0,
+                                      }}
+                                    >
+                                      {Math.round(t)}s
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
                         </div>
-                      ) : null}
+                      )}
                     </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-sm font-semibold dark:text-white">Sound on</span>
+
+                    {/* ── Sound toggle ── */}
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
+                      <span className="text-sm font-semibold dark:text-white">Sound</span>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
@@ -1676,10 +1918,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                         <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                       </label>
                     </div>
+
                   </div>
                   ) : (
-                    <div className="flex items-center justify-center py-16">
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
                       <div className="w-8 h-8 border-2 border-[#0095f6] border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Generating frames…</span>
                     </div>
                   )
                 )}
@@ -1692,7 +1936,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             {/* Left: Final Image Preview */}
             <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center select-none w-full h-auto md:flex-[2]">
               {currentMedia && (
-                <div ref={shareContainerRef} className="relative w-full h-full flex items-center justify-center" onClick={handleImageClick}>
+                <div ref={shareContainerRef} data-media-container className="relative w-full h-full flex items-center justify-center" onClick={handleImageClick}>
                   {currentMedia.type === 'video' ? (
                     <div style={{ width: shareBoxSize.w, height: shareBoxSize.h }} className="overflow-hidden bg-black rounded">
                       <video
@@ -1727,22 +1971,85 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                       alt="Share Preview"
                     />
                   )}
-                  {currentMedia.type !== 'video' && (
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
-                      Click photo to tag people
+                  {tags.length === 0 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none select-none">
+                      Tap to tag · Drag tags to reposition
                     </div>
                   )}
 
-                  {/* Tags */}
+                  {/* Tags — draggable */}
                   {tags.map((tag) => (
                     <div
                       key={tag.id}
-                      className="tag-item absolute bg-black/70 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 transform -translate-x-1/2 -translate-y-1/2 cursor-default"
-                      style={{ left: `${tag.x}%`, top: `${tag.y}%` }}
+                      className="tag-item absolute z-20 select-none"
+                      style={{
+                        left: `${tag.x}%`,
+                        top:  `${tag.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                        cursor: draggingTagId === tag.id ? 'grabbing' : 'grab',
+                      }}
+                      onMouseDown={(e) => {
+                        if (e.target.closest('button')) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const container = e.currentTarget.closest('[data-media-container]');
+                        if (!container) return;
+                        setDraggingTagId(tag.id);
+                        const rect = container.getBoundingClientRect();
+                        const onMove = (me) => {
+                          const nx = Math.min(100, Math.max(0, ((me.clientX - rect.left) / rect.width)  * 100));
+                          const ny = Math.min(100, Math.max(0, ((me.clientY - rect.top)  / rect.height) * 100));
+                          setTags(prev => prev.map(t => t.id === tag.id ? { ...t, x: nx, y: ny } : t));
+                        };
+                        const onUp = () => {
+                          setDraggingTagId(null);
+                          window.removeEventListener('mousemove', onMove);
+                          window.removeEventListener('mouseup', onUp);
+                        };
+                        window.addEventListener('mousemove', onMove);
+                        window.addEventListener('mouseup', onUp);
+                      }}
+                      onTouchStart={(e) => {
+                        if (e.target.closest('button')) return;
+                        e.stopPropagation();
+                        const container = e.currentTarget.closest('[data-media-container]');
+                        if (!container) return;
+                        setDraggingTagId(tag.id);
+                        const rect = container.getBoundingClientRect();
+                        const onMove = (te) => {
+                          const touch = te.touches[0];
+                          const nx = Math.min(100, Math.max(0, ((touch.clientX - rect.left) / rect.width)  * 100));
+                          const ny = Math.min(100, Math.max(0, ((touch.clientY - rect.top)  / rect.height) * 100));
+                          setTags(prev => prev.map(t => t.id === tag.id ? { ...t, x: nx, y: ny } : t));
+                        };
+                        const onEnd = () => {
+                          setDraggingTagId(null);
+                          window.removeEventListener('touchmove', onMove);
+                          window.removeEventListener('touchend', onEnd);
+                        };
+                        window.addEventListener('touchmove', onMove, { passive: false });
+                        window.addEventListener('touchend', onEnd);
+                      }}
                     >
-                      <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-black/70 absolute -top-[6px] left-1/2 -translate-x-1/2"></div>
-                      <span className="text-xs font-semibold">{tag.user.username}</span>
-                      <button onClick={(e) => handleRemoveTag(e, tag.id)} className="hover:text-gray-300"><X size={12} /></button>
+                      {/* Tag bubble */}
+                      <div className="relative flex items-center gap-1.5 bg-black/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-full shadow-lg border border-white/20">
+                        {tag.user.avatar_url ? (
+                          <img src={tag.user.avatar_url} className="w-4 h-4 rounded-full object-cover flex-shrink-0" alt="" />
+                        ) : (
+                          <div className="w-4 h-4 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center flex-shrink-0">
+                            <span className="text-[8px] font-bold text-white">{(tag.user.username || '').slice(0,1).toUpperCase()}</span>
+                          </div>
+                        )}
+                        <span className="text-xs font-semibold whitespace-nowrap">@{tag.user.username}</span>
+                        <button
+                          onClick={(e) => handleRemoveTag(e, tag.id)}
+                          className="ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors"
+                        >
+                          <X size={9} />
+                        </button>
+                      </div>
+                      {/* Pin dot */}
+                      <div className="absolute left-1/2 -translate-x-1/2 -bottom-[5px] w-2 h-2 bg-black/80 rounded-full border border-white/30" />
                     </div>
                   ))}
 
@@ -1867,7 +2174,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                 <div
                   className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900"
                   onClick={() => {
-                    setTagCoordinates({ x: 85, y: 85 });
                     setShowTagSearch(true);
                     setSearchQuery('');
                     fetchUsers('');
@@ -1888,7 +2194,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                         key={u.id}
                         className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 rounded-md px-2 py-1"
                         onClick={() => {
-                          setTagCoordinates({ x: 85, y: 85 });
                           handleTagUser(u);
                         }}
                       >
@@ -1985,167 +2290,163 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           </div>
         </div>
       )}
-      {/* ── Upload Progress Overlay ── */}
+      {/* ── Upload Progress Overlay — Instagram color scheme ── */}
       {isSubmitting && uploadStage !== 'idle' && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col items-center gap-6">
-            {/* Animated icon */}
-            <div className="relative flex items-center justify-center w-20 h-20">
-              {/* Outer spinning ring */}
-              <svg className="absolute inset-0 w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="6" className="dark:stroke-gray-700" />
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)' }}>
+          <div className="rounded-3xl p-8 w-full max-w-xs flex flex-col items-center gap-5"
+            style={{ background: 'linear-gradient(145deg,#1a1a1a,#0d0d0d)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 32px 80px rgba(0,0,0,0.6)' }}>
+
+            {/* Instagram-style gradient ring */}
+            <div className="relative flex items-center justify-center w-24 h-24">
+              <svg className="absolute inset-0 w-24 h-24" style={{ transform: 'rotate(-90deg)' }} viewBox="0 0 96 96">
+                <circle cx="48" cy="48" r="42" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
                 <circle
-                  cx="40" cy="40" r="34" fill="none"
-                  stroke="url(#uploadGrad)" strokeWidth="6"
+                  cx="48" cy="48" r="42" fill="none"
+                  stroke="url(#iGrad)" strokeWidth="5"
                   strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 34}`}
-                  strokeDashoffset={`${2 * Math.PI * 34 * (1 - uploadProgress / 100)}`}
-                  style={{ transition: 'stroke-dashoffset 0.4s ease' }}
+                  strokeDasharray={`${2 * Math.PI * 42}`}
+                  strokeDashoffset={`${2 * Math.PI * 42 * (1 - uploadProgress / 100)}`}
+                  style={{ transition: 'stroke-dashoffset 0.5s cubic-bezier(0.4,0,0.2,1)' }}
                 />
                 <defs>
-                  <linearGradient id="uploadGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#f472b6" />
-                    <stop offset="100%" stopColor="#a855f7" />
+                  <linearGradient id="iGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%"   stopColor="#feda75" />
+                    <stop offset="25%"  stopColor="#fa7e1e" />
+                    <stop offset="50%"  stopColor="#d62976" />
+                    <stop offset="75%"  stopColor="#962fbf" />
+                    <stop offset="100%" stopColor="#4f5bd5" />
                   </linearGradient>
                 </defs>
               </svg>
-              {/* Inner icon */}
-              <div className="relative z-10 flex flex-col items-center justify-center">
-                {uploadStage === 'converting' && (
-                  <svg className="w-8 h-8 text-pink-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-                  </svg>
-                )}
-                {uploadStage === 'uploading' && (
-                  <svg className="w-8 h-8 text-purple-500 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                  </svg>
-                )}
-                {uploadStage === 'posting' && (
-                  <svg className="w-8 h-8 text-purple-500 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                  </svg>
-                )}
-              </div>
+              {/* Center percentage */}
+              <span className="relative z-10 text-2xl font-bold text-white tabular-nums">{uploadProgress}%</span>
             </div>
 
-            {/* Percentage */}
-            <div className="text-3xl font-bold text-gray-900 dark:text-white tabular-nums">
-              {uploadProgress}%
-            </div>
-
-            {/* Stage label */}
-            <div className="flex flex-col items-center gap-1">
-              <p className="text-base font-semibold text-gray-800 dark:text-gray-100">
-                {uploadStage === 'converting' && 'Trimming & exporting MP4…'}
-                {uploadStage === 'uploading' && 'Uploading your reel…'}
-                {uploadStage === 'posting' && 'Almost there…'}
+            {/* Stage title */}
+            <div className="flex flex-col items-center gap-1 text-center">
+              <p className="text-base font-semibold text-white">
+                {uploadStage === 'converting' && '✂️ Trimming video…'}
+                {uploadStage === 'uploading'  && '⬆️ Uploading…'}
+                {uploadStage === 'posting'    && '🚀 Publishing…'}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-                {uploadStage === 'converting' && 'Applying your trim and crop. This may take a moment.'}
-                {uploadStage === 'uploading' && 'Sending your video to the server.'}
-                {uploadStage === 'posting' && 'Publishing your reel. Hang tight!'}
+              <p className="text-xs text-white/40">
+                {uploadStage === 'converting' && 'Applying your trim & crop'}
+                {uploadStage === 'uploading'  && 'Sending to server'}
+                {uploadStage === 'posting'    && 'Almost done!'}
               </p>
             </div>
 
-            {/* Progress bar */}
-            <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+            {/* Instagram gradient bar */}
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
               <div
-                className="h-full rounded-full transition-all duration-300"
+                className="h-full rounded-full transition-all duration-500"
                 style={{
                   width: `${uploadProgress}%`,
-                  background: 'linear-gradient(90deg, #f472b6, #a855f7)'
+                  background: 'linear-gradient(90deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5)'
                 }}
               />
             </div>
+
+
           </div>
         </div>
       )}
 
-      {/* ── Success Popup ── */}
-      {showSuccess && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div
-            className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col items-center gap-5"
-            style={{ animation: 'popIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both' }}
-          >
+      {/* ── Success Popup — Instagram style, auto-home after 5s ── */}
+      {showSuccess && (() => {
+        // Auto-navigate after 5s
+        const doClose = () => {
+          setShowSuccess(false);
+          setUploadStage('idle');
+          setUploadProgress(0);
+          handleClose();
+          setMedia([]);
+          setCaption('');
+          setLocation('');
+          setTags([]);
+          navigate('/');
+        };
+        return (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(16px)' }}>
             <style>{`
-              @keyframes popIn {
-                from { opacity: 0; transform: scale(0.85) translateY(10px); }
-                to   { opacity: 1; transform: scale(1)    translateY(0); }
+              @keyframes igPopIn {
+                from { opacity:0; transform:scale(0.8) translateY(16px); }
+                to   { opacity:1; transform:scale(1) translateY(0); }
               }
-              @keyframes checkDraw {
-                from { stroke-dashoffset: 40; }
+              @keyframes igCheckDraw {
+                from { stroke-dashoffset: 48; }
                 to   { stroke-dashoffset: 0; }
+              }
+              @keyframes igRingRotate {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
+              }
+              @keyframes igCountdown {
+                from { stroke-dashoffset: 0; }
+                to   { stroke-dashoffset: ${2 * Math.PI * 22}; }
               }
             `}</style>
 
-            {/* Animated checkmark */}
-            <div className="relative flex items-center justify-center w-20 h-20">
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 opacity-15 animate-ping" style={{ animationDuration: '1.5s' }} />
-              <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f472b6, #a855f7)' }}>
-                <svg className="w-10 h-10 text-white" viewBox="0 0 40 40" fill="none">
-                  <path
-                    d="M10 21l7 7 14-14"
-                    stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"
-                    strokeDasharray="40"
-                    strokeDashoffset="0"
-                    style={{ animation: 'checkDraw 0.45s 0.2s ease both' }}
-                  />
-                </svg>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center gap-1 text-center">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                {postType === 'reel' ? 'Reel Published! 🎉' : 'Post Shared! 🎉'}
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {postType === 'reel'
-                  ? 'Your reel is live and ready to be seen by everyone.'
-                  : 'Your post has been shared with your followers.'}
-              </p>
-            </div>
-
-            {/* Stats row */}
-            <div className="w-full flex items-center justify-around py-3 px-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700">
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-lg font-bold text-gray-900 dark:text-white">
-                  {media.filter(m => m.type === 'video').length}
-                </span>
-                <span className="text-xs text-gray-400">{media.filter(m => m.type === 'video').length === 1 ? 'Video' : 'Videos'}</span>
-              </div>
-              <div className="w-px h-8 bg-gray-200 dark:bg-gray-700" />
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">MP4</span>
-                <span className="text-xs text-gray-400">Format</span>
-              </div>
-              <div className="w-px h-8 bg-gray-200 dark:bg-gray-700" />
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-lg font-bold text-gray-900 dark:text-white">✓</span>
-                <span className="text-xs text-gray-400">Uploaded</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                setShowSuccess(false);
-                setUploadStage('idle');
-                setUploadProgress(0);
-                handleClose();
-                setMedia([]);
-                setCaption('');
-                setLocation('');
-                setTags([]);
+            <div
+              className="w-full max-w-xs flex flex-col items-center gap-6 rounded-3xl p-8"
+              style={{
+                animation: 'igPopIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both',
+                background: 'linear-gradient(145deg,#1c1c1c,#111)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 40px 100px rgba(0,0,0,0.7)'
               }}
-              className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #f472b6, #a855f7)' }}
             >
-              Done
-            </button>
+              {/* Instagram gradient checkmark circle */}
+              <div className="relative flex items-center justify-center w-24 h-24">
+                {/* Spinning rainbow ring */}
+                <svg className="absolute inset-0 w-24 h-24" style={{ animation: 'igRingRotate 3s linear infinite' }} viewBox="0 0 96 96">
+                  <defs>
+                    <linearGradient id="igSuccessGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%"   stopColor="#feda75" />
+                      <stop offset="25%"  stopColor="#fa7e1e" />
+                      <stop offset="50%"  stopColor="#d62976" />
+                      <stop offset="75%"  stopColor="#962fbf" />
+                      <stop offset="100%" stopColor="#4f5bd5" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="48" cy="48" r="44" fill="none" stroke="url(#igSuccessGrad)" strokeWidth="4" strokeDasharray="138 138" strokeLinecap="round" />
+                </svg>
+                {/* Inner circle with checkmark */}
+                <div className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5)' }}>
+                  <svg className="w-8 h-8" viewBox="0 0 32 32" fill="none">
+                    <path
+                      d="M7 17l6 6 12-12"
+                      stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+                      strokeDasharray="48" strokeDashoffset="0"
+                      style={{ animation: 'igCheckDraw 0.5s 0.15s ease both' }}
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Text */}
+              <div className="flex flex-col items-center gap-1.5 text-center">
+                <h3 className="text-xl font-bold text-white">
+                  {postType === 'reel' ? 'Reel Published! 🎉' : 'Post Shared! 🎉'}
+                </h3>
+                <p className="text-sm text-white/50">
+                  {postType === 'reel' ? 'Your reel is now live' : 'Your post has been shared'}
+                </p>
+              </div>
+
+              {/* Instagram gradient divider */}
+              <div className="w-full h-px" style={{ background: 'linear-gradient(90deg,transparent,#d62976,transparent)' }} />
+
+              {/* Countdown auto-redirect */}
+              <SuccessCountdown onDone={doClose} />
+
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Error Popup ── */}
       {uploadStage === 'error' && !isSubmitting && (
