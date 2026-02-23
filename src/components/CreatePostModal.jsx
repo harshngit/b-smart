@@ -78,6 +78,136 @@ async function getCroppedImg(imageSrc, pixelCrop) {
   })
 }
 
+// ─── Video Processing Utility ──────────────────────────────────────────────
+// Trims and crops a video using canvas + MediaRecorder (browser-native, no deps).
+// cropParams: { x, y, width, height, outputWidth, outputHeight } — all in NATIVE
+//             video pixel space (not screen pixels). Pass null for no crop.
+// onProgress: (0–100) called during processing.
+async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParams, onProgress) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(originalFile);
+    video.src = objectUrl;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    // Must be in DOM (hidden) for captureStream to work in some browsers
+    video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
+    document.body.appendChild(video);
+
+    const cleanup = () => {
+      try { document.body.removeChild(video); } catch {}
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    video.onloadedmetadata = async () => {
+      const totalDuration = trimEnd - trimStart;
+      if (totalDuration <= 0.05) {
+        cleanup();
+        resolve(originalFile);
+        return;
+      }
+
+      const natW = video.videoWidth  || 1280;
+      const natH = video.videoHeight || 720;
+
+      // Source crop rect in native pixels
+      const srcX = cropParams?.x      ?? 0;
+      const srcY = cropParams?.y      ?? 0;
+      const srcW = cropParams?.width  ?? natW;
+      const srcH = cropParams?.height ?? natH;
+
+      // Output canvas dimensions
+      const outW = cropParams?.outputWidth  ?? natW;
+      const outH = cropParams?.outputHeight ?? natH;
+
+      // ── Canvas output ────────────────────────────────────────────────
+      const canvas = document.createElement('canvas');
+      canvas.width  = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext('2d');
+
+      // ── Pick best mimeType ──────────────────────────────────────────
+      const mimeType =
+        MediaRecorder.isTypeSupported('video/mp4;codecs=avc1') ? 'video/mp4;codecs=avc1' :
+        MediaRecorder.isTypeSupported('video/mp4')             ? 'video/mp4'              :
+        MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' :
+        MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' :
+        'video/webm';
+
+      // ── Set up MediaRecorder ────────────────────────────────────────
+      let stream, recorder;
+      try {
+        stream   = canvas.captureStream(30);
+        recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+      } catch {
+        try {
+          // Fallback: record straight from video (no crop applied)
+          const vStream = video.captureStream
+            ? video.captureStream(30)
+            : video.mozCaptureStream
+            ? video.mozCaptureStream(30)
+            : null;
+          if (!vStream) throw new Error('no stream');
+          recorder = new MediaRecorder(vStream, { mimeType });
+        } catch {
+          cleanup();
+          resolve(originalFile);
+          return;
+        }
+      }
+
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data?.size > 0) chunks.push(e.data); };
+
+      recorder.onstop = () => {
+        cleanup();
+        const blob = new Blob(chunks, { type: 'video/mp4' });
+        resolve(new File([blob], 'video.mp4', { type: 'video/mp4' }));
+      };
+
+      recorder.onerror = () => { cleanup(); resolve(originalFile); };
+
+      // ── Seek to trimStart, then start ───────────────────────────────
+      video.currentTime = trimStart;
+      await new Promise(res => {
+        const onSeeked = () => { video.removeEventListener('seeked', onSeeked); res(); };
+        video.addEventListener('seeked', onSeeked);
+      });
+
+      recorder.start(100); // collect chunks every 100 ms
+      video.play().catch(() => {});
+
+      // ── Frame draw loop ─────────────────────────────────────────────
+      const drawFrame = () => {
+        const elapsed  = Math.max(0, video.currentTime - trimStart);
+        const progress = Math.min(100, Math.round((elapsed / totalDuration) * 100));
+        if (onProgress) onProgress(progress);
+
+        // Stop condition
+        if (video.currentTime >= trimEnd - 0.05 || video.ended || video.paused) {
+          video.pause();
+          if (recorder.state === 'recording') {
+            // Draw one last frame before stopping
+            ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+            recorder.stop();
+          }
+          return;
+        }
+
+        // Draw current frame — crop from native src rect into full output canvas
+        ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+
+        if (recorder.state === 'recording') requestAnimationFrame(drawFrame);
+      };
+
+      requestAnimationFrame(drawFrame);
+    };
+
+    video.onerror = () => { cleanup(); resolve(originalFile); };
+  });
+}
+
 const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
@@ -115,6 +245,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [allUsers, setAllUsers] = useState([]);
   const [isLoadingAllUsers, setIsLoadingAllUsers] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  // Upload progress states
+  const [uploadStage, setUploadStage] = useState('idle'); // 'idle' | 'converting' | 'uploading' | 'posting' | 'done' | 'error'
+  const [uploadProgress, setUploadProgress] = useState(0); // 0-100
+  const [uploadError, setUploadError] = useState('');
 
   const POPULAR_EMOJIS = ['😂', '😮', '😍', '😢', '👏', '🔥', '🎉', '💯', '❤️', '🤣', '🥰', '😘', '😭', '😊'];
 
@@ -319,6 +453,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
         return {
           id: Math.random().toString(36).substr(2, 9),
           url,
+          originalFile: file, // ← store original File so we can upload with correct mime type (mp4/mov)
+          videoNaturalWidth:  video.videoWidth  || 0, // ← native video dimensions for crop calc
+          videoNaturalHeight: video.videoHeight || 0,
           type: 'video',
           crop: { x: 0, y: 0 },
           zoom: 1,
@@ -413,39 +550,83 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
 
   const handleNextStep = async () => {
     if (step === 'crop') {
-      if (media.some(m => m.type === 'video')) {
-        const newMedia = await Promise.all(media.map(async (item) => {
-          try {
-            const croppedUrl = await getCroppedImg(item.url, item.croppedAreaPixels);
-            return { ...item, croppedUrl };
-          } catch {
-            return { ...item, croppedUrl: item.url };
-          }
-        }));
-        setMedia(newMedia);
-        setStep('edit');
-      } else {
-        const newMedia = await Promise.all(media.map(async (item) => {
-          try {
-            const croppedUrl = await getCroppedImg(item.url, item.croppedAreaPixels);
-            return { ...item, croppedUrl };
-          } catch {
-            return { ...item, croppedUrl: item.url };
-          }
-        }));
-        setMedia(newMedia);
-        setStep('edit');
-      }
+      // ── Compute croppedAreaPixels for video items ──────────────────────
+      // Videos use a visual overlay box (not react-easy-crop) so we must
+      // manually derive the crop rectangle in the video's native pixel space.
+      const containerEl = cropContainerRef.current;
+
+      const computeVideoCropPixels = (item) => {
+        if (item.type !== 'video') return item.croppedAreaPixels || null;
+        if (!containerEl) return null;
+
+        const cw = containerEl.clientWidth;
+        const ch = containerEl.clientHeight;
+        const vw = item.videoNaturalWidth  || item.originalAspect ? (ch * item.originalAspect) : cw;
+        const vh = item.videoNaturalHeight || ch;
+
+        // How the video is rendered inside the container (object-contain)
+        const videoAspect = item.originalAspect || (vw / vh) || 1;
+        let rendW, rendH;
+        if (cw / ch > videoAspect) { rendH = ch; rendW = rendH * videoAspect; }
+        else                        { rendW = cw; rendH = rendW / videoAspect; }
+
+        // The white overlay box dimensions on screen
+        const boxW = overlaySize.w || rendW;
+        const boxH = overlaySize.h || rendH;
+
+        // Center of the rendered video on screen
+        const vidLeft = (cw - rendW) / 2;
+        const vidTop  = (ch - rendH) / 2;
+        // Center of the overlay box (it's centered in the container)
+        const boxLeft = (cw - boxW) / 2;
+        const boxTop  = (ch - boxH) / 2;
+
+        // Offset of box inside the rendered video (screen pixels)
+        const offsetX = boxLeft - vidLeft;
+        const offsetY = boxTop  - vidTop;
+
+        // Scale factor: native pixels per screen pixel
+        const scaleX = (item.videoNaturalWidth  || rendW) / rendW;
+        const scaleY = (item.videoNaturalHeight || rendH) / rendH;
+
+        return {
+          x:      Math.max(0, Math.round(offsetX * scaleX)),
+          y:      Math.max(0, Math.round(offsetY * scaleY)),
+          width:  Math.round(boxW * scaleX),
+          height: Math.round(boxH * scaleY),
+        };
+      };
+
+      const newMedia = await Promise.all(media.map(async (item) => {
+        if (item.type === 'video') {
+          // Compute and store the crop pixels for use during upload
+          const cropPx = computeVideoCropPixels(item);
+          return { ...item, croppedAreaPixels: cropPx, croppedUrl: item.url };
+        }
+        try {
+          const croppedUrl = await getCroppedImg(item.url, item.croppedAreaPixels);
+          return { ...item, croppedUrl };
+        } catch {
+          return { ...item, croppedUrl: item.url };
+        }
+      }));
+      setMedia(newMedia);
+      setStep('edit');
     } else if (step === 'edit') {
       setStep('share');
     } else if (step === 'share') {
       // Submit post
       if (isSubmitting) return;
       setIsSubmitting(true);
+      setUploadStage('converting');
+      setUploadProgress(0);
+      setUploadError('');
 
       try {
         if (!userObject) {
-          alert("Please log in to share a post.");
+          setUploadStage('error');
+          setUploadError('Please log in to share a post.');
+          setIsSubmitting(false);
           return;
         }
 
@@ -459,29 +640,101 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           return 'custom';
         };
 
-        // Upload media and prepare array
-        const processedMedia = await Promise.all(media.map(async (item) => {
-          // Fetch blob from blob URL or generate filtered blob
-          let blob;
-          try {
-            blob = await applyFiltersToImage(item);
-          } catch (e) {
-            console.error("Error applying filters, falling back to original", e);
-            const response = await fetch(item.croppedUrl || item.url);
-            blob = await response.blob();
+        // ── STAGE 1: Trim + Crop + Convert each video to MP4 ───────────
+        const totalItems = media.length;
+        const convertedMedia = await Promise.all(media.map(async (item, idx) => {
+          if (item.type !== 'video' || !item.originalFile) return item;
+
+          const start = item.trimStart || 0;
+          const dur   = item.duration  || 0;
+          const end   = (item.trimEnd && item.trimEnd > 0) ? item.trimEnd : dur;
+
+          // Build crop params from croppedAreaPixels (computed in crop step for videos)
+          let cropParams = null;
+          if (item.croppedAreaPixels) {
+            const { x, y, width, height } = item.croppedAreaPixels;
+            if (width > 0 && height > 0) {
+              // Output dimensions: match the chosen aspect ratio, capped at original size
+              const aspect = item.aspect || (width / height) || 1;
+              // Keep output resolution as close to source as possible, max 1920 on long side
+              const maxLong = 1920;
+              let outputWidth, outputHeight;
+              if (aspect >= 1) {
+                outputWidth  = Math.min(width,  maxLong);
+                outputHeight = Math.round(outputWidth / aspect);
+              } else {
+                outputHeight = Math.min(height, maxLong);
+                outputWidth  = Math.round(outputHeight * aspect);
+              }
+              // Ensure even dimensions (required by most video codecs)
+              outputWidth  = outputWidth  % 2 === 0 ? outputWidth  : outputWidth  - 1;
+              outputHeight = outputHeight % 2 === 0 ? outputHeight : outputHeight - 1;
+              cropParams = { x, y, width, height, outputWidth, outputHeight };
+            }
           }
 
-          const fileExt = blob.type.split('/')[1] || 'jpg';
+          const convertedFile = await processVideoForUpload(
+            item.originalFile,
+            start,
+            end,
+            cropParams,
+            (pct) => {
+              const base  = (idx / totalItems) * 50;
+              const slice = (1 / totalItems) * 50;
+              setUploadProgress(Math.round(base + (pct / 100) * slice));
+            }
+          );
+          return { ...item, convertedFile };
+        }));
+
+        // ── STAGE 2: Upload files ────────────────────────────────────────
+        setUploadStage('uploading');
+        setUploadProgress(50);
+
+        const processedMedia = await Promise.all(convertedMedia.map(async (item, idx) => {
+          let blob;
+          let uploadMimeType;
+
+          try {
+            if (item.type === 'video') {
+              // Use converted mp4 file if available, else original
+              const fileToUpload = item.convertedFile || item.originalFile;
+              if (fileToUpload) {
+                blob = fileToUpload;
+                uploadMimeType = 'video/mp4';
+              } else {
+                const response = await fetch(item.url);
+                blob = await response.blob();
+                uploadMimeType = blob.type;
+              }
+            } else {
+              blob = await applyFiltersToImage(item);
+              uploadMimeType = blob.type;
+            }
+          } catch (e) {
+            console.error('Error processing media, falling back to original', e);
+            const response = await fetch(item.croppedUrl || item.url);
+            blob = await response.blob();
+            uploadMimeType = blob.type;
+          }
+
+          const fileExt = item.type === 'video' ? 'mp4' : (uploadMimeType.split('/')[1] || 'jpg');
           const fileName = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-          const file = new File([blob], fileName, { type: blob.type });
+          const file = new File([blob], fileName, { type: uploadMimeType });
 
           const formData = new FormData();
           formData.append('file', file);
 
           const uploadResponse = await api.post('https://bsmart.asynk.store/api/upload', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: (evt) => {
+              if (evt.total) {
+                const filePct = Math.round((evt.loaded / evt.total) * 100);
+                const base = 50 + (idx / totalItems) * 45;
+                const slice = (1 / totalItems) * 45;
+                setUploadProgress(Math.round(base + (filePct / 100) * slice));
+              }
+            }
           });
 
           const { fileUrl, fileName: serverFileName } = uploadResponse.data;
@@ -495,10 +748,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           const saturate = `saturate(${100 + adj.saturate}%)`;
           const sepia = adj.sepia !== 0 ? `sepia(${Math.abs(adj.sepia)}%)` : '';
           const hue = adj.sepia < 0 ? `hue-rotate(-${Math.abs(adj.sepia)}deg)` : (adj.sepia > 0 ? `hue-rotate(${adj.sepia}deg)` : '');
-
           const filterCss = `${baseFilter} ${brightness} ${contrast} ${saturate} ${sepia} ${hue}`.trim();
 
-          // Upload selected thumbnail only (video)
+          // Upload thumbnail
           let uploadedThumbs = null;
           let thumbnailTime = 0;
           if (item.type === 'video') {
@@ -506,12 +758,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             const cover = item.coverUrl;
             if (cover) {
               const thumbForm = new FormData();
-              const imgBlob = await (async () => {
-                const img = await fetch(cover);
-                return await img.blob();
-              })();
+              const imgBlob = await (await fetch(cover)).blob();
               const tFile = new File([imgBlob], `thumb_${Date.now()}.jpg`, { type: 'image/jpeg' });
-              // API supports single file param
               thumbForm.append('file', tFile);
               try {
                 const thumbRes = await api.post('https://bsmart.asynk.store/api/upload/thumbnail', thumbForm, {
@@ -522,60 +770,44 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                 uploadedThumbs = null;
               }
               const count = thumbs.length;
-              const idx = Math.max(0, thumbs.findIndex(t => t === cover));
+              const idxThumb = Math.max(0, thumbs.findIndex(t => t === cover));
               const dur = item.duration || 0;
-              thumbnailTime = (count > 1 && dur > 0) ? (idx * dur) / (count - 1) : 0;
+              thumbnailTime = (count > 1 && dur > 0) ? (idxThumb * dur) / (count - 1) : 0;
             }
           }
 
-          let finalFileUrl = fileUrl;
-          let timing = undefined;
-
+          let timing;
           if (item.type === 'video') {
             const dur = item.duration || 0;
             const start = item.trimStart || 0;
-            const endRaw = item.trimEnd || dur;
-            const end = endRaw > 0 ? endRaw : dur;
-            const hasTrim =
-              dur > 0 &&
-              (start > 0.01 || (end > 0 && end < dur - 0.01));
-
+            const end = (item.trimEnd && item.trimEnd > 0) ? item.trimEnd : dur;
             timing = { start, end: end || dur };
-
-            if (hasTrim && fileUrl) {
-              const startSec = Math.max(0, start);
-              const endSec = Math.max(startSec, end || dur);
-              finalFileUrl = `${fileUrl}#t=${startSec.toFixed(3)},${endSec.toFixed(3)}`;
-            }
           }
 
           const baseObj = {
             fileName: serverFileName || fileName,
             type: item.type === 'video' ? 'video' : 'image',
-            fileUrl: finalFileUrl,
+            fileUrl,
             crop: {
-              mode: "original",
+              mode: 'original',
               aspect_ratio: getAspectRatioLabel(item.aspect || item.originalAspect || 1),
               zoom: item.zoom,
               x: item.crop.x,
               y: item.crop.y
             },
-            timing: timing,
+            timing,
             thumbnail: uploadedThumbs || undefined,
-            "thumbail-time": item.type === 'video' ? thumbnailTime : undefined,
+            'thumbail-time': item.type === 'video' ? thumbnailTime : undefined,
             videoLength: item.type === 'video' ? (item.duration || 0) : undefined,
             totalLenght: item.type === 'video' ? (item.duration || 0) : undefined,
-            "finalLength-start": item.type === 'video' ? (item.trimStart || 0) : undefined,
-            "finallength-end": item.type === 'video' ? (item.trimEnd || item.duration || 0) : undefined,
+            'finalLength-start': item.type === 'video' ? (item.trimStart || 0) : undefined,
+            'finallength-end': item.type === 'video' ? (item.trimEnd || item.duration || 0) : undefined,
             finalLength: item.type === 'video' ? Math.max(0, (item.trimEnd || item.duration || 0) - (item.trimStart || 0)) : undefined,
             finallength: item.type === 'video' ? Math.max(0, (item.trimEnd || item.duration || 0) - (item.trimStart || 0)) : undefined
           };
-          
+
           if (item.type !== 'video') {
-            baseObj.filter = {
-              name: item.filter,
-              css: filterCss
-            };
+            baseObj.filter = { name: item.filter, css: filterCss };
             baseObj.adjustments = {
               brightness: item.adjustments.brightness,
               contrast: item.adjustments.contrast,
@@ -585,11 +817,14 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
               vignette: item.adjustments.vignette
             };
           }
-          
+
           return baseObj;
         }));
 
-        // Extract hashtags from caption
+        // ── STAGE 3: Post to API ─────────────────────────────────────────
+        setUploadStage('posting');
+        setUploadProgress(97);
+
         const hashtags = caption.match(/#[a-zA-Z0-9_]+/g) || [];
 
         if (postType === 'reel') {
@@ -608,7 +843,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             turn_off_commenting: turnOffCommenting
           };
           await api.post('https://bsmart.asynk.store/api/posts/reels', payload);
-          setShowSuccess(true);
         } else {
           const payload = {
             caption,
@@ -628,18 +862,14 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           await api.post('/posts', payload);
         }
 
-        if (!showSuccess) {
-          handleClose();
-          setMedia([]);
-          setCaption('');
-          setLocation('');
-          setTags([]);
-          alert("Post shared successfully!");
-        }
+        setUploadProgress(100);
+        setUploadStage('done');
+        setShowSuccess(true);
 
       } catch (error) {
-        console.error("Error creating post:", error);
-        alert("Failed to create post. Please try again.");
+        console.error('Error creating post:', error);
+        setUploadStage('error');
+        setUploadError(error?.response?.data?.message || error?.message || 'Failed to upload. Please try again.');
       } finally {
         setIsSubmitting(false);
       }
@@ -1470,16 +1700,21 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                         className="w-full h-full object-cover"
                         controls={false}
                         autoPlay
+                        loop
                         muted={!currentMedia.soundOn}
                         onLoadedMetadata={(e) => {
-                          e.currentTarget.currentTime = currentMedia.trimStart || 0;
+                          const v = e.currentTarget;
+                          v.currentTime = currentMedia.trimStart || 0;
                         }}
                         onTimeUpdate={(e) => {
                           const v = e.currentTarget;
-                          const end = currentMedia.trimEnd || 0;
-                          if (end > 0 && v.currentTime > end) {
-                            v.pause();
-                            v.currentTime = end;
+                          const trimEnd = (currentMedia.trimEnd && currentMedia.trimEnd > 0)
+                            ? currentMedia.trimEnd
+                            : (currentMedia.duration || 0);
+                          if (trimEnd > 0 && v.currentTime >= trimEnd) {
+                            // Loop back to trimStart
+                            v.currentTime = currentMedia.trimStart || 0;
+                            v.play().catch(() => {});
                           }
                         }}
                       />
@@ -1750,24 +1985,197 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           </div>
         </div>
       )}
-      {showSuccess && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">
-              Reel uploaded successfully
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
-              Your reel has been created. You can close this window or continue editing.
-            </p>
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => {
-                  setShowSuccess(false);
-                  handleClose();
+      {/* ── Upload Progress Overlay ── */}
+      {isSubmitting && uploadStage !== 'idle' && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col items-center gap-6">
+            {/* Animated icon */}
+            <div className="relative flex items-center justify-center w-20 h-20">
+              {/* Outer spinning ring */}
+              <svg className="absolute inset-0 w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="6" className="dark:stroke-gray-700" />
+                <circle
+                  cx="40" cy="40" r="34" fill="none"
+                  stroke="url(#uploadGrad)" strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 34}`}
+                  strokeDashoffset={`${2 * Math.PI * 34 * (1 - uploadProgress / 100)}`}
+                  style={{ transition: 'stroke-dashoffset 0.4s ease' }}
+                />
+                <defs>
+                  <linearGradient id="uploadGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#f472b6" />
+                    <stop offset="100%" stopColor="#a855f7" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              {/* Inner icon */}
+              <div className="relative z-10 flex flex-col items-center justify-center">
+                {uploadStage === 'converting' && (
+                  <svg className="w-8 h-8 text-pink-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                )}
+                {uploadStage === 'uploading' && (
+                  <svg className="w-8 h-8 text-purple-500 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                )}
+                {uploadStage === 'posting' && (
+                  <svg className="w-8 h-8 text-purple-500 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                )}
+              </div>
+            </div>
+
+            {/* Percentage */}
+            <div className="text-3xl font-bold text-gray-900 dark:text-white tabular-nums">
+              {uploadProgress}%
+            </div>
+
+            {/* Stage label */}
+            <div className="flex flex-col items-center gap-1">
+              <p className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                {uploadStage === 'converting' && 'Trimming & exporting MP4…'}
+                {uploadStage === 'uploading' && 'Uploading your reel…'}
+                {uploadStage === 'posting' && 'Almost there…'}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+                {uploadStage === 'converting' && 'Applying your trim and crop. This may take a moment.'}
+                {uploadStage === 'uploading' && 'Sending your video to the server.'}
+                {uploadStage === 'posting' && 'Publishing your reel. Hang tight!'}
+              </p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${uploadProgress}%`,
+                  background: 'linear-gradient(90deg, #f472b6, #a855f7)'
                 }}
-                className="px-4 py-2.5 rounded-lg bg-insta-pink text-white font-medium hover:bg-insta-purple transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Success Popup ── */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div
+            className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col items-center gap-5"
+            style={{ animation: 'popIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both' }}
+          >
+            <style>{`
+              @keyframes popIn {
+                from { opacity: 0; transform: scale(0.85) translateY(10px); }
+                to   { opacity: 1; transform: scale(1)    translateY(0); }
+              }
+              @keyframes checkDraw {
+                from { stroke-dashoffset: 40; }
+                to   { stroke-dashoffset: 0; }
+              }
+            `}</style>
+
+            {/* Animated checkmark */}
+            <div className="relative flex items-center justify-center w-20 h-20">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 opacity-15 animate-ping" style={{ animationDuration: '1.5s' }} />
+              <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f472b6, #a855f7)' }}>
+                <svg className="w-10 h-10 text-white" viewBox="0 0 40 40" fill="none">
+                  <path
+                    d="M10 21l7 7 14-14"
+                    stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"
+                    strokeDasharray="40"
+                    strokeDashoffset="0"
+                    style={{ animation: 'checkDraw 0.45s 0.2s ease both' }}
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-1 text-center">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                {postType === 'reel' ? 'Reel Published! 🎉' : 'Post Shared! 🎉'}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {postType === 'reel'
+                  ? 'Your reel is live and ready to be seen by everyone.'
+                  : 'Your post has been shared with your followers.'}
+              </p>
+            </div>
+
+            {/* Stats row */}
+            <div className="w-full flex items-center justify-around py-3 px-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700">
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-lg font-bold text-gray-900 dark:text-white">
+                  {media.filter(m => m.type === 'video').length}
+                </span>
+                <span className="text-xs text-gray-400">{media.filter(m => m.type === 'video').length === 1 ? 'Video' : 'Videos'}</span>
+              </div>
+              <div className="w-px h-8 bg-gray-200 dark:bg-gray-700" />
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">MP4</span>
+                <span className="text-xs text-gray-400">Format</span>
+              </div>
+              <div className="w-px h-8 bg-gray-200 dark:bg-gray-700" />
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-lg font-bold text-gray-900 dark:text-white">✓</span>
+                <span className="text-xs text-gray-400">Uploaded</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowSuccess(false);
+                setUploadStage('idle');
+                setUploadProgress(0);
+                handleClose();
+                setMedia([]);
+                setCaption('');
+                setLocation('');
+                setTags([]);
+              }}
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #f472b6, #a855f7)' }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Error Popup ── */}
+      {uploadStage === 'error' && !isSubmitting && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div
+            className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-red-100 dark:border-red-900/40 flex flex-col items-center gap-5"
+            style={{ animation: 'popIn 0.3s ease both' }}
+          >
+            <div className="w-20 h-20 rounded-full flex items-center justify-center bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800">
+              <svg className="w-9 h-9 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <div className="flex flex-col items-center gap-1 text-center">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Upload Failed</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{uploadError || 'Something went wrong. Please try again.'}</p>
+            </div>
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => { setUploadStage('idle'); setUploadProgress(0); setUploadError(''); }}
+                className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
-                Close
+                Cancel
+              </button>
+              <button
+                onClick={() => { setUploadStage('idle'); setUploadProgress(0); setUploadError(''); handleNextStep(); }}
+                className="flex-1 py-3 rounded-xl text-white font-semibold text-sm transition-all active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #f472b6, #a855f7)' }}
+              >
+                Try Again
               </button>
             </div>
           </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Edit, Trash2, ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
@@ -51,6 +51,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [isMuted, setIsMuted] = useState(true);
+    const videoRef = useRef(null);
 
     // Handle different data structures (Supabase join vs flat vs new API)
     const user = post.user_id || post.users || post.user || {};
@@ -98,6 +100,14 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
     const prevImage = (e) => {
         e.stopPropagation();
         setCurrentImageIndex((prev) => (prev === 0 ? mediaItems.length - 1 : prev - 1));
+    };
+
+    const toggleMute = (e) => {
+        e.stopPropagation();
+        if (videoRef.current) {
+            videoRef.current.muted = !isMuted;
+        }
+        setIsMuted(!isMuted);
     };
 
     useEffect(() => {
@@ -327,34 +337,44 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                                 (() => {
                                     const { start, end } = getVideoTiming(mediaItems[currentImageIndex]);
                                     return (
-                                        <video
-                                            src={mediaItems[currentImageIndex].fileUrl || mediaItems[currentImageIndex].url}
-                                            className="w-full h-auto max-h-[600px] object-contain"
-                                            controls
-                                            autoPlay
-                                            muted
-                                            data-start={start}
-                                            data-end={end}
-                                            onLoadedMetadata={(e) => {
-                                                const s = Number(e.currentTarget.dataset.start || 0);
-                                                if (s > 0 && isFinite(s)) {
-                                                    e.currentTarget.currentTime = s;
-                                                }
-                                            }}
-                                            onTimeUpdate={(e) => {
-                                                const v = e.currentTarget;
-                                                const s = Number(v.dataset.start || 0);
-                                                const endVal = Number(v.dataset.end || 0);
-                                                if (endVal > 0 && isFinite(endVal) && v.currentTime > endVal) {
+                                        <div className="relative w-full h-auto max-h-[600px]">
+                                            <video
+                                                ref={videoRef}
+                                                src={mediaItems[currentImageIndex].fileUrl || mediaItems[currentImageIndex].url}
+                                                className="w-full h-auto max-h-[600px] object-contain"
+                                                controls
+                                                autoPlay
+                                                muted={isMuted}
+                                                data-start={start}
+                                                data-end={end}
+                                                onLoadedMetadata={(e) => {
+                                                    const s = Number(e.currentTarget.dataset.start || 0);
                                                     if (s > 0 && isFinite(s)) {
-                                                        v.currentTime = s;
-                                                    } else {
-                                                        v.currentTime = endVal;
+                                                        e.currentTarget.currentTime = s;
                                                     }
-                                                    v.pause();
-                                                }
-                                            }}
-                                        />
+                                                }}
+                                                onTimeUpdate={(e) => {
+                                                    const v = e.currentTarget;
+                                                    const s = Number(v.dataset.start || 0);
+                                                    const endVal = Number(v.dataset.end || 0);
+                                                    if (endVal > 0 && isFinite(endVal) && v.currentTime > endVal) {
+                                                        if (s > 0 && isFinite(s)) {
+                                                            v.currentTime = s;
+                                                        } else {
+                                                            v.currentTime = endVal;
+                                                        }
+                                                        v.pause();
+                                                    }
+                                                }}
+                                            />
+                                            {/* Mute/Unmute Button */}
+                                            <button
+                                                onClick={toggleMute}
+                                                className="absolute bottom-3 right-3 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                            >
+                                                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                                            </button>
+                                        </div>
                                     );
                                 })()
                             ) : (
