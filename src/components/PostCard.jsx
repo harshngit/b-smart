@@ -65,10 +65,30 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
         (userObject._id && userId && String(userObject._id) === String(userId))
     );
 
-    // Extract media items
     const mediaItems = post.media && post.media.length > 0
         ? post.media
         : (post.imageUrl ? [{ fileUrl: post.imageUrl }] : []);
+
+    const getVideoTiming = (item) => {
+        if (!item) return { start: 0, end: 0 };
+        const toNumber = (v) => {
+            if (typeof v === 'number' && isFinite(v)) return v;
+            if (typeof v === 'string') {
+                const n = parseFloat(v);
+                return isFinite(n) ? n : 0;
+            }
+            return 0;
+        };
+        const timing = item.timing || {};
+        let start = toNumber(timing.start ?? item["finalLength-start"]);
+        let end = toNumber(timing.end ?? item["finallength-end"]);
+        const duration = toNumber(item.videoLength ?? item.totalLenght ?? item.duration);
+        if (start < 0) start = 0;
+        if ((!end || end <= 0) && duration > 0) end = duration;
+        if (duration > 0 && end > duration) end = duration;
+        if (end > 0 && end <= start) end = 0;
+        return { start, end };
+    };
 
     const nextImage = (e) => {
         e.stopPropagation();
@@ -303,11 +323,47 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                 {mediaItems.length > 0 ? (
                     <>
                         <div className="w-full h-auto min-h-[300px] flex items-center justify-center bg-black">
-                            <img
-                                src={mediaItems[currentImageIndex].fileUrl || mediaItems[currentImageIndex].image}
-                                alt={`Post content ${currentImageIndex + 1}`}
-                                className="w-full h-auto max-h-[600px] object-contain"
-                            />
+                            {mediaItems[currentImageIndex].type === 'video' ? (
+                                (() => {
+                                    const { start, end } = getVideoTiming(mediaItems[currentImageIndex]);
+                                    return (
+                                        <video
+                                            src={mediaItems[currentImageIndex].fileUrl || mediaItems[currentImageIndex].url}
+                                            className="w-full h-auto max-h-[600px] object-contain"
+                                            controls
+                                            autoPlay
+                                            muted
+                                            data-start={start}
+                                            data-end={end}
+                                            onLoadedMetadata={(e) => {
+                                                const s = Number(e.currentTarget.dataset.start || 0);
+                                                if (s > 0 && isFinite(s)) {
+                                                    e.currentTarget.currentTime = s;
+                                                }
+                                            }}
+                                            onTimeUpdate={(e) => {
+                                                const v = e.currentTarget;
+                                                const s = Number(v.dataset.start || 0);
+                                                const endVal = Number(v.dataset.end || 0);
+                                                if (endVal > 0 && isFinite(endVal) && v.currentTime > endVal) {
+                                                    if (s > 0 && isFinite(s)) {
+                                                        v.currentTime = s;
+                                                    } else {
+                                                        v.currentTime = endVal;
+                                                    }
+                                                    v.pause();
+                                                }
+                                            }}
+                                        />
+                                    );
+                                })()
+                            ) : (
+                                <img
+                                    src={mediaItems[currentImageIndex].fileUrl || mediaItems[currentImageIndex].image}
+                                    alt={`Post content ${currentImageIndex + 1}`}
+                                    className="w-full h-auto max-h-[600px] object-contain"
+                                />
+                            )}
                         </div>
 
                         {/* Navigation Arrows */}

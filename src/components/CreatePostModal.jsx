@@ -143,6 +143,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [dragHandle, setDragHandle] = useState(null);
   const editVideoRef = useRef(null);
   const shareContainerRef = useRef(null);
+  const [trimPlayTime, setTrimPlayTime] = useState(0);
   const [shareBoxSize, setShareBoxSize] = useState({ w: 0, h: 0 });
 
   const currentMedia = media[currentIndex];
@@ -527,10 +528,31 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             }
           }
 
+          let finalFileUrl = fileUrl;
+          let timing = undefined;
+
+          if (item.type === 'video') {
+            const dur = item.duration || 0;
+            const start = item.trimStart || 0;
+            const endRaw = item.trimEnd || dur;
+            const end = endRaw > 0 ? endRaw : dur;
+            const hasTrim =
+              dur > 0 &&
+              (start > 0.01 || (end > 0 && end < dur - 0.01));
+
+            timing = { start, end: end || dur };
+
+            if (hasTrim && fileUrl) {
+              const startSec = Math.max(0, start);
+              const endSec = Math.max(startSec, end || dur);
+              finalFileUrl = `${fileUrl}#t=${startSec.toFixed(3)},${endSec.toFixed(3)}`;
+            }
+          }
+
           const baseObj = {
             fileName: serverFileName || fileName,
             type: item.type === 'video' ? 'video' : 'image',
-            fileUrl: fileUrl,
+            fileUrl: finalFileUrl,
             crop: {
               mode: "original",
               aspect_ratio: getAspectRatioLabel(item.aspect || item.originalAspect || 1),
@@ -538,7 +560,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
               x: item.crop.x,
               y: item.crop.y
             },
-            timing: item.type === 'video' ? { start: item.trimStart || 0, end: item.trimEnd || item.duration || 0 } : undefined,
+            timing: timing,
             thumbnail: uploadedThumbs || undefined,
             "thumbail-time": item.type === 'video' ? thumbnailTime : undefined,
             videoLength: item.type === 'video' ? (item.duration || 0) : undefined,
@@ -826,7 +848,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
       await new Promise(res => { v.onloadedmetadata = res; });
       const duration = isFinite(v.duration) ? v.duration : 0;
       const frames = [];
-      const count = 8;
+      const baseCount = 7;
+      const maxCount = 24;
+      const count = duration > 0
+        ? Math.min(maxCount, Math.max(baseCount, Math.round(duration / 3)))
+        : baseCount;
       const width = 240;
       const height = 240;
       canvas.width = width;
@@ -1166,6 +1192,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                         }}
                         onTimeUpdate={(e) => {
                           const v = e.currentTarget;
+                          setTrimPlayTime(v.currentTime);
                           const d = currentMedia.duration || 0;
                           const end = currentMedia.trimEnd && currentMedia.trimEnd > 0 ? currentMedia.trimEnd : d;
                           if (end > 0 && v.currentTime >= end) {
@@ -1317,7 +1344,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                       <div className="text-sm font-semibold mb-2 dark:text-white">Trim</div>
                       {currentMedia?.thumbnails ? (
                         <div
-                          ref={trimTrackRef}
                           className="relative w-full h-20 rounded bg-black/10 dark:bg-white/5 overflow-visible select-none"
                           onMouseMove={(e) => {
                             if (!dragHandle) return;
@@ -1335,52 +1361,76 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                           onMouseLeave={() => setDragHandle(null)}
                           onMouseUp={() => setDragHandle(null)}
                         >
-                          <div className="absolute inset-0 flex">
-                            {(currentMedia.thumbnails || []).map((thumb, idx) => (
-                              <img key={idx} src={thumb} className="h-full flex-1 object-cover" alt="" />
-                            ))}
-                          </div>
-                          <div className="absolute inset-0">
+                          <div
+                            ref={trimTrackRef}
+                            className="absolute top-2 bottom-2 left-4 right-4 bg-black overflow-hidden"
+                            style={{
+                              backgroundImage: currentMedia?.coverUrl
+                                ? `url(${currentMedia.coverUrl})`
+                                : (currentMedia?.thumbnails && currentMedia.thumbnails[0]
+                                  ? `url(${currentMedia.thumbnails[0]})`
+                                  : (currentMedia?.croppedUrl || currentMedia?.url
+                                    ? `url(${currentMedia.croppedUrl || currentMedia.url})`
+                                    : undefined)),
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center'
+                            }}
+                          >
+                            <div className="absolute inset-0">
+                              {(() => {
+                                const dur = currentMedia.duration || 0;
+                                const s = (currentMedia.trimStart || 0) / (dur || 1);
+                                const e = (currentMedia.trimEnd || 0) / (dur || 1);
+                                const progress = dur > 0 ? Math.min(1, Math.max(0, (trimPlayTime || 0) / dur)) : 0;
+                                const left = `${s * 100}%`;
+                                const width = `${Math.max(e - s, 0) * 100}%`;
+                                const progressLeft = `${progress * 100}%`;
+                                return (
+                                  <>
+                                    <div
+                                      className="absolute top-0 bottom-0 w-[3px] bg-white z-20 shadow-[0_0_6px_rgba(255,255,255,0.9)]"
+                                      style={{ left: `calc(${progressLeft} - 1.5px)` }}
+                                    />
+                                    <div className="absolute top-0 bottom-0 bg-black/40" style={{ left: 0, right: `calc(100% - ${left})` }} />
+                                    <div className="absolute top-0 bottom-0 bg-black/40" style={{ left: `${e * 100}%`, right: 0 }} />
+                                    <div
+                                      className="absolute top-0 bottom-0 border-2 border-white rounded pointer-events-none z-10"
+                                      style={{ left, width }}
+                                    />
+                                    <div
+                                      className="absolute top-0 bottom-0 w-3 bg-white rounded-lg cursor-ew-resize ring-1 ring-black/30 z-20"
+                                      style={{ left }}
+                                      onMouseDown={() => setDragHandle('start')}
+                                    />
+                                    <div
+                                      className="absolute top-0 bottom-0 w-3 bg-white rounded-lg cursor-ew-resize ring-1 ring-black/30 z-20"
+                                      style={{ left: `calc(${e * 100}% - 0.5rem)` }}
+                                      onMouseDown={() => setDragHandle('end')}
+                                    />
+                                  </>
+                                );
+                              })()}
+                            </div>
                             {(() => {
                               const dur = currentMedia.duration || 0;
-                              const s = (currentMedia.trimStart || 0) / (dur || 1);
-                              const e = (currentMedia.trimEnd || 0) / (dur || 1);
-                              const left = `${s * 100}%`;
+                              const endVal = (currentMedia.trimEnd && currentMedia.trimEnd > 0) ? currentMedia.trimEnd : dur;
+                              const startVal = currentMedia.trimStart || 0;
+                              const trimLen = Math.max(0, endVal - startVal);
                               return (
                                 <>
-                                  <div className="absolute top-0 bottom-0 bg-black/40" style={{ left: 0, right: `calc(100% - ${left})` }} />
-                                  <div className="absolute top-0 bottom-0 bg-black/40" style={{ left: `${e * 100}%`, right: 0 }} />
-                                  <div
-                                    className="absolute top-0 bottom-0 w-3 bg-white rounded-lg cursor-ew-resize ring-1 ring-black/30"
-                                    style={{ left }}
-                                    onMouseDown={() => setDragHandle('start')}
-                                  />
-                                  <div
-                                    className="absolute top-0 bottom-0 w-3 bg-white rounded-lg cursor-ew-resize ring-1 ring-black/30"
-                                    style={{ left: `calc(${e * 100}% - 0.5rem)` }}
-                                    onMouseDown={() => setDragHandle('end')}
-                                  />
-                                  <div className="absolute -top-6 z-20 text-xs font-mono text-white px-1.5 py-0.5 rounded bg-black/60 pointer-events-none" style={{ left: `calc(${s * 100}% - 1.5rem)` }}>
-                                    {formatDuration(currentMedia.trimStart || 0)}
+                                  <div className="absolute -top-5 left-4 text-xs font-mono text-white px-2 py-0.5 rounded-full bg-black/80 pointer-events-none">
+                                    {formatDuration(startVal)}
                                   </div>
-                                  <div className="absolute -top-6 z-20 text-xs font-mono text-white px-1.5 py-0.5 rounded bg-black/60 pointer-events-none" style={{ left: `calc(${e * 100}% - 1.5rem)` }}>
-                                    {formatDuration(currentMedia.trimEnd || 0)}
+                                  <div className="absolute -top-5 right-4 text-xs font-mono text-white px-2 py-0.5 rounded-full bg-black/80 pointer-events-none">
+                                    {formatDuration(endVal)}
+                                  </div>
+                                  <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs font-semibold text-white px-3 py-1 rounded-full bg-black/80">
+                                    {formatDuration(trimLen)}
                                   </div>
                                 </>
                               );
                             })()}
                           </div>
-                          {(() => {
-                            const dur = currentMedia.duration || 0;
-                            const endVal = (currentMedia.trimEnd && currentMedia.trimEnd > 0) ? currentMedia.trimEnd : dur;
-                            const startVal = currentMedia.trimStart || 0;
-                            const midVal = (startVal + endVal) / 2;
-                            return (
-                              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-semibold text-gray-200">
-                                {formatDuration(midVal)}
-                              </div>
-                            );
-                          })()}
                         </div>
                       ) : null}
                     </div>
