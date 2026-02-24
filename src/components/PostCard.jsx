@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Edit, Trash2, ChevronLeft, ChevronRight, Volume2, VolumeX, UserPlus, UserCheck, Tag } from 'lucide-react';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Edit, Trash2, ChevronLeft, ChevronRight, Volume2, VolumeX, UserPlus, UserCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
@@ -37,16 +37,19 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, isDeleting }) => {
     );
 };
 
-// ─── People Tag Overlay ─────────────────────────────────────────────────────
-// Shows Instagram-style draggable tag bubbles on tap/click
+// ─── People Tag Overlay — exact Instagram style ────────────────────────────
 const PeopleTagsOverlay = ({ tags, visible }) => {
     const [showTags, setShowTags] = useState(false);
 
+    // Auto-show briefly on load then hide
     useEffect(() => {
         if (visible && tags && tags.length > 0) {
-            setShowTags(true);
-            const t = setTimeout(() => setShowTags(false), 2800);
-            return () => clearTimeout(t);
+            const showT = setTimeout(() => setShowTags(true), 0);
+            const hideT = setTimeout(() => setShowTags(false), 2600);
+            return () => {
+                clearTimeout(showT);
+                clearTimeout(hideT);
+            };
         }
     }, [visible, tags]);
 
@@ -55,56 +58,69 @@ const PeopleTagsOverlay = ({ tags, visible }) => {
     return (
         <>
             <style>{`
-                @keyframes tagPop {
-                    from { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
-                    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                @keyframes igTagPop {
+                    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+                    70%  { transform: translate(-50%, -50%) scale(1.08); }
+                    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
                 }
-                @keyframes tagFadeOut {
-                    from { opacity: 1; }
-                    to   { opacity: 0; }
+                @keyframes igTagFade {
+                    0%   { opacity: 1; }
+                    100% { opacity: 0; }
                 }
             `}</style>
 
-            {/* Clickable overlay — tap to toggle tags */}
-            <div
-                className="absolute inset-0 z-10 cursor-pointer select-none"
+            {/* Tag icon button — bottom left, Instagram person-silhouette style */}
+            <button
+                className="absolute bottom-3 left-3 z-5 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all hover:bg-black/70 active:scale-90"
                 onClick={(e) => { e.stopPropagation(); setShowTags(s => !s); }}
+                aria-label="View tagged people"
             >
-                {/* Tag count badge — shown when tags are hidden */}
-                {!showTags && (
-                    <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-black/55 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full pointer-events-none">
-                        <Tag size={11} />
-                        <span className="font-medium">{tags.length}</span>
-                    </div>
-                )}
+                {/* Instagram person-tag SVG icon */}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                </svg>
+            </button>
 
-                {/* Tag bubbles */}
-                {showTags && tags.map((tag, idx) => (
+            {/* Tag bubbles — shown when icon clicked */}
+            {showTags && tags.map((tag, idx) => {
+                // Clamp position so bubble doesn't go off-screen
+                const x = Math.min(88, Math.max(12, tag.x));
+                const y = Math.min(88, Math.max(12, tag.y));
+                // Flip arrow: if tag is in bottom half, show arrow below bubble pointing up
+                const inBottomHalf = y > 55;
+                return (
                     <div
                         key={tag._id || idx}
-                        className="absolute"
+                        className="absolute z-30 pointer-events-auto"
                         style={{
-                            left: `${Math.min(95, Math.max(5, tag.x))}%`,
-                            top:  `${Math.min(95, Math.max(5, tag.y))}%`,
+                            left: `${x}%`,
+                            top:  `${y}%`,
                             transform: 'translate(-50%, -50%)',
-                            animation: `tagPop 0.25s ${idx * 0.06}s cubic-bezier(0.34,1.56,0.64,1) both`,
+                            animation: `igTagPop 0.28s ${idx * 0.07}s cubic-bezier(0.34,1.56,0.64,1) both`,
                         }}
                     >
-                        <Link
-                            to={`/profile/${tag.user_id || ''}`}
-                            onClick={e => e.stopPropagation()}
-                            className="flex flex-col items-center gap-0.5 no-underline"
-                        >
-                            {/* Pin dot */}
-                            <div className="w-2 h-2 bg-white rounded-full shadow-md border border-black/20 mx-auto" />
-                            {/* Username bubble */}
-                            <div className="bg-black/80 backdrop-blur-sm text-white text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap shadow-lg border border-white/10 hover:bg-black/95 transition-colors">
+                        <div className="flex flex-col items-center">
+                            {/* Arrow up (if in bottom half, arrow points down toward center) */}
+                            {!inBottomHalf && (
+                                <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-white/90 -mb-[1px] drop-shadow-sm" />
+                            )}
+                            {/* White pill bubble — exact Instagram style */}
+                            <Link
+                                to={`/profile/${tag.user_id || ''}`}
+                                onClick={e => e.stopPropagation()}
+                                className="block bg-white/90 backdrop-blur-sm text-black text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap shadow-xl hover:bg-white transition-colors"
+                                style={{ letterSpacing: '-0.01em' }}
+                            >
                                 @{tag.username}
-                            </div>
-                        </Link>
+                            </Link>
+                            {/* Arrow down */}
+                            {inBottomHalf && (
+                                <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white/90 -mt-[1px] drop-shadow-sm" />
+                            )}
+                        </div>
                     </div>
-                ))}
-            </div>
+                );
+            })}
         </>
     );
 };
@@ -219,11 +235,16 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
         return { start: s, end: e };
     };
 
-    // Relative date
+    const [nowTs, setNowTs] = useState(0);
+    useEffect(() => {
+        const t = setTimeout(() => setNowTs(Date.now()), 0);
+        return () => clearTimeout(t);
+    }, []);
     const formattedDate = (() => {
         const raw = post.createdAt || post.created_at;
         if (!raw) return 'Just now';
-        const diff = Math.floor((Date.now() - new Date(raw)) / 1000);
+        if (!nowTs) return 'Just now';
+        const diff = Math.floor((nowTs - new Date(raw).getTime()) / 1000);
         if (diff < 60)     return 'Just now';
         if (diff < 3600)   return `${Math.floor(diff / 60)}m`;
         if (diff < 86400)  return `${Math.floor(diff / 3600)}h`;
@@ -234,49 +255,43 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
     // ── Init from post data ───────────────────────────────────────────────
     useEffect(() => {
         if (!post) return;
-
-        // Likes
-        if (Array.isArray(post.likes)) {
-            const myId = userObject?._id || userObject?.id;
-            const liked = myId ? post.likes.some(l => {
-                if (typeof l === 'string') return String(l) === String(myId);
-                return String(l.user_id || l._id || l.id) === String(myId);
-            }) : false;
-            setIsLiked(liked);
-            setLikeCount(post.likes.length);
-        } else if (typeof post.is_liked_by_me !== 'undefined') {
-            setIsLiked(post.is_liked_by_me);
-            setLikeCount(post.likes_count || 0);
-        }
-
-        // Saved
-        setIsSaved(post.is_saved_by_me || false);
-
-        // Latest comment
-        if (post.latest_comments?.length > 0) {
-            const c = post.latest_comments[0];
-            setLatestComment({ username: c.username || c.user?.username, text: c.text || c.content });
-        } else if (post.comments?.length > 0) {
-            const c = post.comments[0];
-            setLatestComment({ username: c.user?.username, text: c.text || c.content });
-        } else if (!post._id) {
-            // Legacy Supabase
-            supabase
-                .from('comments')
-                .select('id, content, created_at, users(username)')
-                .eq('post_id', post.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single()
-                .then(({ data }) => {
-                    if (data) setLatestComment({ username: data.users?.username, text: data.content });
-                })
-                .catch(() => {});
-        }
-
-        // Reset video state when media changes
-        setVideoReady(false);
-        setVideoPlaying(false);
+        const t = setTimeout(() => {
+            if (Array.isArray(post.likes)) {
+                const myId = userObject?._id || userObject?.id;
+                const liked = myId ? post.likes.some(l => {
+                    if (typeof l === 'string') return String(l) === String(myId);
+                    return String(l.user_id || l._id || l.id) === String(myId);
+                }) : false;
+                setIsLiked(liked);
+                setLikeCount(post.likes.length);
+            } else if (typeof post.is_liked_by_me !== 'undefined') {
+                setIsLiked(post.is_liked_by_me);
+                setLikeCount(post.likes_count || 0);
+            }
+            setIsSaved(post.is_saved_by_me || false);
+            if (post.latest_comments?.length > 0) {
+                const c = post.latest_comments[0];
+                setLatestComment({ username: c.username || c.user?.username, text: c.text || c.content });
+            } else if (post.comments?.length > 0) {
+                const c = post.comments[0];
+                setLatestComment({ username: c.user?.username, text: c.text || c.content });
+            } else if (!post._id) {
+                supabase
+                    .from('comments')
+                    .select('id, content, created_at, users(username)')
+                    .eq('post_id', post.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
+                    .then(({ data }) => {
+                        if (data) setLatestComment({ username: data.users?.username, text: data.content });
+                    })
+                    .catch(() => {});
+            }
+            setVideoReady(false);
+            setVideoPlaying(false);
+        }, 0);
+        return () => clearTimeout(t);
     }, [post, userObject]);
 
     // ── Handlers ──────────────────────────────────────────────────────────
@@ -296,7 +311,6 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                     ? likes.filter(l => l.user_id !== userObject.id)
                     : [...likes, { user_id: userObject.id }];
                 await supabase.from('posts').update({ likes: updated }).eq('id', post.id);
-                post.likes = updated;
             }
         } catch {
             setIsLiked(!newLiked);
@@ -427,13 +441,13 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
             />
 
             {/* ── Media ──────────────────────────────────────────────────── */}
-            <div className="w-full bg-black overflow-hidden relative group" style={{ minHeight: 300 }}>
+            <div className="w-full bg-black overflow-hidden relative group">
                 {mediaItems.length > 0 ? (
                     <>
                         {isVideo ? (() => {
                             const { start, end } = getVideoTiming(currentItem);
-                            // Show thumbnail when: video not ready, or video is paused/stopped
-                            const showThumb = thumbnailUrl && (!videoReady || !videoPlaying);
+                            // Show thumbnail when: video not ready
+                            const showThumb = thumbnailUrl && !videoReady;
                             return (
                                 <div className="relative w-full">
                                     {/* ── Thumbnail poster (shown until video plays) ── */}
@@ -456,10 +470,10 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                                         className="w-full h-auto max-h-[600px] object-contain"
                                         style={{
                                             display: videoReady ? 'block' : 'none',
-                                            opacity: videoPlaying ? 1 : 0,
-                                            position: videoPlaying ? 'relative' : 'absolute',
+                                            opacity: 1,
+                                            position: 'relative',
                                             top: 0, left: 0,
-                                            minHeight: !videoPlaying ? 0 : undefined,
+                                            minHeight: undefined,
                                         }}
                                         autoPlay
                                         muted={isMuted}
@@ -565,34 +579,49 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                 )}
             </div>
 
-            {/* ── Action Bar ─────────────────────────────────────────────── */}
-            <div className="px-3 pt-2.5">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3.5">
+            {/* ── Action Bar — Instagram exact layout ──────────────────── */}
+            <div className="px-3 pt-2">
+                {/* Icons row */}
+                <div className="flex items-center justify-between mb-1.5">
+                    {/* Left: Like · Comment · Share */}
+                    <div className="flex items-center gap-4">
                         {/* Like */}
-                        <button onClick={handleLike} className="active:scale-90 transition-transform" aria-label="Like">
+                        <button
+                            onClick={handleLike}
+                            className="flex items-center gap-1.5 active:scale-90 transition-transform group"
+                            aria-label="Like"
+                        >
                             <Heart
                                 size={24}
-                                className={`transition-all duration-200 ${isLiked ? 'fill-red-500 text-red-500' : 'text-black dark:text-white'}`}
+                                className={`transition-all duration-200 group-active:scale-125 ${isLiked ? 'fill-red-500 text-red-500' : 'text-black dark:text-white'}`}
                             />
                         </button>
+
                         {/* Comment */}
-                        <button onClick={() => onCommentClick?.(post)} className="hover:opacity-60 transition-opacity" aria-label="Comment">
+                        <button
+                            onClick={() => onCommentClick?.(post)}
+                            className="flex items-center gap-1.5 hover:opacity-60 transition-opacity"
+                            aria-label="Comment"
+                        >
                             <MessageCircle size={24} className="text-black dark:text-white" />
                         </button>
+
                         {/* Share */}
                         <button className="hover:opacity-60 transition-opacity" aria-label="Share">
                             <Send size={24} className="text-black dark:text-white" />
                         </button>
                     </div>
 
-                    {/* Right side: Follow (if not owner) + Save */}
+                    {/* Right: Follow (if not owner) + Save */}
                     <div className="flex items-center gap-3">
                         {!isOwner && userId && userObject && (
                             <FollowButton targetUserId={String(userId)} />
                         )}
-                        {/* Save / Unsave */}
-                        <button onClick={handleSave} className="active:scale-90 transition-transform" aria-label={isSaved ? 'Unsave' : 'Save'}>
+                        <button
+                            onClick={handleSave}
+                            className="active:scale-90 transition-transform"
+                            aria-label={isSaved ? 'Unsave' : 'Save'}
+                        >
                             <Bookmark
                                 size={24}
                                 className={`transition-all duration-200 ${isSaved ? 'fill-black text-black dark:fill-white dark:text-white' : 'text-black dark:text-white'}`}
@@ -601,10 +630,10 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                     </div>
                 </div>
 
-                {/* Like count */}
+                {/* Like count line (always shown if not hidden) */}
                 {!post.hide_likes_count && (
                     <p className="font-semibold text-sm dark:text-white mb-1">
-                        {likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}
+                        {likeCount} {likeCount === 1 ? 'like' : 'likes'}
                     </p>
                 )}
 
@@ -616,14 +645,14 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                     </p>
                 ) : null}
 
-                {/* People tag mentions (below caption) */}
+                {/* People tag @mentions below caption */}
                 {peopleTags.length > 0 && (
                     <div className="flex flex-wrap gap-x-2 gap-y-0.5 mb-1">
                         {peopleTags.map((tag, i) => (
                             <Link
                                 key={tag._id || i}
                                 to={`/profile/${tag.user_id || ''}`}
-                                className="text-xs text-[#0095f6] hover:underline font-medium"
+                                className="text-sm text-[#0095f6] hover:underline font-semibold"
                             >
                                 @{tag.username}
                             </Link>
@@ -631,26 +660,26 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                     </div>
                 )}
 
-                {/* Latest comment */}
-                {latestComment && (
-                    <p className="text-sm dark:text-white mb-1">
-                        <span className="font-semibold mr-1 dark:text-white">{latestComment.username}</span>
-                        {latestComment.text}
-                    </p>
-                )}
-
-                {/* View all comments */}
+                {/* View all comments link */}
                 {(post.comments_count || 0) > 1 && (
                     <button
                         onClick={() => onCommentClick?.(post)}
-                        className="block text-sm text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 mb-1 transition-colors"
+                        className="block text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 mb-1 transition-colors"
                     >
-                        View all {post.comments_count} comments
+                        View all {post.comments_count >= 1000 ? `${(post.comments_count / 1000).toFixed(1)}K` : post.comments_count} comments
                     </button>
                 )}
 
+                {/* Latest comment preview */}
+                {latestComment && (
+                    <p className="text-sm dark:text-white mb-1 leading-snug">
+                        <span className="font-semibold mr-1 dark:text-white">{latestComment.username}</span>
+                        <span className="text-gray-700 dark:text-gray-300">{latestComment.text}</span>
+                    </p>
+                )}
+
                 {/* Timestamp */}
-                <p className="text-gray-400 text-[11px] uppercase tracking-wider mt-0.5">{formattedDate}</p>
+                <p className="text-gray-400 dark:text-gray-500 text-[11px] uppercase tracking-wider mt-1">{formattedDate}</p>
             </div>
         </div>
     );
