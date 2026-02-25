@@ -247,12 +247,17 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [step, setStep] = useState('select'); // 'select', 'crop', 'edit', 'share'
   const { userObject } = useSelector((state) => state.auth);
   const [postType, setPostType] = useState(initialType);
-
+  
   useEffect(() => {
     if (isOpen) {
+      if (initialType === 'ad') {
+        onClose(); // Close modal first
+        navigate('/create-ad');
+        return;
+      }
       setPostType(initialType);
     }
-  }, [isOpen, initialType]);
+  }, [isOpen, initialType, navigate, onClose]);
 
   // Media State
   const [media, setMedia] = useState([]);
@@ -1252,8 +1257,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                       if (!userObject.vendor_validated) {
                         setShowVendorNotValidated(true);
                       } else {
-                        onClose();
-                        navigate('/ads');
+                        onClose(); // Close modal first
+                        navigate('/create-ad');
                       }
                     }}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10"
@@ -2122,6 +2127,20 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
 
             {/* Right: Share Details */}
             <div className="flex-1 bg-white dark:bg-black border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-800 flex flex-col w-full md:w-auto md:min-w-[340px] overflow-y-auto scrollbar-hide">
+              {/* Preview of the Reel (Mobile Only) */}
+              <div className="md:hidden w-full aspect-[9/16] bg-black relative">
+                {media.length > 0 && (
+                  <video
+                    src={media[currentIndex].url}
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                  />
+                )}
+              </div>
+
               {/* User Info */}
               <div className="flex items-center gap-3 p-4">
                 <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex items-center justify-center">

@@ -123,7 +123,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
                             if (!userObject.vendor_validated) {
                               setShowVendorNotValidated(true);
                             } else {
-                              navigate('/ads');
+                              navigate('/create-ad');
                             }
                             setIsCreateDropdownOpen(false);
                           }}

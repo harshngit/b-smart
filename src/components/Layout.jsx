@@ -10,8 +10,8 @@ import { Heart, Bell, MessageCircle } from 'lucide-react';
 const Layout = () => {
   const location = useLocation();
   const { userObject } = useSelector((state) => state.auth);
-  const isExcludedPage = ['/profile', '/settings', '/reels', '/promote', '/ads'].includes(location.pathname);
-  const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
+  const isExcludedPage = ['/profile', '/settings', '/reels', '/promote', '/ads', '/create-ad'].includes(location.pathname);
+  const isFullScreenPage = ['/reels', '/promote', '/ads', '/create-ad'].includes(location.pathname);
   // Show TopBar on mobile for all pages except profile, settings, reels, and promote
   const showTopBar = !isExcludedPage;
   const [showDesktopNotifications, setShowDesktopNotifications] = useState(false);
@@ -56,7 +56,7 @@ const Layout = () => {
       {/* Desktop Top Right Notifications */}
       {!isExcludedPage && (
         <div
-          className="hidden md:block fixed top-8 right-8 z-50"
+          className="hidden md:block fixed top-8 right-8 z-20"
           onMouseEnter={() => setShowDesktopNotifications(true)}
           onMouseLeave={() => setShowDesktopNotifications(false)}
         >
