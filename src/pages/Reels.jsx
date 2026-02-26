@@ -606,10 +606,10 @@ const Reels = () => {
   return (
     <>
       {/* ── Full-screen black background ── */}
-      <div className="w-full h-screen bg-black overflow-hidden flex items-center justify-center">
+      <div className="w-full lg:h-auto h-screen bg-black overflow-hidden flex items-center justify-center">
 
         {/* ── Content: video card + action buttons ── */}
-        <div className="flex items-end justify-center h-full py-4 gap-4">
+        <div className="flex items-end justify-center h-full lg:py-2 py-4 gap-4">
 
           {/* ── Video card ── */}
           <div
@@ -665,7 +665,7 @@ const Reels = () => {
                     {/* Mute button — top right */}
                     <button
                       onClick={() => setIsMuted(!isMuted)}
-                      className="absolute bottom-14 right-4 bg-black/40 p-2 rounded-full text-white backdrop-blur-sm z-20"
+                      className="absolute lg:bottom-5 bottom-14 right-4 bg-black/40 p-2 rounded-full text-white backdrop-blur-sm z-20"
                     >
                       {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                     </button>
@@ -740,7 +740,7 @@ const Reels = () => {
                     </div>
 
                     {/* ── Bottom info (left side) — user + caption + audio ── */}
-                    <div className="absolute bottom-[8%] left-0 z-20 px-4 pb-6 pr-16"
+                    <div className="absolute lg:bottom-[0%] bottom-[8%] left-0 z-20 px-4 pb-6 pr-16"
                       style={{ maxWidth: 'calc(100% - 56px)' }}
                     >
                       {/* User row: avatar + username + Follow */}

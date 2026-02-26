@@ -5,7 +5,6 @@ import BottomNav from './BottomNav';
 import TopBar from './TopBar';
 import Sidebar from './Sidebar';
 import CreatePostModal from './CreatePostModal';
-import { Heart, Bell, MessageCircle } from 'lucide-react';
 
 const Layout = () => {
   const location = useLocation();
@@ -14,7 +13,6 @@ const Layout = () => {
   const isFullScreenPage = ['/reels', '/promote', '/ads', '/create-ad'].includes(location.pathname);
   // Show TopBar on mobile for all pages except profile, settings, reels, and promote
   const showTopBar = !isExcludedPage;
-  const [showDesktopNotifications, setShowDesktopNotifications] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState('post');
 
@@ -52,57 +50,6 @@ const Layout = () => {
         onClose={() => setIsCreateModalOpen(false)}
         initialType={createType}
       />
-
-      {/* Desktop Top Right Notifications */}
-      {!isExcludedPage && (
-        <div
-          className="hidden md:block fixed top-8 right-8 z-20"
-          onMouseEnter={() => setShowDesktopNotifications(true)}
-          onMouseLeave={() => setShowDesktopNotifications(false)}
-        >
-          <button
-            className="w-10 h-10 rounded-full bg-white dark:bg-[#262626] shadow-lg border border-gray-100 dark:border-gray-800 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors relative"
-            onClick={() => setShowDesktopNotifications(!showDesktopNotifications)}
-          >
-            <Heart size={20} className="text-gray-900 dark:text-white" />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-[#fa3f5e] rounded-full border border-white dark:border-[#262626]"></span>
-          </button>
-
-          {showDesktopNotifications && (
-            <div className="absolute right-0 top-full pt-2 w-80 z-50 animate-fade-in">
-              <div className="bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-2">
-                <div className="px-4 py-3 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
-                  <h3 className="font-semibold text-sm dark:text-white">Notifications</h3>
-                  <span className="text-xs text-[#fa3f5e] font-medium cursor-pointer">Mark all read</span>
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  <div className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex gap-3 items-center cursor-pointer transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center flex-shrink-0"><Bell size={14} /></div>
-                    <div>
-                      <p className="text-sm text-gray-900 dark:text-gray-200">New follower: <span className="font-bold">Sarah</span></p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">2 min ago</p>
-                    </div>
-                  </div>
-                  <div className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex gap-3 items-center cursor-pointer transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-pink-50 dark:bg-pink-900/20 text-pink-500 flex items-center justify-center flex-shrink-0"><Heart size={14} /></div>
-                    <div>
-                      <p className="text-sm text-gray-900 dark:text-gray-200">Mike liked your post</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">1 hour ago</p>
-                    </div>
-                  </div>
-                  <div className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex gap-3 items-center cursor-pointer transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-500 flex items-center justify-center flex-shrink-0"><MessageCircle size={14} /></div>
-                    <div>
-                      <p className="text-sm text-gray-900 dark:text-gray-200">Anna commented: "Amazing!"</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">2 hours ago</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Floating Wallet for Desktop */}
       {!isExcludedPage && (
