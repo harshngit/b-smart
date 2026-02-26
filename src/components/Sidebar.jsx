@@ -124,8 +124,8 @@ const Sidebar = ({ onOpenCreateModal }) => {
                       </button>
                       {userObject?.role === 'vendor' && (
                         <button
-                          onClick={() => {
-                            if (!userObject.vendor_validated) {
+                           onClick={() => {
+                            if (!userObject?.is_active) {
                               setShowVendorNotValidated(true);
                             } else {
                               navigate('/create-ad');
@@ -263,10 +263,10 @@ const Sidebar = ({ onOpenCreateModal }) => {
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">
-              Vendor verification pending
+              Vendor account inactive
             </h3>
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
-              Your vendor account is not yet validated. Please refresh this page or wait 2–3 working days for verification before uploading ads.
+              Your vendor account is inactive. Please contact support or wait for activation before uploading ads.
             </p>
             <div className="flex justify-center">
               <button
