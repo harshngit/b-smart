@@ -9,7 +9,7 @@ import CreatePost from './pages/CreatePost';
 import Reels from './pages/Reels';
 import Promote from './pages/Promote';
 import Ads from './pages/Ads';
-import CreateAd from './pages/CreateAd';
+
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
@@ -64,7 +64,7 @@ function App() {
           <Route path="/reels" element={<Reels />} />
           <Route path="/promote" element={<Promote />} />
           <Route path="/ads" element={<Ads />} />
-          <Route path="/create-ad" element={<CreateAd />} />
+
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/:userId" element={<Profile />} />
           <Route path="/edit-profile" element={<EditProfile />} />
