@@ -241,7 +241,7 @@ function SuccessCountdown({ onDone }) {
   );
 }
 
-const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
+const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal }) => {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [step, setStep] = useState('select'); // 'select', 'crop', 'edit', 'share'
@@ -250,14 +250,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   
   useEffect(() => {
     if (isOpen) {
-      if (initialType === 'ad') {
-        onClose(); // Close modal first
-        navigate('/create-ad');
-        return;
-      }
       setPostType(initialType);
     }
-  }, [isOpen, initialType, navigate, onClose]);
+  }, [isOpen, initialType]);
 
   // Media State
   const [media, setMedia] = useState([]);
@@ -283,10 +278,69 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
   const [allUsers, setAllUsers] = useState([]);
   const [isLoadingAllUsers, setIsLoadingAllUsers] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  
+  const CATEGORIES = [
+    'Fashion', 'Electronics', 'Food & Dining', 'Beauty & Personal Care', 'Travel', 'Education',
+    'Real Estate', 'Automotive', 'Health & Fitness', 'Entertainment', 'Sports', 'Technology',
+    'Home & Garden', 'Pets', 'Business & Finance', 'Art & Design', 'Books & Literature',
+    'Gaming', 'Music', 'Photography', 'Science', 'Social Media', 'Other'
+  ];
+
+  const COUNTRIES = [
+    'USA', 'Canada', 'UK', 'Australia', 'India', 'Germany', 'France', 'Italy', 'Spain', 'Brazil',
+    'Mexico', 'Japan', 'South Korea', 'China', 'Russia', 'South Africa', 'Nigeria', 'Egypt',
+    'Saudi Arabia', 'UAE', 'Turkey', 'Argentina', 'Chile', 'Colombia', 'Peru', 'Indonesia',
+    'Thailand', 'Vietnam', 'Malaysia', 'Philippines', 'Singapore', 'New Zealand', 'Netherlands',
+    'Belgium', 'Sweden', 'Norway', 'Denmark', 'Finland', 'Poland', 'Ukraine', 'Greece', 'Portugal',
+    'Ireland', 'Switzerland', 'Austria', 'Hungary', 'Czech Republic', 'Romania', 'Pakistan', 'Bangladesh'
+  ].sort();
+
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [targetLanguage, setTargetLanguage] = useState('English');
+  const [targetLocation, setTargetLocation] = useState(COUNTRIES[0]);
+  const [totalBudgetCoins, setTotalBudgetCoins] = useState('');
+  
+  // Custom Dropdown State
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const categoryRef = useRef(null);
+  const languageRef = useRef(null);
+  const countryRef = useRef(null);
+
+  // Click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (categoryRef.current && !categoryRef.current.contains(event.target)) setShowCategoryDropdown(false);
+      if (languageRef.current && !languageRef.current.contains(event.target)) setShowLanguageDropdown(false);
+      if (countryRef.current && !countryRef.current.contains(event.target)) setShowCountryDropdown(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Upload progress states
   const [uploadStage, setUploadStage] = useState('idle'); // 'idle' | 'converting' | 'uploading' | 'posting' | 'done' | 'error'
   const [uploadProgress, setUploadProgress] = useState(0); // 0-100
   const [uploadError, setUploadError] = useState('');
+  
+  // Ad Add-ons State
+  const [adTab, setAdTab] = useState('product'); // 'product' | 'offer'
+  const [products, setProducts] = useState([]);
+  const [offers, setOffers] = useState([]);
+  
+  // Current Product Form State
+  const [prodName, setProdName] = useState('');
+  const [prodDesc, setProdDesc] = useState('');
+  const [prodPrice, setProdPrice] = useState('');
+  const [prodImages, setProdImages] = useState([]);
+
+  // Current Offer Form State
+  const [offerCode, setOfferCode] = useState('');
+  const [offerDesc, setOfferDesc] = useState('');
+  const [offerLink, setOfferLink] = useState('');
+  const [offerImage, setOfferImage] = useState(null);
+
   // Dragging tag state
   const [draggingTagId, setDraggingTagId] = useState(null);
   // dragOffset removed — not needed
@@ -437,6 +491,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
     const validFiles = files.filter(file => {
       if (postType === 'post') return file.type.startsWith('image/');
       if (postType === 'reel') return file.type.startsWith('video/');
+      if (postType === 'ad') return file.type.startsWith('image/') || file.type.startsWith('video/');
       return file.type.startsWith('image/') || file.type.startsWith('video/');
     });
 
@@ -568,6 +623,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
 
   const handleBack = () => {
     if (step === 'share') {
+      if (postType === 'ad') {
+        setStep('details');
+      } else {
+        setStep('edit');
+      }
+    } else if (step === 'details') {
       setStep('edit');
     } else if (step === 'edit') {
       setStep('crop');
@@ -645,6 +706,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
       setMedia(newMedia);
       setStep('edit');
     } else if (step === 'edit') {
+      if (postType === 'ad') {
+        setStep('details');
+      } else {
+        setStep('share');
+      }
+    } else if (step === 'details') {
       setStep('share');
     } else if (step === 'share') {
       // Submit post
@@ -892,6 +959,18 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
             turn_off_commenting: turnOffCommenting,
             type: postType
           };
+
+          if (postType === 'ad') {
+             Object.assign(payload, {
+                category,
+                target_language: targetLanguage,
+                target_location: targetLocation,
+                total_budget_coins: totalBudgetCoins,
+                products,
+                offers
+             });
+          }
+
           await api.post('/posts', payload);
         }
 
@@ -908,6 +987,46 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
         setIsSubmitting(false);
       }
     }
+  };
+
+  const handleAddProduct = () => {
+    if (!prodName || !prodPrice) return;
+    const newProduct = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: prodName,
+      description: prodDesc,
+      price: prodPrice,
+      images: prodImages
+    };
+    setProducts([...products, newProduct]);
+    setProdName('');
+    setProdDesc('');
+    setProdPrice('');
+    setProdImages([]);
+  };
+
+  const handleAddOffer = () => {
+    if (!offerCode) return;
+    const newOffer = {
+      id: Math.random().toString(36).substr(2, 9),
+      code: offerCode,
+      description: offerDesc,
+      link: offerLink,
+      image: offerImage
+    };
+    setOffers([...offers, newOffer]);
+    setOfferCode('');
+    setOfferDesc('');
+    setOfferLink('');
+    setOfferImage(null);
+  };
+
+  const handleRemoveProduct = (id) => {
+    setProducts(products.filter(p => p.id !== id));
+  };
+
+  const handleRemoveOffer = (id) => {
+    setOffers(offers.filter(o => o.id !== id));
   };
 
   // Tagging & Emoji Handlers
@@ -1004,6 +1123,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
     setStep('select');
     setMedia([]);
     setCurrentIndex(0);
+    setCaption('');
+    setCategory(CATEGORIES[0]);
+      setTargetLanguage('English');
+      setTargetLocation(COUNTRIES[0]);
+      setTotalBudgetCoins('');
     onClose();
   };
 
@@ -1187,7 +1311,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
           {step === 'select' ? (
             <>
               <div className="w-10"></div> {/* Spacer */}
-              <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'reel' ? 'reel' : 'post'}</h2>
+              <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'reel' ? 'reel' : postType === 'ad' ? 'ad' : 'post'}</h2>
               <button onClick={handleClose} className="text-black dark:text-white md:hidden">
                 <X size={24} />
               </button>
@@ -1202,7 +1326,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
               </div>
               <h2 className="font-semibold text-base text-center dark:text-white flex-1">{step === 'crop' ? 'Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Edit' : 'Create new post'}</h2>
               <div className="w-20 flex justify-end">
-                <button onClick={handleNextStep} className="text-[#0095f6] hover:text-[#00376b] dark:hover:text-blue-400 font-semibold text-sm transition-colors">
+                <button 
+                  onClick={handleNextStep} 
+                  className="text-[#0095f6] hover:text-[#00376b] dark:hover:text-blue-400 font-semibold text-sm transition-colors"
+                  disabled={step === 'share' && postType === 'ad' && (!totalBudgetCoins)}
+                >
                   {step === 'share' ? 'Share' : 'Next'}
                 </button>
               </div>
@@ -1257,8 +1385,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                       if (!userObject.vendor_validated) {
                         setShowVendorNotValidated(true);
                       } else {
-                        onClose(); // Close modal first
-                        navigate('/create-ad');
+                        if (onOpenAdModal) {
+                          onOpenAdModal();
+                        } else {
+                          onClose();
+                        }
                       }
                     }}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10"
@@ -1935,6 +2066,216 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
               </div>
             </div>
           </div>
+        ) : step === 'details' ? (
+          /* DETAILS STEP */
+          <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-white dark:bg-black">
+            {/* Full width Details Form */}
+            <div className="flex flex-col w-full h-full">
+              {/* Tabs */}
+              <div className="flex border-b border-gray-200 dark:border-gray-800 justify-center bg-white dark:bg-black sticky top-0 z-10">
+                 <button onClick={() => setAdTab('product')} className={`px-12 py-3 text-sm font-semibold transition-colors ${adTab === 'product' ? 'text-black dark:text-white border-b-2 border-black dark:border-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Product</button>
+                 <button onClick={() => setAdTab('offer')} className={`px-12 py-3 text-sm font-semibold transition-colors ${adTab === 'offer' ? 'text-black dark:text-white border-b-2 border-black dark:border-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Offer</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide w-full max-w-5xl mx-auto">
+                 {adTab === 'product' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
+                       {/* Left: Product Form */}
+                       <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Add New Product</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-500 mb-1">Product Name</label>
+                              <input type="text" placeholder="Product Name" value={prodName} onChange={e => setProdName(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+                              <textarea placeholder="Description" value={prodDesc} onChange={e => setProdDesc(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white resize-none focus:ring-1 focus:ring-blue-500 outline-none" rows={3} />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-500 mb-1">Price</label>
+                              <input type="number" placeholder="Price" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
+                            </div>
+                            
+                            {/* Drag & Drop Photo Upload Box */}
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-500 mb-1">Photos</label>
+                              <div 
+                                className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  setIsDragging(false);
+                                  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                                  if (files.length > 0) setProdImages([...prodImages, ...files]);
+                                }}
+                                onClick={() => document.getElementById('product-file-input').click()}
+                              >
+                                <Images className="text-gray-400 mb-2" size={32} />
+                                <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Drag photos here</span>
+                                <span className="text-xs text-gray-400 mt-1">or click to upload</span>
+                                <input 
+                                  id="product-file-input"
+                                  type="file" 
+                                  multiple 
+                                  accept="image/*" 
+                                  className="hidden"
+                                  onChange={e => setProdImages([...prodImages, ...Array.from(e.target.files)])} 
+                                />
+                              </div>
+
+                              {prodImages.length > 0 && (
+                                 <div className="flex gap-2 overflow-x-auto py-3 scrollbar-hide">
+                                    {prodImages.map((file, idx) => (
+                                       <div key={idx} className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 flex-shrink-0 relative group shadow-sm">
+                                          <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="" />
+                                          <button onClick={(e) => { e.stopPropagation(); setProdImages(prodImages.filter((_, i) => i !== idx)); }} className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full hover:bg-red-500 transition-colors"><X size={12}/></button>
+                                       </div>
+                                    ))}
+                                 </div>
+                              )}
+                            </div>
+
+                            <button onClick={handleAddProduct} disabled={!prodName || !prodPrice} className="w-full py-2.5 bg-[#0095f6] hover:bg-[#1877f2] text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm mt-2">Add Product</button>
+                          </div>
+                       </div>
+                       
+                       {/* Right: Product List */}
+                       <div className="border-l border-gray-100 dark:border-gray-800 pl-0 md:pl-8 overflow-y-auto">
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 sticky top-0 bg-white dark:bg-black py-2 z-10">Added Products ({products.length})</h3>
+                          {products.length > 0 ? (
+                            <div className="space-y-3">
+                               {products.map(p => (
+                                  <div key={p.id} className="flex gap-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl relative group border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
+                                     {p.images && p.images.length > 0 ? (
+                                       <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
+                                         <img src={URL.createObjectURL(p.images[0])} className="w-full h-full object-cover" alt="" />
+                                       </div>
+                                     ) : (
+                                       <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0 text-gray-400">
+                                         <Images size={20}/>
+                                       </div>
+                                     )}
+                                     <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                        <p className="font-semibold text-sm truncate dark:text-white">{p.name}</p>
+                                        <p className="text-xs text-gray-500 truncate mb-0.5">{p.description}</p>
+                                        <p className="text-sm font-medium text-blue-600 dark:text-blue-400">${p.price}</p>
+                                     </div>
+                                     <button onClick={() => handleRemoveProduct(p.id)} className="absolute top-2 right-2 p-1.5 bg-white dark:bg-black rounded-full opacity-0 group-hover:opacity-100 transition-all text-gray-500 hover:text-red-500 shadow-sm border border-gray-100 dark:border-gray-800">
+                                       <X size={14}/>
+                                     </button>
+                                  </div>
+                               ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-xl">
+                               <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center mb-2">
+                                  <Plus size={24} />
+                               </div>
+                               <p className="text-sm">No products added yet</p>
+                            </div>
+                          )}
+                       </div>
+                    </div>
+                 ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
+                       {/* Left: Offer Form */}
+                       <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Add New Offer</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-500 mb-1">Offer Code</label>
+                              <input type="text" placeholder="Offer Code" value={offerCode} onChange={e => setOfferCode(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+                              <textarea placeholder="Description" value={offerDesc} onChange={e => setOfferDesc(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white resize-none focus:ring-1 focus:ring-blue-500 outline-none" rows={3} />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-500 mb-1">Link</label>
+                              <input type="text" placeholder="Link" value={offerLink} onChange={e => setOfferLink(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
+                            </div>
+                            
+                            {/* Drag & Drop Offer Image Upload Box */}
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-500 mb-1">Offer Image</label>
+                              <div 
+                                className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  setIsDragging(false);
+                                  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                                  if (files.length > 0) setOfferImage(files[0]);
+                                }}
+                                onClick={() => document.getElementById('offer-file-input').click()}
+                              >
+                                <Images className="text-gray-400 mb-2" size={32} />
+                                <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Drag photo here</span>
+                                <span className="text-xs text-gray-400 mt-1">or click to upload</span>
+                                <input 
+                                  id="offer-file-input"
+                                  type="file" 
+                                  accept="image/*" 
+                                  className="hidden"
+                                  onChange={e => setOfferImage(e.target.files[0])} 
+                                />
+                              </div>
+
+                              {offerImage && (
+                                 <div className="w-full h-48 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative mt-3 group shadow-sm">
+                                    <img src={URL.createObjectURL(offerImage)} className="w-full h-full object-cover" alt="" />
+                                    <button onClick={(e) => { e.stopPropagation(); setOfferImage(null); }} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-red-500 transition-colors"><X size={16}/></button>
+                                 </div>
+                              )}
+                            </div>
+
+                            <button onClick={handleAddOffer} disabled={!offerCode} className="w-full py-2.5 bg-[#0095f6] hover:bg-[#1877f2] text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm mt-2">Add Offer</button>
+                          </div>
+                       </div>
+                       
+                       {/* Right: Offer List */}
+                       <div className="border-l border-gray-100 dark:border-gray-800 pl-0 md:pl-8 overflow-y-auto">
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 sticky top-0 bg-white dark:bg-black py-2 z-10">Added Offers ({offers.length})</h3>
+                          {offers.length > 0 ? (
+                            <div className="space-y-3">
+                               {offers.map(o => (
+                                  <div key={o.id} className="flex gap-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl relative group border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
+                                     {o.image ? (
+                                       <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
+                                         <img src={URL.createObjectURL(o.image)} className="w-full h-full object-cover" alt="" />
+                                       </div>
+                                     ) : (
+                                       <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0 text-gray-400">
+                                         <Images size={20}/>
+                                       </div>
+                                     )}
+                                     <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                        <p className="font-semibold text-sm truncate dark:text-white">{o.code}</p>
+                                        <p className="text-xs text-gray-500 truncate mb-0.5">{o.link}</p>
+                                     </div>
+                                     <button onClick={() => handleRemoveOffer(o.id)} className="absolute top-2 right-2 p-1.5 bg-white dark:bg-black rounded-full opacity-0 group-hover:opacity-100 transition-all text-gray-500 hover:text-red-500 shadow-sm border border-gray-100 dark:border-gray-800">
+                                       <X size={14}/>
+                                     </button>
+                                  </div>
+                               ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-xl">
+                               <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center mb-2">
+                                  <Plus size={24} />
+                               </div>
+                               <p className="text-sm">No offers added yet</p>
+                            </div>
+                          )}
+                       </div>
+                    </div>
+                 )}
+              </div>
+            </div>
+          </div>
         ) : (
           /* SHARE STEP */
           <div className="flex-1 flex flex-col md:flex-row lg:overflow-hidden overflow-y-auto overflow-x-hidden">
@@ -2187,6 +2528,109 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post' }) => {
                   <span className="text-xs text-gray-400">{caption.length}/2,200</span>
                 </div>
               </div>
+
+              {/* Ad-specific fields */}
+              {postType === 'ad' && (
+                <div className="px-4 pb-4 border-b border-gray-100 dark:border-gray-800 space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
+                    <div className="relative" ref={categoryRef}>
+                      <div 
+                        onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                        className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors"
+                      >
+                        <span className="truncate">{category}</span>
+                        <ChevronDown size={16} className={`text-gray-500 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                      </div>
+                      
+                      {showCategoryDropdown && (
+                        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                          {CATEGORIES.map(o => (
+                            <div 
+                              key={o} 
+                              onClick={() => {
+                                setCategory(o);
+                                setShowCategoryDropdown(false);
+                              }}
+                              className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 ${category === o ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : ''}`}
+                            >
+                              {o}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Target Language</label>
+                    <div className="relative" ref={languageRef}>
+                      <div 
+                        onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                        className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors"
+                      >
+                        <span className="truncate">{targetLanguage}</span>
+                        <ChevronDown size={16} className={`text-gray-500 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} />
+                      </div>
+                      
+                      {showLanguageDropdown && (
+                        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                          {['English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Arabic', 'Hindi', 'Portuguese', 'Russian', 'Italian', 'Korean', 'Turkish'].map(o => (
+                            <div 
+                              key={o} 
+                              onClick={() => {
+                                setTargetLanguage(o);
+                                setShowLanguageDropdown(false);
+                              }}
+                              className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 ${targetLanguage === o ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : ''}`}
+                            >
+                              {o}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Target Country</label>
+                    <div className="relative" ref={countryRef}>
+                      <div 
+                        onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                        className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors"
+                      >
+                        <span className="truncate">{targetLocation}</span>
+                        <ChevronDown size={16} className={`text-gray-500 transition-transform ${showCountryDropdown ? 'rotate-180' : ''}`} />
+                      </div>
+                      
+                      {showCountryDropdown && (
+                        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                          {COUNTRIES.map(o => (
+                            <div 
+                              key={o} 
+                              onClick={() => {
+                                setTargetLocation(o);
+                                setShowCountryDropdown(false);
+                              }}
+                              className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 ${targetLocation === o ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : ''}`}
+                            >
+                              {o}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Total Budget (Coins)</label>
+                    <input 
+                      type="number"
+                      value={totalBudgetCoins} 
+                      onChange={(e) => setTotalBudgetCoins(e.target.value)} 
+                      placeholder="e.g. 1000" 
+                      className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Settings Rows */}
               <div className="flex flex-col">

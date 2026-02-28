@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Home, PlusSquare, Clapperboard, ShoppingBag, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
@@ -7,7 +7,6 @@ import CreatePostModal from './CreatePostModal';
 
 const Sidebar = ({ onOpenCreateModal }) => {
   const location = useLocation();
-  const navigate = useNavigate();
   const dispatch = useDispatch();
   const { mode } = useSelector((state) => state.theme);
   const { userObject } = useSelector((state) => state.auth);
@@ -128,7 +127,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
                             if (!userObject?.is_active) {
                               setShowVendorNotValidated(true);
                             } else {
-                              navigate('/create-ad');
+                              onOpenCreateModal('ad');
                             }
                             setIsCreateDropdownOpen(false);
                           }}

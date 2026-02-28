@@ -9,8 +9,8 @@ import CreatePostModal from './CreatePostModal';
 const Layout = () => {
   const location = useLocation();
   const { userObject } = useSelector((state) => state.auth);
-  const isExcludedPage = ['/profile', '/settings', '/reels', '/promote', '/ads', '/create-ad'].includes(location.pathname);
-  const isFullScreenPage = ['/reels', '/promote', '/ads', '/create-ad'].includes(location.pathname);
+  const isExcludedPage = ['/profile', '/settings', '/reels', '/promote', '/ads'].includes(location.pathname);
+  const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
   // Show TopBar on mobile for all pages except profile, settings, reels, and promote
   const showTopBar = !isExcludedPage;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

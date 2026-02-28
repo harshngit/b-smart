@@ -606,7 +606,7 @@ const Reels = () => {
   return (
     <>
       {/* ── Full-screen black background ── */}
-      <div className="w-full lg:h-auto h-screen bg-black overflow-hidden flex items-center justify-center">
+      <div className="w-full lg:h-auto h-screen  overflow-hidden flex items-center justify-center">
 
         {/* ── Content: video card + action buttons ── */}
         <div className="flex items-end justify-center h-full lg:py-2 py-4 gap-4">
@@ -840,7 +840,7 @@ const Reels = () => {
           <button
             onClick={() => goToIndex(currentIndex - 1)}
             disabled={currentIndex === 0}
-            className="w-12 h-12 rounded-full bg-white/10 border border-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center hover:bg-white/25 hover:scale-110 active:scale-95 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+            className="w-12 h-12 rounded-full dark:bg-white/10 border border-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center hover:bg-white/25 hover:scale-110 active:scale-95 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="18 15 12 9 6 15" />
