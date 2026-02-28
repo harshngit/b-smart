@@ -274,6 +274,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     'Ireland', 'Switzerland', 'Austria', 'Hungary', 'Czech Republic', 'Romania', 'Pakistan', 'Bangladesh'
   ].sort();
 
+   const [categories, setCategories] = useState(CATEGORIES);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [targetLanguage, setTargetLanguage] = useState('English');
   const [targetLocation, setTargetLocation] = useState(COUNTRIES[0]);
@@ -294,6 +296,23 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setIsLoadingCategories(true);
+    api.get('/ads/categories')
+      .then((res) => {
+        const cats = res?.data?.categories || [];
+        if (!active) return;
+        if (cats.length) {
+          setCategories(cats);
+          setCategory(cats.includes('All') ? 'All' : cats[0]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setIsLoadingCategories(false); });
+    return () => { active = false; };
   }, []);
 
   const [uploadStage, setUploadStage] = useState('idle');
@@ -719,7 +738,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             }
           });
 
-          const { fileUrl, fileName: serverFileName } = uploadResponse.data;
+          const { fileName: serverFileName } = uploadResponse.data;
 
           // Generate Filter CSS
           const filterDef = FILTERS.find(f => f.name === item.filter);
@@ -807,8 +826,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             y: item.crop?.y || 0
           };
 
-          // fileUrl for internal use (needed for payload)
-          mediaObj._fileUrl = fileUrl;
+          
 
           return mediaObj;
         }));
@@ -826,7 +844,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             location,
             media: processedMedia
               .filter(m => m.media_type === 'video')
-              .map(({ _fileUrl, ...rest }) => rest),
+              .map(m => { const copy = { ...m }; delete copy._fileUrl; return copy; }),
             tags: hashtags,
             people_tags: tags.map(t => ({
               user_id: t.user.id,
@@ -841,7 +859,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
         } else if (postType === 'ad') {
           // ── AD — new /api/ads endpoint with full schema ──
-          const mediaForApi = processedMedia.map(({ _fileUrl, ...rest }) => rest);
+          const mediaForApi = processedMedia.map(m => { const copy = { ...m }; delete copy._fileUrl; return copy; });
 
           // Map products → product_offer array
           const productOffers = [
@@ -895,7 +913,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           const payload = {
             caption,
             location,
-            media: processedMedia.map(({ fileUrl, ...rest }) => rest),
+            media: processedMedia.map(m => { const copy = { ...m }; delete copy.fileUrl; return copy; }),
             tags: hashtags,
             people_tags: tags.map(t => ({
               user_id: t.user.id,
@@ -1974,9 +1992,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                       </div>
                       {showCategoryDropdown && (
                         <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
-                          {CATEGORIES.map(o => (
-                            <div key={o} onClick={() => { setCategory(o); setShowCategoryDropdown(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 ${category === o ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : ''}`}>{o}</div>
-                          ))}
+                          {isLoadingCategories ? (
+                            <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">Loading categories...</div>
+                          ) : (
+                            (categories.length ? categories : CATEGORIES).map(o => (
+                              <div
+                                key={o}
+                                onClick={() => { setCategory(o); setShowCategoryDropdown(false); }}
+                                className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 ${category === o ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : ''}`}
+                              >
+                                {o}
+                              </div>
+                            ))
+                          )}
                         </div>
                       )}
                     </div>

@@ -575,7 +575,7 @@ const Reels = () => {
   };
 
   if (loading) return (
-    <div className="w-full h-screen flex justify-center items-center bg-black">
+    <div className="w-full h-screen flex justify-center items-center dark:bg-black bg-white">
       <div className="flex flex-col items-center gap-3">
         <Loader2 size={36} className="text-white animate-spin" />
         <span className="text-white/60 text-sm">Loading reels...</span>
