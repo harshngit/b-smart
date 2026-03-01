@@ -864,7 +864,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           // Map products → product_offer array
           const productOffers = [
             ...products.map(p => ({
-              id: p.id,
+              
               title: p.name,
               description: p.description || '',
               price: parseFloat(p.price) || 0,
@@ -872,7 +872,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               type: 'product'
             })),
             ...offers.map(o => ({
-              id: o.id,
+              
               title: o.code,
               description: o.description || '',
               price: 0,
