@@ -265,6 +265,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     'Gaming', 'Music', 'Photography', 'Science', 'Social Media', 'Other'
   ];
 
+  const LANGUAGES = [
+    'English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Arabic', 'Hindi', 'Portuguese', 'Russian', 'Italian', 'Korean', 'Turkish'
+  ].sort();
+
   const COUNTRIES = [
     'USA', 'Canada', 'UK', 'Australia', 'India', 'Germany', 'France', 'Italy', 'Spain', 'Brazil',
     'Mexico', 'Japan', 'South Korea', 'China', 'Russia', 'South Africa', 'Nigeria', 'Egypt',
@@ -274,29 +278,17 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     'Ireland', 'Switzerland', 'Austria', 'Hungary', 'Czech Republic', 'Romania', 'Pakistan', 'Bangladesh'
   ].sort();
 
-   const [categories, setCategories] = useState(CATEGORIES);
+  const [categories, setCategories] = useState(CATEGORIES);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
-  const [category, setCategory] = useState(CATEGORIES[0]);
-  const [targetLanguage, setTargetLanguage] = useState('English');
-  const [targetLocation, setTargetLocation] = useState(COUNTRIES[0]);
+  
+  // Ad multi-select states
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedLanguages, setSelectedLanguages] = useState([]);
+  const [selectedCountries, setSelectedCountries] = useState([]);
   const [totalBudgetCoins, setTotalBudgetCoins] = useState('');
   
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
-  const categoryRef = useRef(null);
-  const languageRef = useRef(null);
-  const countryRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (categoryRef.current && !categoryRef.current.contains(event.target)) setShowCategoryDropdown(false);
-      if (languageRef.current && !languageRef.current.contains(event.target)) setShowLanguageDropdown(false);
-      if (countryRef.current && !countryRef.current.contains(event.target)) setShowCountryDropdown(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // Accordion state: 'category' | 'language' | 'country' | null
+  const [openAccordion, setOpenAccordion] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -307,7 +299,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         if (!active) return;
         if (cats.length) {
           setCategories(cats);
-          setCategory(cats.includes('All') ? 'All' : cats[0]);
         }
       })
       .catch(() => {})
@@ -319,21 +310,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState('');
   
-  const [adTab, setAdTab] = useState('product');
-  const [products, setProducts] = useState([]);
-  const [offers, setOffers] = useState([]);
-  
-  const [prodName, setProdName] = useState('');
-  const [prodDesc, setProdDesc] = useState('');
-  const [prodPrice, setProdPrice] = useState('');
-  const [prodLink, setProdLink] = useState('');
-  const [prodImages, setProdImages] = useState([]);
-
-  const [offerCode, setOfferCode] = useState('');
-  const [offerDesc, setOfferDesc] = useState('');
-  const [offerLink, setOfferLink] = useState('');
-  const [offerImage, setOfferImage] = useState(null);
-
   const [draggingTagId, setDraggingTagId] = useState(null);
 
   const POPULAR_EMOJIS = ['😂', '😮', '😍', '😢', '👏', '🔥', '🎉', '💯', '❤️', '🤣', '🥰', '😘', '😭', '😊'];
@@ -550,9 +526,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
   const handleBack = () => {
     if (step === 'share') {
-      if (postType === 'ad') setStep('details');
-      else setStep('edit');
-    } else if (step === 'details') {
       setStep('edit');
     } else if (step === 'edit') {
       setStep('crop');
@@ -630,9 +603,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       setMedia(newMedia);
       setStep('edit');
     } else if (step === 'edit') {
-      if (postType === 'ad') setStep('details');
-      else setStep('share');
-    } else if (step === 'details') {
       setStep('share');
     } else if (step === 'share') {
       if (isSubmitting) return;
@@ -861,26 +831,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           // ── AD — new /api/ads endpoint with full schema ──
           const mediaForApi = processedMedia.map(m => { const copy = { ...m }; delete copy._fileUrl; return copy; });
 
-          // Map products → product_offer array
-          const productOffers = [
-            ...products.map(p => ({
-              
-              title: p.name,
-              description: p.description || '',
-              price: parseFloat(p.price) || 0,
-              link: p.link || '',
-              type: 'product'
-            })),
-            ...offers.map(o => ({
-              
-              title: o.code,
-              description: o.description || '',
-              price: 0,
-              link: o.link || '',
-              type: 'offer'
-            }))
-          ];
-
           const adPayload = {
             type: 'ads',
             caption,
@@ -898,11 +848,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               disable_comments: turnOffCommenting
             },
             content_type: media.some(m => m.type === 'video') ? 'reel' : 'post',
-            category,
+            category: selectedCategories,
             tags: hashtags,
-            target_language: [targetLanguage],
-            target_location: [targetLocation],
-            product_offer: productOffers,
+            target_language: selectedLanguages,
+            target_location: selectedCountries,
+            product_offer: [],
             total_budget_coins: parseFloat(totalBudgetCoins) || 0
           };
 
@@ -941,36 +891,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       }
     }
   };
-
-  const handleAddProduct = () => {
-    if (!prodName || !prodPrice) return;
-    const newProduct = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: prodName,
-      description: prodDesc,
-      price: prodPrice,
-      link: prodLink,
-      images: prodImages
-    };
-    setProducts([...products, newProduct]);
-    setProdName(''); setProdDesc(''); setProdPrice(''); setProdLink(''); setProdImages([]);
-  };
-
-  const handleAddOffer = () => {
-    if (!offerCode) return;
-    const newOffer = {
-      id: Math.random().toString(36).substr(2, 9),
-      code: offerCode,
-      description: offerDesc,
-      link: offerLink,
-      image: offerImage
-    };
-    setOffers([...offers, newOffer]);
-    setOfferCode(''); setOfferDesc(''); setOfferLink(''); setOfferImage(null);
-  };
-
-  const handleRemoveProduct = (id) => setProducts(products.filter(p => p.id !== id));
-  const handleRemoveOffer = (id) => setOffers(offers.filter(o => o.id !== id));
 
   const handleEmojiClick = (emoji) => {
     setCaption(prev => prev + emoji);
@@ -1052,12 +972,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     setMedia([]);
     setCurrentIndex(0);
     setCaption('');
-    setCategory(CATEGORIES[0]);
-    setTargetLanguage('English');
-    setTargetLocation(COUNTRIES[0]);
+    
+    setSelectedCategories([]);
+    setSelectedLanguages([]);
+    setSelectedCountries([]);
     setTotalBudgetCoins('');
-    setProducts([]);
-    setOffers([]);
+    
     setTags([]);
     onClose();
   };
@@ -1634,178 +1554,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               </div>
             </div>
           </div>
-        ) : step === 'details' ? (
-          /* DETAILS STEP — Ad Products & Offers */
-          <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-white dark:bg-black">
-            <div className="flex flex-col w-full h-full">
-              <div className="flex border-b border-gray-200 dark:border-gray-800 justify-center bg-white dark:bg-black sticky top-0 z-10">
-                <button onClick={() => setAdTab('product')} className={`px-12 py-3 text-sm font-semibold transition-colors ${adTab === 'product' ? 'text-black dark:text-white border-b-2 border-black dark:border-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Product</button>
-                <button onClick={() => setAdTab('offer')} className={`px-12 py-3 text-sm font-semibold transition-colors ${adTab === 'offer' ? 'text-black dark:text-white border-b-2 border-black dark:border-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Offer</button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide w-full max-w-5xl mx-auto">
-                {adTab === 'product' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Add New Product</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Product Name *</label>
-                          <input type="text" placeholder="Product Name" value={prodName} onChange={e => setProdName(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
-                          <textarea placeholder="Description" value={prodDesc} onChange={e => setProdDesc(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white resize-none focus:ring-1 focus:ring-blue-500 outline-none" rows={3} />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Price *</label>
-                          <input type="number" placeholder="Price" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Product Link</label>
-                          <input type="url" placeholder="https://..." value={prodLink} onChange={e => setProdLink(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Photos</label>
-                          <div
-                            className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              setIsDragging(false);
-                              const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                              if (files.length > 0) setProdImages([...prodImages, ...files]);
-                            }}
-                            onClick={() => document.getElementById('product-file-input').click()}
-                          >
-                            <Images className="text-gray-400 mb-2" size={32} />
-                            <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Drag photos here</span>
-                            <span className="text-xs text-gray-400 mt-1">or click to upload</span>
-                            <input id="product-file-input" type="file" multiple accept="image/*" className="hidden" onChange={e => setProdImages([...prodImages, ...Array.from(e.target.files)])} />
-                          </div>
-                          {prodImages.length > 0 && (
-                            <div className="flex gap-2 overflow-x-auto py-3 scrollbar-hide">
-                              {prodImages.map((file, idx) => (
-                                <div key={idx} className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 flex-shrink-0 relative group shadow-sm">
-                                  <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="" />
-                                  <button onClick={(e) => { e.stopPropagation(); setProdImages(prodImages.filter((_, i) => i !== idx)); }} className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full hover:bg-red-500 transition-colors"><X size={12}/></button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <button onClick={handleAddProduct} disabled={!prodName || !prodPrice} className="w-full py-2.5 bg-[#0095f6] hover:bg-[#1877f2] text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm mt-2">Add Product</button>
-                      </div>
-                    </div>
-                    <div className="border-l border-gray-100 dark:border-gray-800 pl-0 md:pl-8 overflow-y-auto">
-                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 sticky top-0 bg-white dark:bg-black py-2 z-10">Added Products ({products.length})</h3>
-                      {products.length > 0 ? (
-                        <div className="space-y-3">
-                          {products.map(p => (
-                            <div key={p.id} className="flex gap-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl relative group border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
-                              {p.images && p.images.length > 0 ? (
-                                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
-                                  <img src={URL.createObjectURL(p.images[0])} className="w-full h-full object-cover" alt="" />
-                                </div>
-                              ) : (
-                                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0 text-gray-400"><Images size={20}/></div>
-                              )}
-                              <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <p className="font-semibold text-sm truncate dark:text-white">{p.name}</p>
-                                <p className="text-xs text-gray-500 truncate mb-0.5">{p.description}</p>
-                                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">${p.price}</p>
-                              </div>
-                              <button onClick={() => handleRemoveProduct(p.id)} className="absolute top-2 right-2 p-1.5 bg-white dark:bg-black rounded-full opacity-0 group-hover:opacity-100 transition-all text-gray-500 hover:text-red-500 shadow-sm border border-gray-100 dark:border-gray-800"><X size={14}/></button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-xl">
-                          <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center mb-2"><Plus size={24} /></div>
-                          <p className="text-sm">No products added yet</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Add New Offer</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Offer Title *</label>
-                          <input type="text" placeholder="Offer Code or Title" value={offerCode} onChange={e => setOfferCode(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
-                          <textarea placeholder="Description" value={offerDesc} onChange={e => setOfferDesc(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white resize-none focus:ring-1 focus:ring-blue-500 outline-none" rows={3} />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Link</label>
-                          <input type="url" placeholder="https://..." value={offerLink} onChange={e => setOfferLink(e.target.value)} className="w-full p-2 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-sm dark:text-white focus:ring-1 focus:ring-blue-500 outline-none" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Offer Image</label>
-                          <div
-                            className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              setIsDragging(false);
-                              const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                              if (files.length > 0) setOfferImage(files[0]);
-                            }}
-                            onClick={() => document.getElementById('offer-file-input').click()}
-                          >
-                            <Images className="text-gray-400 mb-2" size={32} />
-                            <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Drag photo here</span>
-                            <span className="text-xs text-gray-400 mt-1">or click to upload</span>
-                            <input id="offer-file-input" type="file" accept="image/*" className="hidden" onChange={e => setOfferImage(e.target.files[0])} />
-                          </div>
-                          {offerImage && (
-                            <div className="w-full h-48 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative mt-3 group shadow-sm">
-                              <img src={URL.createObjectURL(offerImage)} className="w-full h-full object-cover" alt="" />
-                              <button onClick={(e) => { e.stopPropagation(); setOfferImage(null); }} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-red-500 transition-colors"><X size={16}/></button>
-                            </div>
-                          )}
-                        </div>
-                        <button onClick={handleAddOffer} disabled={!offerCode} className="w-full py-2.5 bg-[#0095f6] hover:bg-[#1877f2] text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm mt-2">Add Offer</button>
-                      </div>
-                    </div>
-                    <div className="border-l border-gray-100 dark:border-gray-800 pl-0 md:pl-8 overflow-y-auto">
-                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 sticky top-0 bg-white dark:bg-black py-2 z-10">Added Offers ({offers.length})</h3>
-                      {offers.length > 0 ? (
-                        <div className="space-y-3">
-                          {offers.map(o => (
-                            <div key={o.id} className="flex gap-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl relative group border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
-                              {o.image ? (
-                                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
-                                  <img src={URL.createObjectURL(o.image)} className="w-full h-full object-cover" alt="" />
-                                </div>
-                              ) : (
-                                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0 text-gray-400"><Images size={20}/></div>
-                              )}
-                              <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <p className="font-semibold text-sm truncate dark:text-white">{o.code}</p>
-                                <p className="text-xs text-gray-500 truncate mb-0.5">{o.link}</p>
-                              </div>
-                              <button onClick={() => handleRemoveOffer(o.id)} className="absolute top-2 right-2 p-1.5 bg-white dark:bg-black rounded-full opacity-0 group-hover:opacity-100 transition-all text-gray-500 hover:text-red-500 shadow-sm border border-gray-100 dark:border-gray-800"><X size={14}/></button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-xl">
-                          <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center mb-2"><Plus size={24} /></div>
-                          <p className="text-sm">No offers added yet</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         ) : (
           /* SHARE STEP */
           <div className="flex-1 flex flex-col md:flex-row lg:overflow-hidden overflow-y-auto overflow-x-hidden">
@@ -1983,64 +1731,98 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               {/* Ad-specific fields */}
               {postType === 'ad' && (
                 <div className="px-4 pb-4 border-b border-gray-100 dark:border-gray-800 space-y-4 pt-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
-                    <div className="relative" ref={categoryRef}>
-                      <div onClick={() => setShowCategoryDropdown(!showCategoryDropdown)} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors">
-                        <span className="truncate">{category}</span>
-                        <ChevronDown size={16} className={`text-gray-500 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                  
+                  {/* Category Accordion */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setOpenAccordion(openAccordion === 'category' ? null : 'category')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
+                    >
+                      <span>Category {selectedCategories.length > 0 && `(${selectedCategories.length})`}</span>
+                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'category' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openAccordion === 'category' && (
+                      <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
+                        {isLoadingCategories ? (
+                          <div className="p-2 text-xs text-gray-500">Loading...</div>
+                        ) : (
+                          categories.map(cat => (
+                            <label key={cat} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedCategories.includes(cat)}
+                                onChange={() => {
+                                  if (selectedCategories.includes(cat)) setSelectedCategories(selectedCategories.filter(c => c !== cat));
+                                  else setSelectedCategories([...selectedCategories, cat]);
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm dark:text-gray-200">{cat}</span>
+                            </label>
+                          ))
+                        )}
                       </div>
-                      {showCategoryDropdown && (
-                        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
-                          {isLoadingCategories ? (
-                            <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">Loading categories...</div>
-                          ) : (
-                            (categories.length ? categories : CATEGORIES).map(o => (
-                              <div
-                                key={o}
-                                onClick={() => { setCategory(o); setShowCategoryDropdown(false); }}
-                                className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 ${category === o ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : ''}`}
-                              >
-                                {o}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Target Language</label>
-                    <div className="relative" ref={languageRef}>
-                      <div onClick={() => setShowLanguageDropdown(!showLanguageDropdown)} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors">
-                        <span className="truncate">{targetLanguage}</span>
-                        <ChevronDown size={16} className={`text-gray-500 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} />
+
+                  {/* Language Accordion */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setOpenAccordion(openAccordion === 'language' ? null : 'language')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
+                    >
+                      <span>Target Language {selectedLanguages.length > 0 && `(${selectedLanguages.length})`}</span>
+                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'language' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openAccordion === 'language' && (
+                      <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
+                        {LANGUAGES.map(lang => (
+                          <label key={lang} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedLanguages.includes(lang)}
+                              onChange={() => {
+                                if (selectedLanguages.includes(lang)) setSelectedLanguages(selectedLanguages.filter(l => l !== lang));
+                                else setSelectedLanguages([...selectedLanguages, lang]);
+                              }}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm dark:text-gray-200">{lang}</span>
+                          </label>
+                        ))}
                       </div>
-                      {showLanguageDropdown && (
-                        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
-                          {['English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Arabic', 'Hindi', 'Portuguese', 'Russian', 'Italian', 'Korean', 'Turkish'].map(o => (
-                            <div key={o} onClick={() => { setTargetLanguage(o); setShowLanguageDropdown(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 ${targetLanguage === o ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : ''}`}>{o}</div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Target Country</label>
-                    <div className="relative" ref={countryRef}>
-                      <div onClick={() => setShowCountryDropdown(!showCountryDropdown)} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors">
-                        <span className="truncate">{targetLocation}</span>
-                        <ChevronDown size={16} className={`text-gray-500 transition-transform ${showCountryDropdown ? 'rotate-180' : ''}`} />
+
+                  {/* Country Accordion */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setOpenAccordion(openAccordion === 'country' ? null : 'country')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
+                    >
+                      <span>Target Country {selectedCountries.length > 0 && `(${selectedCountries.length})`}</span>
+                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'country' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openAccordion === 'country' && (
+                      <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
+                        {COUNTRIES.map(country => (
+                          <label key={country} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedCountries.includes(country)}
+                              onChange={() => {
+                                if (selectedCountries.includes(country)) setSelectedCountries(selectedCountries.filter(c => c !== country));
+                                else setSelectedCountries([...selectedCountries, country]);
+                              }}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm dark:text-gray-200">{country}</span>
+                          </label>
+                        ))}
                       </div>
-                      {showCountryDropdown && (
-                        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
-                          {COUNTRIES.map(o => (
-                            <div key={o} onClick={() => { setTargetLocation(o); setShowCountryDropdown(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 ${targetLocation === o ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : ''}`}>{o}</div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Total Budget (Coins) *</label>
                     <input

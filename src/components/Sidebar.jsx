@@ -18,6 +18,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const dropdownRef = useRef(null);
   const moreDropdownRef = useRef(null);
   const notificationsRef = useRef(null);
+  const isVendor = userObject?.role === 'vendor';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -38,12 +39,15 @@ const Sidebar = ({ onOpenCreateModal }) => {
     };
   }, []);
 
-  const navItems = [
+  const navItems = isVendor ? [
     { icon: Home, label: 'Home', path: '/' },
-    { icon: Search, label: 'Search', path: '/search' },
     { icon: Target, label: 'Ads', path: '/ads' },
     { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
-    { icon: Megaphone, label: 'Promote', path: '/promote' },
+    { icon: User, label: 'Profile', path: '/profile' },
+  ] : [
+    { icon: Home, label: 'Home', path: '/' },
+    { icon: Search, label: 'Search', path: '/search' },
+    { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
     { icon: Clapperboard, label: 'Reels', path: '/reels' },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
@@ -101,27 +105,31 @@ const Sidebar = ({ onOpenCreateModal }) => {
                   {/* Dropdown Menu */}
                   {isCreateDropdownOpen && (
                     <div className={`absolute left-0 top-full mt-2 w-48 bg-white dark:bg-[#262626] rounded-lg shadow-lg border border-gray-100 dark:border-gray-800 py-2 z-[60] overflow-hidden ${isHovered ? 'translate-x-0' : 'translate-x-14'}`}>
-                      <button
-                        onClick={() => {
-                          onOpenCreateModal('post');
-                          setIsCreateDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
-                      >
-                        <Image size={18} />
-                        Create Post
-                      </button>
-                      <button
-                        onClick={() => {
-                          onOpenCreateModal('reel');
-                          setIsCreateDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
-                      >
-                        <Video size={18} />
-                        Upload Reel
-                      </button>
-                      {userObject?.role === 'vendor' && (
+                      {!isVendor && (
+                        <>
+                          <button
+                            onClick={() => {
+                              onOpenCreateModal('post');
+                              setIsCreateDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
+                          >
+                            <Image size={18} />
+                            Create Post
+                          </button>
+                          <button
+                            onClick={() => {
+                              onOpenCreateModal('reel');
+                              setIsCreateDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
+                          >
+                            <Video size={18} />
+                            Upload Reel
+                          </button>
+                        </>
+                      )}
+                      {isVendor && (
                         <button
                            onClick={() => {
                             if (!userObject?.is_active) {
