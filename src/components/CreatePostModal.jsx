@@ -282,7 +282,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   
   // Ad multi-select states
-  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState("");
   const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [selectedCountries, setSelectedCountries] = useState([]);
   const [totalBudgetCoins, setTotalBudgetCoins] = useState('');
@@ -708,7 +708,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             }
           });
 
-          const { fileName: serverFileName } = uploadResponse.data;
+          const { fileName: serverFileName, url: serverUrl, fileUrl: serverFileUrl } = uploadResponse.data;
+          const finalUrl = serverUrl || serverFileUrl;
 
           // Generate Filter CSS
           const filterDef = FILTERS.find(f => f.name === item.filter);
@@ -754,6 +755,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           // Build the media object per the API schema
           const mediaObj = {
             fileName: serverFileName || fileName,
+            fileUrl: finalUrl,
+            url: finalUrl,
             media_type: item.type === 'video' ? 'video' : 'image',
           };
 
@@ -848,7 +851,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               disable_comments: turnOffCommenting
             },
             content_type: media.some(m => m.type === 'video') ? 'reel' : 'post',
-            category: selectedCategories,
+            category: Array.isArray(selectedCategories) ? (selectedCategories[0] || '') : (selectedCategories || ''),
             tags: hashtags,
             target_language: selectedLanguages,
             target_location: selectedCountries,
@@ -1738,7 +1741,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                       onClick={() => setOpenAccordion(openAccordion === 'category' ? null : 'category')}
                       className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
                     >
-                      <span>Category {selectedCategories.length > 0 && `(${selectedCategories.length})`}</span>
+                      <span>Category {selectedCategories.length > 0 && `(${selectedCategories[0]})`}</span>
                       <ChevronDown size={16} className={`transition-transform ${openAccordion === 'category' ? 'rotate-180' : ''}`} />
                     </button>
                     {openAccordion === 'category' && (
@@ -1749,13 +1752,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                           categories.map(cat => (
                             <label key={cat} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
                               <input
-                                type="checkbox"
+                                type="radio"
+                                name="ad_category"
                                 checked={selectedCategories.includes(cat)}
-                                onChange={() => {
-                                  if (selectedCategories.includes(cat)) setSelectedCategories(selectedCategories.filter(c => c !== cat));
-                                  else setSelectedCategories([...selectedCategories, cat]);
-                                }}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                onChange={() => setSelectedCategories([cat])}
+                                className="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
                               <span className="text-sm dark:text-gray-200">{cat}</span>
                             </label>
