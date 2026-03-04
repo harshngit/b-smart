@@ -696,7 +696,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           const formData = new FormData();
           formData.append('file', file);
 
-          const uploadResponse = await api.post('https://bsmart.asynk.store/api/upload', formData, {
+          const uploadResponse = await api.post('https://api.bebsmart.in/api/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress: (evt) => {
               if (evt.total) {
@@ -734,7 +734,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               const tFile = new File([imgBlob], `thumb_${Date.now()}.jpg`, { type: 'image/jpeg' });
               thumbForm.append('file', tFile);
               try {
-                const thumbRes = await api.post('https://bsmart.asynk.store/api/upload/thumbnail', thumbForm, {
+                const thumbRes = await api.post('https://api.bebsmart.in/api/upload/thumbnail', thumbForm, {
                   headers: { 'Content-Type': 'multipart/form-data' }
                 });
                 uploadedThumbs = thumbRes.data?.thumbnails || null;
@@ -828,7 +828,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             hide_likes_count: hideLikes,
             turn_off_commenting: turnOffCommenting
           };
-          await api.post('https://bsmart.asynk.store/api/posts/reels', payload);
+          await api.post('https://api.bebsmart.in/api/posts/reels', payload);
 
         } else if (postType === 'ad') {
           // ── AD — new /api/ads endpoint with full schema ──
@@ -859,7 +859,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             total_budget_coins: parseFloat(totalBudgetCoins) || 0
           };
 
-          await api.post('https://bsmart.asynk.store/api/ads', adPayload);
+          await api.post('https://api.bebsmart.in/api/ads', adPayload);
 
         } else {
           // Post — existing endpoint unchanged
@@ -912,7 +912,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const fetchUsers = async (query) => {
     setIsSearchingUsers(true);
     try {
-      const { data } = await api.get('https://bsmart.asynk.store/api/users');
+      const { data } = await api.get('https://api.bebsmart.in/api/users');
       let usersRaw = Array.isArray(data) ? data : (data.users || []);
       const users = usersRaw.map(item => item.user || item);
       let filtered = users;
@@ -936,7 +936,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     const loadAll = async () => {
       setIsLoadingAllUsers(true);
       try {
-        const { data } = await api.get('https://bsmart.asynk.store/api/users');
+        const { data } = await api.get('https://api.bebsmart.in/api/users');
         const usersRaw = Array.isArray(data) ? data : (data.users || []);
         const users = usersRaw.map(item => item.user || item);
         const mapped = users.map(u => ({
