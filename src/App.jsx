@@ -28,6 +28,7 @@ import VendorLayout from './components/VendorLayout';
 import VendorDashboard from './pages/vendor-pages/Dashboard';
 import VendorProfile from './pages/vendor-pages/VendorProfile';
 import AdsManagement from './pages/vendor-pages/AdsManagement';
+import AdDetails from './pages/vendor-pages/AdDetails';
 import ReportsAnalytics from './pages/vendor-pages/ReportsAnalytics';
 import CoinsBilling from './pages/vendor-pages/CoinsBilling';
 import VendorSettings from './pages/vendor-pages/Settings';
@@ -90,6 +91,7 @@ function App() {
           <Route path="dashboard" element={<VendorDashboard />} />
           <Route path="profile" element={<VendorProfile />} />
           <Route path="ads-management" element={<AdsManagement />} />
+          <Route path="ads-management/:adId" element={<AdDetails />} />
           <Route path="analytics" element={<ReportsAnalytics />} />
           <Route path="billing" element={<CoinsBilling />} />
           <Route path="settings" element={<VendorSettings />} />
