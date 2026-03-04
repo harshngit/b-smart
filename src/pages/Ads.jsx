@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   Heart, MessageCircle, Send, MoreHorizontal, Music2,
   Volume2, VolumeX, Bookmark, ChevronLeft, Search,
@@ -428,7 +430,10 @@ const ProductOffer = ({ offer }) => {
 };
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-const Ads = () => {
+const Ads = ({ feedMode = 'user' }) => {
+  const { userObject } = useSelector((state) => state.auth);
+  const isVendorUser = userObject?.role === 'vendor';
+
   const [categories] = useState(FALLBACK_CATEGORIES);
   const [activeCategory, setActiveCategory] = useState('All');
   const [ads, setAds] = useState([]);
@@ -474,23 +479,35 @@ const Ads = () => {
     setLoading(true);
     setError(null);
     try {
-      const url = category === 'All'
-        ? `${BASE_URL}/api/ads/feed`
-        : `${BASE_URL}/api/ads/feed?category=${encodeURIComponent(category)}`;
-      const res = await fetch(url, { headers: authHeaders() });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.data || data.ads || []);
-      setAds(list);
-      setCurrentIndex(0);
-      setProgress(0);
-      setLikedIds(new Set(list.filter(a => a.is_liked_by_me).map(a => a._id)));
+      // Use the same feed for vendors for now to ensure they see ads
+      // TODO: Implement specific vendor feed endpoints if required (e.g. /api/ads/vendor/feed)
+      const paths = ['/api/ads/feed'];
+
+      let lastStatus = 0;
+      for (const path of paths) {
+        const url = category === 'All'
+          ? `${BASE_URL}${path}`
+          : `${BASE_URL}${path}?category=${encodeURIComponent(category)}`;
+
+        const res = await fetch(url, { headers: authHeaders() });
+        lastStatus = res.status;
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.data || data.ads || []);
+        setAds(list);
+        setCurrentIndex(0);
+        setProgress(0);
+        setLikedIds(new Set(list.filter(a => a.is_liked_by_me).map(a => a._id)));
+        return;
+      }
+      throw new Error(`HTTP ${lastStatus || 0}`);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [feedMode]);
 
   useEffect(() => { fetchAds(activeCategory); }, [activeCategory, fetchAds]);
 
@@ -679,6 +696,8 @@ const Ads = () => {
   const ad = ads[currentIndex];
 
   // ─── Render ──────────────────────────────────────────────────────────────────
+  if (feedMode === 'user' && isVendorUser) return <Navigate to="/vendor-ads" replace />;
+
   return (
     <div className="flex flex-col bg-white dark:bg-black overflow-hidden">
 

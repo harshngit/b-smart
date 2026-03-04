@@ -41,7 +41,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
 
   const navItems = isVendor ? [
     { icon: Home, label: 'Home', path: '/' },
-    { icon: Target, label: 'Ads', path: '/ads' },
+    { icon: Target, label: 'Ads', path: '/vendor-ads' },
     { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
     { icon: User, label: 'Profile', path: '/profile' },
   ] : [
@@ -49,6 +49,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
     { icon: Search, label: 'Search', path: '/search' },
     { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
     { icon: Clapperboard, label: 'Reels', path: '/reels' },
+    { icon: Target, label: 'Ads', path: '/ads' },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
 

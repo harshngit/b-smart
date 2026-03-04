@@ -41,8 +41,8 @@ const BottomNav = ({ onOpenCreateModal }) => {
         </Link>
 
         {isVendor ? (
-          <Link to="/ads" className={`${isActive('/ads') ? activeColor : inactiveColor}`}>
-            <Target size={28} strokeWidth={isActive('/ads') ? 2.5 : 2} />
+          <Link to="/vendor-ads" className={`${isActive('/vendor-ads') ? activeColor : inactiveColor}`}>
+            <Target size={28} strokeWidth={isActive('/vendor-ads') ? 2.5 : 2} />
           </Link>
         ) : (
           <Link to="/search" className={`${isActive('/search') ? activeColor : inactiveColor}`}>

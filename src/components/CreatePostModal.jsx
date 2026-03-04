@@ -855,7 +855,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             tags: hashtags,
             target_language: selectedLanguages,
             target_location: selectedCountries,
-            product_offer: [],
             total_budget_coins: parseFloat(totalBudgetCoins) || 0
           };
 
