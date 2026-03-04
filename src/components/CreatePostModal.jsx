@@ -1170,31 +1170,36 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             </button>
             <div className="md:hidden absolute left-0 right-0 bottom-6 flex justify-center">
               <div className="backdrop-blur-md bg-black/40 dark:bg-black/40 border border-white/10 rounded-2xl shadow-xl px-2 py-2 w-[92%] max-w-sm text-white flex items-center justify-around">
-                <button
-                  onClick={() => setPostType('post')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'post' ? 'bg-white/20' : 'hover:bg-white/10'}`}
-                >
-                  <Image size={18} className="text-purple-400" />
-                  <span className="text-xs font-semibold">Post</span>
-                </button>
-                <button
-                  onClick={() => setPostType('reel')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'reel' ? 'bg-white/20' : 'hover:bg-white/10'}`}
-                >
-                  <Video size={18} className="text-pink-400" />
-                  <span className="text-xs font-semibold">Reel</span>
-                </button>
+                {userObject?.role !== 'vendor' && (
+                  <>
+                    <button
+                      onClick={() => setPostType('post')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'post' ? 'bg-white/20' : 'hover:bg-white/10'}`}
+                    >
+                      <Image size={18} className="text-purple-400" />
+                      <span className="text-xs font-semibold">Post</span>
+                    </button>
+                    <button
+                      onClick={() => setPostType('reel')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'reel' ? 'bg-white/20' : 'hover:bg-white/10'}`}
+                    >
+                      <Video size={18} className="text-pink-400" />
+                      <span className="text-xs font-semibold">Reel</span>
+                    </button>
+                  </>
+                )}
                 {userObject?.role === 'vendor' && (
                   <button
                     onClick={() => {
-                      if (!userObject.vendor_validated) {
+                      if (!userObject?.is_active) {
                         setShowVendorNotValidated(true);
                       } else {
                         if (onOpenAdModal) onOpenAdModal();
                         else onClose();
+                        setPostType('ad');
                       }
                     }}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'ad' ? 'bg-white/20' : 'hover:bg-white/10'}`}
                   >
                     <Megaphone size={18} className="text-blue-400" />
                     <span className="text-xs font-semibold">Ad</span>
