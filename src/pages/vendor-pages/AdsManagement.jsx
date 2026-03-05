@@ -82,7 +82,11 @@ export default function AdsManagement() {
       <div className="max-w-7xl mx-auto p-6 md:p-8">
         
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Ads Management</h1>
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-red-500 to-pink-600">
+              Ads Management
+            </span>
+          </h1>
           <p className="text-gray-500 dark:text-gray-400">Manage and track your advertising campaigns efficiently.</p>
         </div>
 
@@ -126,7 +130,7 @@ export default function AdsManagement() {
             <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm">
               <Trash2 className="w-4 h-4" /> Bulk Delete
             </button>
-            <button className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-gray-900/20 dark:shadow-white/10">
+            <button className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-pink-500/20">
               <span>+</span> Create New Ad
             </button>
           </div>

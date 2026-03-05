@@ -465,7 +465,7 @@ export default function VendorProfile() {
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
     
 
-      <div className="max-w-5xl mx-auto p-6 md:p-8">
+      <div className="max-w-7xl mx-auto p-6 md:p-8">
 
         {/* Page Header */}
         <div className="mb-8 animate-fade-in">
