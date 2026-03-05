@@ -1,4 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useSelector } from "react-redux";
+import api from "../../lib/api";
 
 
 // ─── Reusable Field Components ───────────────────────────────────────────────
@@ -109,32 +111,56 @@ const Badge = ({ status }) => {
 
 // ─── Sub Tab: Company Information ────────────────────────────────────────────
 const CompanyInfo = () => {
+  const { userObject } = useSelector((state) => state.auth);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [logoPreview, setLogoPreview] = useState(null);
   const fileRef = useRef();
 
   const [form, setForm] = useState({
-    companyName: "Pixel Media Pvt. Ltd.",
-    registeredName: "Pixel Media Private Limited",
-    regNumber: "U74999MH2018PTC123456",
-    taxId: "27AABCU9603R1ZX",
-    yearEstablished: "2018",
-    companyType: "Private Limited",
-    industry: "Digital Marketing",
-    businessNature: "Advertising Agency",
-    website: "https://pixelmedia.in",
-    email: "hello@pixelmedia.in",
-    phone: "+91 98765 43210",
-    address: "304, Nucleus Mall, Link Road, Andheri West, Mumbai – 400053",
-    country: "India",
-    coverage: "Pan India",
-    description: "Pixel Media is a full-service digital advertising agency specializing in social media campaigns, influencer marketing, and performance ads across major platforms.",
-    instagram: "https://instagram.com/pixelmedia",
-    facebook: "https://facebook.com/pixelmedia",
-    linkedin: "https://linkedin.com/company/pixelmedia",
+    companyName: "",
+    registeredName: "",
+    regNumber: "",
+    taxId: "",
+    yearEstablished: "",
+    companyType: "",
+    industry: "",
+    businessNature: "",
+    website: "",
+    email: "",
+    phone: "",
+    address: "",
+    country: "",
+    coverage: "",
+    description: "",
+    instagram: "",
+    facebook: "",
+    linkedin: "",
     twitter: "",
   });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const id = userObject?._id || userObject?.id;
+      if (id) {
+        try {
+          const res = await api.get(`/vendors/profile/${id}`);
+          if (res.data) {
+            // Merge fetched data with form state, prioritizing fetched data
+            setForm(prev => ({
+              ...prev,
+              ...res.data,
+              // Map specific fields if API response keys differ, e.g.:
+              // companyName: res.data.company_name || res.data.companyName || prev.companyName,
+            }));
+          }
+        } catch (error) {
+          console.error("Failed to fetch vendor profile:", error);
+        }
+      }
+    };
+    fetchProfile();
+  }, [userObject]);
 
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
