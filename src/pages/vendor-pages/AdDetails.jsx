@@ -1,377 +1,775 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, CheckCircle, BarChart2, DollarSign, Users,
-  MessageCircle, Share2, ThumbsUp, Activity, Clock, Eye, Download
+import { useState, useEffect, useCallback } from "react";
+import api from "../../lib/api";
+import {
+  ArrowLeft, CheckCircle, BarChart2, Users, MessageCircle,
+  ThumbsDown, Clock, Eye, MapPin, Globe, Tag,
+  Film, Hash, Building2, Coins, Heart, AlertCircle,
+  ChevronDown, ChevronUp, RefreshCw
 } from "lucide-react";
-import { 
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area
-} from 'recharts';
+import {
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
+} from "recharts";
 
-// ─── Reusable Components ─────────────────────────────────────────────────────
+// ─── Reusable Components ──────────────────────────────────────────────────────
 
 const Badge = ({ status }) => {
   const styles = {
-    active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800",
-    paused: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+    active:    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800",
+    paused:    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800",
     completed: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
-    draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700",
-    rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800",
+    draft:     "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700",
+    rejected:  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800",
+    pending:   "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
   };
   return (
-    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${styles[status.toLowerCase()] || styles.draft}`}>
-      {status}
+    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${styles[(status || "").toLowerCase()] || styles.draft}`}>
+      {status || "Unknown"}
     </span>
   );
 };
 
 const Card = ({ title, children, className = "", action }) => (
   <div className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm ${className}`}>
-    <div className="flex justify-between items-center mb-6">
-      {title && <h3 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h3>}
-      {action}
-    </div>
+    {title && (
+      <div className="flex justify-between items-center mb-5">
+        <h3 className="text-base font-bold text-gray-900 dark:text-white">{title}</h3>
+        {action}
+      </div>
+    )}
     {children}
   </div>
 );
 
-const StatCard = ({ label, value, trend, color = "blue", icon: Icon }) => {
+const StatCard = ({ label, value, color = "blue", icon: Icon }) => {
   const colors = {
-    blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
+    blue:   "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
     purple: "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400",
-    pink: "bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400",
+    pink:   "bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400",
     orange: "bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400",
-    green: "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
+    green:  "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
+    red:    "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400",
   };
-
   return (
-    <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-3 rounded-xl ${colors[color]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        {trend && (
-          <span className={`px-2 py-1 rounded-lg text-xs font-bold ${trend > 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-            {trend > 0 ? '+' : ''}{trend}%
-          </span>
-        )}
+    <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colors[color]}`}>
+        <Icon className="w-5 h-5" />
       </div>
-      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{value}</div>
+      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-0.5">{value}</div>
       <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
     </div>
   );
 };
 
-export default function AdDetails() {
-  const { adId } = useParams();
-  const navigate = useNavigate();
+const InfoRow = ({ icon: Icon, label, value, mono = false }) => (
+  <div className="flex items-start justify-between gap-4 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
+    <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide min-w-[130px] flex-shrink-0">
+      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+      {label}
+    </div>
+    <div className={`text-sm font-semibold text-gray-800 dark:text-gray-200 text-right break-all ${mono ? "font-mono text-xs" : ""}`}>
+      {value ?? "—"}
+    </div>
+  </div>
+);
 
-  // Mock Data (In a real app, fetch data based on adId)
-  const ad = {
-      id: adId || "AD-2024-001",
-      name: "Summer Sale Campaign",
-      category: "Fashion",
-      status: "Active",
-      totalCoins: 5000,
-      coinsUsed: 2100,
-      clicks: 850,
-      impressions: 12500,
-      startDate: "2024-03-01",
-      endDate: "2024-03-15",
-      performance: {
-        reach: "10.2k",
-        ctr: "6.8%",
-        cpc: "₹2.47",
-        cpm: "₹168",
-        engagementRate: "4.2%",
-        conversionRate: "1.8%",
-        dailyData: [
-          { name: 'Day 1', value: 120 }, { name: 'Day 2', value: 150 }, { name: 'Day 3', value: 180 },
-          { name: 'Day 4', value: 140 }, { name: 'Day 5', value: 200 }, { name: 'Day 6', value: 250 },
-          { name: 'Day 7', value: 300 }, { name: 'Day 8', value: 280 }, { name: 'Day 9', value: 320 },
-          { name: 'Day 10', value: 350 }, { name: 'Day 11', value: 400 }, { name: 'Day 12', value: 380 },
-          { name: 'Day 13', value: 420 }, { name: 'Day 14', value: 450 }, { name: 'Day 15', value: 480 }
-        ],
-        genderData: [
-          { name: 'Male', value: 45 }, { name: 'Female', value: 55 }
-        ],
-        locationData: [
-          { name: 'Mumbai', value: 30 }, { name: 'Delhi', value: 25 }, 
-          { name: 'Bangalore', value: 20 }, { name: 'Hyderabad', value: 15 }, 
-          { name: 'Pune', value: 10 }
-        ],
-        languageData: [
-          { name: 'English', value: 60 }, { name: 'Hindi', value: 30 }, { name: 'Other', value: 10 }
-        ],
-      },
-      engagement: { likes: 1200, comments: 450, shares: 85 },
-      financial: { remaining: 2900, spend: 2100, tax: 378 },
-      logs: [
-        { action: "Ad Created", date: "2024-02-28 10:00 AM", user: "Admin" },
-        { action: "Approved", date: "2024-02-29 02:30 PM", user: "System" },
-        { action: "Started", date: "2024-03-01 09:00 AM", user: "System" },
-      ]
+const TagList = ({ items, color = "blue" }) => {
+  const colors = {
+    blue:   "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300",
+    purple: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300",
+    green:  "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300",
   };
+  if (!items || items.length === 0)
+    return <span className="text-sm text-gray-400 italic">None</span>;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item, i) => (
+        <span key={i} className={`px-2.5 py-1 rounded-full text-xs font-semibold ${colors[color]}`}>
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+};
 
-  const isEditable = ["Draft", "Paused"].includes(ad.status);
-  const COLORS = ['#3b82f6', '#ec4899', '#8b5cf6', '#f59e0b', '#10b981'];
+// Avatar — shows image or initials
+const Avatar = ({ name, url, size = "w-8 h-8", textSize = "text-xs" }) => {
+  const initials = (name || "U")
+    .split(" ")
+    .map(w => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        className={`${size} rounded-full object-cover flex-shrink-0`}
+        onError={e => { e.target.style.display = "none"; }}
+      />
+    );
+  }
+  return (
+    <div className={`${size} rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white ${textSize} font-bold flex-shrink-0`}>
+      {initials}
+    </div>
+  );
+};
+
+// ─── Comment Item with Replies ────────────────────────────────────────────────
+
+const CommentItem = ({ comment }) => {
+  const [showReplies, setShowReplies]     = useState(false);
+  const [replies, setReplies]             = useState([]);
+  const [loadingReplies, setLoadingReplies] = useState(false);
+  const [repliesFetched, setRepliesFetched] = useState(false);
+
+  const toggleReplies = useCallback(async () => {
+    // Already fetched — just toggle visibility
+    if (repliesFetched) {
+      setShowReplies(v => !v);
+      return;
+    }
+    setLoadingReplies(true);
+    try {
+      const res = await api.get(`/ads/comments/${comment._id}/replies`);
+      const data = Array.isArray(res.data)
+        ? res.data
+        : res.data?.replies || res.data?.data || [];
+      setReplies(data);
+      setRepliesFetched(true);
+      setShowReplies(true);
+    } catch (err) {
+      console.error("Failed to fetch replies", err);
+    } finally {
+      setLoadingReplies(false);
+    }
+  }, [comment._id, repliesFetched]);
+
+  const replyCount = comment.replies_count || comment.repliesCount || 0;
+  const user       = comment.user_id || comment.user || {};
+  const userName   = user.full_name || user.username || "User";
+  const timeAgo    = comment.createdAt
+    ? new Date(comment.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })
+    : "";
+
+  return (
+    <div className="space-y-2">
+      {/* Comment bubble */}
+      <div className="flex gap-3 items-start p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+        <Avatar name={userName} url={user.avatar_url || ""} />
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center gap-2 mb-1">
+            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{userName}</span>
+            <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{timeAgo}</span>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+            {comment.text || comment.content || comment.comment || ""}
+          </p>
+
+          {/* Reply toggle button */}
+          {replyCount > 0 && (
+            <button
+              onClick={toggleReplies}
+              disabled={loadingReplies}
+              className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
+            >
+              {loadingReplies ? (
+                <RefreshCw className="w-3 h-3 animate-spin" />
+              ) : showReplies ? (
+                <ChevronUp className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+              {showReplies
+                ? "Hide replies"
+                : `${replyCount} ${replyCount === 1 ? "reply" : "replies"}`}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Replies list */}
+      {showReplies && replies.length > 0 && (
+        <div className="ml-10 space-y-2">
+          {replies.map((reply, idx) => {
+            const rUser = reply.user_id || reply.user || {};
+            const rName = rUser.full_name || rUser.username || "User";
+            const rTime = reply.createdAt
+              ? new Date(reply.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })
+              : "";
+            return (
+              <div
+                key={reply._id || idx}
+                className="flex gap-2 items-start p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30"
+              >
+                <Avatar name={rName} url={rUser.avatar_url || ""} size="w-6 h-6" textSize="text-[10px]" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center gap-2 mb-0.5">
+                    <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{rName}</span>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap">{rTime}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                    {reply.text || reply.content || reply.comment || ""}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function AdDetails() {
+  const { adId }   = useParams();
+  const navigate   = useNavigate();
+
+  const [ad, setAd]         = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState("");
+
+  const [comments, setComments]               = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsPage, setCommentsPage]       = useState(1);
+  const [commentsTotal, setCommentsTotal]     = useState(0);
+  const COMMENTS_PER_PAGE = 5;
+
+  const [showAllLikes, setShowAllLikes]       = useState(false);
+
+  const COLORS = ["#3b82f6", "#ec4899", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444"];
+
+  // Fetch Ad
+  useEffect(() => {
+    if (!adId) return;
+    (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await api.get(`/ads/${adId}`);
+        setAd(res.data);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load ad details. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [adId]);
+
+  // Fetch Comments (paginated)
+  useEffect(() => {
+    if (!adId) return;
+    (async () => {
+      setCommentsLoading(true);
+      try {
+        const res = await api.get(`/ads/${adId}/comments`, {
+          params: { page: commentsPage, limit: COMMENTS_PER_PAGE },
+        });
+        const data  = Array.isArray(res.data)
+          ? res.data
+          : res.data?.comments || res.data?.data || [];
+        const total = res.data?.total || res.data?.totalCount || data.length;
+        setComments(data);
+        setCommentsTotal(total);
+      } catch (err) {
+        console.error("Comments fetch failed", err);
+        setComments([]);
+      } finally {
+        setCommentsLoading(false);
+      }
+    })();
+  }, [adId, commentsPage]);
+
+  // ── Loading ──────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 font-medium">Loading ad details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error ────────────────────────────────────────────────────────────────
+  if (error || !ad) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center p-6">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Failed to Load</h2>
+          <p className="text-gray-500 mb-6">{error || "Ad not found."}</p>
+          <button
+            onClick={() => navigate("/vendor/ads-management")}
+            className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors"
+          >
+            Back to Ads Management
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Derived values ───────────────────────────────────────────────────────
+  const status         = ad.status || "draft";
+  const media          = ad.media?.[0] || null;
+  const thumbnail      = media?.thumbnails?.[0]?.fileUrl || null;
+  const isVideo        = media?.media_type === "video";
+  const totalBudget    = ad.total_budget_coins || 0;
+  const coinsSpent     = ad.total_coins_spent  || 0;
+  const coinsRemaining = totalBudget - coinsSpent;
+  const spendPct       = totalBudget > 0 ? Math.round((coinsSpent / totalBudget) * 100) : 0;
+
+  const likesList      = Array.isArray(ad.likes)    ? ad.likes    : [];
+  const dislikesList   = Array.isArray(ad.dislikes) ? ad.dislikes : [];
+  const visibleLikes   = showAllLikes ? likesList : likesList.slice(0, 8);
+
+  const engagementData = [
+    { name: "Likes",    value: ad.likes_count    || 0 },
+    { name: "Dislikes", value: ad.dislikes_count || 0 },
+    { name: "Comments", value: ad.comments_count || 0 },
+  ].filter(d => d.value > 0);
+
+  const totalCommentPages = Math.max(1, Math.ceil(commentsTotal / COMMENTS_PER_PAGE));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
-        
-        <div className="animate-fade-in pb-20 pt-6">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div className="flex items-center gap-4">
-              <button onClick={() => navigate('/vendor/ads-management')} className="p-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm">
-                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-              </button>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{ad.name}</h1>
-                  <Badge status={ad.status} />
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
-                  <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs">ID: {ad.id}</span>
-                  <span>•</span>
-                  <span>Created on {ad.startDate}</span>
-                </div>
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        <div className="pb-20 pt-2">
+
+          {/* ── Header ─────────────────────────────────────────────────── */}
+          <div className="flex items-center gap-4 mb-8">
+            <button
+              onClick={() => navigate("/vendor/ads-management")}
+              className="p-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm flex-shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            </button>
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {ad.caption || "Ad Details"}
+                </h1>
+                <Badge status={status} />
               </div>
-            </div>
-            <div className="flex gap-3">
-              {isEditable && (
-                <button className="px-5 py-2.5 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20">
-                  Save Changes
-                </button>
-              )}
-              <button className="px-5 py-2.5 rounded-xl text-sm font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm">
-                Export Report
-              </button>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2 flex-wrap">
+                <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs">
+                  ID: {ad._id}
+                </span>
+                <span>•</span>
+                <span>
+                  {new Date(ad.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Left Column (2/3) */}
+
+            {/* ══ LEFT COLUMN (2/3) ═══════════════════════════════════════ */}
             <div className="lg:col-span-2 space-y-8">
-              
-              {/* Section 1: Basic Info */}
-              <Card title="Basic Information">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+              {/* Media Preview */}
+              {media && (
+                <Card title="Media Preview">
+                  <div className="flex flex-col sm:flex-row gap-6 items-start">
+                    <div
+                      className="relative w-36 flex-shrink-0 rounded-xl overflow-hidden bg-black"
+                      style={{ aspectRatio: "9/16" }}
+                    >
+                      {thumbnail ? (
+                        <img src={thumbnail} alt="thumbnail" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-500">
+                          <Film className="w-8 h-8" />
+                        </div>
+                      )}
+                      {isVideo && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full bg-white/80 flex items-center justify-center shadow">
+                            <div className="w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[10px] border-l-gray-800 ml-1" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <InfoRow icon={Film}     label="Type"        value={media.media_type} />
+                      <InfoRow icon={Film}     label="File"        value={media.fileName} mono />
+                      {isVideo && media.video_meta && (
+                        <>
+                          <InfoRow icon={Clock} label="Duration"    value={`${media.video_meta.final_duration?.toFixed(2)}s`} />
+                          <InfoRow icon={Clock} label="Original"    value={`${media.video_meta.original_length_seconds?.toFixed(2)}s`} />
+                          <InfoRow icon={Clock} label="Trim Range"  value={`${media.video_meta.selected_start?.toFixed(2)}s – ${media.video_meta.selected_end?.toFixed(2)}s`} />
+                        </>
+                      )}
+                      {media.crop_settings && (
+                        <InfoRow icon={BarChart2} label="Aspect Ratio" value={media.crop_settings.aspect_ratio} />
+                      )}
+                      {media.image_editing?.filter?.name && (
+                        <InfoRow icon={Tag} label="Filter" value={media.image_editing.filter.name} />
+                      )}
+                      <div className="pt-3">
+                        <a
+                          href={media.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Open Media
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <StatCard label="Total Views"     value={(ad.views_count           || 0).toLocaleString()} icon={Eye}           color="blue"   />
+                <StatCard label="Unique Views"    value={(ad.unique_views_count    || 0).toLocaleString()} icon={Users}         color="purple" />
+                <StatCard label="Completed Views" value={(ad.completed_views_count || 0).toLocaleString()} icon={CheckCircle}   color="green"  />
+                <StatCard label="Likes"           value={(ad.likes_count           || 0).toLocaleString()} icon={Heart}         color="pink"   />
+                <StatCard label="Dislikes"        value={(ad.dislikes_count        || 0).toLocaleString()} icon={ThumbsDown}    color="red"    />
+                <StatCard label="Comments"        value={(ad.comments_count        || 0).toLocaleString()} icon={MessageCircle} color="orange" />
+              </div>
+
+              {/* Ad Information */}
+              <Card title="Ad Information">
+                <InfoRow icon={Hash}        label="Caption"      value={ad.caption}      />
+                <InfoRow icon={Tag}         label="Category"     value={ad.category}     />
+                <InfoRow icon={Film}        label="Content Type" value={ad.content_type} />
+                <InfoRow icon={MapPin}      label="Location"     value={ad.location}     />
+                <InfoRow icon={AlertCircle} label="Status"       value={<Badge status={ad.status} />} />
+                {ad.rejection_reason ? (
+                  <InfoRow icon={AlertCircle} label="Reject Reason" value={ad.rejection_reason} />
+                ) : null}
+                <InfoRow icon={Clock} label="Created At" value={new Date(ad.createdAt).toLocaleString("en-IN")} />
+                <InfoRow icon={Clock} label="Updated At" value={new Date(ad.updatedAt).toLocaleString("en-IN")} />
+              </Card>
+
+              {/* Targeting Settings */}
+              <Card title="Targeting Settings">
+                <div className="space-y-6">
+                  {/* Target Languages */}
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Campaign Name</label>
-                    <input 
-                      type="text" 
-                      defaultValue={ad.name} 
-                      disabled={!isEditable}
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        <Globe className="w-3.5 h-3.5" /> Target Languages
+                      </div>
+                      <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">
+                        {(ad.target_language || []).length}
+                      </span>
+                    </div>
+                    <TagList items={ad.target_language} color="blue" />
+                  </div>
+
+                  {/* Target Locations */}
+                  <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        <MapPin className="w-3.5 h-3.5" /> Target Locations
+                      </div>
+                      <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">
+                        {(ad.target_location || []).length}
+                      </span>
+                    </div>
+                    <TagList items={ad.target_location} color="purple" />
+                  </div>
+
+                  {/* Target Preferences */}
+                  {(ad.target_preferences || []).length > 0 && (
+                    <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                        <Tag className="w-3.5 h-3.5" /> Preferences
+                      </div>
+                      <TagList items={ad.target_preferences} color="green" />
+                    </div>
+                  )}
+
+                  {/* Hashtags */}
+                  {(ad.hashtags || []).length > 0 && (
+                    <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                        <Hash className="w-3.5 h-3.5" /> Hashtags
+                      </div>
+                      <TagList items={ad.hashtags} color="green" />
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              {/* Engagement Controls */}
+              <Card title="Engagement Controls">
+                <div className="space-y-3">
+                  {[
+                    { label: "Hide Likes Count", value: ad.engagement_controls?.hide_likes_count },
+                    { label: "Disable Comments",  value: ad.engagement_controls?.disable_comments  },
+                  ].map((ctrl, i) => (
+                    <div key={i} className="flex items-center justify-between p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{ctrl.label}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${ctrl.value
+                        ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
+                        : "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"}`}
+                      >
+                        {ctrl.value ? "Enabled" : "Disabled"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* ── Likes & Dislikes Array ──────────────────────────────── */}
+              <Card
+                title={`Likes (${ad.likes_count || 0})`}
+                action={
+                  likesList.length > 8 && (
+                    <button
+                      onClick={() => setShowAllLikes(v => !v)}
+                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {showAllLikes ? "Show Less" : `View All ${likesList.length}`}
+                    </button>
+                  )
+                }
+              >
+                {likesList.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <Heart className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No likes yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {visibleLikes.map((like, i) => {
+                      const u    = like.user_id || like.user || like;
+                      const name = u.full_name || u.username || `User ${i + 1}`;
+                      return (
+                        <div
+                          key={like._id || i}
+                          className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-pink-50 dark:hover:bg-pink-900/10 transition-colors"
+                        >
+                          <Avatar name={name} url={u.avatar_url || ""} />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{name}</div>
+                            {u.username && (
+                              <div className="text-xs text-gray-400 truncate">@{u.username}</div>
+                            )}
+                          </div>
+                          <Heart className="w-3.5 h-3.5 text-pink-500 flex-shrink-0" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Dislikes sub-section */}
+                {dislikesList.length > 0 && (
+                  <div className="mt-5 pt-5 border-t border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                      <ThumbsDown className="w-3.5 h-3.5 text-red-400" />
+                      Dislikes ({ad.dislikes_count || dislikesList.length})
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {dislikesList.slice(0, 6).map((dislike, i) => {
+                        const u    = dislike.user_id || dislike.user || dislike;
+                        const name = u.full_name || u.username || `User ${i + 1}`;
+                        return (
+                          <div
+                            key={dislike._id || i}
+                            className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/50"
+                          >
+                            <Avatar name={name} url={u.avatar_url || ""} />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{name}</div>
+                              {u.username && <div className="text-xs text-gray-400 truncate">@{u.username}</div>}
+                            </div>
+                            <ThumbsDown className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              {/* ── Comments Section ────────────────────────────────────── */}
+              <Card title={`Comments (${commentsTotal || ad.comments_count || 0})`}>
+                {commentsLoading ? (
+                  <div className="flex items-center justify-center py-10 gap-3 text-gray-400">
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span className="text-sm">Loading comments...</span>
+                  </div>
+                ) : comments.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No comments yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {comments.map(comment => (
+                      <CommentItem key={comment._id} comment={comment} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {totalCommentPages > 1 && (
+                  <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <button
+                      onClick={() => setCommentsPage(p => Math.max(1, p - 1))}
+                      disabled={commentsPage === 1 || commentsLoading}
+                      className="px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="text-xs text-gray-500">
+                      Page {commentsPage} of {totalCommentPages}
+                    </span>
+                    <button
+                      onClick={() => setCommentsPage(p => Math.min(totalCommentPages, p + 1))}
+                      disabled={commentsPage === totalCommentPages || commentsLoading}
+                      className="px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </Card>
+
+            </div>
+
+            {/* ══ RIGHT COLUMN (1/3) ══════════════════════════════════════ */}
+            <div className="space-y-8">
+
+              {/* Publisher Info */}
+              <Card title="Publisher">
+                <div className="flex items-center gap-3 mb-4">
+                  <Avatar
+                    name={ad.user_id?.full_name || "U"}
+                    url={ad.user_id?.avatar_url || ""}
+                    size="w-12 h-12"
+                    textSize="text-sm"
+                  />
+                  <div>
+                    <div className="font-bold text-sm text-gray-900 dark:text-white">
+                      {ad.user_id?.full_name || "—"}
+                    </div>
+                    <div className="text-xs text-gray-500">@{ad.user_id?.username || "—"}</div>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span className="font-bold uppercase tracking-wide">Business</span>
+                  </div>
+                  <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                    {ad.vendor_id?.business_name || "—"}
+                  </div>
+                  <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                    ad.vendor_id?.validated
+                      ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                      : "bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+                  }`}>
+                    {ad.vendor_id?.validated ? "✓ Verified" : "Unverified"}
+                  </span>
+                </div>
+              </Card>
+
+              {/* Budget & Coins */}
+              <Card title="Budget & Coins">
+                <div className="relative p-5 rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden mb-5 shadow-lg">
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-orange-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                  <div className="relative z-10">
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Total Budget</div>
+                    <div className="text-3xl font-extrabold mb-4 tracking-tight flex items-center gap-2">
+                      <Coins className="w-6 h-6 text-yellow-400" />
+                      {totalBudget.toLocaleString()}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/10">
+                      <div>
+                        <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Spent</div>
+                        <div className="font-bold text-base text-red-400">{coinsSpent.toLocaleString()}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Remaining</div>
+                        <div className="font-bold text-base text-emerald-400">{coinsRemaining.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                    <span>Budget Used</span>
+                    <span className="font-bold">{spendPct}%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full bg-gradient-to-r from-orange-500 to-pink-500 transition-all"
+                      style={{ width: `${spendPct}%` }}
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Category</label>
-                    <select 
-                      defaultValue={ad.category} 
-                      disabled={!isEditable}
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none"
-                    >
-                      <option>Fashion</option>
-                      <option>Electronics</option>
-                      <option>Gifts</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Start Date</label>
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      {ad.startDate}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">End Date</label>
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      {ad.endDate}
-                    </div>
+                </div>
+                <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+                    <span>Coins Reward</span>
+                    <span className="font-semibold text-gray-800 dark:text-white">{ad.coins_reward ?? 0}</span>
                   </div>
                 </div>
               </Card>
 
-              {/* Section 2: Performance Overview */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                <StatCard label="Total Impressions" value={ad.impressions.toLocaleString()} icon={Eye} trend={12} color="blue" />
-                <StatCard label="Reach" value={ad.performance.reach} icon={Users} trend={8} color="purple" />
-                <StatCard label="Clicks" value={ad.clicks} icon={Activity} trend={-2} color="orange" />
-                <StatCard label="CTR" value={ad.performance.ctr} icon={BarChart2} color="green" />
-                <StatCard label="CPC" value={ad.performance.cpc} icon={DollarSign} color="pink" />
-                <StatCard label="CPM" value={ad.performance.cpm} icon={DollarSign} color="blue" />
-                <StatCard label="Engagement" value={ad.performance.engagementRate} icon={ThumbsUp} trend={5} color="purple" />
-                <StatCard label="Conversion" value={ad.performance.conversionRate} icon={CheckCircle} color="green" />
-              </div>
-
-              {/* Charts Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Daily Performance Line Chart */}
-                <Card title="Daily Performance" className="col-span-1 md:col-span-2">
-                  <div className="h-72 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={ad.performance.dailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                          itemStyle={{ color: '#111827', fontWeight: 600 }}
-                        />
-                        <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </Card>
-
-                {/* Gender Pie Chart */}
-                <Card title="Demographics (Gender)">
-                  <div className="h-64 w-full flex items-center justify-center">
+              {/* Engagement Pie */}
+              <Card title="Engagement Breakdown">
+                {engagementData.length > 0 ? (
+                  <div className="h-52 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={ad.performance.genderData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
+                          data={engagementData}
+                          cx="50%" cy="50%"
+                          innerRadius={50} outerRadius={70}
+                          paddingAngle={5} dataKey="value"
                         >
-                          {ad.performance.genderData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          {engagementData.map((_, index) => (
+                            <Cell key={index} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip contentStyle={{ borderRadius: '8px' }} />
+                        <Tooltip contentStyle={{ borderRadius: "8px" }} />
                         <Legend verticalAlign="bottom" height={36} iconType="circle" />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                </Card>
-
-                {/* Location Bar Chart */}
-                <Card title="Top Locations">
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={ad.performance.locationData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E5E7EB" />
-                        <XAxis type="number" hide />
-                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} width={60} />
-                        <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px' }} />
-                        <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                ) : (
+                  <div className="text-center py-8 text-gray-400">
+                    <BarChart2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No engagement data yet</p>
                   </div>
-                </Card>
-
-              </div>
-
-              {/* Section 5: Activity Logs */}
-              <Card title="Activity Logs">
-                <div className="relative pl-4 border-l-2 border-gray-100 dark:border-gray-800 space-y-8">
-                  {ad.logs.map((log, i) => (
-                    <div key={i} className="relative">
-                      <div className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white dark:border-gray-900 shadow-sm" />
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                        <div className="text-sm font-bold text-gray-900 dark:text-white">{log.action}</div>
-                        <div className="text-xs text-gray-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {log.date}
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">Performed by <span className="font-medium text-gray-700 dark:text-gray-300">{log.user}</span></div>
-                    </div>
-                  ))}
-                </div>
+                )}
               </Card>
-            </div>
 
-            {/* Right Column (1/3) */}
-            <div className="space-y-8">
-              
-              {/* Section 3: Engagement Summary */}
-              <Card title="Engagement">
-                <div className="space-y-4">
+              {/* Views Breakdown */}
+              <Card title="Views Breakdown">
+                <div className="space-y-2">
                   {[
-                    { label: "Likes", value: ad.engagement.likes, icon: ThumbsUp, color: "bg-red-50 text-red-600" },
-                    { label: "Comments", value: ad.engagement.comments, icon: MessageCircle, color: "bg-blue-50 text-blue-600" },
-                    { label: "Shares", value: ad.engagement.shares, icon: Share2, color: "bg-green-50 text-green-600" },
+                    { label: "Total Views",     value: ad.views_count           || 0, color: "bg-blue-500"   },
+                    { label: "Unique Views",    value: ad.unique_views_count    || 0, color: "bg-purple-500" },
+                    { label: "Completed Views", value: ad.completed_views_count || 0, color: "bg-green-500"  },
                   ].map((item, i) => (
-                    <div key={i} className="flex justify-between items-center p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2.5 rounded-lg ${item.color} dark:bg-opacity-20`}>
-                          <item.icon className="w-4 h-4" />
-                        </div>
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{item.label}</span>
+                    <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.color}`} />
+                        {item.label}
                       </div>
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">{item.value.toLocaleString()}</span>
+                      <span className="font-bold text-sm text-gray-900 dark:text-white">
+                        {item.value.toLocaleString()}
+                      </span>
                     </div>
                   ))}
-
-                  <div className="pt-6 mt-2 border-t border-gray-100 dark:border-gray-800">
-                    <label className="flex items-center justify-between cursor-pointer group">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors">Disable Comments</span>
-                        <span className="text-xs text-gray-500">Prevent new comments on this ad</span>
-                      </div>
-                      <div className="relative inline-block w-11 h-6 align-middle select-none transition duration-200 ease-in">
-                        <input type="checkbox" name="toggle" id="toggle" className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer translate-x-0.5 translate-y-0.5 transition-transform duration-200 ease-in-out shadow-sm" />
-                        <label htmlFor="toggle" className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer"></label>
-                      </div>
-                    </label>
-                  </div>
                 </div>
-              </Card>
-
-              {/* Section 4: Financial Report */}
-              <Card title="Financial Report">
-                <div className="relative p-6 rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden mb-6 shadow-lg">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                  <div className="relative z-10">
-                    <div className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2">Total Spend</div>
-                    <div className="text-4xl font-extrabold mb-6 tracking-tight">₹ {ad.financial.spend.toLocaleString()}</div>
-                    <div className="grid grid-cols-2 gap-6 pt-4 border-t border-white/10">
-                      <div>
-                        <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Budget</div>
-                        <div className="font-bold text-lg">₹ {ad.totalCoins.toLocaleString()}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Remaining</div>
-                        <div className="font-bold text-lg text-emerald-400">₹ {ad.financial.remaining.toLocaleString()}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4 text-sm">
-                  <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
-                    <span>Base Cost</span>
-                    <span className="font-medium">₹ {(ad.financial.spend - ad.financial.tax).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
-                    <span>Tax (18% GST)</span>
-                    <span className="font-medium">₹ {ad.financial.tax.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center font-bold text-gray-900 dark:text-white pt-4 border-t border-gray-100 dark:border-gray-800 text-base">
-                    <span>Total Amount</span>
-                    <span>₹ {ad.financial.spend.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <button className="w-full mt-8 py-3.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm">
-                  <Download className="w-4 h-4" /> Download Invoice
-                </button>
               </Card>
 
             </div>
