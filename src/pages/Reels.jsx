@@ -378,7 +378,9 @@ const CommentsUI = ({ reel, onClose, userObject }) => {
       </div>
 
       {/* Input footer */}
-      <div className="border-t border-gray-100 dark:border-white/10 bg-white dark:bg-[#262626] shrink-0">
+      <div className="border-t border-gray-100 dark:border-white/10 bg-white dark:bg-[#262626] shrink-0"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         {replyTo && (
           <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 px-4 pt-2">
             <span>Replying to <span className="font-bold text-blue-500">@{replyTo.username}</span></span>
@@ -804,7 +806,14 @@ const Reels = () => {
       {commentsOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setCommentsOpen(false)} />
-          <div className="relative z-10 h-[70vh]" style={{ animation: 'slideUpMobile 0.28s cubic-bezier(0.32,0.72,0,1) forwards' }}>
+          {/* FIX: pb-16 clears the bottom nav bar (~64px); safe-area covers notched phones */}
+          <div
+            className="relative z-10 h-[75vh] pb-16"
+            style={{
+              paddingBottom: 'max(64px, env(safe-area-inset-bottom, 64px))',
+              animation: 'slideUpMobile 0.28s cubic-bezier(0.32,0.72,0,1) forwards',
+            }}
+          >
             <CommentsBottomSheet reel={currentReel} onClose={() => setCommentsOpen(false)} userObject={userObject} />
           </div>
         </div>

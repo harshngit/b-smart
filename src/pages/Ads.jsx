@@ -855,7 +855,7 @@ const Ads = ({ feedMode = 'user' }) => {
   if (feedMode === 'user' && isVendorUser) return <Navigate to="/vendor-ads" replace />;
 
   return (
-    <div className="flex flex-col bg-white dark:bg-black overflow-hidden">
+    <div className="flex flex-col bg-black overflow-hidden h-screen">
 
       {/* Desktop top bar */}
       <div className="hidden md:flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0">
@@ -879,11 +879,14 @@ const Ads = ({ feedMode = 'user' }) => {
       </div>
 
       {/* Feed */}
-      <div className="flex flex-1 min-h-0 overflow-hidden relative mt-[5px]">
-        <div className="flex-1 flex items-center justify-center relative overflow-hidden h-full"
+      {/* Mobile: black full-screen, card centred and capped at 430px wide */}
+      {/* Desktop: white/dark bg, centred phone-card layout */}
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+        <div
+          className="flex-1 flex items-center justify-center relative overflow-hidden h-full bg-black md:bg-white dark:bg-black"
           onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
 
-          {/* Mobile top bar */}
+          {/* Mobile top bar — floats over the card */}
           <div className="md:hidden absolute top-0 left-0 right-0 z-30 flex items-center px-3 pt-3 pb-1 gap-3 bg-gradient-to-b from-black/60 to-transparent">
             <button className="w-8 h-8 flex items-center justify-center shrink-0">
               <ChevronLeft size={22} className="text-white" />
@@ -931,7 +934,13 @@ const Ads = ({ feedMode = 'user' }) => {
 
           {/* Carousel */}
           {!loading && !error && ads.length > 0 && (
-            <div className="relative w-full h-full md:w-[360px] md:h-[90vh] overflow-hidden md:rounded-2xl md:shadow-2xl bg-black">
+            <div className="
+              relative overflow-hidden bg-black
+              /* Mobile: full height, capped at 430px wide, centred — Instagram style */
+              w-full max-w-[430px] h-full
+              /* Desktop: fixed phone card */
+              md:w-[360px] md:h-[90vh] md:rounded-2xl md:shadow-2xl
+            ">
 
               {/* ── Progress bar ── */}
               <div className="absolute top-0 left-0 right-0 z-40 h-1 bg-white/20">
@@ -980,7 +989,7 @@ const Ads = ({ feedMode = 'user' }) => {
                       {/* Mute btn — video only */}
                       {isVideo && isCurrent && (
                         <button onClick={() => setIsMuted(m => !m)}
-                          className="absolute lg:right-4 lg:bottom-5 bottom-[80px] right-[60px] bg-black/50 p-2 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-20">
+                          className="absolute bottom-[145px] md:bottom-5 right-[52px] md:right-4 bg-black/50 p-2 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-20">
                           {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                         </button>
                       )}
@@ -993,8 +1002,8 @@ const Ads = ({ feedMode = 'user' }) => {
                         </div>
                       )}
 
-                      {/* Bottom info */}
-                      <div className="absolute bottom-0 left-0 w-full p-4 pb-20 md:pb-6 z-20">
+                      {/* Bottom info — clears bottom nav (64px) on mobile */}
+                      <div className="absolute bottom-0 left-0 w-full p-4 pb-[72px] md:pb-6 z-20" style={{ paddingRight: '60px' }}>
                         {/* Vendor row */}
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                           {a.user_id?.avatar_url
@@ -1037,9 +1046,9 @@ const Ads = ({ feedMode = 'user' }) => {
                         </div>
                       </div>
 
-                      {/* Mobile right actions */}
+                      {/* Mobile right actions — pinned above bottom nav */}
                       {isCurrent && (
-                        <div className="md:hidden absolute right-3 bottom-[80px] z-30">
+                        <div className="md:hidden absolute right-3 bottom-[72px] z-30">
                           <ActionButtons
                             ad={a}
                             mobile
@@ -1093,8 +1102,13 @@ const Ads = ({ feedMode = 'user' }) => {
       {activeCommentAdId && (
         <>
           {/* Mobile Overlay */}
-          <div className="md:hidden absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end">
-            <div className="w-full h-[70vh] bg-white dark:bg-gray-900 rounded-t-2xl flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200">
+          <div className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex flex-col justify-end">
+            {/* Tap backdrop to close */}
+            <div className="absolute inset-0" onClick={closeComments} />
+            <div
+              className="relative w-full bg-white dark:bg-gray-900 rounded-t-2xl flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200"
+              style={{ height: '72vh', marginBottom: 'max(64px, env(safe-area-inset-bottom, 64px))' }}
+            >
               <CommentsContent
                 comments={comments}
                 replies={replies}
