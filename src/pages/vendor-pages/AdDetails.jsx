@@ -42,6 +42,7 @@ const Card = ({ title, children, className = "", action }) => (
 );
 
 const StatCard = ({ label, value, color = "blue", icon: Icon }) => {
+  const IconComponent = Icon;
   const colors = {
     blue:   "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
     purple: "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400",
@@ -53,7 +54,7 @@ const StatCard = ({ label, value, color = "blue", icon: Icon }) => {
   return (
     <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colors[color]}`}>
-        <Icon className="w-5 h-5" />
+        <IconComponent className="w-5 h-5" />
       </div>
       <div className="text-2xl font-bold text-gray-900 dark:text-white mb-0.5">{value}</div>
       <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
@@ -61,17 +62,20 @@ const StatCard = ({ label, value, color = "blue", icon: Icon }) => {
   );
 };
 
-const InfoRow = ({ icon: Icon, label, value, mono = false }) => (
-  <div className="flex items-start justify-between gap-4 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
-    <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide min-w-[130px] flex-shrink-0">
-      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-      {label}
+const InfoRow = ({ icon: Icon, label, value, mono = false }) => {
+  const IconComponent = Icon;
+  return (
+    <div className="flex items-start justify-between gap-4 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
+      <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide min-w-[130px] flex-shrink-0">
+        <IconComponent className="w-3.5 h-3.5 flex-shrink-0" />
+        {label}
+      </div>
+      <div className={`text-sm font-semibold text-gray-800 dark:text-gray-200 text-right break-all ${mono ? "font-mono text-xs" : ""}`}>
+        {value ?? "—"}
+      </div>
     </div>
-    <div className={`text-sm font-semibold text-gray-800 dark:text-gray-200 text-right break-all ${mono ? "font-mono text-xs" : ""}`}>
-      {value ?? "—"}
-    </div>
-  </div>
-);
+  );
+};
 
 const TagList = ({ items, color = "blue" }) => {
   const colors = {

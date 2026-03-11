@@ -774,7 +774,7 @@ const Ads = ({ feedMode = 'user' }) => {
     setReplyTo(null);
     try {
       const parentId = replyInfo ? replyInfo.id : null;
-      const newItem = await commentService.createComment(activeCommentAdId, text, parentId);
+      await commentService.createComment(activeCommentAdId, text, parentId);
       if (replyInfo) {
         // Re-fetch replies for the root comment and keep it expanded
         await loadReplies(replyInfo.rootCommentId);
