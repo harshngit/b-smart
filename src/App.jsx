@@ -22,6 +22,8 @@ import EditProfile from './pages/EditProfile';
 import WalletDetails from './pages/WalletDetails';
 import MobilePostDetail from './pages/MobilePostDetail';
 import AuthCallback from './pages/AuthCallback';
+import Notifications from './pages/Notifications';
+import VendorNotifications from './pages/vendor-pages/VendorNotifications';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import VendorLayout from './components/VendorLayout';
@@ -81,6 +83,7 @@ function App() {
           <Route path="/edit-profile" element={<EditProfile />} />
           <Route path="/wallet" element={<WalletDetails />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/notifications" element={<Notifications />} />
         </Route>
 
         <Route path="/vendor" element={
@@ -95,6 +98,7 @@ function App() {
           <Route path="analytics" element={<ReportsAnalytics />} />
           <Route path="billing" element={<CoinsBilling />} />
           <Route path="settings" element={<VendorSettings />} />
+          <Route path="notifications" element={<VendorNotifications />} />
         </Route>
 
         <Route path="/post/:postId" element={

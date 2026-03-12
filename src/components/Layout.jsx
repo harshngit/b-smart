@@ -119,7 +119,7 @@ const Layout = () => {
     try {
       // Step 1: PATCH /api/users/{id}
       await api.patch(`/users/${userId}`, payload);
-    } catch (patchErr) {
+    } catch {
       // Fallback: try PUT if PATCH not supported
       try {
         await api.put(`/users/${userId}`, payload);
