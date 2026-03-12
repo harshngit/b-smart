@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import commentService from '../services/commentServiceJS';
 import {
@@ -545,6 +545,17 @@ const Ads = ({ feedMode = 'user' }) => {
   const currentUserId = userObject?._id || userObject?.id || null;
   const currentUserAvatar = userObject?.avatar_url || null;
   const currentUserName = userObject?.full_name || userObject?.username || 'You';
+  const navigate = useNavigate();
+
+  // ── Search state ────────────────────────────────────────────────────────────
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchDropdownVisible, setSearchDropdownVisible] = useState(false);
+  const searchInputRef = React.useRef(null);
+  const searchContainerRef = React.useRef(null);
+
   const [categories] = useState(FALLBACK_CATEGORIES);
   const [activeCategory, setActiveCategory] = useState('All');
   const [ads, setAds] = useState([]);
@@ -601,6 +612,74 @@ const Ads = ({ feedMode = 'user' }) => {
   });
 
   // ── Fetch Ads ────────────────────────────────────────────────────────────────
+  // ── Search logic ────────────────────────────────────────────────────────────
+  const searchDebounceRef = React.useRef(null);
+
+  const runSearch = useCallback(async (q) => {
+    const query = q.trim();
+    if (!query) { setSearchResults([]); setSearchDropdownVisible(false); return; }
+    setSearchLoading(true);
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        status: 'active',
+        page: 1,
+        limit: 20,
+      });
+      const res = await fetch(`${BASE_URL}/api/ads/search?${params}`, { headers: authHeaders() });
+      const data = await res.json();
+      // API may return { ads: [...] } or { data: [...] } or plain array
+      const ads = Array.isArray(data) ? data : (data.ads || data.data || data.results || []);
+      // Also try to extract user/profile results if the API bundles them
+      const users = data.users || data.vendors || [];
+      setSearchResults([
+        ...users.map(u => ({ _type: 'user', ...u })),
+        ...ads.map(a => ({ _type: 'ad', ...a })),
+      ]);
+      setSearchDropdownVisible(true);
+    } catch { setSearchResults([]); }
+    finally { setSearchLoading(false); }
+  }, []);
+
+  const handleSearchInput = (e) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    clearTimeout(searchDebounceRef.current);
+    if (!q.trim()) { setSearchResults([]); setSearchDropdownVisible(false); return; }
+    searchDebounceRef.current = setTimeout(() => runSearch(q), 350);
+  };
+
+  const handleSearchOpen = () => {
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  };
+
+  const handleSearchClose = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchDropdownVisible(false);
+  };
+
+  const handleSearchResultClick = (item) => {
+    handleSearchClose();
+    if (item._type === 'user') {
+      navigate(`/profile/${item._id || item.id}`);
+    }
+    // For ads — just close and let user see feed; or navigate to ad detail if available
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setSearchDropdownVisible(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   const fetchAds = useCallback(async (category = 'All') => {
     setLoading(true);
     setError(null);
@@ -995,9 +1074,93 @@ const Ads = ({ feedMode = 'user' }) => {
             </button>
           ))}
         </div>
-        <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 ml-4 shrink-0">
-          <Search size={18} />
-        </button>
+        {/* Desktop Search */}
+        <div ref={searchContainerRef} className="relative ml-4 shrink-0">
+          {searchOpen ? (
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full px-3 py-1.5 w-64">
+              <Search size={14} className="text-gray-400 shrink-0" />
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={handleSearchInput}
+                placeholder="Search ads, users…"
+                className="flex-1 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder-gray-400"
+              />
+              {searchLoading
+                ? <Loader2 size={14} className="animate-spin text-gray-400 shrink-0" />
+                : <button onClick={handleSearchClose}><X size={14} className="text-gray-400 hover:text-gray-700 dark:hover:text-white" /></button>
+              }
+            </div>
+          ) : (
+            <button onClick={handleSearchOpen} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500">
+              <Search size={18} />
+            </button>
+          )}
+
+          {/* Desktop Dropdown */}
+          {searchDropdownVisible && searchResults.length > 0 && (
+            <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden z-50 max-h-96 overflow-y-auto">
+              {/* Users section */}
+              {searchResults.filter(r => r._type === 'user').length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">People</div>
+                  {searchResults.filter(r => r._type === 'user').map(u => (
+                    <button key={u._id || u.id} onClick={() => handleSearchResultClick(u)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
+                      <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] shrink-0">
+                        <div className="w-full h-full rounded-full bg-white dark:bg-[#1c1c1e] overflow-hidden flex items-center justify-center">
+                          {u.avatar_url
+                            ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                            : <span className="text-xs font-bold text-gray-700 dark:text-white">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
+                          }
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</div>
+                        {u.username && <div className="text-xs text-gray-400 truncate">@{u.username}</div>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Ads section */}
+              {searchResults.filter(r => r._type === 'ad').length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Ads</div>
+                  {searchResults.filter(r => r._type === 'ad').map(ad => {
+                    const adUser = ad.user_id || ad.vendor_id || {};
+                    const thumb = ad.media?.[0]?.fileUrl || ad.media?.[0]?.thumbnail_url;
+                    return (
+                      <button key={ad._id} onClick={() => handleSearchResultClick(ad)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0">
+                          {thumb
+                            ? <img src={thumb} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-gray-400"><ShoppingBag size={14} /></div>
+                          }
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{ad.caption || ad.title || 'Ad'}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {ad.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium">{ad.category}</span>}
+                            {typeof adUser === 'object' && adUser.username && <span className="text-[10px] text-gray-400">@{adUser.username}</span>}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {/* No results */}
+              {searchResults.length === 0 && !searchLoading && searchQuery.trim() && (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
+                  <Search size={20} className="opacity-40" />
+                  <span className="text-sm">No results for "{searchQuery}"</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Feed */}
@@ -1024,10 +1187,85 @@ const Ads = ({ feedMode = 'user' }) => {
                 </button>
               ))}
             </div>
-            <button className="w-8 h-8 flex items-center justify-center shrink-0">
-              <Search size={20} className="text-white" />
-            </button>
+            {/* Mobile Search toggle */}
+            <div className="shrink-0 relative" ref={!searchOpen ? null : searchContainerRef}>
+              {searchOpen ? (
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-black/70 backdrop-blur-md rounded-full px-3 py-1.5 w-52 border border-white/20 z-40">
+                  <Search size={13} className="text-white/60 shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    value={searchQuery}
+                    onChange={handleSearchInput}
+                    placeholder="Search…"
+                    className="flex-1 bg-transparent text-sm outline-none text-white placeholder-white/40"
+                  />
+                  {searchLoading
+                    ? <Loader2 size={13} className="animate-spin text-white/60 shrink-0" />
+                    : <button onClick={handleSearchClose}><X size={13} className="text-white/60" /></button>
+                  }
+                </div>
+              ) : (
+                <button onClick={handleSearchOpen} className="w-8 h-8 flex items-center justify-center shrink-0">
+                  <Search size={20} className="text-white" />
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Mobile Search Dropdown */}
+          {searchOpen && searchDropdownVisible && searchResults.length > 0 && (
+            <div className="absolute top-14 left-3 right-3 bg-black/90 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden z-40 max-h-80 overflow-y-auto shadow-2xl">
+              {searchResults.filter(r => r._type === 'user').length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-white/40 border-b border-white/10">People</div>
+                  {searchResults.filter(r => r._type === 'user').map(u => (
+                    <button key={u._id || u.id} onClick={() => handleSearchResultClick(u)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left">
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 to-pink-500 p-[1.5px] shrink-0">
+                        <div className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center">
+                          {u.avatar_url
+                            ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                            : <span className="text-xs font-bold text-white">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
+                          }
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-white truncate">{u.full_name || u.username}</div>
+                        {u.username && <div className="text-xs text-white/40 truncate">@{u.username}</div>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchResults.filter(r => r._type === 'ad').length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-white/40 border-b border-white/10">Ads</div>
+                  {searchResults.filter(r => r._type === 'ad').map(ad => {
+                    const thumb = ad.media?.[0]?.fileUrl || ad.media?.[0]?.thumbnail_url;
+                    const adUser = ad.user_id || ad.vendor_id || {};
+                    return (
+                      <button key={ad._id} onClick={() => handleSearchResultClick(ad)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left">
+                        <div className="w-9 h-9 rounded-xl overflow-hidden bg-white/10 shrink-0">
+                          {thumb
+                            ? <img src={thumb} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-white/40"><ShoppingBag size={12} /></div>
+                          }
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-white truncate">{ad.caption || ad.title || 'Ad'}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {ad.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/50 font-medium">{ad.category}</span>}
+                            {typeof adUser === 'object' && adUser.username && <span className="text-[10px] text-white/40">@{adUser.username}</span>}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Loading */}
           {loading && (
