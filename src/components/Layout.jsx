@@ -14,15 +14,17 @@ const Layout = () => {
   const { userObject } = useSelector((state) => state.auth);
   const isExcludedPage = ['/profile', '/settings', '/reels', '/promote', '/ads'].includes(location.pathname);
   const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
-  // Show TopBar on mobile for all pages except profile, settings, reels, and promote
   const showTopBar = !isExcludedPage;
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState('post');
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [savingProfileSetup, setSavingProfileSetup] = useState(false);
   const [profileSetupError, setProfileSetupError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const userId = userObject?._id || userObject?.id || '';
+
   const initialSetupState = useMemo(() => {
     const rawGender = (userObject?.gender || userObject?.sex || '').toString().toLowerCase();
     const gender = rawGender === 'male' || rawGender === 'female' ? rawGender : '';
@@ -37,12 +39,14 @@ const Layout = () => {
       country: a.country || '',
     };
   }, [userObject?.address, userObject?.gender, userObject?.sex]);
+
   const [profileSetupForm, setProfileSetupForm] = useState(initialSetupState);
 
   useEffect(() => {
     setProfileSetupForm(initialSetupState);
   }, [initialSetupState]);
 
+  // Check if profile still needs setup (gender OR any address field missing)
   const needsProfileSetup = useMemo(() => {
     if (!userObject) return false;
     const g = (userObject?.gender || '').toString().toLowerCase();
@@ -55,9 +59,13 @@ const Layout = () => {
     return !g || !addressLine1 || !pincode || !city || !state || !country;
   }, [userObject]);
 
+  // Show modal on login if profile is incomplete and not dismissed this session
   useEffect(() => {
     if (!userObject) return;
-    if (!needsProfileSetup) return;
+    if (!needsProfileSetup) {
+      setShowProfileSetup(false);
+      return;
+    }
     const key = userId ? `profile_setup_dismissed_${userId}` : 'profile_setup_dismissed';
     const dismissed = sessionStorage.getItem(key) === '1';
     if (!dismissed) setShowProfileSetup(true);
@@ -68,8 +76,10 @@ const Layout = () => {
     sessionStorage.setItem(key, '1');
     setShowProfileSetup(false);
     setProfileSetupError('');
+    setSaveSuccess(false);
   }, [userId]);
 
+  // ── Save handler: PATCH /api/users/{id} → then re-fetch /api/auth/me ──────
   const saveProfileSetup = useCallback(async () => {
     const gender = (profileSetupForm.gender || '').toLowerCase();
     const address = {
@@ -81,72 +91,96 @@ const Layout = () => {
       country: profileSetupForm.country || '',
     };
 
-    if (!gender || !address.address_line1 || !address.pincode || !address.city || !address.state || !address.country) {
-      setProfileSetupError('Please fill gender and all required address fields.');
+    if (!gender) {
+      setProfileSetupError('Please select your gender.');
+      return;
+    }
+    if (!address.address_line1 || !address.pincode || !address.city || !address.state || !address.country) {
+      setProfileSetupError('Please fill all required address fields (Address Line 1, Pincode, City, State, Country).');
+      return;
+    }
+
+    if (!userId) {
+      setProfileSetupError('User session not found. Please log in again.');
       return;
     }
 
     setSavingProfileSetup(true);
     setProfileSetupError('');
+    setSaveSuccess(false);
 
-    const payload = { gender, address };
-    const endpoints = ['/users/me', '/auth/me', '/users/profile', '/auth/profile', '/users/update'];
-    const methods = ['patch', 'put'];
-
-    const tryRequest = async () => {
-      for (const endpoint of endpoints) {
-        for (const method of methods) {
-          try {
-            const res = await api[method](endpoint, payload);
-            const data = res?.data?.user ?? res?.data?.data ?? res?.data;
-            if (data && typeof data === 'object') {
-              dispatch(setUser(data));
-            } else {
-              dispatch(fetchMe());
-            }
-            return true;
-          } catch {
-            continue;
-          }
-        }
-      }
-
-      if (userId) {
-        const endpoint = `/users/${userId}`;
-        for (const method of methods) {
-          try {
-            const res = await api[method](endpoint, payload);
-            const data = res?.data?.user ?? res?.data?.data ?? res?.data;
-            if (data && typeof data === 'object') {
-              dispatch(setUser(data));
-            } else {
-              dispatch(fetchMe());
-            }
-            return true;
-          } catch {
-            continue;
-          }
-        }
-      }
-
-      return false;
+    const payload = {
+      gender,
+      address,
+      // Also derive location string from city + country for convenience
+      location: [address.city, address.country].filter(Boolean).join(', '),
     };
 
-    const ok = await tryRequest();
-    if (!ok) {
-      setProfileSetupError('Failed to save. Please try again.');
-      setSavingProfileSetup(false);
-      return;
+    try {
+      // Step 1: PATCH /api/users/{id}
+      await api.patch(`/users/${userId}`, payload);
+    } catch (patchErr) {
+      // Fallback: try PUT if PATCH not supported
+      try {
+        await api.put(`/users/${userId}`, payload);
+      } catch {
+        setSavingProfileSetup(false);
+        setProfileSetupError('Failed to save profile. Please try again.');
+        return;
+      }
+    }
+
+    // Step 2: Re-fetch /api/auth/me to refresh Redux store with latest data
+    try {
+      const meRes = await api.get('/auth/me');
+      const freshUser =
+        meRes?.data?.user ??
+        meRes?.data?.data ??
+        meRes?.data;
+
+      if (freshUser && typeof freshUser === 'object') {
+        dispatch(setUser(freshUser));
+      } else {
+        // Fallback: use fetchMe thunk
+        dispatch(fetchMe());
+      }
+    } catch {
+      // Even if re-fetch fails, still dispatch fetchMe as fallback
+      dispatch(fetchMe());
     }
 
     setSavingProfileSetup(false);
-    setShowProfileSetup(false);
+    setSaveSuccess(true);
+
+    // Close after a short success flash
+    setTimeout(() => {
+      setShowProfileSetup(false);
+      setSaveSuccess(false);
+    }, 900);
   }, [dispatch, profileSetupForm, userId]);
 
   const handleOpenCreateModal = (type = 'post') => {
     setCreateType(type);
     setIsCreateModalOpen(true);
   };
+
+  const field = (name, label, placeholder, type = 'text') => (
+    <div className="space-y-1">
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+        {label}
+        {['address_line1', 'pincode', 'city', 'state', 'country'].includes(name) && (
+          <span className="text-red-400 ml-0.5">*</span>
+        )}
+      </label>
+      <input
+        type={type}
+        value={profileSetupForm[name]}
+        onChange={(e) => setProfileSetupForm((p) => ({ ...p, [name]: e.target.value }))}
+        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
+        placeholder={placeholder}
+      />
+    </div>
+  );
 
   return (
     <div className={`min-h-screen bg-gray-50 dark:bg-black md:pb-0 ${isFullScreenPage ? 'pb-0' : 'pb-16'}`}>
@@ -155,14 +189,13 @@ const Layout = () => {
       <div className="md:pl-20 min-h-screen transition-all duration-300">
         {showTopBar && <TopBar />}
 
-        {/* Main Content Container with Gaps on Desktop */}
         <div className={`
-          ${showTopBar ? 'pt-16 md:pt-4' : 'pt-0 md:pt-4'} 
-          w-full 
-          md:max-w-[calc(100%-80px)] 
-          lg:max-w-4xl 
-          mx-auto 
-          px-0 
+          ${showTopBar ? 'pt-16 md:pt-4' : 'pt-0 md:pt-4'}
+          w-full
+          md:max-w-[calc(100%-80px)]
+          lg:max-w-4xl
+          mx-auto
+          px-0
           md:px-8
         `}>
           <Outlet />
@@ -178,33 +211,54 @@ const Layout = () => {
         initialType={createType}
       />
 
+      {/* ── Profile Setup Modal ─────────────────────────────────────────── */}
       {showProfileSetup && (
-        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-[#262626] rounded-2xl border border-gray-100 dark:border-white/10 shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between shrink-0">
               <div className="min-w-0">
-                <div className="text-base font-bold text-gray-900 dark:text-white truncate">Complete your profile</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Add gender and address to continue.</div>
+                <div className="text-base font-bold text-gray-900 dark:text-white">Complete your profile</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Add gender and address to continue.{' '}
+                  <span className="text-red-400">* required</span>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={closeProfileSetup}
-                className="w-9 h-9 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center text-gray-500 dark:text-gray-300"
+                className="w-9 h-9 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center text-gray-500 dark:text-gray-300 transition-colors shrink-0"
                 aria-label="Close"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            {/* Scrollable body */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+
+              {/* Error */}
               {profileSetupError && (
-                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-300 text-sm">
-                  {profileSetupError}
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-300 text-sm flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0">⚠️</span>
+                  <span>{profileSetupError}</span>
                 </div>
               )}
 
+              {/* Success */}
+              {saveSuccess && (
+                <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/30 text-green-600 dark:text-green-300 text-sm flex items-center gap-2">
+                  <span>✅</span>
+                  <span>Profile saved successfully!</span>
+                </div>
+              )}
+
+              {/* Gender */}
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Gender</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Gender <span className="text-red-400">*</span>
+                </label>
                 <select
                   value={profileSetupForm.gender}
                   onChange={(e) => setProfileSetupForm((p) => ({ ...p, gender: e.target.value }))}
@@ -213,88 +267,54 @@ const Layout = () => {
                   <option value="" disabled>Select gender</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Address Line 1</label>
-                <input
-                  value={profileSetupForm.address_line1}
-                  onChange={(e) => setProfileSetupForm((p) => ({ ...p, address_line1: e.target.value }))}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
-                  placeholder="Address line 1"
-                />
-              </div>
+              {/* Address Line 1 */}
+              {field('address_line1', 'Address Line 1', 'Flat / House No., Building, Street')}
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Address Line 2</label>
-                <input
-                  value={profileSetupForm.address_line2}
-                  onChange={(e) => setProfileSetupForm((p) => ({ ...p, address_line2: e.target.value }))}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
-                  placeholder="Address line 2"
-                />
-              </div>
+              {/* Address Line 2 */}
+              {field('address_line2', 'Address Line 2 (optional)', 'Area, Landmark')}
 
+              {/* Pincode + City */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Pincode</label>
-                  <input
-                    value={profileSetupForm.pincode}
-                    onChange={(e) => setProfileSetupForm((p) => ({ ...p, pincode: e.target.value }))}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
-                    placeholder="560001"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">City</label>
-                  <input
-                    value={profileSetupForm.city}
-                    onChange={(e) => setProfileSetupForm((p) => ({ ...p, city: e.target.value }))}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
-                    placeholder="Bengaluru"
-                  />
-                </div>
+                {field('pincode', 'Pincode', '560001')}
+                {field('city', 'City', 'Bengaluru')}
               </div>
 
+              {/* State + Country */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">State</label>
-                  <input
-                    value={profileSetupForm.state}
-                    onChange={(e) => setProfileSetupForm((p) => ({ ...p, state: e.target.value }))}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
-                    placeholder="Karnataka"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Country</label>
-                  <input
-                    value={profileSetupForm.country}
-                    onChange={(e) => setProfileSetupForm((p) => ({ ...p, country: e.target.value }))}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
-                    placeholder="India"
-                  />
-                </div>
+                {field('state', 'State', 'Karnataka')}
+                {field('country', 'Country', 'India')}
               </div>
             </div>
 
-            <div className="px-5 py-4 border-t border-gray-100 dark:border-white/10 flex items-center justify-end gap-3">
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-gray-100 dark:border-white/10 flex items-center justify-end gap-3 shrink-0">
               <button
                 type="button"
                 onClick={closeProfileSetup}
-                className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 font-semibold hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
                 disabled={savingProfileSetup}
+                className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 font-semibold hover:bg-gray-200 dark:hover:bg-white/15 transition-colors disabled:opacity-50"
               >
                 Later
               </button>
               <button
                 type="button"
                 onClick={saveProfileSetup}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white font-bold shadow-lg shadow-insta-pink/20 disabled:opacity-70"
                 disabled={savingProfileSetup}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white font-bold shadow-lg shadow-insta-pink/20 disabled:opacity-70 flex items-center gap-2 transition-opacity"
               >
-                {savingProfileSetup ? 'Saving...' : 'Save'}
+                {savingProfileSetup ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Saving…
+                  </>
+                ) : 'Save'}
               </button>
             </div>
           </div>
@@ -303,9 +323,16 @@ const Layout = () => {
 
       {/* Floating Wallet for Desktop */}
       {!isExcludedPage && (
-        <Link to="/wallet" className="hidden md:flex fixed bottom-8 right-8 z-50 bg-white dark:bg-[#262626] rounded-full shadow-lg p-1 pr-4 items-center gap-2 border border-gray-100 dark:border-gray-800 animate-fade-in hover:scale-105 transition-transform cursor-pointer">
+        <Link
+          to="/wallet"
+          className="hidden md:flex fixed bottom-8 right-8 z-50 bg-white dark:bg-[#262626] rounded-full shadow-lg p-1 pr-4 items-center gap-2 border border-gray-100 dark:border-gray-800 animate-fade-in hover:scale-105 transition-transform cursor-pointer"
+        >
           <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+              <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+              <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+            </svg>
           </div>
           <div className="flex flex-col">
             <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Balance</span>

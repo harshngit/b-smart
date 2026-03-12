@@ -398,7 +398,7 @@ const FollowButton = ({ userId, mobile = false }) => {
 };
 
 // ─── Action Buttons ────────────────────────────────────────────────────────────
-const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile = false, onComment }) => (
+const ActionButtons = ({ ad, likedIds, toggleLike, dislikedIds, toggleDislike, savedIds, toggleSave, mobile = false, onComment }) => (
   <div className="flex flex-col items-center gap-4">
     {/* Like */}
     <button onClick={() => toggleLike(ad._id)} className="flex flex-col items-center gap-1">
@@ -410,6 +410,29 @@ const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile 
       </div>
       <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>
         {fmt(ad.likes_count)}
+      </span>
+    </button>
+
+    {/* Dislike */}
+    <button onClick={() => toggleDislike(ad._id)} className="flex flex-col items-center gap-1">
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
+        ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+        {/* Thumbs-down icon */}
+        <svg
+          width={20} height={20} viewBox="0 0 24 24" fill="none" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round" stroke="currentColor"
+          className={
+            dislikedIds.has(ad._id)
+              ? 'text-blue-500 fill-blue-500'
+              : mobile ? 'text-white' : 'text-gray-800 dark:text-white'
+          }
+        >
+          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+          <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+        </svg>
+      </div>
+      <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>
+        {dislikedIds.has(ad._id) ? 'Disliked' : 'Dislike'}
       </span>
     </button>
 
@@ -532,7 +555,20 @@ const Ads = ({ feedMode = 'user' }) => {
   const [touchStartY, setTouchStartY] = useState(null);
   const [progress, setProgress] = useState(0);
   const [likedIds, setLikedIds] = useState(new Set());
+  const [dislikedIds, setDislikedIds] = useState(new Set());
   const [savedIds, setSavedIds] = useState(new Set());
+
+  // Track which ad IDs the current user has already viewed this session.
+  // Using a ref so it never triggers re-renders and persists across index changes.
+  const viewedIdsRef = useRef(null);
+  if (viewedIdsRef.current === null) {
+    try {
+      const stored = sessionStorage.getItem('ads_viewed_ids');
+      viewedIdsRef.current = stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      viewedIdsRef.current = new Set();
+    }
+  }
 
   // Comments state
   const [activeCommentAdId, setActiveCommentAdId] = useState(null);
@@ -610,6 +646,35 @@ const Ads = ({ feedMode = 'user' }) => {
     clearInterval(imageTimerRef.current);
   };
 
+  // ── View Tracking ─────────────────────────────────────────────────────────────
+  // Fires POST /api/ads/{id}/view only ONCE per ad per session per user.
+  // For video ads — called when the video starts playing on the current slide.
+  // For image ads — called when the image ad becomes the current slide.
+  const trackView = useCallback(async (adId) => {
+    if (!adId) return;
+    const key = String(adId);
+    if (viewedIdsRef.current.has(key)) return;
+
+    viewedIdsRef.current.add(key);
+    try {
+      sessionStorage.setItem('ads_viewed_ids', JSON.stringify([...viewedIdsRef.current]));
+    } catch { /* sessionStorage unavailable — in-memory ref still guards */ }
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/ads/${adId}/view`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : '' } }),
+      });
+      if (!res.ok) {
+        viewedIdsRef.current.delete(key);
+        throw new Error(`HTTP ${res.status}`);
+      }
+    } catch (err) {
+      console.error('View tracking failed:', err);
+    }
+  }, [currentUserId]);
+
   useEffect(() => {
     const adsList = adsRef.current;
     if (!adsList.length) return;
@@ -626,6 +691,10 @@ const Ads = ({ feedMode = 'user' }) => {
       vid.currentTime = 0;
       setProgress(0);
       vid.play().catch(() => {});
+
+      // Fire view once when video starts playing
+      trackView(currentAd._id);
+
       progressIntervalRef.current = setInterval(() => {
         if (vid.duration) setProgress((vid.currentTime / vid.duration) * 100);
       }, 100);
@@ -633,6 +702,9 @@ const Ads = ({ feedMode = 'user' }) => {
       setProgress(0);
       const startTime = Date.now();
       const totalMs = IMAGE_AD_DURATION * 1000;
+
+      // Fire view once when image ad becomes active
+      trackView(currentAd._id);
 
       imageTimerRef.current = setInterval(() => {
         const elapsed = Date.now() - startTime;
@@ -647,7 +719,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
     return () => clearTimers();
   // Only re-run when the SLIDE changes, not when ads data mutates (like/count updates)
-  }, [currentIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentIndex, trackView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Navigation ───────────────────────────────────────────────────────────────
   const goToIndex = useCallback((index) => {
@@ -683,23 +755,73 @@ const Ads = ({ feedMode = 'user' }) => {
     setTouchStartY(null);
   };
 
-  // ── Like / Unlike ────────────────────────────────────────────────────────────
+  // ── Like ─────────────────────────────────────────────────────────────────────
   const toggleLike = useCallback(async (adId) => {
     const isLiked = likedIds.has(adId);
-    setLikedIds(prev => { const s = new Set(prev); isLiked ? s.delete(adId) : s.add(adId); return s; });
+
+    // Optimistic UI update
+    setLikedIds(prev => {
+      const s = new Set(prev);
+      isLiked ? s.delete(adId) : s.add(adId);
+      return s;
+    });
+    // If liking, remove any dislike
+    if (!isLiked) {
+      setDislikedIds(prev => { const s = new Set(prev); s.delete(adId); return s; });
+    }
     setAds(prev => prev.map(a => a._id === adId
-      ? { ...a, likes_count: a.likes_count + (isLiked ? -1 : 1), is_liked_by_me: !isLiked } : a));
+      ? { ...a, likes_count: a.likes_count + (isLiked ? -1 : 1), is_liked_by_me: !isLiked }
+      : a));
+
     try {
       const endpoint = isLiked ? `/api/ads/${adId}/dislike` : `/api/ads/${adId}/like`;
-      const res = await fetch(`${BASE_URL}${endpoint}`, { method: 'POST', headers: authHeaders() });
+      const res = await fetch(`${BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : '' } }),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (err) {
       console.error('Like failed:', err);
+      // Rollback
       setLikedIds(prev => { const s = new Set(prev); isLiked ? s.add(adId) : s.delete(adId); return s; });
       setAds(prev => prev.map(a => a._id === adId
-        ? { ...a, likes_count: a.likes_count + (isLiked ? 1 : -1), is_liked_by_me: isLiked } : a));
+        ? { ...a, likes_count: a.likes_count + (isLiked ? 1 : -1), is_liked_by_me: isLiked }
+        : a));
     }
-  }, [likedIds]);
+  }, [likedIds, currentUserId]);
+
+  // ── Dislike ───────────────────────────────────────────────────────────────────
+  const toggleDislike = useCallback(async (adId) => {
+    const isDisliked = dislikedIds.has(adId);
+
+    // Optimistic UI — disliking removes any existing like
+    setDislikedIds(prev => {
+      const s = new Set(prev);
+      isDisliked ? s.delete(adId) : s.add(adId);
+      return s;
+    });
+    if (!isDisliked && likedIds.has(adId)) {
+      setLikedIds(prev => { const s = new Set(prev); s.delete(adId); return s; });
+      setAds(prev => prev.map(a => a._id === adId
+        ? { ...a, likes_count: Math.max(0, a.likes_count - 1), is_liked_by_me: false }
+        : a));
+    }
+
+    try {
+      const endpoint = isDisliked ? `/api/ads/${adId}/like` : `/api/ads/${adId}/dislike`;
+      const res = await fetch(`${BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : '' } }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      console.error('Dislike failed:', err);
+      // Rollback
+      setDislikedIds(prev => { const s = new Set(prev); isDisliked ? s.add(adId) : s.delete(adId); return s; });
+    }
+  }, [dislikedIds, likedIds, currentUserId]);
 
   const toggleSave = useCallback((adId) => {
     setSavedIds(prev => { const s = new Set(prev); s.has(adId) ? s.delete(adId) : s.add(adId); return s; });
@@ -1054,6 +1176,8 @@ const Ads = ({ feedMode = 'user' }) => {
                             mobile
                             likedIds={likedIds}
                             toggleLike={toggleLike}
+                            dislikedIds={dislikedIds}
+                            toggleDislike={toggleDislike}
                             savedIds={savedIds}
                             toggleSave={toggleSave}
                             onComment={openComments}
@@ -1070,25 +1194,12 @@ const Ads = ({ feedMode = 'user' }) => {
           {/* Desktop right actions + nav */}
           {!loading && !error && ad && (
             <div ref={actionPanelRef} className="hidden md:flex flex-col gap-2 ml-4 justify-end h-full md:h-[85vh] pb-4">
-              {/* Navigation arrows - Instagram style */}
-              <div className="flex flex-col items-center gap-2 mb-2">
-                <button
-                  onClick={() => goToIndex(currentIndex - 1)}
-                  disabled={currentIndex === 0}
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 transition-all active:scale-90">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-800 dark:text-white"><polyline points="18 15 12 9 6 15"/></svg>
-                </button>
-                <button
-                  onClick={() => goToIndex(currentIndex + 1)}
-                  disabled={currentIndex === ads.length - 1}
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 transition-all active:scale-90">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-800 dark:text-white"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-              </div>
               <ActionButtons
                 ad={ad}
                 likedIds={likedIds}
                 toggleLike={toggleLike}
+                dislikedIds={dislikedIds}
+                toggleDislike={toggleDislike}
                 savedIds={savedIds}
                 toggleSave={toggleSave}
                 onComment={openComments}
@@ -1096,6 +1207,24 @@ const Ads = ({ feedMode = 'user' }) => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Nav arrows */}
+      <div className="hidden md:flex fixed right-5 top-1/2 -translate-y-1/2 z-40 flex-col gap-3">
+        <button
+          onClick={() => goToIndex(currentIndex - 1)}
+          disabled={currentIndex === 0}
+          className="w-12 h-12 rounded-full dark:bg-white/10 border border-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center hover:bg-white/25 hover:scale-110 active:scale-95 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+        </button>
+        <button
+          onClick={() => goToIndex(currentIndex + 1)}
+          disabled={currentIndex === ads.length - 1}
+          className="w-12 h-12 rounded-full bg-white/10 border border-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center hover:bg-white/25 hover:scale-110 active:scale-95 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+        </button>
       </div>
 
       {/* ─── Comments Overlay (Desktop Popup + Mobile Bottom Sheet) ─── */}
