@@ -398,7 +398,7 @@ const FollowButton = ({ userId, mobile = false }) => {
 };
 
 // ─── Action Buttons ────────────────────────────────────────────────────────────
-const ActionButtons = ({ ad, likedIds, toggleLike, dislikedIds, toggleDislike, savedIds, toggleSave, mobile = false, onComment }) => (
+const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile = false, onComment }) => (
   <div className="flex flex-col items-center gap-4">
     {/* Like */}
     <button onClick={() => toggleLike(ad._id)} className="flex flex-col items-center gap-1">
@@ -414,27 +414,7 @@ const ActionButtons = ({ ad, likedIds, toggleLike, dislikedIds, toggleDislike, s
     </button>
 
     {/* Dislike */}
-    <button onClick={() => toggleDislike(ad._id)} className="flex flex-col items-center gap-1">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
-        ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-        {/* Thumbs-down icon */}
-        <svg
-          width={20} height={20} viewBox="0 0 24 24" fill="none" strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round" stroke="currentColor"
-          className={
-            dislikedIds.has(ad._id)
-              ? 'text-blue-500 fill-blue-500'
-              : mobile ? 'text-white' : 'text-gray-800 dark:text-white'
-          }
-        >
-          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
-          <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
-        </svg>
-      </div>
-      <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>
-        {dislikedIds.has(ad._id) ? 'Disliked' : 'Dislike'}
-      </span>
-    </button>
+  
 
     {/* Comment */}
     <button onClick={() => onComment && onComment(ad)} className="flex flex-col items-center gap-1">
@@ -566,7 +546,6 @@ const Ads = ({ feedMode = 'user' }) => {
   const [touchStartY, setTouchStartY] = useState(null);
   const [progress, setProgress] = useState(0);
   const [likedIds, setLikedIds] = useState(new Set());
-  const [dislikedIds, setDislikedIds] = useState(new Set());
   const [savedIds, setSavedIds] = useState(new Set());
 
   // Track which ad IDs the current user has already viewed this session.
@@ -712,7 +691,7 @@ const Ads = ({ feedMode = 'user' }) => {
     } finally {
       setLoading(false);
     }
-  }, [feedMode]);
+  }, []);
 
   useEffect(() => { fetchAds(activeCategory); }, [activeCategory, fetchAds]);
 
@@ -798,7 +777,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
     return () => clearTimers();
   // Only re-run when the SLIDE changes, not when ads data mutates (like/count updates)
-  }, [currentIndex, trackView]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentIndex, trackView]);
 
   // ── Navigation ───────────────────────────────────────────────────────────────
   const goToIndex = useCallback((index) => {
@@ -844,10 +823,6 @@ const Ads = ({ feedMode = 'user' }) => {
       isLiked ? s.delete(adId) : s.add(adId);
       return s;
     });
-    // If liking, remove any dislike
-    if (!isLiked) {
-      setDislikedIds(prev => { const s = new Set(prev); s.delete(adId); return s; });
-    }
     setAds(prev => prev.map(a => a._id === adId
       ? { ...a, likes_count: a.likes_count + (isLiked ? -1 : 1), is_liked_by_me: !isLiked }
       : a));
@@ -871,36 +846,6 @@ const Ads = ({ feedMode = 'user' }) => {
   }, [likedIds, currentUserId]);
 
   // ── Dislike ───────────────────────────────────────────────────────────────────
-  const toggleDislike = useCallback(async (adId) => {
-    const isDisliked = dislikedIds.has(adId);
-
-    // Optimistic UI — disliking removes any existing like
-    setDislikedIds(prev => {
-      const s = new Set(prev);
-      isDisliked ? s.delete(adId) : s.add(adId);
-      return s;
-    });
-    if (!isDisliked && likedIds.has(adId)) {
-      setLikedIds(prev => { const s = new Set(prev); s.delete(adId); return s; });
-      setAds(prev => prev.map(a => a._id === adId
-        ? { ...a, likes_count: Math.max(0, a.likes_count - 1), is_liked_by_me: false }
-        : a));
-    }
-
-    try {
-      const endpoint = isDisliked ? `/api/ads/${adId}/like` : `/api/ads/${adId}/dislike`;
-      const res = await fetch(`${BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : '' } }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } catch (err) {
-      console.error('Dislike failed:', err);
-      // Rollback
-      setDislikedIds(prev => { const s = new Set(prev); isDisliked ? s.add(adId) : s.delete(adId); return s; });
-    }
-  }, [dislikedIds, likedIds, currentUserId]);
 
   const toggleSave = useCallback((adId) => {
     setSavedIds(prev => { const s = new Set(prev); s.has(adId) ? s.delete(adId) : s.add(adId); return s; });
@@ -1414,8 +1359,6 @@ const Ads = ({ feedMode = 'user' }) => {
                             mobile
                             likedIds={likedIds}
                             toggleLike={toggleLike}
-                            dislikedIds={dislikedIds}
-                            toggleDislike={toggleDislike}
                             savedIds={savedIds}
                             toggleSave={toggleSave}
                             onComment={openComments}
@@ -1436,8 +1379,6 @@ const Ads = ({ feedMode = 'user' }) => {
                 ad={ad}
                 likedIds={likedIds}
                 toggleLike={toggleLike}
-                dislikedIds={dislikedIds}
-                toggleDislike={toggleDislike}
                 savedIds={savedIds}
                 toggleSave={toggleSave}
                 onComment={openComments}
@@ -1563,3 +1504,5 @@ const Ads = ({ feedMode = 'user' }) => {
 };
 
 export default Ads;
+
+
