@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import commentService from '../services/commentServiceJS';
 import {
@@ -527,6 +527,27 @@ const Ads = ({ feedMode = 'user' }) => {
   const currentUserName = userObject?.full_name || userObject?.username || 'You';
   const navigate = useNavigate();
 
+  // ── Wallet balance state ─────────────────────────────────────────────────
+  const [walletBalance, setWalletBalance] = useState(
+    userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0
+  );
+
+  const fetchWalletBalance = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/wallet`, { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Handle various backend response shapes
+      const bal =
+        data?.balance ??
+        data?.wallet?.balance ??
+        data?.data?.balance ??
+        data?.data?.wallet?.balance ??
+        data?.user?.wallet?.balance;
+      if (bal !== undefined && bal !== null) setWalletBalance(Math.floor(Number(bal)));
+    } catch { /* silent */ }
+  }, []);
+
   // ── Search state ────────────────────────────────────────────────────────────
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -547,6 +568,7 @@ const Ads = ({ feedMode = 'user' }) => {
   const [progress, setProgress] = useState(0);
   const [likedIds, setLikedIds] = useState(new Set());
   const [savedIds, setSavedIds] = useState(new Set());
+  const [coinToast, setCoinToast] = useState(null); // { amount, id }
 
   // Track which ad IDs the current user has already viewed this session.
   // Using a ref so it never triggers re-renders and persists across index changes.
@@ -705,9 +727,9 @@ const Ads = ({ feedMode = 'user' }) => {
   };
 
   // ── View Tracking ─────────────────────────────────────────────────────────────
-  // Fires POST /api/ads/{id}/view only ONCE per ad per session per user.
-  // For video ads — called when the video starts playing on the current slide.
-  // For image ads — called when the image ad becomes the current slide.
+  // Fires POST /api/ads/{id}/view ONLY when the ad is fully watched.
+  // For video ads — called when video ends (onEnded).
+  // For image ads — called when 15s timer completes (pct >= 100).
   const trackView = useCallback(async (adId) => {
     if (!adId) return;
     const key = String(adId);
@@ -728,10 +750,42 @@ const Ads = ({ feedMode = 'user' }) => {
         viewedIdsRef.current.delete(key);
         throw new Error(`HTTP ${res.status}`);
       }
+      // Parse response — backend may return updated wallet/coins directly
+      const resData = await res.json().catch(() => ({}));
+      const directBal =
+        resData?.wallet?.balance ??
+        resData?.user?.wallet?.balance ??
+        resData?.balance ??
+        resData?.data?.balance;
+      const coinsRewarded =
+        resData?.coins_rewarded ??
+        resData?.coins ??
+        resData?.reward ??
+        resData?.data?.coins_rewarded;
+      if (directBal !== undefined) {
+        setWalletBalance(Math.floor(Number(directBal)));
+      } else {
+        // Fallback: poll wallet endpoint (give backend 800ms to settle)
+        setTimeout(() => fetchWalletBalance(), 800);
+      }
+      // Show coin reward toast
+      if (coinsRewarded && Number(coinsRewarded) > 0) {
+        const toastId = Date.now();
+        setCoinToast({ amount: Number(coinsRewarded), id: toastId });
+        setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
+      } else {
+        // Still show a generic toast so user knows it was registered
+        const toastId = Date.now();
+        const adCoins = adsRef.current.find(a => String(a._id) === String(adId))?.coins_reward;
+        if (adCoins && Number(adCoins) > 0) {
+          setCoinToast({ amount: Number(adCoins), id: toastId });
+          setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
+        }
+      }
     } catch (err) {
       console.error('View tracking failed:', err);
     }
-  }, [currentUserId]);
+  }, [currentUserId, fetchWalletBalance]);
 
   useEffect(() => {
     const adsList = adsRef.current;
@@ -750,19 +804,20 @@ const Ads = ({ feedMode = 'user' }) => {
       setProgress(0);
       vid.play().catch(() => {});
 
-      // Fire view once when video starts playing
-      trackView(currentAd._id);
-
+      // Track progress
       progressIntervalRef.current = setInterval(() => {
         if (vid.duration) setProgress((vid.currentTime / vid.duration) * 100);
       }, 100);
+
+      // Fire view when video fully ends (coins rewarded on complete watch)
+      const onEnded = () => trackView(currentAd._id);
+      vid.addEventListener('ended', onEnded);
+      // Store cleanup on the ref so we can remove it when slide changes
+      vid._onEndedCleanup = () => vid.removeEventListener('ended', onEnded);
     } else {
       setProgress(0);
       const startTime = Date.now();
       const totalMs = IMAGE_AD_DURATION * 1000;
-
-      // Fire view once when image ad becomes active
-      trackView(currentAd._id);
 
       imageTimerRef.current = setInterval(() => {
         const elapsed = Date.now() - startTime;
@@ -770,12 +825,22 @@ const Ads = ({ feedMode = 'user' }) => {
         setProgress(pct);
         if (pct >= 100) {
           clearInterval(imageTimerRef.current);
+          // Fire view ONLY when image ad fully completes (coins rewarded on complete watch)
+          trackView(currentAd._id);
           setCurrentIndex(prev => (prev + 1 < adsRef.current.length ? prev + 1 : prev));
         }
       }, 100);
     }
 
-    return () => clearTimers();
+    return () => {
+      clearTimers();
+      // Clean up video ended listener if any
+      const vid = videoRefs.current[currentIndex];
+      if (vid?._onEndedCleanup) {
+        vid._onEndedCleanup();
+        vid._onEndedCleanup = null;
+      }
+    };
   // Only re-run when the SLIDE changes, not when ads data mutates (like/count updates)
   }, [currentIndex, trackView]);
 
@@ -1132,85 +1197,20 @@ const Ads = ({ feedMode = 'user' }) => {
                 </button>
               ))}
             </div>
-            {/* Mobile Search toggle */}
-            <div className="shrink-0 relative" ref={!searchOpen ? null : searchContainerRef}>
-              {searchOpen ? (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-black/70 backdrop-blur-md rounded-full px-3 py-1.5 w-52 border border-white/20 z-40">
-                  <Search size={13} className="text-white/60 shrink-0" />
-                  <input
-                    ref={searchInputRef}
-                    value={searchQuery}
-                    onChange={handleSearchInput}
-                    placeholder="Search…"
-                    className="flex-1 bg-transparent text-sm outline-none text-white placeholder-white/40"
-                  />
-                  {searchLoading
-                    ? <Loader2 size={13} className="animate-spin text-white/60 shrink-0" />
-                    : <button onClick={handleSearchClose}><X size={13} className="text-white/60" /></button>
-                  }
-                </div>
-              ) : (
-                <button onClick={handleSearchOpen} className="w-8 h-8 flex items-center justify-center shrink-0">
-                  <Search size={20} className="text-white" />
-                </button>
-              )}
-            </div>
+            {/* Mobile Wallet Balance Badge */}
+            <Link to="/wallet" className="shrink-0 flex items-center gap-1.5 bg-black/50 backdrop-blur-md border border-white/20 rounded-full px-2.5 py-1.5">
+              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+                </svg>
+              </div>
+              <div className="flex flex-col leading-none">
+                <span className="text-[9px] text-white/60 font-medium">Balance</span>
+                <span className="text-[11px] font-bold text-white">Coins {walletBalance}</span>
+              </div>
+            </Link>
           </div>
 
-          {/* Mobile Search Dropdown */}
-          {searchOpen && searchDropdownVisible && searchResults.length > 0 && (
-            <div className="absolute top-14 left-3 right-3 bg-black/90 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden z-40 max-h-80 overflow-y-auto shadow-2xl">
-              {searchResults.filter(r => r._type === 'user').length > 0 && (
-                <div>
-                  <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-white/40 border-b border-white/10">People</div>
-                  {searchResults.filter(r => r._type === 'user').map(u => (
-                    <button key={u._id || u.id} onClick={() => handleSearchResultClick(u)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left">
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 to-pink-500 p-[1.5px] shrink-0">
-                        <div className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center">
-                          {u.avatar_url
-                            ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
-                            : <span className="text-xs font-bold text-white">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
-                          }
-                        </div>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-white truncate">{u.full_name || u.username}</div>
-                        {u.username && <div className="text-xs text-white/40 truncate">@{u.username}</div>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {searchResults.filter(r => r._type === 'ad').length > 0 && (
-                <div>
-                  <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-white/40 border-b border-white/10">Ads</div>
-                  {searchResults.filter(r => r._type === 'ad').map(ad => {
-                    const thumb = ad.media?.[0]?.fileUrl || ad.media?.[0]?.thumbnail_url;
-                    const adUser = ad.user_id || ad.vendor_id || {};
-                    return (
-                      <button key={ad._id} onClick={() => handleSearchResultClick(ad)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left">
-                        <div className="w-9 h-9 rounded-xl overflow-hidden bg-white/10 shrink-0">
-                          {thumb
-                            ? <img src={thumb} alt="" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center text-white/40"><ShoppingBag size={12} /></div>
-                          }
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-white truncate">{ad.caption || ad.title || 'Ad'}</div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            {ad.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/50 font-medium">{ad.category}</span>}
-                            {typeof adUser === 'object' && adUser.username && <span className="text-[10px] text-white/40">@{adUser.username}</span>}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Loading */}
           {loading && (
@@ -1481,10 +1481,30 @@ const Ads = ({ feedMode = 'user' }) => {
         </>
       )}
 
+      {/* ── Coin Reward Toast ── */}
+      {coinToast && (
+        <div
+          key={coinToast.id}
+          className="fixed top-20 left-1/2 z-[100] -translate-x-1/2 flex items-center gap-2 bg-amber-500 text-white px-4 py-2.5 rounded-full shadow-2xl font-bold text-sm animate-bounce"
+          style={{ animation: 'coinToastIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards' }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="#FCD34D" stroke="#D97706" strokeWidth="1.5"/>
+            <text x="12" y="16.5" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#7C2D12">B</text>
+          </svg>
+          +{coinToast.amount} Coins Earned!
+        </div>
+      )}
+
       <style>{`
         @keyframes slideInRight {
           from { opacity: 0; transform: translateX(16px); }
           to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes coinToastIn {
+          0%   { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.85); }
+          60%  { transform: translateX(-50%) translateY(4px) scale(1.05); }
+          100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
         }
         @keyframes slideInLeft {
           from { opacity: 0; transform: translateX(-16px); }
@@ -1504,5 +1524,3 @@ const Ads = ({ feedMode = 'user' }) => {
 };
 
 export default Ads;
-
-

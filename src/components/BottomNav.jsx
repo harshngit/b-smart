@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
-  Home, Plus, Search, Target, User, LayoutDashboard, FileText,
+  Home, Plus, Target, User, LayoutDashboard, FileText,
   Clapperboard, CreditCard, Settings, ShoppingBag, Megaphone,
   BarChart2, ChevronUp, X
 } from 'lucide-react';
@@ -43,14 +43,13 @@ const BottomNav = ({ onOpenCreateModal }) => {
   // ── Member nav items (all sidebar items) ─────────────────────────────────────
   const memberPrimaryNav = [
     { icon: Home,        path: '/',        label: 'Home'   },
-    { icon: Search,      path: '/search',  label: 'Search' },
+    { icon: ShoppingBag, path: '/ads',     label: 'Ads'    },
     null, // center button placeholder
     { icon: Clapperboard,path: '/reels',   label: 'Reels'  },
     { icon: User,        path: '/profile', label: 'Profile'},
   ];
 
   const memberMoreItems = [
-    { icon: ShoppingBag, path: '/ads',      label: 'Ads'      },
     { icon: Megaphone,   path: '/promote',  label: 'Promote'  },
     { icon: Settings,    path: '/settings', label: 'Settings' },
   ];
@@ -133,18 +132,7 @@ const BottomNav = ({ onOpenCreateModal }) => {
           );
         })}
 
-        {/* "More" button — replaces last slot for mobile if moreItems exist */}
-        {moreItems.length > 0 && (
-          <button
-            onClick={() => setShowMoreMenu(m => !m)}
-            className={`flex flex-col items-center gap-0.5 min-w-[40px] transition-colors ${showMoreMenu ? activeColor : inactiveColor}`}
-          >
-            {showMoreMenu
-              ? <X size={26} strokeWidth={2} />
-              : <ChevronUp size={26} strokeWidth={2} />
-            }
-          </button>
-        )}
+
 
       </div>
 

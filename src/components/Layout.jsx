@@ -12,7 +12,7 @@ const Layout = () => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
-  const isExcludedPage = ['/profile', '/settings', '/reels', '/promote', '/ads'].includes(location.pathname);
+  const isExcludedPage = ['/profile', '/settings', '/promote'].includes(location.pathname);
   const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
   const showTopBar = !isExcludedPage;
 

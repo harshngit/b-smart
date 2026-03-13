@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Heart, MessageCircle, Send, MoreHorizontal, Music2,
   Volume2, VolumeX, Bookmark, Loader2, X, Trash2
@@ -463,6 +464,25 @@ const Reels = () => {
   const [actionPanelRight, setActionPanelRight] = useState(100);
 
   const { userObject } = useSelector((state) => state.auth);
+  const [walletBalance, setWalletBalance] = useState(
+    userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0
+  );
+
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('https://api.bebsmart.in/api/wallet', {
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const bal = data?.balance ?? data?.wallet?.balance ?? data?.data?.balance;
+        if (bal !== undefined) setWalletBalance(Math.floor(Number(bal)));
+      } catch { /* silent */ }
+    };
+    fetchWallet();
+  }, []);
 
   useEffect(() => {
     const measure = () => {
@@ -625,6 +645,22 @@ const Reels = () => {
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
+            {/* Mobile Wallet Balance Badge — top-right overlay */}
+            <Link
+              to="/wallet"
+              className="md:hidden absolute top-4 right-3 z-40 flex items-center gap-1.5 bg-black/50 backdrop-blur-md border border-white/20 rounded-full px-2.5 py-1.5"
+            >
+              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+                </svg>
+              </div>
+              <div className="flex flex-col leading-none">
+                <span className="text-[9px] text-white/60 font-medium">Balance</span>
+                <span className="text-[11px] font-bold text-white">Coins {walletBalance}</span>
+              </div>
+            </Link>
+
             <div
               className="h-full w-full transition-transform duration-500 ease-out"
               style={{ transform: `translateY(-${currentIndex * 100}%)` }}
