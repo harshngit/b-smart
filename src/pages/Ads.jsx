@@ -526,6 +526,18 @@ const Ads = ({ feedMode = 'user' }) => {
   const currentUserAvatar = userObject?.avatar_url || null;
   const currentUserName = userObject?.full_name || userObject?.username || 'You';
   const navigate = useNavigate();
+  const pageHeightClass = "h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]";
+
+  useEffect(() => {
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
 
   // ── Wallet balance state ─────────────────────────────────────────────────
   const [walletBalance, setWalletBalance] = useState(
@@ -569,6 +581,9 @@ const Ads = ({ feedMode = 'user' }) => {
   const [likedIds, setLikedIds] = useState(new Set());
   const [savedIds, setSavedIds] = useState(new Set());
   const [coinToast, setCoinToast] = useState(null); // { amount, id }
+  // Popup modals for coin rewards
+  const [viewRewardPopup, setViewRewardPopup] = useState(null); // { amount } — shown first time only
+  const [likeRewardPopup, setLikeRewardPopup] = useState(null); // { amount, isLike } — shown on every like/dislike
 
   // Track which ad IDs the current user has already viewed this session.
   // Using a ref so it never triggers re-renders and persists across index changes.
@@ -768,81 +783,62 @@ const Ads = ({ feedMode = 'user' }) => {
         // Fallback: poll wallet endpoint (give backend 800ms to settle)
         setTimeout(() => fetchWalletBalance(), 800);
       }
-      // Show coin reward toast
-      if (coinsRewarded && Number(coinsRewarded) > 0) {
-        const toastId = Date.now();
-        setCoinToast({ amount: Number(coinsRewarded), id: toastId });
-        setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
-      } else {
-        // Still show a generic toast so user knows it was registered
-        const toastId = Date.now();
-        const adCoins = adsRef.current.find(a => String(a._id) === String(adId))?.coins_reward;
-        if (adCoins && Number(adCoins) > 0) {
-          setCoinToast({ amount: Number(adCoins), id: toastId });
-          setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
-        }
-      }
+      // Show coin reward POPUP (first-time view only — guard already ensures this runs once)
+      const rewardAmount = (coinsRewarded && Number(coinsRewarded) > 0)
+        ? Number(coinsRewarded)
+        : (() => {
+            const adCoins = adsRef.current.find(a => String(a._id) === String(adId))?.coins_reward;
+            return adCoins && Number(adCoins) > 0 ? Number(adCoins) : 10;
+          })();
+      setViewRewardPopup({ amount: rewardAmount });
+      // Also keep the small toast as fallback
+      const toastId = Date.now();
+      setCoinToast({ amount: rewardAmount, id: toastId });
+      setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
     } catch (err) {
       console.error('View tracking failed:', err);
     }
   }, [currentUserId, fetchWalletBalance]);
 
+  // tracks ad _id strings that have already received a view API call (never double-fires)
+  const viewFiredForAdId = useRef(new Set());
+
+  // ── Image-ad 15s progress timer ──────────────────────────────────────────────
+  // Video progress is handled entirely via JSX event props (onTimeUpdate / onEnded).
   useEffect(() => {
     const adsList = adsRef.current;
     if (!adsList.length) return;
-    clearTimers();
-
     const currentAd = adsList[currentIndex];
     if (!currentAd) return;
-
     const isVideo = currentAd.media?.[0]?.media_type === 'video';
 
-    if (isVideo) {
-      const vid = videoRefs.current[currentIndex];
-      if (!vid) return;
-      vid.currentTime = 0;
-      setProgress(0);
-      vid.play().catch(() => {});
+    // Reset progress bar on every slide change
+    setProgress(0);
+    clearTimers();
 
-      // Track progress
-      progressIntervalRef.current = setInterval(() => {
-        if (vid.duration) setProgress((vid.currentTime / vid.duration) * 100);
-      }, 100);
+    if (isVideo) return; // video handles its own progress via JSX event handlers
 
-      // Fire view when video fully ends (coins rewarded on complete watch)
-      const onEnded = () => trackView(currentAd._id);
-      vid.addEventListener('ended', onEnded);
-      // Store cleanup on the ref so we can remove it when slide changes
-      vid._onEndedCleanup = () => vid.removeEventListener('ended', onEnded);
-    } else {
-      setProgress(0);
-      const startTime = Date.now();
-      const totalMs = IMAGE_AD_DURATION * 1000;
+    const startTime = Date.now();
+    const totalMs = IMAGE_AD_DURATION * 1000;
 
-      imageTimerRef.current = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const pct = Math.min((elapsed / totalMs) * 100, 100);
-        setProgress(pct);
-        if (pct >= 100) {
-          clearInterval(imageTimerRef.current);
-          // Fire view ONLY when image ad fully completes (coins rewarded on complete watch)
+    progressIntervalRef.current = setInterval(() => {
+      const pct = Math.min(((Date.now() - startTime) / totalMs) * 100, 100);
+      setProgress(pct);
+      if (pct >= 100) {
+        clearInterval(progressIntervalRef.current);
+        const adId = String(currentAd._id);
+        if (!viewFiredForAdId.current.has(adId)) {
+          viewFiredForAdId.current.add(adId);
           trackView(currentAd._id);
-          setCurrentIndex(prev => (prev + 1 < adsRef.current.length ? prev + 1 : prev));
         }
-      }, 100);
-    }
-
-    return () => {
-      clearTimers();
-      // Clean up video ended listener if any
-      const vid = videoRefs.current[currentIndex];
-      if (vid?._onEndedCleanup) {
-        vid._onEndedCleanup();
-        vid._onEndedCleanup = null;
+        setCurrentIndex(prev => (prev + 1 < adsRef.current.length ? prev + 1 : prev));
       }
-    };
-  // Only re-run when the SLIDE changes, not when ads data mutates (like/count updates)
+    }, 250);
+
+    return () => clearInterval(progressIntervalRef.current);
   }, [currentIndex, trackView]);
+
+
 
   // ── Navigation ───────────────────────────────────────────────────────────────
   const goToIndex = useCallback((index) => {
@@ -900,6 +896,8 @@ const Ads = ({ feedMode = 'user' }) => {
         body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : '' } }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Show like/dislike coin reward popup
+      setLikeRewardPopup({ amount: 10, isLike: !isLiked });
     } catch (err) {
       console.error('Like failed:', err);
       // Rollback
@@ -1066,11 +1064,11 @@ const Ads = ({ feedMode = 'user' }) => {
   if (feedMode === 'user' && isVendorUser) return <Navigate to="/vendor-ads" replace />;
 
   return (
-    <div className="flex flex-col bg-black overflow-hidden h-screen">
+    <div className={`flex flex-col bg-black overflow-hidden ${pageHeightClass}`}>
 
       {/* Desktop top bar */}
       <div className="hidden md:flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1">
+        <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1">
           <ChevronLeft size={16} />
         </button>
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
@@ -1183,7 +1181,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
           {/* Mobile top bar — floats over the card */}
           <div className="md:hidden absolute top-0 left-0 right-0 z-30 flex items-center px-3 pt-3 pb-1 gap-3 bg-gradient-to-b from-black/60 to-transparent">
-            <button className="w-8 h-8 flex items-center justify-center shrink-0">
+            <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center shrink-0">
               <ChevronLeft size={22} className="text-white" />
             </button>
             <div className="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-none mask-linear-fade">
@@ -1249,7 +1247,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
               {/* ── Progress bar ── */}
               <div className="absolute top-0 left-0 right-0 z-40 h-1 bg-white/20">
-                <div className="h-full bg-white" style={{ width: `${progress}%`, transition: 'width 0.1s linear' }} />
+                <div className="h-full bg-white transition-none" style={{ width: `${progress}%` }} />
               </div>
 
               {/* Slides */}
@@ -1268,10 +1266,57 @@ const Ads = ({ feedMode = 'user' }) => {
                       {/* Media */}
                       {isVideo ? (
                         <video
-                          ref={el => videoRefs.current[index] = el}
+                          ref={el => { videoRefs.current[index] = el; }}
                           src={src}
                           className="w-full h-full object-cover"
-                          loop muted={isMuted} playsInline autoPlay={isCurrent}
+                          muted={isMuted}
+                          playsInline
+                          autoPlay={isCurrent}
+                          loop={false}
+                          onLoadedMetadata={e => {
+                            // Seek to trimmed start once metadata (duration) is known
+                            if (!isCurrent) return;
+                            const m = a.media?.[0];
+                            const start = m?.timing_window?.start ?? m?.video_meta?.selected_start ?? 0;
+                            if (start > 0) e.target.currentTime = start;
+                          }}
+                          onTimeUpdate={e => {
+                            if (!isCurrent) return;
+                            const vid = e.target;
+                            const m = a.media?.[0];
+                            const start   = m?.timing_window?.start    ?? m?.video_meta?.selected_start  ?? 0;
+                            const end     = m?.timing_window?.end      ?? m?.video_meta?.selected_end    ?? null;
+                            const dur     = m?.video_meta?.final_duration ?? null;
+                            const ct      = vid.currentTime;
+
+                            // Hit the trim end → stop, mark 100%, fire view
+                            if (end !== null && ct >= end) {
+                              vid.pause();
+                              setProgress(100);
+                              const key = String(a._id);
+                              if (!viewFiredForAdId.current.has(key)) {
+                                viewFiredForAdId.current.add(key);
+                                trackView(a._id);
+                              }
+                              return;
+                            }
+
+                            // Move progress bar
+                            if (dur && dur > 0) {
+                              setProgress(Math.min(((ct - start) / dur) * 100, 100));
+                            } else if (vid.duration > 0) {
+                              setProgress((ct / vid.duration) * 100);
+                            }
+                          }}
+                          onEnded={() => {
+                            if (!isCurrent) return;
+                            setProgress(100);
+                            const key = String(a._id);
+                            if (!viewFiredForAdId.current.has(key)) {
+                              viewFiredForAdId.current.add(key);
+                              trackView(a._id);
+                            }
+                          }}
                         />
                       ) : src ? (
                         <img src={src} className="w-full h-full object-cover"
@@ -1294,7 +1339,7 @@ const Ads = ({ feedMode = 'user' }) => {
                       {/* Mute btn — video only */}
                       {isVideo && isCurrent && (
                         <button onClick={() => setIsMuted(m => !m)}
-                          className="absolute bottom-[145px] md:bottom-5 right-[52px] md:right-4 bg-black/50 p-2 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-20">
+                          className="absolute bottom-[10px] md:bottom-5 right-[55px] md:right-4 bg-black/50 p-2 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-20">
                           {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                         </button>
                       )}
@@ -1308,7 +1353,7 @@ const Ads = ({ feedMode = 'user' }) => {
                       )}
 
                       {/* Bottom info — clears bottom nav (64px) on mobile */}
-                      <div className="absolute bottom-0 left-0 w-full p-4 pb-[72px] md:pb-6 z-20" style={{ paddingRight: '60px' }}>
+                      <div className="absolute bottom-0 left-0 w-full p-4 md:pb-6 z-20" style={{ paddingRight: '60px' }}>
                         {/* Vendor row */}
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                           {a.user_id?.avatar_url
@@ -1353,7 +1398,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
                       {/* Mobile right actions — pinned above bottom nav */}
                       {isCurrent && (
-                        <div className="md:hidden absolute right-3 bottom-[72px] z-30">
+                        <div className="md:hidden absolute right-3 bottom-[10px] z-30">
                           <ActionButtons
                             ad={a}
                             mobile
@@ -1481,6 +1526,72 @@ const Ads = ({ feedMode = 'user' }) => {
         </>
       )}
 
+      {/* ── View Reward Popup (first-time watch) ── */}
+      {viewRewardPopup && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+          <div
+            className="pointer-events-auto bg-white dark:bg-[#1c1c1e] rounded-3xl shadow-2xl px-8 py-7 flex flex-col items-center gap-4 border border-amber-200 dark:border-amber-500/30"
+            style={{ animation: 'popupIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards', minWidth: 260 }}
+          >
+            {/* Coin burst */}
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-300/50" style={{ animation: 'coinPulse 0.6s ease-out' }}>
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" fill="#FCD34D" stroke="#D97706" strokeWidth="1.5"/>
+                  <text x="12" y="16.5" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#7C2D12">B</text>
+                </svg>
+              </div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-md">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-black text-amber-500">+{viewRewardPopup.amount} Coins!</p>
+              <p className="text-gray-700 dark:text-gray-300 font-semibold text-sm mt-0.5">Earned for watching the full ad</p>
+            </div>
+            <button
+              onClick={() => setViewRewardPopup(null)}
+              className="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold py-2.5 rounded-2xl text-sm hover:opacity-90 active:scale-95 transition-all shadow-md"
+            >
+              Awesome! 🎉
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Like / Dislike Coin Popup ── */}
+      {likeRewardPopup && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+          <div
+            className="pointer-events-auto bg-white dark:bg-[#1c1c1e] rounded-3xl shadow-2xl px-8 py-7 flex flex-col items-center gap-4 border dark:border-white/10"
+            style={{ animation: 'popupIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards', minWidth: 260, borderColor: likeRewardPopup.isLike ? '#fca5a5' : '#d1d5db' }}
+          >
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${likeRewardPopup.isLike ? 'bg-gradient-to-br from-red-400 to-pink-500 shadow-red-300/50' : 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-gray-300/40'}`} style={{ animation: 'coinPulse 0.6s ease-out' }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill={likeRewardPopup.isLike ? 'white' : 'white'} stroke="none">
+                {likeRewardPopup.isLike
+                  ? <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                  : <><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></>
+                }
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className={`text-2xl font-black ${likeRewardPopup.isLike ? 'text-red-500' : 'text-gray-500'}`}>
+                {likeRewardPopup.isLike ? `+${likeRewardPopup.amount}` : `-${likeRewardPopup.amount}`} Coins
+              </p>
+              <p className="text-gray-700 dark:text-gray-300 font-semibold text-sm mt-0.5">
+                {likeRewardPopup.isLike ? 'Thanks for liking! 💖' : 'Dislike recorded'}
+              </p>
+            </div>
+            <button
+              onClick={() => setLikeRewardPopup(null)}
+              className={`w-full text-white font-bold py-2.5 rounded-2xl text-sm hover:opacity-90 active:scale-95 transition-all shadow-md ${likeRewardPopup.isLike ? 'bg-gradient-to-r from-red-400 to-pink-500' : 'bg-gradient-to-r from-gray-400 to-gray-600'}`}
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Coin Reward Toast ── */}
       {coinToast && (
         <div
@@ -1497,6 +1608,16 @@ const Ads = ({ feedMode = 'user' }) => {
       )}
 
       <style>{`
+        @keyframes popupIn {
+          0%   { opacity: 0; transform: scale(0.7); }
+          60%  { transform: scale(1.04); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes coinPulse {
+          0%   { transform: scale(0.5); opacity: 0; }
+          60%  { transform: scale(1.15); }
+          100% { transform: scale(1); opacity: 1; }
+        }
         @keyframes slideInRight {
           from { opacity: 0; transform: translateX(16px); }
           to   { opacity: 1; transform: translateX(0); }

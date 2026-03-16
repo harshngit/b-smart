@@ -9,6 +9,34 @@ import api from '../lib/api';
 
 const BASE_URL = 'https://api.bebsmart.in';
 
+const normalizeApiArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  const candidates = [
+    value.data,
+    value?.data?.data,
+    value.posts,
+    value.feed,
+    value.items,
+    value.results,
+    value.ads,
+    value?.data?.posts,
+    value?.data?.feed,
+    value?.data?.items,
+    value?.data?.results,
+    value?.data?.ads,
+    value?.data?.data?.posts,
+    value?.data?.data?.feed,
+    value?.data?.data?.items,
+    value?.data?.data?.results,
+    value?.data?.data?.ads,
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c;
+  }
+  return [];
+};
+
 const adAuthHeaders = () => {
   const token = localStorage.getItem('token');
   return {
@@ -70,14 +98,16 @@ const FeedSkeleton = () => (
 const AD_INTERVAL = 4; // show 1 ad after every 4 posts
 
 const buildFeed = (posts, ads) => {
-  if (!ads.length) return posts;
+  const safePosts = normalizeApiArray(posts);
+  const safeAds = normalizeApiArray(ads);
+  if (!safeAds.length) return safePosts;
   const feed = [];
   let adIdx = 0;
-  posts.forEach((post, i) => {
+  safePosts.forEach((post, i) => {
     feed.push(post);
     // After every AD_INTERVAL posts, insert the next ad (cycle through ads)
-    if ((i + 1) % AD_INTERVAL === 0 && adIdx < ads.length) {
-      feed.push({ ...ads[adIdx % ads.length], item_type: 'ad' });
+    if ((i + 1) % AD_INTERVAL === 0 && adIdx < safeAds.length) {
+      feed.push({ ...safeAds[adIdx % safeAds.length], item_type: 'ad' });
       adIdx++;
     }
   });
@@ -99,7 +129,7 @@ const Home = () => {
   const fetchPosts = useCallback(async () => {
     try {
       const { data } = await api.get('/posts/feed');
-      return data || [];
+      return normalizeApiArray(data);
     } catch (e) {
       console.error('Error fetching posts:', e);
       return [];
@@ -112,7 +142,7 @@ const Home = () => {
       const res = await fetch(`${BASE_URL}/api/ads/feed`, { headers: adAuthHeaders() });
       if (!res.ok) return [];
       const data = await res.json();
-      return Array.isArray(data) ? data : (data.data || data.ads || []);
+      return normalizeApiArray(data);
     } catch (e) {
       console.error('Error fetching ads:', e);
       return [];

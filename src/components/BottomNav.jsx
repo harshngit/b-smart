@@ -43,7 +43,7 @@ const BottomNav = ({ onOpenCreateModal }) => {
   // ── Member nav items (all sidebar items) ─────────────────────────────────────
   const memberPrimaryNav = [
     { icon: Home,        path: '/',        label: 'Home'   },
-    { icon: ShoppingBag, path: '/ads',     label: 'Ads'    },
+    { icon: Target, path: '/ads',     label: 'Ads'    },
     null, // center button placeholder
     { icon: Clapperboard,path: '/reels',   label: 'Reels'  },
     { icon: User,        path: '/profile', label: 'Profile'},

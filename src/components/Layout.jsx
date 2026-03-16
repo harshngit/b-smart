@@ -14,7 +14,7 @@ const Layout = () => {
   const { userObject } = useSelector((state) => state.auth);
   const isExcludedPage = ['/profile', '/settings', '/promote'].includes(location.pathname);
   const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
-  const showTopBar = !isExcludedPage;
+  const showTopBar = !isExcludedPage && !isFullScreenPage;
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState('post');
