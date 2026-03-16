@@ -7,11 +7,15 @@ import {
   Film, Hash, Building2, Coins, Heart, AlertCircle,
   ChevronDown, ChevronUp, RefreshCw, ArrowDownLeft, ArrowUpRight,
   ChevronLeft, ChevronRight, Wallet, TrendingUp, TrendingDown,
-  Activity, UserCheck, BarChart, PieChart as PieIcon, MapPinned
+  Activity, UserCheck, BarChart, PieChart as PieIcon, MapPinned,
+  Venus, Mars, Transgender
 } from "lucide-react";
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
+// ─── World map helpers (no external lib needed) ───────────────────────────────
+// We fetch topoJSON from CDN and convert to SVG paths using a tiny built-in projection
+const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
 
@@ -189,7 +193,7 @@ const CommentItem = ({ comment }) => {
   );
 };
 
-// ─── Stats Section ─────────────────────────────────────────────────────────────
+// ─── Gender Colors & Config ────────────────────────────────────────────────────
 
 const GENDER_COLORS = {
   male:    "#3b82f6",
@@ -198,14 +202,368 @@ const GENDER_COLORS = {
   unknown: "#9ca3af",
 };
 
-// ─── Heatmap Location Card ────────────────────────────────────────────────────
+const GENDER_CONFIG = {
+  male:   { label: "Male",   Icon: Mars,        gradient: "from-blue-500 to-cyan-400",   bg: "bg-blue-500/10",   text: "text-blue-400",   border: "border-blue-500/20"   },
+  female: { label: "Female", Icon: Venus,       gradient: "from-pink-500 to-rose-400",   bg: "bg-pink-500/10",   text: "text-pink-400",   border: "border-pink-500/20"   },
+  other:  { label: "Other",  Icon: Transgender, gradient: "from-purple-500 to-violet-400", bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/20" },
+};
+
+// ─── Gender Donut Ring (SVG) ───────────────────────────────────────────────────
+
+const GenderRing = ({ data, total }) => {
+  const radius = 52;
+  const circ   = 2 * Math.PI * radius;
+  let offset   = 0;
+  const segments = Object.entries(data)
+    .filter(([, v]) => v > 0)
+    .map(([key, val]) => {
+      const color = GENDER_COLORS[key] || GENDER_COLORS.unknown;
+      const dash  = (val / (total || 1)) * circ;
+      const seg   = { key, val, color, dash, offset };
+      offset += dash;
+      return seg;
+    });
+
+  return (
+    <svg viewBox="0 0 120 120" className="w-full h-full" style={{ transform: "rotate(-90deg)" }}>
+      <circle cx="60" cy="60" r={radius} fill="none" stroke="currentColor" strokeWidth="14" className="text-gray-100 dark:text-gray-800" />
+      {segments.map((seg) => (
+        <circle
+          key={seg.key}
+          cx="60" cy="60" r={radius}
+          fill="none"
+          stroke={seg.color}
+          strokeWidth="14"
+          strokeDasharray={`${seg.dash} ${circ}`}
+          strokeDashoffset={-seg.offset}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 1.2s ease" }}
+        />
+      ))}
+    </svg>
+  );
+};
+
+// ─── Gender Analytics Section ─────────────────────────────────────────────────
+
+const GenderAnalyticsSection = ({ genderData }) => {
+  const total = Object.values(genderData).reduce((s, v) => s + v, 0);
+  const fmt   = (n) => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+  const pct   = (v) => total > 0 ? Math.round((v / total) * 100) : 0;
+
+  return (
+    // <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
+    //   {/* Header */}
+    //   <div className="flex items-center gap-3 mb-6">
+    //     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+    //       <Users className="w-4 h-4 text-white" />
+    //     </div>
+    //     <div>
+    //       <h3 className="text-base font-bold text-gray-900 dark:text-white">Audience Gender</h3>
+    //       <p className="text-xs text-gray-500 dark:text-gray-400">Viewer demographics breakdown</p>
+    //     </div>
+    //     <div className="ml-auto text-right">
+    //       <div className="text-xl font-black text-gray-900 dark:text-white">{fmt(total)}</div>
+    //       <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total Viewers</div>
+    //     </div>
+    //   </div>
+
+    //   {total === 0 ? (
+    //     <div className="flex flex-col items-center justify-center py-10 gap-3">
+    //       <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+    //         <Users className="w-7 h-7 text-gray-300 dark:text-gray-600" />
+    //       </div>
+    //       <p className="text-sm font-medium text-gray-400">No gender data available yet</p>
+    //     </div>
+    //   ) : (
+    //     <>
+    //       {/* Ring + Bars Row */}
+    //       <div className="flex flex-col sm:flex-row items-center gap-6 mb-6">
+    //         {/* Donut */}
+    //         <div className="relative w-36 h-36 flex-shrink-0">
+    //           <GenderRing data={genderData} total={total} />
+    //           <div className="absolute inset-0 flex flex-col items-center justify-center">
+    //             <span className="text-2xl font-black text-gray-900 dark:text-white">{fmt(total)}</span>
+    //             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total</span>
+    //           </div>
+    //         </div>
+
+    //         {/* Progress bars */}
+    //         <div className="flex-1 w-full space-y-3">
+    //           {Object.entries(GENDER_CONFIG).map(([key, cfg]) => {
+    //             const val  = genderData[key] || 0;
+    //             const p    = pct(val);
+    //             const Icon = cfg.Icon;
+    //             return (
+    //               <div key={key}>
+    //                 <div className="flex items-center justify-between mb-1.5">
+    //                   <div className="flex items-center gap-1.5">
+    //                     <Icon className={`w-3.5 h-3.5 ${cfg.text}`} />
+    //                     <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{cfg.label}</span>
+    //                   </div>
+    //                   <div className="flex items-center gap-2">
+    //                     <span className="text-xs font-bold text-gray-900 dark:text-white">{fmt(val)}</span>
+    //                     <span className={`text-[10px] font-bold ${cfg.text} ${cfg.bg} px-1.5 py-0.5 rounded-full`}>{p}%</span>
+    //                   </div>
+    //                 </div>
+    //                 <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+    //                   <div
+    //                     className={`h-full rounded-full bg-gradient-to-r ${cfg.gradient} transition-all duration-1000`}
+    //                     style={{ width: `${p}%` }}
+    //                   />
+    //                 </div>
+    //               </div>
+    //             );
+    //           })}
+    //         </div>
+    //       </div>
+
+    //       {/* Summary pill cards */}
+    //       <div className="grid grid-cols-3 gap-3">
+    //         {Object.entries(GENDER_CONFIG).map(([key, cfg]) => {
+    //           const val  = genderData[key] || 0;
+    //           const p    = pct(val);
+    //           const Icon = cfg.Icon;
+    //           return (
+    //             <div key={key} className={`rounded-2xl p-4 ${cfg.bg} border ${cfg.border} flex flex-col items-center gap-1.5`}>
+    //               <Icon className={`w-5 h-5 ${cfg.text}`} />
+    //               <div className={`text-xl font-black ${cfg.text}`}>{p}%</div>
+    //               <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{cfg.label}</div>
+    //               <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">{fmt(val)} viewers</div>
+    //             </div>
+    //           );
+    //         })}
+    //       </div>
+    //     </>
+    //   )}
+    // </div>
+    <></>
+  );
+};
+
+// ─── Pure SVG World Map ── zero external deps, pure fetch + inline topoJSON decode ──
+
+// Mercator projection (pure JS)
+function mercatorProject(lon, lat, W, H) {
+  const x      = ((lon + 180) / 360) * W;
+  const latRad = (lat * Math.PI) / 180;
+  const mercN  = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
+  const y      = H / 2 - (W * mercN) / (2 * Math.PI);
+  return [x, y];
+}
+
+// Decode a TopoJSON delta-encoded arc → absolute quantized coords
+function decodeArc(arc) {
+  let x = 0, y = 0;
+  return arc.map(([dx, dy]) => { x += dx; y += dy; return [x, y]; });
+}
+
+// Transform quantized → longitude/latitude using topo.transform
+function transformPoint([qx, qy], { scale: [sx, sy], translate: [tx, ty] }) {
+  return [qx * sx + tx, qy * sy + ty];
+}
+
+// Build SVG path string from a single ring of arc indices
+function ringToD(arcIndices, topoArcs, transform, W, H) {
+  const pts = arcIndices.flatMap(idx => {
+    const raw = idx < 0 ? decodeArc(topoArcs[~idx]).reverse() : decodeArc(topoArcs[idx]);
+    return raw.map(pt => transformPoint(pt, transform));
+  });
+  if (pts.length < 2) return "";
+  return pts.map(([lon, lat], i) => {
+    const [px, py] = mercatorProject(lon, lat, W, H);
+    return `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`;
+  }).join(" ") + " Z";
+}
+
+// Convert a TopoJSON geometry object to full SVG path string
+function topoGeomToPath(geom, topoArcs, transform, W, H) {
+  if (!geom) return "";
+  if (geom.type === "Polygon")
+    return geom.arcs.map(ring => ringToD(ring, topoArcs, transform, W, H)).join(" ");
+  if (geom.type === "MultiPolygon")
+    return geom.arcs.flatMap(poly => poly.map(ring => ringToD(ring, topoArcs, transform, W, H))).join(" ");
+  return "";
+}
+
+// ISO numeric → country name (covers ~180 countries)
+const ISO_TO_NAME = {
+  4:"Afghanistan",8:"Albania",12:"Algeria",24:"Angola",32:"Argentina",36:"Australia",40:"Austria",
+  50:"Bangladesh",56:"Belgium",64:"Bhutan",68:"Bolivia",76:"Brazil",100:"Bulgaria",116:"Cambodia",
+  120:"Cameroon",124:"Canada",144:"Sri Lanka",152:"Chile",156:"China",170:"Colombia",180:"DR Congo",
+  188:"Costa Rica",191:"Croatia",192:"Cuba",196:"Cyprus",203:"Czech Republic",208:"Denmark",
+  218:"Ecuador",818:"Egypt",231:"Ethiopia",246:"Finland",250:"France",276:"Germany",288:"Ghana",
+  300:"Greece",320:"Guatemala",332:"Haiti",340:"Honduras",348:"Hungary",356:"India",360:"Indonesia",
+  364:"Iran",368:"Iraq",372:"Ireland",376:"Israel",380:"Italy",388:"Jamaica",392:"Japan",
+  400:"Jordan",398:"Kazakhstan",404:"Kenya",408:"North Korea",410:"South Korea",414:"Kuwait",
+  422:"Lebanon",426:"Lesotho",430:"Liberia",434:"Libya",440:"Lithuania",442:"Luxembourg",
+  450:"Madagascar",454:"Malawi",458:"Malaysia",484:"Mexico",504:"Morocco",508:"Mozambique",
+  516:"Namibia",524:"Nepal",528:"Netherlands",554:"New Zealand",566:"Nigeria",578:"Norway",
+  586:"Pakistan",591:"Panama",598:"Papua New Guinea",600:"Paraguay",604:"Peru",608:"Philippines",
+  616:"Poland",620:"Portugal",634:"Qatar",642:"Romania",643:"Russia",646:"Rwanda",
+  682:"Saudi Arabia",686:"Senegal",694:"Sierra Leone",703:"Slovakia",706:"Somalia",
+  710:"South Africa",724:"Spain",729:"Sudan",752:"Sweden",756:"Switzerland",760:"Syria",
+  764:"Thailand",792:"Turkey",800:"Uganda",804:"Ukraine",784:"United Arab Emirates",
+  826:"United Kingdom",840:"United States of America",858:"Uruguay",862:"Venezuela",
+  704:"Vietnam",887:"Yemen",894:"Zambia",716:"Zimbabwe",
+};
+
+// ─── World Heatmap Section ────────────────────────────────────────────────────
+
+const WorldHeatmapSection = ({ locationRows }) => {
+  const [geoFeatures, setGeoFeatures] = useState([]);
+  const [mapLoading, setMapLoading]   = useState(true);
+  const [tooltip, setTooltip]         = useState(null);
+  const W = 960, H = 500;
+
+  useEffect(() => {
+    fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
+      .then(r => r.json())
+      .then(topo => {
+        const features = topo.objects.countries.geometries.map(geom => ({
+          id:   geom.id,
+          name: ISO_TO_NAME[geom.id] || "",
+          path: topoGeomToPath(geom, topo.arcs, topo.transform, W, H),
+        })).filter(f => f.path);
+        setGeoFeatures(features);
+      })
+      .catch(() => {})
+      .finally(() => setMapLoading(false));
+  }, []);
+
+  const countryMap = {};
+  locationRows.forEach((row) => {
+    const name = (row.location || "").trim();
+    if (!name || name.toLowerCase() === "unknown") return;
+    countryMap[name] = (countryMap[name] || 0) + (row.views || row.unique_viewers || 1);
+  });
+
+  const maxVal       = Math.max(...Object.values(countryMap), 1);
+  const hasData      = Object.keys(countryMap).length > 0;
+  const totalViews   = Object.values(countryMap).reduce((s, v) => s + v, 0);
+  const topCountries = Object.entries(countryMap).sort(([, a], [, b]) => b - a).slice(0, 8);
+  const fmt = (n) => n >= 1_000_000 ? `${(n/1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(n);
+
+  const getHeatColor = (name) => {
+    const val = countryMap[name];
+    if (!val) return "#1f2937";
+    const t = Math.pow(val / maxVal, 0.5);
+    if (t > 0.8)  return "#f97316";
+    if (t > 0.55) return "#fb923c";
+    if (t > 0.3)  return "#fdba74";
+    return "#fed7aa";
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-400 flex items-center justify-center">
+            <Globe className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white">Views by Location</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {hasData ? `${Object.keys(countryMap).length} countries · ${fmt(totalViews)} total views` : "No location data available"}
+            </p>
+          </div>
+        </div>
+        {hasData && (
+          <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400">
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#fed7aa" }} /> Low</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#fb923c" }} /> Mid</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#f97316" }} /> High</span>
+          </div>
+        )}
+      </div>
+
+      <div className="p-6">
+        {!hasData ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <Globe className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+            </div>
+            <p className="text-sm font-medium text-gray-400">No location data to display</p>
+            <p className="text-xs text-gray-300 dark:text-gray-600">Location heatmap appears when viewer locations are tracked</p>
+          </div>
+        ) : (
+          <>
+            <div className="relative rounded-2xl overflow-hidden bg-gray-950 border border-gray-800 mb-6">
+              {mapLoading ? (
+                <div className="flex items-center justify-center h-52 gap-3">
+                  <RefreshCw className="w-5 h-5 animate-spin text-orange-400" />
+                  <span className="text-xs text-gray-400">Loading map…</span>
+                </div>
+              ) : (
+                <div className="relative">
+                  <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ maxHeight: 320 }}>
+                    <rect width={W} height={H} fill="#030712" />
+                    {geoFeatures.map((feat) => (
+                      <path
+                        key={feat.id}
+                        d={feat.path}
+                        fill={getHeatColor(feat.name)}
+                        stroke="#1f2937"
+                        strokeWidth={0.5}
+                        style={{ cursor: countryMap[feat.name] ? "pointer" : "default", transition: "fill 0.15s" }}
+                        onMouseEnter={(e) => countryMap[feat.name] && setTooltip({ name: feat.name, val: countryMap[feat.name], x: e.clientX, y: e.clientY })}
+                        onMouseMove={(e)  => setTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
+                        onMouseLeave={()  => setTooltip(null)}
+                      />
+                    ))}
+                  </svg>
+                  {tooltip && (
+                    <div
+                      className="fixed z-50 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold shadow-xl pointer-events-none border border-gray-700"
+                      style={{ left: tooltip.x + 14, top: tooltip.y - 42 }}
+                    >
+                      📍 {tooltip.name}: <span className="text-orange-400">{fmt(tooltip.val)} views</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Top Locations</p>
+              <div className="space-y-2">
+                {topCountries.map(([country, views], i) => {
+                  const rankColors = ["bg-orange-500","bg-orange-400","bg-amber-400","bg-gray-500","bg-gray-400"];
+                  return (
+                    <div key={country} className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0 ${rankColors[Math.min(i, rankColors.length - 1)]}`}>
+                        {i + 1}
+                      </div>
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 w-28 flex-shrink-0 truncate">{country}</span>
+                      <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                        <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700"
+                          style={{ width: `${Math.round((views / maxVal) * 100)}%` }} />
+                      </div>
+                      <span className="text-xs font-bold text-gray-900 dark:text-white w-12 text-right flex-shrink-0">{fmt(views)}</span>
+                      <span className="text-[10px] text-gray-400 w-8 text-right flex-shrink-0">
+                        {totalViews > 0 ? `${Math.round((views / totalViews) * 100)}%` : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+// ─── Heatmap Location Card (original table-style, kept) ───────────────────────
 
 const HEATMAP_METRIC_OPTIONS = [
-  { key: "views",               label: "Views",         color: { from: "#1e3a8a", mid: "#3b82f6", to: "#93c5fd" } },
-  { key: "unique_viewers",      label: "Unique",        color: { from: "#4c1d95", mid: "#8b5cf6", to: "#c4b5fd" } },
-  { key: "completed_views",     label: "Completed",     color: { from: "#065f46", mid: "#10b981", to: "#6ee7b7" } },
-  { key: "rewarded_views",      label: "Rewarded",      color: { from: "#78350f", mid: "#f59e0b", to: "#fde68a" } },
-  { key: "total_coins_rewarded",label: "Coins",         color: { from: "#7c2d12", mid: "#f97316", to: "#fed7aa" } },
+  { key: "views",                label: "Views",     color: { from: "#1e3a8a", mid: "#3b82f6", to: "#93c5fd" } },
+  { key: "unique_viewers",       label: "Unique",    color: { from: "#4c1d95", mid: "#8b5cf6", to: "#c4b5fd" } },
+  { key: "completed_views",      label: "Completed", color: { from: "#065f46", mid: "#10b981", to: "#6ee7b7" } },
+  { key: "rewarded_views",       label: "Rewarded",  color: { from: "#78350f", mid: "#f59e0b", to: "#fde68a" } },
+  { key: "total_coins_rewarded", label: "Coins",     color: { from: "#7c2d12", mid: "#f97316", to: "#fed7aa" } },
 ];
 
 const LocationHeatmap = ({ locationRows }) => {
@@ -216,13 +574,10 @@ const LocationHeatmap = ({ locationRows }) => {
   const maxVal    = Math.max(...locationRows.map(r => r[activeMetric] || 0), 1);
   const totalVal  = locationRows.reduce((s, r) => s + (r[activeMetric] || 0), 0);
 
-  // Heatmap intensity: 0..1
-  const intensity = (val) => Math.pow((val || 0) / maxVal, 0.6); // power < 1 = softer scale
+  const intensity = (val) => Math.pow((val || 0) / maxVal, 0.6);
 
-  // Color interpolation for heatmap cells
   const heatColor = (val) => {
     const t = intensity(val);
-    // Returns CSS var-safe opacity-based color
     return { opacity: Math.max(0.08, t), value: val || 0 };
   };
 
@@ -234,201 +589,163 @@ const LocationHeatmap = ({ locationRows }) => {
     { key: "total_coins_rewarded", label: "Coins",     suffix: "🪙" },
   ];
 
-  // Rank 1 = highest
   const ranked = [...locationRows].sort((a, b) => (b[activeMetric] || 0) - (a[activeMetric] || 0));
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+    // <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+    //   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+    //     <div className="flex items-center gap-3">
+    //       <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+    //         <MapPinned className="w-4 h-4 text-white" />
+    //       </div>
+    //       <div>
+    //         <h3 className="text-base font-bold text-gray-900 dark:text-white">Location Breakdown</h3>
+    //         <p className="text-xs text-gray-400 mt-0.5">{locationRows.length} locations tracked</p>
+    //       </div>
+    //     </div>
+    //     <div className="flex gap-1.5 flex-wrap">
+    //       {HEATMAP_METRIC_OPTIONS.map(m => (
+    //         <button
+    //           key={m.key}
+    //           onClick={() => setActiveMetric(m.key)}
+    //           className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${
+    //             activeMetric === m.key
+    //               ? "bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm"
+    //               : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+    //           }`}
+    //         >
+    //           {m.label}
+    //         </button>
+    //       ))}
+    //     </div>
+    //   </div>
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-800">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <MapPinned className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-gray-900 dark:text-white">Views by Location</h3>
-            <p className="text-xs text-gray-400 mt-0.5">{locationRows.length} locations tracked</p>
-          </div>
-        </div>
-        {/* Metric pills */}
-        <div className="flex gap-1.5 flex-wrap">
-          {HEATMAP_METRIC_OPTIONS.map(m => (
-            <button
-              key={m.key}
-              onClick={() => setActiveMetric(m.key)}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${
-                activeMetric === m.key
-                  ? "bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
+    //   <div className="p-6">
+    //     <div className="flex items-center gap-2 mb-5">
+    //       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Low</span>
+    //       <div className="flex-1 h-2 rounded-full overflow-hidden" style={{
+    //         background: `linear-gradient(to right, ${metricDef.color.to}33, ${metricDef.color.mid}, ${metricDef.color.from})`
+    //       }} />
+    //       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">High</span>
+    //       <span className="text-[10px] text-gray-500 ml-2 font-semibold">Total: {totalVal.toLocaleString()}</span>
+    //     </div>
 
-      {/* Heatmap grid */}
-      <div className="p-6">
+    //     <div className="space-y-2">
+    //       {ranked.map((row, rankIdx) => {
+    //         const val        = row[activeMetric] || 0;
+    //         const pct        = totalVal > 0 ? ((val / totalVal) * 100).toFixed(1) : "0.0";
+    //         const heat       = heatColor(val);
+    //         const isHovered  = hoveredRow === rankIdx;
 
-        {/* Legend strip */}
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Low</span>
-          <div className="flex-1 h-2 rounded-full overflow-hidden" style={{
-            background: `linear-gradient(to right, ${metricDef.color.to}33, ${metricDef.color.mid}, ${metricDef.color.from})`
-          }} />
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">High</span>
-          <span className="text-[10px] text-gray-500 ml-2 font-semibold">Total: {totalVal.toLocaleString()}</span>
-        </div>
+    //         return (
+    //           <div
+    //             key={rankIdx}
+    //             onMouseEnter={() => setHoveredRow(rankIdx)}
+    //             onMouseLeave={() => setHoveredRow(null)}
+    //             className={`relative rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer ${
+    //               rankIdx === 0 ? "border-blue-200 dark:border-blue-800" : "border-gray-100 dark:border-gray-800"
+    //             } ${isHovered ? "scale-[1.005] shadow-md" : ""}`}
+    //           >
+    //             <div
+    //               className="absolute inset-0 transition-opacity duration-300"
+    //               style={{
+    //                 background: `linear-gradient(135deg, ${metricDef.color.from}${Math.round(heat.opacity * 255).toString(16).padStart(2, "0")} 0%, ${metricDef.color.mid}${Math.round(heat.opacity * 0.6 * 255).toString(16).padStart(2, "0")} 60%, transparent 100%)`,
+    //               }}
+    //             />
+    //             <div className="absolute bottom-0 left-0 h-0.5 transition-all duration-700"
+    //               style={{ width: `${(val / maxVal) * 100}%`, background: `linear-gradient(to right, ${metricDef.color.from}, ${metricDef.color.mid})`, opacity: 0.7 }}
+    //             />
 
-        {/* Location rows as heatmap cards */}
-        <div className="space-y-2">
-          {ranked.map((row, rankIdx) => {
-            const val    = row[activeMetric] || 0;
-            const pct    = totalVal > 0 ? ((val / totalVal) * 100).toFixed(1) : "0.0";
-            const heat   = heatColor(val);
-            const isTop  = rankIdx === 0;
-            const isHovered = hoveredRow === rankIdx;
+    //             <div className="relative p-4">
+    //               <div className="flex items-center gap-3">
+    //                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 ${
+    //                   rankIdx === 0 ? "bg-blue-600 text-white" :
+    //                   rankIdx === 1 ? "bg-purple-500 text-white" :
+    //                   rankIdx === 2 ? "bg-pink-500 text-white" :
+    //                   "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+    //                 }`}>
+    //                   {rankIdx + 1}
+    //                 </div>
 
-            return (
-              <div
-                key={rankIdx}
-                onMouseEnter={() => setHoveredRow(rankIdx)}
-                onMouseLeave={() => setHoveredRow(null)}
-                className={`relative rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer ${
-                  isTop
-                    ? "border-blue-200 dark:border-blue-800"
-                    : "border-gray-100 dark:border-gray-800"
-                } ${isHovered ? "scale-[1.005] shadow-md" : ""}`}
-                style={{ background: isHovered ? undefined : undefined }}
-              >
-                {/* Heatmap fill layer */}
-                <div
-                  className="absolute inset-0 transition-opacity duration-300"
-                  style={{
-                    background: `linear-gradient(135deg, ${metricDef.color.from}${Math.round(heat.opacity * 255).toString(16).padStart(2, "0")} 0%, ${metricDef.color.mid}${Math.round(heat.opacity * 0.6 * 255).toString(16).padStart(2, "0")} 60%, transparent 100%)`,
-                  }}
-                />
+    //                 <div className="flex-1 min-w-0">
+    //                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+    //                     <div className="flex items-center gap-1.5 min-w-0 sm:w-40 flex-shrink-0">
+    //                       <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+    //                       <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{row.location}</span>
+    //                     </div>
 
-                {/* Progress bar at bottom */}
-                <div className="absolute bottom-0 left-0 h-0.5 transition-all duration-700"
-                  style={{
-                    width: `${(val / maxVal) * 100}%`,
-                    background: `linear-gradient(to right, ${metricDef.color.from}, ${metricDef.color.mid})`,
-                    opacity: 0.7
-                  }}
-                />
+    //                     <div className="flex flex-wrap gap-2 flex-1">
+    //                       {METRICS_DETAIL.map(m => {
+    //                         const v        = row[m.key] || 0;
+    //                         const isActive = m.key === activeMetric;
+    //                         return (
+    //                           <div key={m.key} className={`flex flex-col items-start px-2.5 py-1.5 rounded-xl transition-all ${
+    //                             isActive ? "bg-gray-900 dark:bg-white" : "bg-white/60 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700"
+    //                           }`}>
+    //                             <span className={`text-[9px] font-bold uppercase tracking-wider ${isActive ? "text-gray-400 dark:text-gray-600" : "text-gray-400 dark:text-gray-500"}`}>{m.label}</span>
+    //                             <span className={`text-xs font-black ${isActive ? "text-white dark:text-gray-900" : "text-gray-800 dark:text-gray-200"}`}>
+    //                               {m.suffix}{v.toLocaleString()}
+    //                             </span>
+    //                           </div>
+    //                         );
+    //                       })}
+    //                     </div>
 
-                <div className="relative p-4">
-                  <div className="flex items-center gap-3">
-                    {/* Rank badge */}
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 ${
-                      rankIdx === 0 ? "bg-blue-600 text-white" :
-                      rankIdx === 1 ? "bg-purple-500 text-white" :
-                      rankIdx === 2 ? "bg-pink-500 text-white" :
-                      "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                    }`}>
-                      {rankIdx + 1}
-                    </div>
+    //                     <div className="flex-shrink-0 text-right">
+    //                       <div className="text-lg font-black text-gray-900 dark:text-white leading-none">{pct}%</div>
+    //                       <div className="text-[10px] text-gray-400 mt-0.5">share</div>
+    //                     </div>
+    //                   </div>
+    //                 </div>
+    //               </div>
+    //             </div>
+    //           </div>
+    //         );
+    //       })}
+    //     </div>
 
-                    {/* Location + metric cells */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                        {/* Location name */}
-                        <div className="flex items-center gap-1.5 min-w-0 sm:w-40 flex-shrink-0">
-                          <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                          <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{row.location}</span>
-                        </div>
-
-                        {/* Metric cells */}
-                        <div className="flex flex-wrap gap-2 flex-1">
-                          {METRICS_DETAIL.map(m => {
-                            const v = row[m.key] || 0;
-                            const isActive = m.key === activeMetric;
-                            return (
-                              <div key={m.key} className={`flex flex-col items-start px-2.5 py-1.5 rounded-xl transition-all ${
-                                isActive
-                                  ? "bg-gray-900 dark:bg-white"
-                                  : "bg-white/60 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700"
-                              }`}>
-                                <span className={`text-[9px] font-bold uppercase tracking-wider ${
-                                  isActive ? "text-gray-400 dark:text-gray-600" : "text-gray-400 dark:text-gray-500"
-                                }`}>{m.label}</span>
-                                <span className={`text-xs font-black ${
-                                  isActive ? "text-white dark:text-gray-900" : "text-gray-800 dark:text-gray-200"
-                                }`}>
-                                  {m.suffix}{v.toLocaleString()}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Pct share */}
-                        <div className="flex-shrink-0 text-right">
-                          <div className="text-lg font-black text-gray-900 dark:text-white leading-none">{pct}%</div>
-                          <div className="text-[10px] text-gray-400 mt-0.5">share</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Totals footer */}
-        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 grid grid-cols-5 gap-2">
-          {METRICS_DETAIL.map(m => (
-            <div key={m.key} className={`text-center py-2 rounded-xl ${
-              m.key === activeMetric ? "bg-gray-100 dark:bg-gray-800" : ""
-            }`}>
-              <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">{m.label}</div>
-              <div className="text-xs font-black text-gray-900 dark:text-white">
-                {m.suffix}{locationRows.reduce((s, r) => s + (r[m.key] || 0), 0).toLocaleString()}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    //     <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 grid grid-cols-5 gap-2">
+    //       {METRICS_DETAIL.map(m => (
+    //         <div key={m.key} className={`text-center py-2 rounded-xl ${m.key === activeMetric ? "bg-gray-100 dark:bg-gray-800" : ""}`}>
+    //           <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">{m.label}</div>
+    //           <div className="text-xs font-black text-gray-900 dark:text-white">
+    //             {m.suffix}{locationRows.reduce((s, r) => s + (r[m.key] || 0), 0).toLocaleString()}
+    //           </div>
+    //         </div>
+    //       ))}
+    //     </div>
+    //   </div>
+    // </div>
+    <></>
   );
 };
 
 // ─── Likes & Dislikes Panel ───────────────────────────────────────────────────
 
 const LikesDislikesPanel = ({ stats }) => {
-  const [activeGender, setActiveGender] = useState(null); // null = all
+  const [activeGender, setActiveGender] = useState(null);
 
-  const totalLikes    = stats.likes?.total    || 0;
-  const totalDislikes = stats.dislikes?.total || 0;
+  const totalLikes     = stats.likes?.total    || 0;
+  const totalDislikes  = stats.dislikes?.total || 0;
   const totalReactions = totalLikes + totalDislikes;
-  const likesPct   = totalReactions > 0 ? (totalLikes    / totalReactions) * 100 : 0;
-  const dislikesPct = totalReactions > 0 ? (totalDislikes / totalReactions) * 100 : 0;
-
   const likesByGender    = stats.likes?.by_gender    || {};
   const dislikesByGender = stats.dislikes?.by_gender || {};
-  const genderKeys = [...new Set([...Object.keys(likesByGender), ...Object.keys(dislikesByGender)])];
+  const genderKeys       = [...new Set([...Object.keys(likesByGender), ...Object.keys(dislikesByGender)])];
 
-  const genderConfig = {
-    male:    { label: "Male",    color: "#3b82f6", bg: "bg-blue-500",   bgLight: "bg-blue-50 dark:bg-blue-900/20",   text: "text-blue-600 dark:text-blue-400"   },
-    female:  { label: "Female",  color: "#ec4899", bg: "bg-pink-500",   bgLight: "bg-pink-50 dark:bg-pink-900/20",   text: "text-pink-600 dark:text-pink-400"   },
-    other:   { label: "Other",   color: "#8b5cf6", bg: "bg-purple-500", bgLight: "bg-purple-50 dark:bg-purple-900/20",text: "text-purple-600 dark:text-purple-400" },
-    unknown: { label: "Unknown", color: "#9ca3af", bg: "bg-gray-400",   bgLight: "bg-gray-50 dark:bg-gray-800",      text: "text-gray-500 dark:text-gray-400"   },
-  };
-
-  // Filtered counts based on active gender
   const filteredLikes    = activeGender ? (likesByGender[activeGender]?.count    || 0) : totalLikes;
   const filteredDislikes = activeGender ? (dislikesByGender[activeGender]?.count || 0) : totalDislikes;
   const filteredTotal    = filteredLikes + filteredDislikes;
   const filteredLikesPct = filteredTotal > 0 ? (filteredLikes / filteredTotal) * 100 : 0;
 
+  const genderConfig = {
+    male:    { label: "Male",    color: "#3b82f6" },
+    female:  { label: "Female",  color: "#ec4899" },
+    other:   { label: "Other",   color: "#8b5cf6" },
+    unknown: { label: "Unknown", color: "#9ca3af" },
+  };
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-
-      {/* Header */}
       <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-red-500 flex items-center justify-center">
@@ -442,8 +759,7 @@ const LikesDislikesPanel = ({ stats }) => {
       </div>
 
       <div className="p-6 space-y-7">
-
-        {/* ── Big sentiment bar ─────────────────────────────────────── */}
+        {/* Big split bar */}
         <div>
           <div className="flex justify-between items-end mb-2">
             <div className="flex items-center gap-2">
@@ -457,38 +773,27 @@ const LikesDislikesPanel = ({ stats }) => {
               <ThumbsDown className="w-4 h-4 text-red-400" />
             </div>
           </div>
-
-          {/* Split bar */}
           <div className="h-4 rounded-full overflow-hidden flex bg-gray-100 dark:bg-gray-800">
             <div
               className="h-full bg-gradient-to-r from-pink-500 to-rose-400 transition-all duration-700 flex items-center justify-end pr-2"
               style={{ width: `${filteredLikesPct}%`, minWidth: filteredLikes > 0 ? "2%" : "0%" }}
             >
-              {filteredLikesPct > 20 && (
-                <span className="text-[10px] font-black text-white">{Math.round(filteredLikesPct)}%</span>
-              )}
+              {filteredLikesPct > 20 && <span className="text-[10px] font-black text-white">{Math.round(filteredLikesPct)}%</span>}
             </div>
             <div
               className="h-full bg-gradient-to-r from-red-400 to-red-500 transition-all duration-700 flex items-center justify-start pl-2"
               style={{ width: `${100 - filteredLikesPct}%`, minWidth: filteredDislikes > 0 ? "2%" : "0%" }}
             >
-              {(100 - filteredLikesPct) > 20 && (
-                <span className="text-[10px] font-black text-white">{Math.round(100 - filteredLikesPct)}%</span>
-              )}
+              {(100 - filteredLikesPct) > 20 && <span className="text-[10px] font-black text-white">{Math.round(100 - filteredLikesPct)}%</span>}
             </div>
           </div>
-
           <div className="flex justify-between text-[10px] text-gray-400 mt-1.5 font-semibold">
-            <span className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-pink-500" /> Likes
-            </span>
-            <span className="flex items-center gap-1">
-              Dislikes <div className="w-2 h-2 rounded-full bg-red-500" />
-            </span>
+            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-pink-500" /> Likes</span>
+            <span className="flex items-center gap-1">Dislikes <div className="w-2 h-2 rounded-full bg-red-500" /></span>
           </div>
         </div>
 
-        {/* ── Gender filter pills ───────────────────────────────────── */}
+        {/* Gender filter */}
         {genderKeys.length > 0 && (
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Filter by Gender</p>
@@ -498,26 +803,21 @@ const LikesDislikesPanel = ({ stats }) => {
                 className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
                   activeGender === null
                     ? "bg-gray-900 dark:bg-white text-white dark:text-black border-transparent"
-                    : "border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600"
+                    : "border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
                 }`}
-              >
-                All
-              </button>
+              >All</button>
               {genderKeys.map(g => {
-                const cfg = genderConfig[g] || genderConfig.unknown;
+                const cfg      = genderConfig[g] || genderConfig.unknown;
                 const isActive = activeGender === g;
                 return (
-                  <button
-                    key={g}
+                  <button key={g}
                     onClick={() => setActiveGender(isActive ? null : g)}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                      isActive
-                        ? "border-transparent text-white"
-                        : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
+                      isActive ? "border-transparent text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
                     }`}
                     style={isActive ? { backgroundColor: cfg.color } : {}}
                   >
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cfg.color }} />
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }} />
                     {cfg.label}
                   </button>
                 );
@@ -526,7 +826,7 @@ const LikesDislikesPanel = ({ stats }) => {
           </div>
         )}
 
-        {/* ── Gender breakdown grid ─────────────────────────────────── */}
+        {/* Gender breakdown rows */}
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">By Gender</p>
           <div className="space-y-2.5">
@@ -536,40 +836,26 @@ const LikesDislikesPanel = ({ stats }) => {
               const dCount  = dislikesByGender[g]?.count || 0;
               const gTotal  = lCount + dCount;
               const lPct    = gTotal > 0 ? (lCount / gTotal) * 100 : 0;
-              const isActive = activeGender === g || activeGender === null;
-
               return (
-                <div
-                  key={g}
+                <div key={g}
                   onClick={() => setActiveGender(activeGender === g ? null : g)}
                   className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
-                    activeGender === g
-                      ? "border-gray-300 dark:border-gray-600 shadow-sm"
-                      : activeGender !== null
-                      ? "border-gray-100 dark:border-gray-800 opacity-50"
-                      : "border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700"
+                    activeGender === g ? "border-gray-300 dark:border-gray-600 shadow-sm"
+                    : activeGender !== null ? "border-gray-100 dark:border-gray-800 opacity-50"
+                    : "border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cfg.color }} />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cfg.color }} />
                       <span className="text-sm font-bold text-gray-900 dark:text-white capitalize">{g}</span>
                     </div>
                     <span className="text-xs text-gray-400 font-semibold">{gTotal.toLocaleString()} reactions</span>
                   </div>
-
-                  {/* Mini split bar */}
                   <div className="h-2 rounded-full overflow-hidden flex bg-gray-100 dark:bg-gray-800 mb-2">
-                    <div
-                      className="h-full transition-all duration-500"
-                      style={{ width: `${lPct}%`, backgroundColor: "#ec4899", minWidth: lCount > 0 ? "2%" : "0%" }}
-                    />
-                    <div
-                      className="h-full transition-all duration-500"
-                      style={{ width: `${100 - lPct}%`, backgroundColor: "#ef4444", minWidth: dCount > 0 ? "2%" : "0%" }}
-                    />
+                    <div className="h-full transition-all duration-500" style={{ width: `${lPct}%`, backgroundColor: "#ec4899", minWidth: lCount > 0 ? "2%" : "0%" }} />
+                    <div className="h-full transition-all duration-500" style={{ width: `${100 - lPct}%`, backgroundColor: "#ef4444", minWidth: dCount > 0 ? "2%" : "0%" }} />
                   </div>
-
                   <div className="flex justify-between text-xs">
                     <span className="text-pink-500 font-bold flex items-center gap-1">
                       <Heart className="w-3 h-3" /> {lCount.toLocaleString()}
@@ -586,13 +872,13 @@ const LikesDislikesPanel = ({ stats }) => {
           </div>
         </div>
 
-        {/* ── Sentiment score ───────────────────────────────────────── */}
+        {/* Sentiment score */}
         <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sentiment Score</p>
               <p className="text-3xl font-black text-gray-900 dark:text-white">
-                {totalReactions > 0 ? Math.round((filteredLikes / (filteredLikes + filteredDislikes)) * 100) : 0}
+                {filteredTotal > 0 ? Math.round((filteredLikes / filteredTotal) * 100) : 0}
                 <span className="text-sm font-normal text-gray-400 ml-1">/ 100</span>
               </p>
               <p className="text-xs text-gray-400 mt-1">
@@ -605,16 +891,11 @@ const LikesDislikesPanel = ({ stats }) => {
                 })()}
               </p>
             </div>
-            {/* Donut mini */}
             <div className="relative w-16 h-16">
               <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
                 <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" stroke="currentColor" className="text-gray-200 dark:text-gray-700" />
-                <circle
-                  cx="32" cy="32" r="26" fill="none" strokeWidth="8"
-                  stroke="#ec4899"
-                  strokeDasharray={`${(filteredLikesPct / 100) * 163.4} 163.4`}
-                  strokeLinecap="round"
-                />
+                <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" stroke="#ec4899"
+                  strokeDasharray={`${(filteredLikesPct / 100) * 163.4} 163.4`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <Heart className="w-4 h-4 text-pink-500" />
@@ -630,24 +911,21 @@ const LikesDislikesPanel = ({ stats }) => {
 // ─── Stats Section ─────────────────────────────────────────────────────────────
 
 const StatsSection = ({ adId }) => {
-  const [stats, setStats]       = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
+  const [stats, setStats]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
 
   useEffect(() => {
     if (!adId) return;
     (async () => {
-      setLoading(true);
-      setError("");
+      setLoading(true); setError("");
       try {
         const res = await api.get(`/ads/${adId}/stats`);
         setStats(res.data);
       } catch (err) {
         console.error("Stats fetch failed", err);
         setError(err?.response?.data?.message || "Failed to load stats");
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     })();
   }, [adId]);
 
@@ -671,6 +949,8 @@ const StatsSection = ({ adId }) => {
 
   if (!stats) return null;
 
+  // ── Derived data ────────────────────────────────────────────────────────────
+
   const viewStats = [
     { label: "Total Views",     value: stats.views?.total     || 0, color: "blue",   icon: Eye         },
     { label: "Unique Views",    value: stats.views?.unique    || 0, color: "purple", icon: Users       },
@@ -679,10 +959,24 @@ const StatsSection = ({ adId }) => {
 
   const locationRows = stats.views?.by_location || [];
 
+  // Gender data — support multiple possible shapes from backend
+  const rawGender = stats.gender || stats.views?.by_gender || stats.audience?.gender || {};
+  const genderData = {
+    male:   rawGender.male   || rawGender.Male   || 0,
+    female: rawGender.female || rawGender.Female || 0,
+    other:  rawGender.other  || rawGender.Other  || rawGender.non_binary || 0,
+  };
+
+  const genderPieData = Object.entries(stats.likes?.by_gender || {})
+    .map(([key, val]) => ({ name: key.charAt(0).toUpperCase() + key.slice(1), value: val?.count || 0 }))
+    .filter(d => d.value > 0);
+
+  const pieTotal = genderPieData.reduce((s, d) => s + d.value, 0);
+
   return (
     <div className="space-y-8">
 
-      {/* ── Views Stat Cards ─────────────────────────────────────────────── */}
+      {/* ── Views Overview ────────────────────────────────────────────────── */}
       <div>
         <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <Eye className="w-4 h-4 text-blue-500" /> Views Overview
@@ -694,75 +988,64 @@ const StatsSection = ({ adId }) => {
         </div>
       </div>
 
-      {/* ── Likes & Dislikes ─────────────────────────────────────────────── */}
+      {/* ── Gender Analytics ─────────────────────────────────────────────── */}
+      <GenderAnalyticsSection genderData={genderData} />
+
+      {/* ── World Heatmap ─────────────────────────────────────────────────── */}
+      <WorldHeatmapSection locationRows={locationRows} />
+
+      {/* ── Likes & Dislikes ──────────────────────────────────────────────── */}
       <LikesDislikesPanel stats={stats} />
 
-      {/* ── Audience gender pie (remains from recharts) ───────────────────── */}
-      {(() => {
-        const genderPieData = Object.entries(stats.likes?.by_gender || {})
-          .map(([key, val]) => ({ name: key.charAt(0).toUpperCase() + key.slice(1), value: val?.count || 0 }))
-          .filter(d => d.value > 0);
-        if (!genderPieData.length) return null;
-        const total = genderPieData.reduce((s, d) => s + d.value, 0);
-        return (
-          <Card title="Audience by Gender" icon={PieIcon}>
-            <p className="text-xs text-gray-400 -mt-2 mb-4">Based on who liked this ad</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={genderPieData}
-                      cx="50%" cy="50%"
-                      innerRadius={55} outerRadius={80}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {genderPieData.map((entry, index) => (
-                        <Cell
-                          key={index}
-                          fill={GENDER_COLORS[entry.name.toLowerCase()] || "#6366f1"}
-                          stroke="none"
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", fontSize: "12px" }}
-                      formatter={(value, name) => [`${value} users`, name]}
-                    />
-                    <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10}
-                      formatter={(value) => <span style={{ fontSize: "11px", color: "#9ca3af" }}>{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-2">
-                {genderPieData.map((item) => {
-                  const pct   = total > 0 ? Math.round((item.value / total) * 100) : 0;
-                  const color = GENDER_COLORS[item.name.toLowerCase()] || "#6366f1";
-                  return (
-                    <div key={item.name} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 capitalize">{item.name}</div>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                          </div>
-                          <span className="text-[10px] font-bold text-gray-500 whitespace-nowrap">{pct}%</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-bold text-gray-900 dark:text-white">{item.value}</span>
-                    </div>
-                  );
-                })}
-              </div>
+      {/* ── Audience by Gender Pie (from likes data) ─────────────────────── */}
+      {genderPieData.length > 0 && (
+        <Card title="Audience by Gender (Likes)" icon={PieIcon}>
+          <p className="text-xs text-gray-400 -mt-2 mb-4">Based on who liked this ad</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+            <div className="h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={genderPieData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value">
+                    {genderPieData.map((entry, index) => (
+                      <Cell key={index} fill={GENDER_COLORS[entry.name.toLowerCase()] || "#6366f1"} stroke="none" />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", fontSize: "12px" }}
+                    formatter={(value, name) => [`${value} users`, name]}
+                  />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10}
+                    formatter={(value) => <span style={{ fontSize: "11px", color: "#9ca3af" }}>{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-          </Card>
-        );
-      })()}
+            <div className="space-y-2">
+              {genderPieData.map((item) => {
+                const p     = pieTotal > 0 ? Math.round((item.value / pieTotal) * 100) : 0;
+                const color = GENDER_COLORS[item.name.toLowerCase()] || "#6366f1";
+                return (
+                  <div key={item.name} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 capitalize">{item.name}</div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${p}%`, backgroundColor: color }} />
+                        </div>
+                        <span className="text-[10px] font-bold text-gray-500 whitespace-nowrap">{p}%</span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">{item.value}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+      )}
 
-      {/* ── Location Heatmap ─────────────────────────────────────────────── */}
+      {/* ── Location Table Heatmap ────────────────────────────────────────── */}
       {locationRows.length > 0 && <LocationHeatmap locationRows={locationRows} />}
     </div>
   );
@@ -774,9 +1057,9 @@ export default function AdDetails() {
   const { adId }   = useParams();
   const navigate   = useNavigate();
 
-  const [ad, setAd]         = useState(null);
+  const [ad, setAd]           = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState("");
+  const [error, setError]     = useState("");
 
   const [comments, setComments]               = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -786,19 +1069,16 @@ export default function AdDetails() {
 
   const [showAllLikes, setShowAllLikes] = useState(false);
 
-  // Tab state for right panel
-  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "stats"
+  const [activeTab, setActiveTab] = useState("overview");
 
-  // Wallet / Ad transaction history
-  const [walletHistory, setWalletHistory]   = useState(null);
-  const [walletLoading, setWalletLoading]   = useState(false);
-  const [walletError, setWalletError]       = useState("");
-  const [walletPage, setWalletPage]         = useState(1);
+  const [walletHistory, setWalletHistory] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletError, setWalletError]     = useState("");
+  const [walletPage, setWalletPage]       = useState(1);
   const WALLET_PER_PAGE = 5;
 
   const COLORS = ["#3b82f6", "#ec4899", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444"];
 
-  // Fetch Ad
   useEffect(() => {
     if (!adId) return;
     (async () => {
@@ -813,15 +1093,12 @@ export default function AdDetails() {
     })();
   }, [adId]);
 
-  // Fetch Comments (paginated)
   useEffect(() => {
     if (!adId) return;
     (async () => {
       setCommentsLoading(true);
       try {
-        const res = await api.get(`/ads/${adId}/comments`, {
-          params: { page: commentsPage, limit: COMMENTS_PER_PAGE },
-        });
+        const res = await api.get(`/ads/${adId}/comments`, { params: { page: commentsPage, limit: COMMENTS_PER_PAGE } });
         const data  = Array.isArray(res.data) ? res.data : res.data?.comments || res.data?.data || [];
         const total = res.data?.total || res.data?.totalCount || data.length;
         setComments(data);
@@ -831,15 +1108,12 @@ export default function AdDetails() {
     })();
   }, [adId, commentsPage]);
 
-  // Fetch Wallet / Ad Transaction History
   useEffect(() => {
     if (!adId) return;
     (async () => {
       setWalletLoading(true); setWalletError("");
       try {
-        const res = await api.get(`/wallet/ads/${adId}/history`, {
-          params: { page: walletPage, limit: WALLET_PER_PAGE },
-        });
+        const res = await api.get(`/wallet/ads/${adId}/history`, { params: { page: walletPage, limit: WALLET_PER_PAGE } });
         setWalletHistory(res.data);
       } catch (err) {
         setWalletError(err?.response?.data?.message || "Failed to load transaction history");
@@ -847,7 +1121,6 @@ export default function AdDetails() {
     })();
   }, [adId, walletPage]);
 
-  // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
@@ -859,7 +1132,6 @@ export default function AdDetails() {
     );
   }
 
-  // ── Error ────────────────────────────────────────────────────────────────
   if (error || !ad) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center p-6">
@@ -876,7 +1148,6 @@ export default function AdDetails() {
     );
   }
 
-  // ── Derived values ───────────────────────────────────────────────────────
   const status         = ad.status || "draft";
   const media          = ad.media?.[0] || null;
   const thumbnail      = media?.thumbnails?.[0]?.fileUrl || null;
@@ -903,7 +1174,7 @@ export default function AdDetails() {
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         <div className="pb-20 pt-2">
 
-          {/* ── Header ─────────────────────────────────────────────────── */}
+          {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <button onClick={() => navigate("/vendor/ads-management")}
               className="p-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm flex-shrink-0">
@@ -922,15 +1193,13 @@ export default function AdDetails() {
             </div>
           </div>
 
-          {/* ── Tab Navigation ────────────────────────────────────────── */}
+          {/* Tab Navigation */}
           <div className="flex gap-1 mb-8 bg-white dark:bg-gray-900 p-1 rounded-2xl border border-gray-100 dark:border-gray-800 w-fit shadow-sm">
             {[
-              { id: "overview", label: "Overview",   icon: BarChart2  },
-              { id: "stats",    label: "Stats & Analytics", icon: Activity },
+              { id: "overview", label: "Overview",         icon: BarChart2 },
+              { id: "stats",    label: "Stats & Analytics", icon: Activity  },
             ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   activeTab === tab.id
                     ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-sm"
@@ -943,13 +1212,9 @@ export default function AdDetails() {
             ))}
           </div>
 
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* OVERVIEW TAB                                                    */}
-          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* ══ OVERVIEW TAB ═══════════════════════════════════════════════════ */}
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-              {/* ── LEFT COLUMN (2/3) ──────────────────────────────────── */}
               <div className="lg:col-span-2 space-y-8">
 
                 {/* Media Preview */}
@@ -973,8 +1238,8 @@ export default function AdDetails() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <InfoRow icon={Film} label="Type"   value={media.media_type} />
-                        <InfoRow icon={Film} label="File"   value={media.fileName} mono />
+                        <InfoRow icon={Film}    label="Type"   value={media.media_type} />
+                        <InfoRow icon={Film}    label="File"   value={media.fileName} mono />
                         {isVideo && media.video_meta && (
                           <>
                             <InfoRow icon={Clock} label="Duration"   value={`${media.video_meta.final_duration?.toFixed(2)}s`} />
@@ -1009,21 +1274,19 @@ export default function AdDetails() {
                   <StatCard label="Comments"        value={(ad.comments_count        || 0).toLocaleString()} icon={MessageCircle} color="orange" />
                 </div>
 
-                {/* Ad Information */}
+                {/* Ad Info */}
                 <Card title="Ad Information">
                   <InfoRow icon={Hash}        label="Caption"      value={ad.caption}      />
                   <InfoRow icon={Tag}         label="Category"     value={ad.category}     />
                   <InfoRow icon={Film}        label="Content Type" value={ad.content_type} />
                   <InfoRow icon={MapPin}      label="Location"     value={ad.location}     />
                   <InfoRow icon={AlertCircle} label="Status"       value={<Badge status={ad.status} />} />
-                  {ad.rejection_reason && (
-                    <InfoRow icon={AlertCircle} label="Reject Reason" value={ad.rejection_reason} />
-                  )}
+                  {ad.rejection_reason && <InfoRow icon={AlertCircle} label="Reject Reason" value={ad.rejection_reason} />}
                   <InfoRow icon={Clock} label="Created At" value={new Date(ad.createdAt).toLocaleString("en-IN")} />
                   <InfoRow icon={Clock} label="Updated At" value={new Date(ad.updatedAt).toLocaleString("en-IN")} />
                 </Card>
 
-                {/* Targeting Settings */}
+                {/* Targeting */}
                 <Card title="Targeting Settings">
                   <div className="space-y-6">
                     <div>
@@ -1031,9 +1294,7 @@ export default function AdDetails() {
                         <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
                           <Globe className="w-3.5 h-3.5" /> Target Languages
                         </div>
-                        <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">
-                          {(ad.target_language || []).length}
-                        </span>
+                        <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{(ad.target_language || []).length}</span>
                       </div>
                       <TagList items={ad.target_language} color="blue" />
                     </div>
@@ -1042,9 +1303,7 @@ export default function AdDetails() {
                         <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
                           <MapPin className="w-3.5 h-3.5" /> Target Locations
                         </div>
-                        <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">
-                          {(ad.target_location || []).length}
-                        </span>
+                        <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{(ad.target_location || []).length}</span>
                       </div>
                       <TagList items={ad.target_location} color="purple" />
                     </div>
@@ -1086,7 +1345,7 @@ export default function AdDetails() {
                   </div>
                 </Card>
 
-                {/* Comments Section */}
+                {/* Comments */}
                 <Card title={`Comments (${commentsTotal || ad.comments_count || 0})`}>
                   {commentsLoading ? (
                     <div className="flex items-center justify-center py-10 gap-3 text-gray-400">
@@ -1121,10 +1380,9 @@ export default function AdDetails() {
                 </Card>
               </div>
 
-              {/* ── RIGHT COLUMN (1/3) ──────────────────────────────────── */}
+              {/* RIGHT COLUMN */}
               <div className="space-y-8">
-
-                {/* Publisher Info */}
+                {/* Publisher */}
                 <Card title="Publisher">
                   <div className="flex items-center gap-3 mb-4">
                     <Avatar name={ad.user_id?.full_name || "U"} url={ad.user_id?.avatar_url || ""} size="w-12 h-12" textSize="text-sm" />
@@ -1228,7 +1486,7 @@ export default function AdDetails() {
                   </div>
                 </Card>
 
-                {/* Action Breakdown from wallet history */}
+                {/* Action Breakdown */}
                 {walletHistory?.actions && (
                   <Card title="Action Breakdown">
                     <div className="space-y-2">
@@ -1238,7 +1496,7 @@ export default function AdDetails() {
                         { label: "Comments", data: walletHistory.actions.comments, color: "bg-orange-500", icon: "💬" },
                         { label: "Replies",  data: walletHistory.actions.replies,  color: "bg-purple-500", icon: "↩️" },
                         { label: "Saves",    data: walletHistory.actions.saves,    color: "bg-green-500",  icon: "🔖" },
-                        { label: "Refunds",  data: walletHistory.actions.refunds,  color: "bg-red-500",    icon: "↩" },
+                        { label: "Refunds",  data: walletHistory.actions.refunds,  color: "bg-red-500",    icon: "↩"  },
                       ].filter(a => a.data?.count > 0).map((item, i) => (
                         <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
                           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -1256,20 +1514,17 @@ export default function AdDetails() {
                           <div className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400">
                             <UserCheck className="w-4 h-4" /> Unique Users Reached
                           </div>
-                          <span className="font-bold text-sm text-indigo-700 dark:text-indigo-300">
-                            {walletHistory.unique_users.toLocaleString()}
-                          </span>
+                          <span className="font-bold text-sm text-indigo-700 dark:text-indigo-300">{walletHistory.unique_users.toLocaleString()}</span>
                         </div>
                       )}
                     </div>
                   </Card>
                 )}
 
-                {/* Likes & Dislikes */}
+                {/* Likes & Dislikes list */}
                 <Card title={`Likes (${ad.likes_count || 0})`}
                   action={likesList.length > 8 && (
-                    <button onClick={() => setShowAllLikes(v => !v)}
-                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                    <button onClick={() => setShowAllLikes(v => !v)} className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
                       {showAllLikes ? "Show Less" : `View All ${likesList.length}`}
                     </button>
                   )}>
@@ -1324,14 +1579,10 @@ export default function AdDetails() {
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* STATS & ANALYTICS TAB                                          */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === "stats" && (
-            <StatsSection adId={adId} />
-          )}
+          {/* ══ STATS & ANALYTICS TAB ══════════════════════════════════════════ */}
+          {activeTab === "stats" && <StatsSection adId={adId} />}
 
-          {/* ── Ad Transaction History (always visible, below tabs) ──────── */}
+          {/* ── Transaction History (always visible) ─────────────────────────── */}
           <div className="mt-8">
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
@@ -1471,7 +1722,7 @@ export default function AdDetails() {
                 if (!walletHistory || totalPg <= 1) return null;
                 const windowSize = Math.min(5, totalPg);
                 let start = Math.max(1, walletPage - Math.floor(windowSize / 2));
-                let end = start + windowSize - 1;
+                let end   = start + windowSize - 1;
                 if (end > totalPg) { end = totalPg; start = Math.max(1, end - windowSize + 1); }
                 const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
                 return (
