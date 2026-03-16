@@ -56,26 +56,26 @@ const formatCoins = (n) => {
 const AccordionItem = ({ id, title, openSection, setOpenSection, children, badge }) => {
   const open = openSection === id;
   return (
-    <div className={`rounded-2xl border transition-all duration-200 ${open ? 'border-white/10 bg-[#141414]' : 'border-white/[0.06] bg-[#0f0f0f]'}`}>
+    <div className={`rounded-2xl border transition-all duration-200 ${open ? 'border-gray-200 bg-white dark:border-white/10 dark:bg-[#141414]' : 'border-gray-200 bg-white dark:border-white/[0.06] dark:bg-[#0f0f0f]'}`}>
       <button
         onClick={() => setOpenSection(open ? '' : id)}
         className="w-full px-5 py-4 flex items-center justify-between"
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-white tracking-tight">{title}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white tracking-tight">{title}</span>
           {badge && (
-            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-500 dark:text-orange-400 border border-orange-200 dark:border-orange-500/30">
               {badge}
             </span>
           )}
         </div>
         <ChevronDown
           size={16}
-          className={`transition-transform duration-300 text-white/40 ${open ? 'rotate-180' : ''}`}
+          className={`transition-transform duration-300 text-gray-400 dark:text-white/40 ${open ? 'rotate-180' : ''}`}
         />
       </button>
       {open && (
-        <div className="px-5 pb-5 border-t border-white/[0.06]">
+        <div className="px-5 pb-5 border-t border-gray-100 dark:border-white/[0.06]">
           {children}
         </div>
       )}
@@ -85,7 +85,7 @@ const AccordionItem = ({ id, title, openSection, setOpenSection, children, badge
 
 const StatPill = ({ label, value, positive }) => (
   <div className="flex flex-col gap-0.5">
-    <span className="text-[10px] font-medium text-white/40 uppercase tracking-widest">{label}</span>
+    <span className="text-[10px] font-medium text-white/60 uppercase tracking-widest">{label}</span>
     <span className={`text-lg font-bold ${positive ? 'text-emerald-400' : positive === false ? 'text-rose-400' : 'text-white'}`}>
       {value}
     </span>
@@ -93,15 +93,15 @@ const StatPill = ({ label, value, positive }) => (
 );
 
 const TxSkeleton = () => (
-  <div className="space-y-3">
+  <div className="space-y-3 min-h-[120px]">
     {[1, 2, 3].map(i => (
-      <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] animate-pulse">
-        <div className="w-9 h-9 rounded-xl bg-white/10 shrink-0" />
+      <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-gray-100 dark:bg-white/[0.03] animate-pulse">
+        <div className="w-9 h-9 rounded-xl bg-gray-200 dark:bg-white/10 shrink-0" />
         <div className="flex-1 space-y-2">
-          <div className="h-3 bg-white/10 rounded w-2/3" />
-          <div className="h-2.5 bg-white/[0.06] rounded w-1/3" />
+          <div className="h-3 bg-gray-200 dark:bg-white/10 rounded w-2/3" />
+          <div className="h-2.5 bg-gray-100 dark:bg-white/[0.06] rounded w-1/3" />
         </div>
-        <div className="h-4 w-14 bg-white/10 rounded" />
+        <div className="h-4 w-14 bg-gray-200 dark:bg-white/10 rounded" />
       </div>
     ))}
   </div>
@@ -165,30 +165,29 @@ const WalletDetails = () => {
 
   return (
     <div
-      className="min-h-screen pb-24 dark:bg-[#0a0a0a] bg-white"
+      className="h-screen overflow-hidden flex flex-col bg-gray-50 dark:bg-[#0a0a0a]"
       style={{  fontFamily: "'DM Sans', system-ui, sans-serif" }}
     >
       {/* ── Google Font ── */}
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');`}</style>
 
       {/* ── Header ── */}
-      <div className="sticky top-0 z-20 flex dark:bg-[#0a0a0a] bg-white items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]"
-        style={{ background: 'rgba(10,10,10,0.9)', backdropFilter: 'blur(20px)' }}>
+      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3.5 border-b border-gray-200 dark:border-white/[0.06] bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-xl">
         <button onClick={() => navigate(-1)}
-          className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/[0.06] hover:bg-white/10 transition-colors text-white">
+          className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] hover:bg-gray-200 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-white">
           <ArrowLeft size={16} />
         </button>
         <div className="flex items-center gap-2">
           <Wallet size={16} className="text-orange-400" />
-          <h1 className="text-base font-bold text-white tracking-tight">Wallet & Coins</h1>
+          <h1 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Wallet & Coins</h1>
         </div>
         <button onClick={fetchWalletHistory}
-          className={`ml-auto w-8 h-8 flex items-center justify-center rounded-xl bg-white/[0.06] hover:bg-white/10 transition-colors text-white/60 ${loading ? 'animate-spin' : ''}`}>
+          className={`ml-auto w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] hover:bg-gray-200 dark:hover:bg-white/10 transition-colors text-gray-500 dark:text-white/60 ${loading ? 'animate-spin' : ''}`}>
           <RefreshCw size={14} />
         </button>
       </div>
 
-      <div className="px-4 pt-5 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-6 space-y-3 scrollbar-hide dark:scrollbar-thumb-white/10">
 
         {/* ── Balance Card ── */}
         <div className="relative w-full rounded-3xl overflow-hidden p-6 text-white"
@@ -250,7 +249,7 @@ const WalletDetails = () => {
 
         {/* ── Error banner ── */}
         {error && (
-          <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400 text-sm">
+          <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 text-sm">
             <AlertCircle size={15} className="shrink-0" />
             <span>{error}</span>
             <button onClick={fetchWalletHistory} className="ml-auto text-xs underline underline-offset-2 hover:no-underline">Retry</button>
@@ -266,7 +265,7 @@ const WalletDetails = () => {
           badge={totalTx > 0 ? totalTx : undefined}
         >
           {/* Filter tabs */}
-          <div className="flex gap-1.5 mt-4 mb-4 p-1 bg-white/[0.04] rounded-xl border border-white/[0.06]">
+          <div className="flex gap-1.5 mt-4 mb-4 p-1 bg-gray-100 dark:bg-white/[0.04] rounded-xl border border-gray-200 dark:border-white/[0.06]">
             {['All', 'Earned', 'Spent'].map((tab) => (
               <button
                 key={tab}
@@ -274,7 +273,7 @@ const WalletDetails = () => {
                 className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${
                   filter === tab
                     ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                    : 'text-white/40 hover:text-white/70'
+                    : 'text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/70'
                 }`}>
                 {tab}
               </button>
@@ -285,12 +284,12 @@ const WalletDetails = () => {
           {loading && !walletData ? (
             <TxSkeleton />
           ) : filteredTx.length === 0 ? (
-            <div className="py-10 flex flex-col items-center justify-center gap-2 text-white/30">
+            <div className="py-8 min-h-[120px] flex flex-col items-center justify-center gap-2 text-gray-400 dark:text-white/30">
               <Coins size={28} className="opacity-40" />
               <span className="text-sm">No transactions yet</span>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-y-auto max-h-[340px] min-h-[120px] pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 dark:scrollbar-thumb-white/10">
               {filteredTx.map((tx, idx) => {
                 const meta = getTxMeta(tx.type);
                 const Icon = meta.icon;
@@ -298,7 +297,7 @@ const WalletDetails = () => {
                 return (
                   <div
                     key={tx._id || idx}
-                    className="flex items-center gap-3.5 p-3.5 rounded-xl border border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] transition-colors group"
+                    className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-100 dark:border-white/[0.05] bg-gray-50 dark:bg-white/[0.02] hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors group"
                   >
                     {/* Icon badge */}
                     <div className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center ${meta.bg}`}>
@@ -307,16 +306,16 @@ const WalletDetails = () => {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white/90 truncate leading-snug">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-white/90 truncate leading-snug">
                         {tx.label || meta.label}
                       </p>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="text-[11px] text-white/30 font-mono">
+                        <span className="text-[11px] text-gray-400 dark:text-white/30 font-mono">
                           {formatDate(tx.created_at)}
                         </span>
                         {tx.ad?.title && (
                           <>
-                            <span className="text-white/15">·</span>
+                            <span className="text-gray-300 dark:text-white/15">·</span>
                             <span className="text-[11px] text-orange-400/70 truncate max-w-[100px]">
                               {tx.ad.title}
                             </span>
@@ -324,7 +323,7 @@ const WalletDetails = () => {
                         )}
                       </div>
                       {tx.description && tx.description !== (tx.label || meta.label) && (
-                        <p className="text-[11px] text-white/25 mt-0.5 truncate">{tx.description}</p>
+                        <p className="text-[11px] text-gray-400 dark:text-white/25 mt-0.5 truncate">{tx.description}</p>
                       )}
                     </div>
 
@@ -352,20 +351,20 @@ const WalletDetails = () => {
         <AccordionItem id="account" title="Account Details" openSection={openSection} setOpenSection={setOpenSection}>
           <div className="space-y-4 mt-4">
             {/* User card */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-              <div className="w-11 h-11 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.06]">
+              <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-200 dark:bg-white/10 flex items-center justify-center shrink-0">
                 {apiUser?.avatar_url ? (
                   <img src={apiUser.avatar_url} alt="avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <User size={18} className="text-white/40" />
+                  <User size={18} className="text-gray-400 dark:text-white/40" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-white truncate">{apiUser?.full_name || apiUser?.username || '—'}</div>
-                <div className="text-xs text-white/40">@{apiUser?.username || '—'}</div>
+                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{apiUser?.full_name || apiUser?.username || '—'}</div>
+                <div className="text-xs text-gray-400 dark:text-white/40">@{apiUser?.username || '—'}</div>
               </div>
               {apiUser?.role && (
-                <span className="px-2 py-1 rounded-lg text-[11px] font-bold bg-orange-500/15 text-orange-400 border border-orange-500/20 uppercase tracking-wide">
+                <span className="px-2 py-1 rounded-lg text-[11px] font-bold bg-orange-100 dark:bg-orange-500/15 text-orange-500 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20 uppercase tracking-wide">
                   {apiUser.role}
                 </span>
               )}
@@ -376,29 +375,29 @@ const WalletDetails = () => {
               { label: 'Email',    value: userObject?.email,    icon: Mail  },
               { label: 'Phone',    value: userObject?.phone,    icon: Phone },
             ].map(({ label, value, icon: Icon }) => (
-              <div key={label} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.04]">
-                <span className="text-xs text-white/40 font-medium">{label}</span>
+              <div key={label} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.04]">
+                <span className="text-xs text-gray-500 dark:text-white/40 font-medium">{label}</span>
                 <div className="flex items-center gap-1.5">
-                  <Icon size={12} className="text-white/30" />
-                  <span className="text-sm font-semibold text-white/80">{value || '—'}</span>
+                  <Icon size={12} className="text-gray-400 dark:text-white/30" />
+                  <span className="text-sm font-semibold text-gray-700 dark:text-white/80">{value || '—'}</span>
                 </div>
               </div>
             ))}
             <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.04]">
-              <span className="text-xs text-white/40 font-medium">Balance</span>
+              <span className="text-xs text-gray-500 dark:text-white/40 font-medium">Balance</span>
               <span className="text-sm font-bold text-orange-400">{Math.floor(Number(balance))} Coins</span>
             </div>
             <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.04]">
-              <span className="text-xs text-white/40 font-medium">Currency</span>
-              <span className="text-sm font-semibold text-white/80">{walletData?.wallet?.currency || userObject?.wallet?.currency || 'Coins'}</span>
+              <span className="text-xs text-gray-500 dark:text-white/40 font-medium">Currency</span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-white/80">{walletData?.wallet?.currency || userObject?.wallet?.currency || 'Coins'}</span>
             </div>
 
             {/* Vendor company details */}
             {userObject?.role === 'vendor' && (
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-2 mt-2">
+              <div className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-3 space-y-2 mt-2">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-white/70">
-                    <Building2 size={14} className="text-white/40" />
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-white/70">
+                    <Building2 size={14} className="text-gray-400 dark:text-white/40" />
                     Company Details
                   </div>
                   {userObject?.company_details?.website && (
@@ -417,9 +416,9 @@ const WalletDetails = () => {
                     ['City',           userObject?.company_details?.city],
                     ['Country',        userObject?.company_details?.country],
                   ].map(([label, value]) => (
-                    <div key={label} className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-white/[0.03]">
-                      <span className="text-[10px] text-white/30 uppercase tracking-wide">{label}</span>
-                      <span className="text-xs font-semibold text-white/70 truncate">{value || '—'}</span>
+                    <div key={label} className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.03] border border-gray-100 dark:border-transparent">
+                      <span className="text-[10px] text-gray-400 dark:text-white/30 uppercase tracking-wide">{label}</span>
+                      <span className="text-xs font-semibold text-gray-700 dark:text-white/70 truncate">{value || '—'}</span>
                     </div>
                   ))}
                 </div>
@@ -434,7 +433,7 @@ const WalletDetails = () => {
           <div className="space-y-1 mt-4">
             {['How do coins work?', 'Why is my balance changed?', 'Contact support'].map((item) => (
               <button key={item}
-                className="w-full text-left px-3 py-3 rounded-xl text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-colors">
+                className="w-full text-left px-3 py-3 rounded-xl text-sm text-gray-500 dark:text-white/50 hover:text-gray-800 dark:hover:text-white/80 hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors">
                 {item}
               </button>
             ))}

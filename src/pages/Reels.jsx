@@ -741,12 +741,12 @@ const Reels = () => {
 
   return (
     <>
-      <div className={`w-full ${pageHeightClass} overflow-hidden flex flex-col bg-black`}>
+      <div className={`w-full ${pageHeightClass} overflow-hidden flex flex-col dark:bg-black`}>
         <div className="shrink-0 relative flex items-center px-3 py-2.5 md:px-4 md:py-3 border-b border-white/10">
-          <button onClick={() => navigate(-1)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-white">
+          <button onClick={() => navigate(-1)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 dark:text-white">
             <ChevronLeft size={22} />
           </button>
-          <div className="absolute left-1/2 -translate-x-1/2 text-white font-bold text-sm md:text-base">
+          <div className="absolute left-1/2 -translate-x-1/2 dark:text-white font-bold text-sm md:text-base">
             Reels
           </div>
           <div className="w-9 h-9" />
