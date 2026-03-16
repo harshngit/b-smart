@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { useSelector } from "react-redux";
 import api from "../../lib/api";
 import { 
-  Search, Filter, Calendar, ChevronDown, Eye, Edit3, Trash2, Activity,
-  ChevronLeft, ChevronRight
+  Search, Eye, Edit3, Trash2,
+  ChevronLeft, ChevronRight, Plus
 } from "lucide-react";
 
 // ─── Reusable Components ─────────────────────────────────────────────────────
@@ -29,6 +29,11 @@ const Badge = ({ status }) => {
 
 export default function AdsManagement() {
   const navigate = useNavigate();
+
+  // ── Pull the modal opener from the vendor layout outlet context ──────────
+  // Dashboard uses the same pattern: useOutletContext() → handleOpenCreateModal
+  const { handleOpenCreateModal } = useOutletContext() || {};
+
   const { userObject } = useSelector((state) => state.auth);
   const userId = userObject?._id || userObject?.id;
 
@@ -75,7 +80,6 @@ export default function AdsManagement() {
 
         const res = await api.get(url);
 
-        // Handle both array and paginated object response
         const adsData = Array.isArray(res.data)
           ? res.data
           : Array.isArray(res.data?.ads)
@@ -84,16 +88,12 @@ export default function AdsManagement() {
           ? res.data.data
           : [];
 
-        // Normalize to match actual API response shape
         const normalizedAds = adsData.map(ad => ({
           id: ad._id || ad.id,
-          // Use caption as the ad "name" since there's no title field
           name: ad.caption || ad.title || "Untitled Ad",
           category: ad.category || "Uncategorized",
           status: ad.status || "draft",
-          // username from nested user_id object
           username: ad.user_id?.username || ad.user_id?.full_name || "—",
-          // business name from nested vendor_id object
           businessName: ad.vendor_id?.business_name || "—",
           totalCoins: ad.total_budget_coins || ad.budget || 0,
           coinsUsed: ad.total_coins_spent || ad.spend || 0,
@@ -130,6 +130,17 @@ export default function AdsManagement() {
     });
   }, [ads, filterStatus, searchTerm]);
 
+  // ── Handler: open the CreatePost modal (same flow as Dashboard) ──────────
+  const handleCreateAd = () => {
+    if (handleOpenCreateModal) {
+      // Pass 'ad' so the modal knows to open in Ad creation mode
+      handleOpenCreateModal("ad");
+    } else {
+      // Fallback: navigate to the dedicated create page if modal isn't available
+      navigate("/vendor/ads-management/create");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
       <div className="max-w-7xl mx-auto p-4 md:p-8">
@@ -162,7 +173,7 @@ export default function AdsManagement() {
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar + Create Button */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-3 flex-1">
             <div className="relative flex-1">
@@ -176,11 +187,13 @@ export default function AdsManagement() {
               />
             </div>
           </div>
+
+          {/* ── Create Ad button — opens CreatePost modal via outlet context ── */}
           <button
-            onClick={() => navigate("/vendor/ads-management/create")}
+            onClick={handleCreateAd}
             className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-pink-500/20 whitespace-nowrap"
           >
-            <span>+</span> Create Ad
+            <Plus className="w-4 h-4" /> Create Ad
           </button>
         </div>
 
@@ -226,45 +239,30 @@ export default function AdsManagement() {
                       onClick={() => navigate(`/vendor/ads-management/${ad.id}`)}
                       className="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
                     >
-                      {/* Post ID */}
                       <td className="p-4 pl-6">
                         <div className="text-xs text-gray-500 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded w-fit max-w-[110px] truncate" title={ad.id}>
                           {ad.id}
                         </div>
                       </td>
-
-                      {/* Caption */}
                       <td className="p-4">
                         <div className="font-semibold text-sm text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors max-w-[180px] truncate" title={ad.name}>
                           {ad.name}
                         </div>
                         <div className="text-xs text-gray-400 mt-0.5 capitalize">{ad.contentType}</div>
                       </td>
-
-                      {/* Category */}
                       <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{ad.category}</td>
-
-                      {/* Username */}
                       <td className="p-4">
                         <div className="text-sm font-semibold text-gray-900 dark:text-white">@{ad.username}</div>
                         <div className="text-xs text-gray-400 truncate max-w-[120px]">{ad.businessName}</div>
                       </td>
-
-                      {/* Status */}
                       <td className="p-4">
                         <Badge status={ad.status} />
                       </td>
-
-                      {/* Budget */}
                       <td className="p-4 text-right">
                         <div className="text-sm font-bold text-gray-900 dark:text-white">{ad.totalCoins.toLocaleString()} <span className="text-xs font-normal text-gray-400">coins</span></div>
                         <div className="text-xs text-gray-400">spent: {ad.coinsUsed.toLocaleString()}</div>
                       </td>
-
-                      {/* Created */}
                       <td className="p-4 text-xs text-gray-500 dark:text-gray-400">{ad.createdAt}</td>
-
-                      {/* Actions */}
                       <td className="p-4 pr-6 text-right">
                         <div className="flex justify-end items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                           <button
@@ -343,6 +341,12 @@ export default function AdsManagement() {
                 <div className="text-4xl mb-4">🔍</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">No campaigns found</h3>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">Try adjusting your filters or search query.</p>
+                <button
+                  onClick={handleCreateAd}
+                  className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
+                >
+                  <Plus className="w-4 h-4" /> Create your first ad
+                </button>
               </div>
             )}
           </div>
