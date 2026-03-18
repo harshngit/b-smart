@@ -762,13 +762,46 @@ const PrimaryContact = () => {
 
 // ─── Sub Tab: Sales Officer ───────────────────────────────────────────────────
 const SalesOfficer = () => {
-  const officer = {
-    name: "Arjun Kapoor",
-    empId: "EMP-20491",
-    email: "arjun.kapoor@socialads.in",
-    phone: "+91 99887 76655",
-    assignedDate: "15 Jan 2024",
-  };
+  const [officer, setOfficer] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchOfficer = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await api.get("/sales/my-officer");
+        // API returns { assigned_sales_officer: {...} } or { assigned_sales_officer: null }
+        setOfficer(res.data?.assigned_sales_officer || null);
+      } catch (err) {
+        console.error("Failed to fetch sales officer:", err);
+        setError("Failed to load sales officer details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOfficer();
+  }, []);
+
+  const initials = (name) =>
+    (name || "")
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase())
+      .join("") || "?";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-gray-400 dark:text-gray-500">Loading sales officer...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -782,52 +815,92 @@ const SalesOfficer = () => {
         </span>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 items-center p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-blue-500/20">
-          A
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
+          ⚠️ {error}
         </div>
-        <div className="flex-1 text-center md:text-left">
-          <div className="text-xl font-bold text-gray-900 dark:text-white">{officer.name}</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Sales Account Manager · Employee ID: {officer.empId}</div>
-          <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-3">
-            {[
-              { icon: "✉️", val: officer.email },
-              { icon: "📞", val: officer.phone },
-              { icon: "📅", val: `Assigned: ${officer.assignedDate}` },
-            ].map((item, i) => (
-              <span key={i} className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
-                <span>{item.icon}</span> {item.val}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 min-w-[160px]">
-          <button className="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20">
-            ✉️ Email Officer
-          </button>
-          <button className="px-4 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-            🔄 Reassign
-          </button>
-        </div>
-      </div>
+      )}
 
-      <div className="p-6 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
-        <div className="text-xs font-bold text-pink-600 uppercase tracking-widest mb-4">Officer Details</div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[
-            ["Sales Officer Name", officer.name],
-            ["Employee ID", officer.empId],
-            ["Email Address", officer.email],
-            ["Phone Number", officer.phone],
-            ["Assigned Since", officer.assignedDate],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">{label}</div>
-              <div className="text-sm font-semibold text-gray-900 dark:text-white">{value}</div>
-            </div>
-          ))}
+      {!error && !officer && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+          <span className="text-4xl">🤝</span>
+          <p className="text-base font-semibold text-gray-700 dark:text-gray-300">No Sales Officer Assigned</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center max-w-xs">
+            A dedicated sales account manager will be assigned to your account soon.
+          </p>
         </div>
-      </div>
+      )}
+
+      {officer && (
+        <>
+          {/* Officer Card */}
+          <div className="flex flex-col md:flex-row gap-6 items-center p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-blue-500/20 flex-shrink-0">
+              {officer.avatar_url
+                ? <img src={officer.avatar_url} alt="" className="w-full h-full object-cover rounded-2xl" />
+                : initials(officer.full_name || officer.username)
+              }
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <div className="text-xl font-bold text-gray-900 dark:text-white">
+                {officer.full_name || officer.username || "Sales Officer"}
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Sales Account Manager
+                {officer.username && (
+                  <span className="ml-2 text-gray-400">· @{officer.username}</span>
+                )}
+              </div>
+              <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-3">
+                {officer.email && (
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
+                    ✉️ {officer.email}
+                  </span>
+                )}
+                {officer.phone && (
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
+                    📞 {officer.phone}
+                  </span>
+                )}
+                {officer.location && (
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
+                    📍 {officer.location}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 min-w-[160px]">
+              {officer.email && (
+                <a
+                  href={`mailto:${officer.email}`}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 text-center"
+                >
+                  ✉️ Email Officer
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Officer Details Grid */}
+          <div className="p-6 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
+            <div className="text-xs font-bold text-pink-600 uppercase tracking-widest mb-4">Officer Details</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                ["Sales Officer Name", officer.full_name || officer.username || "—"],
+                ["Username", officer.username ? `@${officer.username}` : "—"],
+                ["Email Address", officer.email || "—"],
+                ["Phone Number", officer.phone || "—"],
+                ["Location", officer.location || "—"],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">{label}</div>
+                  <div className="text-sm font-semibold text-gray-900 dark:text-white">{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
