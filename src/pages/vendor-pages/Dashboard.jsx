@@ -404,7 +404,7 @@ export default function VendorDashboard() {
             value={activeAdsCount != null ? activeAdsCount.toLocaleString() : "—"}
             icon={Megaphone}
             sublabel="Running"
-            onClick={() => navigate("/vendor/ads")}
+            onClick={() => navigate("/vendor/ads-management")}
             highlight
             loading={adsLoading}
           />

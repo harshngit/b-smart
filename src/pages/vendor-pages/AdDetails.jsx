@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import api from "../../lib/api";
 import {
   ArrowLeft, CheckCircle, BarChart2, Users, MessageCircle,
@@ -13,6 +13,152 @@ import {
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
+
+// ─── Age Breakdown Pie Charts (Chart.js) ──────────────────────────────────────
+
+const AGE_LABELS_SHORT = ["Child", "Teen", "Adult", "Middle age", "Senior", "Unknown"];
+const AGE_KEYS = [
+  "Child (0–12 years)",
+  "Teen (13–19 years)",
+  "Adult (20–39 years)",
+  "Middle Age (40–59 years)",
+  "Senior (60+ years)",
+  "Unknown",
+];
+const AGE_COLORS = ["#378ADD", "#1D9E75", "#7F77DD", "#D4537E", "#EF9F27", "#888780"];
+
+const AgeBreakdownCharts = ({ stats }) => {
+  const viewsAge    = stats?.views?.by_age    || {};
+  const likesAge    = stats?.likes?.by_age    || {};
+  const dislikesAge = stats?.dislikes?.by_age || {};
+
+  const toData = (obj) => AGE_KEYS.map(k => obj[k] ?? 0);
+
+  const charts = [
+    { id: "agePieViews",    label: "Views by age",    data: toData(viewsAge)    },
+    { id: "agePieLikes",    label: "Likes by age",    data: toData(likesAge)    },
+    { id: "agePieDislikes", label: "Dislikes by age", data: toData(dislikesAge) },
+  ];
+
+  // Inject Chart.js once
+  useEffect(() => {
+    if (window.__chartJsLoaded) {
+      renderCharts(charts);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+    script.onload = () => {
+      window.__chartJsLoaded = true;
+      renderCharts(charts);
+    };
+    document.head.appendChild(script);
+    return () => {
+      charts.forEach(c => {
+        const inst = window.__ageCharts?.[c.id];
+        if (inst) { inst.destroy(); delete window.__ageCharts[c.id]; }
+      });
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify({ viewsAge, likesAge, dislikesAge })]);
+
+  const renderCharts = (chartList) => {
+    if (!window.Chart) return;
+    window.__ageCharts = window.__ageCharts || {};
+    chartList.forEach(({ id, data }) => {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (window.__ageCharts[id]) { window.__ageCharts[id].destroy(); }
+      const total = data.reduce((a, b) => a + b, 0);
+      window.__ageCharts[id] = new window.Chart(canvas, {
+        type: "pie",
+        data: {
+          labels: AGE_LABELS_SHORT.map((l, i) => `${l} (${data[i]})`),
+          datasets: [{
+            data,
+            backgroundColor: AGE_COLORS,
+            borderColor: "transparent",
+            borderWidth: 0,
+            hoverOffset: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const val = ctx.parsed;
+                  const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                  return ` ${val} (${pct}%)`;
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
+      <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+        <BarChart className="w-4 h-4 text-purple-500" />
+        Age Breakdown
+      </h3>
+      <p className="text-xs text-gray-400 mb-6">Views, likes and dislikes split across age groups</p>
+
+      {/* Color legend */}
+      <div className="flex flex-wrap gap-x-4 gap-y-2 mb-6">
+        {AGE_LABELS_SHORT.map((lbl, i) => (
+          <span key={lbl} className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: AGE_COLORS[i] }} />
+            {lbl}
+          </span>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        {charts.map(({ id, label, data }) => {
+          const total = data.reduce((a, b) => a + b, 0);
+          const dominant = data.indexOf(Math.max(...data));
+          return (
+            <div key={id} className="flex flex-col items-center">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">{label}</p>
+              {/* Dominant badge */}
+              {total > 0 && (
+                <div className="mb-3 px-3 py-1 rounded-full text-[11px] font-bold" style={{ backgroundColor: AGE_COLORS[dominant] + "22", color: AGE_COLORS[dominant] }}>
+                  Top: {AGE_LABELS_SHORT[dominant]} · {Math.round((data[dominant] / total) * 100)}%
+                </div>
+              )}
+              <div style={{ position: "relative", width: "100%", height: "200px" }}>
+                <canvas id={id} />
+              </div>
+              {/* Per-slice mini legend */}
+              <div className="mt-4 w-full space-y-1.5">
+                {data.map((val, i) => {
+                  if (val === 0) return null;
+                  const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: AGE_COLORS[i] }} />
+                      <span className="text-[11px] text-gray-500 dark:text-gray-400 flex-1 truncate">{AGE_LABELS_SHORT[i]}</span>
+                      <span className="text-[11px] font-bold text-gray-700 dark:text-gray-200">{val}</span>
+                      <span className="text-[10px] text-gray-400 w-7 text-right">{pct}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // ─── World map helpers (no external lib needed) ───────────────────────────────
 // We fetch topoJSON from CDN and convert to SVG paths using a tiny built-in projection
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -411,149 +557,389 @@ const ISO_TO_NAME = {
 // ─── World Heatmap Section ────────────────────────────────────────────────────
 
 const WorldHeatmapSection = ({ locationRows }) => {
-  const [geoFeatures, setGeoFeatures] = useState([]);
-  const [mapLoading, setMapLoading]   = useState(true);
-  const [tooltip, setTooltip]         = useState(null);
-  const W = 960, H = 500;
+  const mapRef   = useRef(null);
+  const svgRef   = useRef(null);
+  const zoomRef  = useRef(null);
+  const [tooltip,    setTooltip]    = useState(null);
+  const [mapReady,   setMapReady]   = useState(false);
+  const [zoomLevel,  setZoomLevel]  = useState(1);
+  const [activeMetric, setActiveMetric] = useState("views");
+  const activeMetricRef = useRef("views");
 
-  useEffect(() => {
-    fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
-      .then(r => r.json())
-      .then(topo => {
-        const features = topo.objects.countries.geometries.map(geom => ({
-          id:   geom.id,
-          name: ISO_TO_NAME[geom.id] || "",
-          path: topoGeomToPath(geom, topo.arcs, topo.transform, W, H),
-        })).filter(f => f.path);
-        setGeoFeatures(features);
-      })
-      .catch(() => {})
-      .finally(() => setMapLoading(false));
-  }, []);
+  const METRICS = [
+    { key: "views",           label: "Views",     icon: "\uD83D\uDC41" },
+    { key: "unique_viewers",  label: "Unique",    icon: "\uD83D\uDC64" },
+    { key: "completed_views", label: "Completed", icon: "\u2705" },
+    { key: "rewarded_views",  label: "Rewarded",  icon: "\uD83E\uDE99" },
+  ];
 
-  const countryMap = {};
+  // Parse location strings like "Mumbai, India" → country = last comma segment
+  const countryData = {};
   locationRows.forEach((row) => {
-    const name = (row.location || "").trim();
-    if (!name || name.toLowerCase() === "unknown") return;
-    countryMap[name] = (countryMap[name] || 0) + (row.views || row.unique_viewers || 1);
+    const raw = (row.location || "").trim();
+    if (!raw || raw.toLowerCase() === "unknown") return;
+    const parts = raw.split(", ");
+    const country = parts[parts.length - 1].trim();
+    if (!country) return;
+    if (!countryData[country]) {
+      countryData[country] = { views: 0, unique_viewers: 0, completed_views: 0, rewarded_views: 0, total_coins_rewarded: 0 };
+    }
+    countryData[country].views                += row.views                || 0;
+    countryData[country].unique_viewers       += row.unique_viewers       || 0;
+    countryData[country].completed_views      += row.completed_views      || 0;
+    countryData[country].rewarded_views       += row.rewarded_views       || 0;
+    countryData[country].total_coins_rewarded += row.total_coins_rewarded || 0;
   });
 
-  const maxVal       = Math.max(...Object.values(countryMap), 1);
-  const hasData      = Object.keys(countryMap).length > 0;
-  const totalViews   = Object.values(countryMap).reduce((s, v) => s + v, 0);
-  const topCountries = Object.entries(countryMap).sort(([, a], [, b]) => b - a).slice(0, 8);
+  const hasData = Object.keys(countryData).length > 0;
   const fmt = (n) => n >= 1_000_000 ? `${(n/1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(n);
 
-  const getHeatColor = (name) => {
-    const val = countryMap[name];
-    if (!val) return "#1f2937";
-    const t = Math.pow(val / maxVal, 0.5);
-    if (t > 0.8)  return "#f97316";
-    if (t > 0.55) return "#fb923c";
-    if (t > 0.3)  return "#fdba74";
-    return "#fed7aa";
+  // Interpolate colour on indigo-orange heat scale
+  const HEAT_STOPS = [
+    [0.00, [15,  23,  42 ]],
+    [0.10, [30,  58,  138]],
+    [0.30, [67,  56,  202]],
+    [0.55, [99,  102, 241]],
+    [0.75, [251, 146, 60 ]],
+    [1.00, [249, 115, 22 ]],
+  ];
+  const getColorForValue = (val, maxV) => {
+    if (!val || maxV === 0) return "#0f172a";
+    const t = Math.pow(val / maxV, 0.45);
+    for (let i = 1; i < HEAT_STOPS.length; i++) {
+      const [lo, cLo] = HEAT_STOPS[i - 1];
+      const [hi, cHi] = HEAT_STOPS[i];
+      if (t <= hi) {
+        const f = (t - lo) / (hi - lo);
+        const r = Math.round(cLo[0] + f * (cHi[0] - cLo[0]));
+        const g = Math.round(cLo[1] + f * (cHi[1] - cLo[1]));
+        const b = Math.round(cLo[2] + f * (cHi[2] - cLo[2]));
+        return `rgb(${r},${g},${b})`;
+      }
+    }
+    return "rgb(249,115,22)";
   };
+
+  // Build & mount D3 map once
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const container = mapRef.current;
+
+    const loadScripts = (urls, cb) => {
+      let pending = urls.length;
+      urls.forEach(url => {
+        if (document.querySelector(`script[src="${url}"]`)) { if (!--pending) cb(); return; }
+        const s = Object.assign(document.createElement("script"), {
+          src: url, onload: () => { if (!--pending) cb(); }
+        });
+        document.head.appendChild(s);
+      });
+    };
+
+    loadScripts([
+      "https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js",
+    ], () => {
+      const d3 = window.d3;
+      const topojson = window.topojson;
+      if (!d3 || !topojson) return;
+
+      fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
+        .then(r => r.json())
+        .then(world => {
+          container.innerHTML = "";
+          const W = container.clientWidth || 900;
+          const H = 480;
+
+          const svg = d3.select(container)
+            .append("svg")
+            .attr("width", "100%")
+            .attr("height", H)
+            .attr("viewBox", `0 0 ${W} ${H}`)
+            .style("display", "block")
+            .style("background", "#060d1a");
+          svgRef.current = svg;
+
+          // Background rect
+          svg.append("rect").attr("width", W).attr("height", H).attr("fill", "#060d1a");
+
+          const projection = d3.geoNaturalEarth1()
+            .scale(W / 6.2)
+            .translate([W / 2, H / 2 + 10]);
+          const pathGen = d3.geoPath().projection(projection);
+
+          // idToName from world-atlas properties
+          const idToName = {};
+          world.objects.countries.geometries.forEach(g => {
+            if (g.properties?.name) idToName[+g.id] = g.properties.name;
+          });
+
+          const countries = topojson.feature(world, world.objects.countries);
+
+          // Graticule
+          svg.append("path")
+            .datum(d3.geoGraticule()())
+            .attr("d", pathGen)
+            .attr("fill", "none")
+            .attr("stroke", "#0d2240")
+            .attr("stroke-width", 0.4);
+
+          // Main map group (zoom target)
+          const g = svg.append("g").attr("class", "map-g");
+
+          // Sphere
+          g.append("path")
+            .datum({ type: "Sphere" })
+            .attr("d", pathGen)
+            .attr("fill", "#0a1628")
+            .attr("stroke", "#1e3a5f")
+            .attr("stroke-width", 0.8);
+
+          // Compute max for current metric
+          const getMax = () => {
+            const metric = activeMetricRef.current;
+            return Math.max(...Object.values(countryData).map(d => d[metric] || 0), 1);
+          };
+
+          // Country paths
+          const countryPaths = g.selectAll("path.country")
+            .data(countries.features)
+            .join("path")
+            .attr("class", "country")
+            .attr("d", pathGen)
+            .attr("fill", d => {
+              const name = idToName[+d.id] || "";
+              const cd = countryData[name];
+              if (!cd) return "#0f1e35";
+              return getColorForValue(cd[activeMetricRef.current] || 0, getMax());
+            })
+            .attr("stroke", "#0d2240")
+            .attr("stroke-width", 0.3)
+            .style("cursor", d => countryData[idToName[+d.id]] ? "pointer" : "default");
+
+          // Store refs for recolouring
+          container.__countryPaths = countryPaths;
+          container.__idToName     = idToName;
+          container.__getMax       = getMax;
+          container.__getColorFn   = getColorForValue;
+
+          // Hover interactions
+          countryPaths
+            .on("mouseover", function(event, d) {
+              const name = idToName[+d.id] || "";
+              const cd = countryData[name];
+              d3.select(this)
+                .attr("stroke", cd ? "#f97316" : "#1e3a5f")
+                .attr("stroke-width", cd ? 1.5 : 0.3);
+              if (!cd) { setTooltip(null); return; }
+              const [mx, my] = d3.pointer(event, container);
+              setTooltip({ name, data: cd, x: mx, y: my });
+            })
+            .on("mousemove", function(event) {
+              const [mx, my] = d3.pointer(event, container);
+              setTooltip(t => t ? { ...t, x: mx, y: my } : null);
+            })
+            .on("mouseout", function(event, d) {
+              const name = idToName[+d.id] || "";
+              const cd = countryData[name];
+              d3.select(this)
+                .attr("stroke", "#0d2240")
+                .attr("stroke-width", 0.3);
+              setTooltip(null);
+            });
+
+          // ── Zoom behaviour ────────────────────────────────────────────────
+          const zoom = d3.zoom()
+            .scaleExtent([1, 12])
+            .on("zoom", (event) => {
+              g.attr("transform", event.transform);
+              // Thin strokes at high zoom
+              const k = event.transform.k;
+              countryPaths.attr("stroke-width", 0.3 / k);
+              setZoomLevel(Math.round(k * 10) / 10);
+            });
+
+          svg.call(zoom);
+          zoomRef.current = zoom;
+          container.__svg  = svg;
+          container.__zoom = zoom;
+
+          // Expose zoom helpers on container
+          container.__zoomIn  = () => svg.transition().duration(350).call(zoom.scaleBy, 1.6);
+          container.__zoomOut = () => svg.transition().duration(350).call(zoom.scaleBy, 0.625);
+          container.__zoomReset = () => svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+
+          setMapReady(true);
+        })
+        .catch(err => console.error("Map load error:", err));
+    });
+
+    return () => { container.innerHTML = ""; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationRows]);
+
+  // Recolour on metric change without full redraw
+  useEffect(() => {
+    activeMetricRef.current = activeMetric;
+    const container = mapRef.current;
+    if (!container || !container.__countryPaths || !window.d3) return;
+    const maxV = container.__getMax();
+    container.__countryPaths.attr("fill", d => {
+      const name = container.__idToName[+d.id] || "";
+      const cd = countryData[name];
+      if (!cd) return "#0f1e35";
+      return container.__getColorFn(cd[activeMetric] || 0, maxV);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMetric]);
+
+  const metricValues = Object.values(countryData).map(d => d[activeMetric] || 0);
+  const totalVal = metricValues.reduce((a, b) => a + b, 0);
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-400 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-orange-500 flex items-center justify-center shadow-sm">
             <Globe className="w-4 h-4 text-white" />
           </div>
           <div>
             <h3 className="text-base font-bold text-gray-900 dark:text-white">Views by Location</h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              {hasData ? `${Object.keys(countryMap).length} countries · ${fmt(totalViews)} total views` : "No location data available"}
+              {hasData
+                ? `${Object.keys(countryData).length} ${Object.keys(countryData).length === 1 ? "country" : "countries"} · ${fmt(totalVal)} ${METRICS.find(m => m.key === activeMetric)?.label.toLowerCase()}`
+                : "No location data available"}
             </p>
           </div>
         </div>
-        {hasData && (
-          <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400">
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#fed7aa" }} /> Low</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#fb923c" }} /> Mid</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#f97316" }} /> High</span>
-          </div>
-        )}
+
+        {/* Metric pills */}
+        <div className="flex gap-1.5 flex-wrap">
+          {METRICS.map(m => (
+            <button key={m.key} onClick={() => setActiveMetric(m.key)}
+              className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${
+                activeMetric === m.key
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}>
+              {m.icon} {m.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="p-6">
-        {!hasData ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-              <Globe className="w-8 h-8 text-gray-300 dark:text-gray-600" />
-            </div>
-            <p className="text-sm font-medium text-gray-400">No location data to display</p>
-            <p className="text-xs text-gray-300 dark:text-gray-600">Location heatmap appears when viewer locations are tracked</p>
+      {/* ── Map area ── */}
+      {!hasData ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+            <Globe className="w-8 h-8 text-gray-300 dark:text-gray-600" />
           </div>
-        ) : (
-          <>
-            <div className="relative rounded-2xl overflow-hidden bg-gray-950 border border-gray-800 mb-6">
-              {mapLoading ? (
-                <div className="flex items-center justify-center h-52 gap-3">
-                  <RefreshCw className="w-5 h-5 animate-spin text-orange-400" />
-                  <span className="text-xs text-gray-400">Loading map…</span>
-                </div>
-              ) : (
-                <div className="relative">
-                  <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ maxHeight: 320 }}>
-                    <rect width={W} height={H} fill="#030712" />
-                    {geoFeatures.map((feat) => (
-                      <path
-                        key={feat.id}
-                        d={feat.path}
-                        fill={getHeatColor(feat.name)}
-                        stroke="#1f2937"
-                        strokeWidth={0.5}
-                        style={{ cursor: countryMap[feat.name] ? "pointer" : "default", transition: "fill 0.15s" }}
-                        onMouseEnter={(e) => countryMap[feat.name] && setTooltip({ name: feat.name, val: countryMap[feat.name], x: e.clientX, y: e.clientY })}
-                        onMouseMove={(e)  => setTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
-                        onMouseLeave={()  => setTooltip(null)}
-                      />
-                    ))}
-                  </svg>
-                  {tooltip && (
-                    <div
-                      className="fixed z-50 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold shadow-xl pointer-events-none border border-gray-700"
-                      style={{ left: tooltip.x + 14, top: tooltip.y - 42 }}
-                    >
-                      📍 {tooltip.name}: <span className="text-orange-400">{fmt(tooltip.val)} views</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+          <p className="text-sm font-medium text-gray-400">No location data to display</p>
+        </div>
+      ) : (
+        <div className="relative" style={{ background: "#060d1a" }}>
+          {/* D3 mount point */}
+          <div ref={mapRef} className="w-full" style={{ minHeight: 480 }} />
 
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Top Locations</p>
-              <div className="space-y-2">
-                {topCountries.map(([country, views], i) => {
-                  const rankColors = ["bg-orange-500","bg-orange-400","bg-amber-400","bg-gray-500","bg-gray-400"];
+          {/* Loading overlay */}
+          {!mapReady && (
+            <div className="absolute inset-0 flex items-center justify-center gap-3" style={{ background: "#060d1a" }}>
+              <RefreshCw className="w-5 h-5 animate-spin text-indigo-400" />
+              <span className="text-xs text-gray-400 font-medium">Loading map…</span>
+            </div>
+          )}
+
+          {/* ── Zoom controls ── */}
+          {mapReady && (
+            <div className="absolute top-4 right-4 flex flex-col gap-1 z-10">
+              {/* Zoom level badge */}
+              <div className="text-center text-[10px] font-bold text-gray-400 mb-1 tabular-nums">
+                {zoomLevel.toFixed(1)}×
+              </div>
+              <button
+                onClick={() => mapRef.current?.__zoomIn?.()}
+                className="w-8 h-8 rounded-lg bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center hover:bg-indigo-700 transition-colors text-base font-bold"
+                title="Zoom in"
+              >+</button>
+              <button
+                onClick={() => mapRef.current?.__zoomOut?.()}
+                className="w-8 h-8 rounded-lg bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center hover:bg-indigo-700 transition-colors text-base font-bold"
+                title="Zoom out"
+              >−</button>
+              <button
+                onClick={() => mapRef.current?.__zoomReset?.()}
+                className="w-8 h-8 rounded-lg bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
+                title="Reset zoom"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* ── Colour legend ── */}
+          {mapReady && (
+            <div className="absolute bottom-4 left-4 flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-400">Low</span>
+                <div className="w-28 h-2.5 rounded-full" style={{
+                  background: "linear-gradient(to right, #1e3a8a, #6366f1, #f97316)"
+                }} />
+                <span className="text-[10px] font-bold text-gray-400">High</span>
+              </div>
+              <p className="text-[9px] text-gray-600 ml-0.5">Scroll or pinch to zoom · drag to pan</p>
+            </div>
+          )}
+
+          {/* ── Tooltip ── */}
+          {tooltip && tooltip.data && (
+            <div
+              className="absolute z-20 pointer-events-none rounded-xl px-4 py-3 shadow-2xl text-white"
+              style={{
+                left: Math.min(tooltip.x + 16, (mapRef.current?.clientWidth || 800) - 220),
+                top:  Math.max(tooltip.y - 110, 8),
+                minWidth: 200,
+                background: "rgba(6,13,26,0.97)",
+                border: "1px solid rgba(99,102,241,0.4)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-white/10">
+                <MapPin className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                <span className="text-sm font-bold leading-tight">{tooltip.name}</span>
+              </div>
+              <div className="space-y-1.5">
+                {METRICS.map(m => {
+                  const val = tooltip.data[m.key] || 0;
+                  const isActive = activeMetric === m.key;
                   return (
-                    <div key={country} className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black text-white flex-shrink-0 ${rankColors[Math.min(i, rankColors.length - 1)]}`}>
-                        {i + 1}
-                      </div>
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 w-28 flex-shrink-0 truncate">{country}</span>
-                      <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                        <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700"
-                          style={{ width: `${Math.round((views / maxVal) * 100)}%` }} />
-                      </div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white w-12 text-right flex-shrink-0">{fmt(views)}</span>
-                      <span className="text-[10px] text-gray-400 w-8 text-right flex-shrink-0">
-                        {totalViews > 0 ? `${Math.round((views / totalViews) * 100)}%` : ""}
+                    <div key={m.key} className="flex items-center justify-between gap-4">
+                      <span className={`text-xs ${isActive ? "text-orange-300 font-bold" : "text-gray-400"}`}>
+                        {m.icon} {m.label}
+                      </span>
+                      <span className={`text-xs font-bold tabular-nums ${isActive ? "text-orange-300" : "text-gray-300"}`}>
+                        {fmt(val)}
                       </span>
                     </div>
                   );
                 })}
+                {tooltip.data.total_coins_rewarded > 0 && (
+                  <div className="flex items-center justify-between gap-4 pt-1.5 mt-1 border-t border-white/10">
+                    <span className="text-xs text-amber-400 font-bold">🪙 Coins</span>
+                    <span className="text-xs font-bold text-amber-400 tabular-nums">{fmt(tooltip.data.total_coins_rewarded)}</span>
+                  </div>
+                )}
               </div>
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
+
+
 
 
 // ─── Heatmap Location Card (original table-style, kept) ───────────────────────
@@ -988,6 +1374,9 @@ const StatsSection = ({ adId }) => {
         </div>
       </div>
 
+      {/* ── Age Breakdown Pie Charts ──────────────────────────────────────── */}
+      <AgeBreakdownCharts stats={stats} />
+
       {/* ── Gender Analytics ─────────────────────────────────────────────── */}
       <GenderAnalyticsSection genderData={genderData} />
 
@@ -995,7 +1384,7 @@ const StatsSection = ({ adId }) => {
       <WorldHeatmapSection locationRows={locationRows} />
 
       {/* ── Likes & Dislikes ──────────────────────────────────────────────── */}
-      <LikesDislikesPanel stats={stats} />
+      {/* <LikesDislikesPanel stats={stats} /> */}
 
       {/* ── Audience by Gender Pie (from likes data) ─────────────────────── */}
       {genderPieData.length > 0 && (
