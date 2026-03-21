@@ -5,8 +5,9 @@ import {
   Coins, CreditCard, Receipt, ShieldCheck, CalendarDays,
   Download, ArrowDownLeft, ArrowUpRight, RefreshCw,
   CheckCircle2, XCircle, Clock, Loader2, AlertCircle,
-  ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
-  Wallet, Sparkles, X
+  TrendingDown, TrendingUp,
+  Wallet, Sparkles, X,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -24,9 +25,20 @@ const timeAgo = (d) => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
-const fmtCurrency = (n) => {
-  return "🪙" + new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n || 0);
-};
+// ─── Coin Icon (replaces ₹ symbol everywhere) ─────────────────────────────────
+const CoinIcon = ({ size = 16, className = "" }) => (
+  <svg
+    width={size} height={size} viewBox="0 0 24 24" fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={`inline-block flex-shrink-0 ${className}`}
+    style={{ verticalAlign: "-0.15em" }}
+  >
+    <circle cx="12" cy="12" r="10" fill="#F59E0B" />
+    <circle cx="12" cy="12" r="8" fill="#FBBF24" />
+    <circle cx="12" cy="12" r="6.5" fill="none" stroke="#D97706" strokeWidth="0.8" />
+    <text x="12" y="16" textAnchor="middle" fontSize="9" fontWeight="bold" fill="#92400E" fontFamily="serif">&#8377;</text>
+  </svg>
+);
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -136,7 +148,7 @@ const RechargeModal = ({ onClose, onSuccess }) => {
                         <Coins className="w-4 h-4 text-yellow-500" />
                       </div>
                       <div className="text-xl font-black text-gray-900 dark:text-white">{fmt(p.coins)} <span className="text-sm font-semibold text-gray-500">coins</span></div>
-                      <div className="text-base font-bold text-orange-600 dark:text-orange-400 mt-1">🪙{fmt(p.price)}</div>
+                      <div className="text-base font-bold text-orange-600 dark:text-orange-400 mt-1 flex items-center gap-0.5"><CoinIcon size={14} />{fmt(p.price)}</div>
                     </button>
                   ))}
                 </div>
@@ -175,7 +187,7 @@ const RechargeModal = ({ onClose, onSuccess }) => {
                     <div className="text-xs text-gray-500">{pkg?.label} Package</div>
                   </div>
                 </div>
-                <div className="text-lg font-black text-orange-600 dark:text-orange-400">🪙{fmt(pkg?.price)}</div>
+                <div className="text-lg font-black text-orange-600 dark:text-orange-400 flex items-center gap-0.5"><CoinIcon size={16} />{fmt(pkg?.price)}</div>
               </div>
 
               <div>
@@ -217,7 +229,7 @@ const RechargeModal = ({ onClose, onSuccess }) => {
                 <button onClick={handlePayment} disabled={loading}
                   className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-orange-500 via-pink-600 to-purple-600 text-white font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {loading ? "Processing…" : `Pay 🪙${fmt(pkg?.price)} Securely 🔒`}
+                  {loading ? "Processing…" : <span className="flex items-center gap-1 justify-center">Pay <CoinIcon size={14} />{fmt(pkg?.price)} Securely 🔒</span>}
                 </button>
               </div>
             </div>
@@ -273,7 +285,7 @@ export default function CoinsBilling() {
   // Recharge modal
   const [showRecharge, setShowRecharge] = useState(false);
 
-  const totalPages = Math.ceil(txTotal / LIMIT);
+  const totalPages = Math.ceil(transactions.length / LIMIT);
 
   // ── Fetch wallet balance ───────────────────────────────────────────────────
   const fetchWallet = useCallback(async () => {
@@ -291,24 +303,27 @@ export default function CoinsBilling() {
     setTxLoading(true);
     setTxError("");
     try {
-      const params = { page: txPage, limit: LIMIT };
+      // Fetch all transactions for client-side pagination as requested
+      const params = {};
       if (typeFilter) params.type = typeFilter;
       if (dirFilter)  params.direction = dirFilter;
       if (startDate)  params.startDate = startDate;
       if (endDate)    params.endDate   = endDate;
       const res = await api.get(`/wallet/vendor/${userId}/history`, { params });
-      setTransactions(res.data?.transactions || []);
-      setTxTotal(res.data?.total || 0);
+      
+      const allTx = res.data?.transactions || [];
+      setTransactions(allTx);
+      setTxTotal(res.data?.total || allTx.length);
     } catch (e) {
       setTxError(e?.response?.data?.message || "Failed to load transactions");
     } finally { setTxLoading(false); }
-  }, [userId, txPage, typeFilter, dirFilter, startDate, endDate]);
+  }, [userId, typeFilter, dirFilter, startDate, endDate]);
 
   useEffect(() => { fetchWallet(); }, [fetchWallet]);
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
-  const handleApplyFilters = () => { setTxPage(1); fetchHistory(); };
-  const handleClearFilters = () => { setTypeFilter(""); setDirFilter(""); setStartDate(""); setEndDate(""); setTxPage(1); };
+  const handleApplyFilters = () => { setTxPage(1); fetchHistory(); setShowFilters(false); };
+  const handleClearFilters = () => { setTypeFilter(""); setDirFilter(""); setStartDate(""); setEndDate(""); setTxPage(1); fetchHistory(); setShowFilters(false); };
 
   // Pagination page numbers
   const getPageNums = () => {
@@ -318,6 +333,7 @@ export default function CoinsBilling() {
     if (end > totalPages) { end = totalPages; start = Math.max(1, end - windowSize + 1); }
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   };
+
 
   // Derived coin stats from wallet
   const balance   = wallet?.balance   ?? 0;
@@ -371,14 +387,14 @@ export default function CoinsBilling() {
                 <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Available Balance</div>
                 {walletLoading
                   ? <div className="h-10 w-40 bg-white/10 rounded-xl animate-pulse" />
-                  : <div className="text-4xl font-black tracking-tight">{fmtCurrency(balance)}</div>
+                  : <div className="text-4xl font-black tracking-tight flex items-center gap-1"><CoinIcon size={32} />{new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(balance || 0)}</div>
                 }
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-white/10">
                 {[
-                  { label: "Credited (this page)", value: `+🪙${fmt(credited)}`, color: "text-green-400", icon: TrendingUp },
-                  { label: "Debited (this page)",  value: `-🪙${fmt(debited)}`,  color: "text-red-400",   icon: TrendingDown },
+                  { label: "Credited (this page)", value: <span className="flex items-center gap-0.5">+<CoinIcon size={14} />{fmt(credited)}</span>, color: "text-green-400", icon: TrendingUp },
+                  { label: "Debited (this page)",  value: <span className="flex items-center gap-0.5">-<CoinIcon size={14} />{fmt(debited)}</span>,  color: "text-red-400",   icon: TrendingDown },
                   { label: "Transactions",          value: fmt(txTotal),          color: "text-sky-400",   icon: Receipt },
                 ].map((item, i) => (
                   <div key={i} className="p-3 rounded-2xl bg-white/5">
@@ -507,7 +523,7 @@ export default function CoinsBilling() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                  {transactions.map(tx => (
+                  {transactions.slice((txPage - 1) * LIMIT, txPage * LIMIT).map(tx => (
                     <tr key={tx._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
@@ -524,9 +540,9 @@ export default function CoinsBilling() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className={`text-sm font-bold ${tx.direction === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                          {tx.direction === "credit" ? "+" : "−"}🪙{fmt(tx.amount)}
-                        </span>
+                          <span className={`text-sm font-bold flex items-center gap-0.5 ${tx.direction === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {tx.direction === "credit" ? "+" : "−"}<CoinIcon size={13} />{fmt(tx.amount)}
+                          </span>
                       </td>
                       <td className="px-5 py-3.5"><DirectionBadge direction={tx.direction} /></td>
                       <td className="px-5 py-3.5"><StatusBadge status={tx.status} /></td>
@@ -576,4 +592,4 @@ export default function CoinsBilling() {
       )}
     </div>
   );
-}
+} 

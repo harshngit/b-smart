@@ -272,15 +272,18 @@ const CommentItem = ({ comment }) => {
 
   const toggleReplies = useCallback(async () => {
     if (repliesFetched) { setShowReplies(v => !v); return; }
-    setLoadingReplies(true);
-    try {
-      const res = await api.get(`/ads/comments/${comment._id}/replies`);
-      const data = Array.isArray(res.data) ? res.data : res.data?.replies || res.data?.data || [];
-      setReplies(data);
-      setRepliesFetched(true);
-      setShowReplies(true);
-    } catch (err) { console.error("Failed to fetch replies", err); }
-    finally { setLoadingReplies(false); }
+    const fetchReplies = async () => {
+      setLoadingReplies(true);
+      try {
+        const res = await api.get(`/ads/comments/${comment._id}/replies`);
+        const data = Array.isArray(res.data) ? res.data : res.data?.replies || res.data?.data || [];
+        setReplies(data);
+        setRepliesFetched(true);
+        setShowReplies(true);
+      } catch (err) { console.error("Failed to fetch replies", err); }
+      finally { setLoadingReplies(false); }
+    };
+    fetchReplies();
   }, [comment._id, repliesFetched]);
 
   const replyCount = comment.replies_count || comment.repliesCount || 0;
@@ -1303,7 +1306,7 @@ const StatsSection = ({ adId }) => {
 
   useEffect(() => {
     if (!adId) return;
-    (async () => {
+    const fetchStats = async () => {
       setLoading(true); setError("");
       try {
         const res = await api.get(`/ads/${adId}/stats`);
@@ -1312,7 +1315,8 @@ const StatsSection = ({ adId }) => {
         console.error("Stats fetch failed", err);
         setError(err?.response?.data?.message || "Failed to load stats");
       } finally { setLoading(false); }
-    })();
+    };
+    fetchStats();
   }, [adId]);
 
   if (loading) {
@@ -1470,21 +1474,22 @@ export default function AdDetails() {
 
   useEffect(() => {
     if (!adId) return;
-    (async () => {
+    const fetchData = async () => {
       setLoading(true); setError("");
       try {
         const res = await api.get(`/ads/${adId}`);
-        setAd(res.data);
+        setAd(res.data?.ad || res.data);
       } catch (err) {
         console.error(err);
         setError("Failed to load ad details. Please try again.");
       } finally { setLoading(false); }
-    })();
+    };
+    fetchData();
   }, [adId]);
 
   useEffect(() => {
     if (!adId) return;
-    (async () => {
+    const fetchComments = async () => {
       setCommentsLoading(true);
       try {
         const res = await api.get(`/ads/${adId}/comments`, { params: { page: commentsPage, limit: COMMENTS_PER_PAGE } });
@@ -1494,12 +1499,13 @@ export default function AdDetails() {
         setCommentsTotal(total);
       } catch (err) { console.error("Comments fetch failed", err); setComments([]); }
       finally { setCommentsLoading(false); }
-    })();
+    };
+    fetchComments();
   }, [adId, commentsPage]);
 
   useEffect(() => {
     if (!adId) return;
-    (async () => {
+    const fetchWalletHistory = async () => {
       setWalletLoading(true); setWalletError("");
       try {
         const res = await api.get(`/wallet/ads/${adId}/history`, { params: { page: walletPage, limit: WALLET_PER_PAGE } });
@@ -1507,7 +1513,8 @@ export default function AdDetails() {
       } catch (err) {
         setWalletError(err?.response?.data?.message || "Failed to load transaction history");
       } finally { setWalletLoading(false); }
-    })();
+    };
+    fetchWalletHistory();
   }, [adId, walletPage]);
 
   if (loading) {

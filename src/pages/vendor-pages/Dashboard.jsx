@@ -10,8 +10,6 @@ import {
   ArrowDownLeft,
   RefreshCw,
   Filter,
-  ChevronLeft,
-  ChevronRight,
   Megaphone,
   BarChart2,
   Clock,
@@ -25,17 +23,26 @@ import {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const VALID_CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD", "JPY"];
+// ─── Coin Icon (replaces ₹ symbol everywhere) ─────────────────────────────────
+const CoinIcon = ({ size = 16, className = "" }) => (
+  <svg
+    width={size} height={size} viewBox="0 0 24 24" fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={`inline-block flex-shrink-0 ${className}`}
+    style={{ verticalAlign: "-0.15em" }}
+  >
+    <circle cx="12" cy="12" r="10" fill="#F59E0B" />
+    <circle cx="12" cy="12" r="8" fill="#FBBF24" />
+    <circle cx="12" cy="12" r="6.5" fill="none" stroke="#D97706" strokeWidth="0.8" />
+    <text x="12" y="16" textAnchor="middle" fontSize="9" fontWeight="bold" fill="#92400E" fontFamily="serif">&#8377;</text>
+  </svg>
+);
 
-const formatCurrency = (amount, currency) => {
+const formatCurrencyNum = (amount) => {
   if (amount == null) return "—";
-  const safeCurrency = VALID_CURRENCIES.includes((currency || "").toUpperCase())
-    ? currency.toUpperCase()
-    : "INR";
   return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: safeCurrency,
     maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
   }).format(amount);
 };
 
@@ -149,10 +156,10 @@ const TransactionRow = ({ tx }) => (
       </div>
     </td>
     <td className="px-4 py-3">
-      <span className={`text-sm font-bold ${
+      <span className={`text-sm font-bold flex items-center gap-0.5 ${
         tx.direction === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
       }`}>
-        {tx.direction === "credit" ? "+" : "-"}₹{Number(tx.amount).toLocaleString("en-IN")}
+        {tx.direction === "credit" ? "+" : "-"}<CoinIcon size={13} />{Number(tx.amount).toLocaleString("en-IN")}
       </span>
     </td>
     <td className="px-4 py-3">
@@ -197,16 +204,12 @@ export default function VendorDashboard() {
     () => sessionStorage.getItem("profileBannerDismissed") === "1"
   );
 
-  // Filters & pagination
-  const [page, setPage] = useState(1);
-  const [limit] = useState(7);
+  // Filters
   const [typeFilter, setTypeFilter] = useState("");
   const [directionFilter, setDirectionFilter] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-
-  const totalPages = Math.ceil(total / limit);
 
   // ─── Fetch Wallet & History ───────────────────────────────────────────────
   const fetchWalletData = useCallback(async () => {
@@ -214,7 +217,7 @@ export default function VendorDashboard() {
     setWalletLoading(true);
     setWalletError(null);
     try {
-      const params = { page, limit };
+      const params = { limit: 7 };
       if (typeFilter) params.type = typeFilter;
       if (directionFilter) params.direction = directionFilter;
       if (startDate) params.startDate = startDate;
@@ -226,7 +229,7 @@ export default function VendorDashboard() {
       setTotal(res.data.total || 0);
 
       // /api/wallet/vendor/{userId}/history — detailed transactions with filters
-      const histParams = { page, limit };
+      const histParams = { limit: 7 };
       if (typeFilter) histParams.type = typeFilter;
       if (directionFilter) histParams.direction = directionFilter;
       if (startDate) histParams.startDate = startDate;
@@ -241,7 +244,7 @@ export default function VendorDashboard() {
     } finally {
       setWalletLoading(false);
     }
-  }, [userObject?._id, page, limit, typeFilter, directionFilter, startDate, endDate]);
+  }, [userObject?._id, typeFilter, directionFilter, startDate, endDate]);
 
   // ─── Fetch Active Ads Count ───────────────────────────────────────────────
   const fetchActiveAds = useCallback(async () => {
@@ -290,7 +293,6 @@ export default function VendorDashboard() {
   const recentActivity = transactions.slice(0, 5);
 
   const handleApplyFilters = () => {
-    setPage(1);
     fetchWalletData();
   };
 
@@ -299,7 +301,6 @@ export default function VendorDashboard() {
     setDirectionFilter("");
     setStartDate("");
     setEndDate("");
-    setPage(1);
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -394,6 +395,8 @@ export default function VendorDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Pagination */}
           </div>
         )}
 
@@ -410,7 +413,7 @@ export default function VendorDashboard() {
           />
           <MetricCard
             label="Wallet Balance"
-            value={wallet ? formatCurrency(wallet.balance, wallet.currency) : "—"}
+            value={wallet ? <span className="flex items-center gap-1"><CoinIcon size={22} />{formatCurrencyNum(wallet.balance)}</span> : "—"}
             icon={Wallet}
             sublabel="Available"
             onClick={() => navigate("/vendor/billing")}
@@ -418,14 +421,14 @@ export default function VendorDashboard() {
           />
           <MetricCard
             label="Total Credited"
-            value={walletLoading ? "—" : `₹${totalCredited.toLocaleString("en-IN")}`}
+            value={walletLoading ? "—" : <span className="flex items-center gap-1"><CoinIcon size={22} />{totalCredited.toLocaleString("en-IN")}</span>}
             icon={TrendingUp}
             sublabel="This Page"
             loading={walletLoading}
           />
           <MetricCard
             label="Total Debited"
-            value={walletLoading ? "—" : `₹${totalDebited.toLocaleString("en-IN")}`}
+            value={walletLoading ? "—" : <span className="flex items-center gap-1"><CoinIcon size={22} />{totalDebited.toLocaleString("en-IN")}</span>}
             icon={TrendingDown}
             sublabel="This Page"
             loading={walletLoading}
@@ -557,50 +560,6 @@ export default function VendorDashboard() {
                 </table>
               )}
             </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Page {page} of {totalPages} · {total} total
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  {(() => {
-                    const windowSize = Math.min(5, totalPages);
-                    let start = Math.max(1, page - Math.floor(windowSize / 2));
-                    let end = start + windowSize - 1;
-                    if (end > totalPages) { end = totalPages; start = Math.max(1, end - windowSize + 1); }
-                    return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => setPage(p)}
-                        className={`w-8 h-8 rounded-xl text-xs font-bold transition-colors ${
-                          page === p
-                            ? "bg-gradient-to-r from-pink-600 to-orange-500 text-white shadow-sm"
-                            : "border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ));
-                  })()}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Right Panel */}
@@ -618,7 +577,7 @@ export default function VendorDashboard() {
                   <div className="h-10 w-36 rounded-lg bg-white/10 animate-pulse mb-1" />
                 ) : (
                   <div className="text-4xl font-black mb-1">
-                    {wallet ? formatCurrency(wallet.balance, wallet.currency) : "—"}
+                    {wallet ? formatCurrencyNum(wallet.balance) : "—"}
                   </div>
                 )}
                 <div className="text-xs text-gray-400 font-medium">Available Balance</div>
@@ -627,13 +586,13 @@ export default function VendorDashboard() {
                   <div className="p-3 rounded-xl bg-white/5">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-green-400 mb-1">Credited</div>
                     <div className="text-lg font-extrabold">
-                      {walletLoading ? "—" : `₹${totalCredited.toLocaleString("en-IN")}`}
+                      {walletLoading ? "—" : <span className="flex items-center gap-0.5"><CoinIcon size={15} />{totalCredited.toLocaleString("en-IN")}</span>}
                     </div>
                   </div>
                   <div className="p-3 rounded-xl bg-white/5">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-red-400 mb-1">Debited</div>
                     <div className="text-lg font-extrabold">
-                      {walletLoading ? "—" : `₹${totalDebited.toLocaleString("en-IN")}`}
+                      {walletLoading ? "—" : <span className="flex items-center gap-0.5"><CoinIcon size={15} />{totalDebited.toLocaleString("en-IN")}</span>}
                     </div>
                   </div>
                 </div>
@@ -642,7 +601,7 @@ export default function VendorDashboard() {
                   onClick={() => navigate("/vendor/billing")}
                   className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-orange-500 text-white text-sm font-bold hover:opacity-90 transition-opacity"
                 >
-                  🪙 Recharge Wallet
+                  <CoinIcon size={16} className="mr-1" /> Recharge Wallet
                 </button>
               </div>
             </div>
@@ -686,8 +645,8 @@ export default function VendorDashboard() {
                           {tx.label || tx.type || "Transaction"}
                         </p>
                         <div className="flex items-center justify-between mt-0.5">
-                          <span className={`text-xs font-bold ${tx.direction === "credit" ? "text-green-600" : "text-red-600"}`}>
-                            {tx.direction === "credit" ? "+" : "-"}₹{Number(tx.amount).toLocaleString("en-IN")}
+                          <span className={`text-xs font-bold flex items-center gap-0.5 ${tx.direction === "credit" ? "text-green-600" : "text-red-600"}`}>
+                            {tx.direction === "credit" ? "+" : "-"}<CoinIcon size={12} />{Number(tx.amount).toLocaleString("en-IN")}
                           </span>
                           <span className="text-[10px] text-gray-400">{formatTimeAgo(tx.created_at)}</span>
                         </div>
