@@ -24,10 +24,8 @@ const timeAgo = (d) => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
-const VALID_CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED"];
-const fmtCurrency = (n, c) => {
-  const cur = VALID_CURRENCIES.includes((c || "").toUpperCase()) ? c.toUpperCase() : "INR";
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(n || 0);
+const fmtCurrency = (n) => {
+  return "🪙" + new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n || 0);
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -138,7 +136,7 @@ const RechargeModal = ({ onClose, onSuccess }) => {
                         <Coins className="w-4 h-4 text-yellow-500" />
                       </div>
                       <div className="text-xl font-black text-gray-900 dark:text-white">{fmt(p.coins)} <span className="text-sm font-semibold text-gray-500">coins</span></div>
-                      <div className="text-base font-bold text-orange-600 dark:text-orange-400 mt-1">₹{fmt(p.price)}</div>
+                      <div className="text-base font-bold text-orange-600 dark:text-orange-400 mt-1">🪙{fmt(p.price)}</div>
                     </button>
                   ))}
                 </div>
@@ -177,7 +175,7 @@ const RechargeModal = ({ onClose, onSuccess }) => {
                     <div className="text-xs text-gray-500">{pkg?.label} Package</div>
                   </div>
                 </div>
-                <div className="text-lg font-black text-orange-600 dark:text-orange-400">₹{fmt(pkg?.price)}</div>
+                <div className="text-lg font-black text-orange-600 dark:text-orange-400">🪙{fmt(pkg?.price)}</div>
               </div>
 
               <div>
@@ -219,7 +217,7 @@ const RechargeModal = ({ onClose, onSuccess }) => {
                 <button onClick={handlePayment} disabled={loading}
                   className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-orange-500 via-pink-600 to-purple-600 text-white font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {loading ? "Processing…" : `Pay ₹${fmt(pkg?.price)} Securely 🔒`}
+                  {loading ? "Processing…" : `Pay 🪙${fmt(pkg?.price)} Securely 🔒`}
                 </button>
               </div>
             </div>
@@ -248,7 +246,7 @@ const RechargeModal = ({ onClose, onSuccess }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const LIMIT = 8;
+const LIMIT = 7;
 
 export default function CoinsBilling() {
   const { userObject } = useSelector(s => s.auth);
@@ -373,14 +371,14 @@ export default function CoinsBilling() {
                 <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Available Balance</div>
                 {walletLoading
                   ? <div className="h-10 w-40 bg-white/10 rounded-xl animate-pulse" />
-                  : <div className="text-4xl font-black tracking-tight">{fmtCurrency(balance, currency)}</div>
+                  : <div className="text-4xl font-black tracking-tight">{fmtCurrency(balance)}</div>
                 }
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-white/10">
                 {[
-                  { label: "Credited (this page)", value: `+₹${fmt(credited)}`, color: "text-green-400", icon: TrendingUp },
-                  { label: "Debited (this page)",  value: `-₹${fmt(debited)}`,  color: "text-red-400",   icon: TrendingDown },
+                  { label: "Credited (this page)", value: `+🪙${fmt(credited)}`, color: "text-green-400", icon: TrendingUp },
+                  { label: "Debited (this page)",  value: `-🪙${fmt(debited)}`,  color: "text-red-400",   icon: TrendingDown },
                   { label: "Transactions",          value: fmt(txTotal),          color: "text-sky-400",   icon: Receipt },
                 ].map((item, i) => (
                   <div key={i} className="p-3 rounded-2xl bg-white/5">
@@ -527,7 +525,7 @@ export default function CoinsBilling() {
                       </td>
                       <td className="px-5 py-3.5">
                         <span className={`text-sm font-bold ${tx.direction === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                          {tx.direction === "credit" ? "+" : "−"}₹{fmt(tx.amount)}
+                          {tx.direction === "credit" ? "+" : "−"}🪙{fmt(tx.amount)}
                         </span>
                       </td>
                       <td className="px-5 py-3.5"><DirectionBadge direction={tx.direction} /></td>

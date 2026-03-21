@@ -31,6 +31,7 @@ const Layout = () => {
     const a = userObject?.address || {};
     return {
       gender,
+      age: userObject?.age ? String(userObject.age) : '',
       address_line1: a.address_line1 || a.addressLine1 || '',
       address_line2: a.address_line2 || a.addressLine2 || '',
       pincode: a.pincode || '',
@@ -38,7 +39,7 @@ const Layout = () => {
       state: a.state || '',
       country: a.country || '',
     };
-  }, [userObject?.address, userObject?.gender, userObject?.sex]);
+  }, [userObject?.address, userObject?.gender, userObject?.sex, userObject?.age]);
 
   const [profileSetupForm, setProfileSetupForm] = useState(initialSetupState);
 
@@ -46,17 +47,18 @@ const Layout = () => {
     setProfileSetupForm(initialSetupState);
   }, [initialSetupState]);
 
-  // Check if profile still needs setup (gender OR any address field missing)
+  // Check if profile still needs setup (gender OR age OR any address field missing)
   const needsProfileSetup = useMemo(() => {
     if (!userObject) return false;
     const g = (userObject?.gender || '').toString().toLowerCase();
+    const age = userObject?.age;
     const a = userObject?.address || {};
     const addressLine1 = a.address_line1 || a.addressLine1 || '';
     const pincode = a.pincode || '';
     const city = a.city || '';
     const state = a.state || '';
     const country = a.country || '';
-    return !g || !addressLine1 || !pincode || !city || !state || !country;
+    return !g || !age || !addressLine1 || !pincode || !city || !state || !country;
   }, [userObject]);
 
   // Show modal on login if profile is incomplete and not dismissed this session
@@ -82,6 +84,7 @@ const Layout = () => {
   // ── Save handler: PATCH /api/users/{id} → then re-fetch /api/auth/me ──────
   const saveProfileSetup = useCallback(async () => {
     const gender = (profileSetupForm.gender || '').toLowerCase();
+    const age = parseInt(profileSetupForm.age || '', 10);
     const address = {
       address_line1: profileSetupForm.address_line1 || '',
       address_line2: profileSetupForm.address_line2 || '',
@@ -93,6 +96,10 @@ const Layout = () => {
 
     if (!gender) {
       setProfileSetupError('Please select your gender.');
+      return;
+    }
+    if (!age || age < 13 || age > 100) {
+      setProfileSetupError('Please enter a valid age (13–100).');
       return;
     }
     if (!address.address_line1 || !address.pincode || !address.city || !address.state || !address.country) {
@@ -111,6 +118,7 @@ const Layout = () => {
 
     const payload = {
       gender,
+      age,
       address,
       // Also derive location string from city + country for convenience
       location: [address.city, address.country].filter(Boolean).join(', '),
@@ -221,7 +229,7 @@ const Layout = () => {
               <div className="min-w-0">
                 <div className="text-base font-bold text-gray-900 dark:text-white">Complete your profile</div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Add gender and address to continue.{' '}
+                  Add your details to continue.{' '}
                   <span className="text-red-400">* required</span>
                 </div>
               </div>
@@ -254,21 +262,40 @@ const Layout = () => {
                 </div>
               )}
 
-              {/* Gender */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                  Gender <span className="text-red-400">*</span>
-                </label>
-                <select
-                  value={profileSetupForm.gender}
-                  onChange={(e) => setProfileSetupForm((p) => ({ ...p, gender: e.target.value }))}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white"
-                >
-                  <option value="" disabled>Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
+              {/* Gender + Age row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Gender */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Gender <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={profileSetupForm.gender}
+                    onChange={(e) => setProfileSetupForm((p) => ({ ...p, gender: e.target.value }))}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white"
+                  >
+                    <option value="" disabled>Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                {/* Age */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Age <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="13"
+                    max="100"
+                    value={profileSetupForm.age}
+                    onChange={(e) => setProfileSetupForm((p) => ({ ...p, age: e.target.value }))}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600"
+                    placeholder="e.g. 25"
+                  />
+                </div>
               </div>
 
               {/* Address Line 1 */}

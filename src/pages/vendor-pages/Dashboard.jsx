@@ -199,7 +199,7 @@ export default function VendorDashboard() {
 
   // Filters & pagination
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit] = useState(7);
   const [typeFilter, setTypeFilter] = useState("");
   const [directionFilter, setDirectionFilter] = useState("");
   const [startDate, setStartDate] = useState("");

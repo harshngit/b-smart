@@ -649,7 +649,7 @@ const WorldHeatmapSection = ({ locationRows }) => {
         .then(world => {
           container.innerHTML = "";
           const W = container.clientWidth || 900;
-          const H = 480;
+          const H = Math.max(container.clientHeight || 0, 520);
 
           const svg = d3.select(container)
             .append("svg")
@@ -664,8 +664,8 @@ const WorldHeatmapSection = ({ locationRows }) => {
           svg.append("rect").attr("width", W).attr("height", H).attr("fill", "#060d1a");
 
           const projection = d3.geoNaturalEarth1()
-            .scale(W / 6.2)
-            .translate([W / 2, H / 2 + 10]);
+            .scale(W / 5.8)
+            .translate([W / 2, H / 2]);
           const pathGen = d3.geoPath().projection(projection);
 
           // idToName from world-atlas properties
@@ -841,7 +841,7 @@ const WorldHeatmapSection = ({ locationRows }) => {
       ) : (
         <div className="relative" style={{ background: "#060d1a" }}>
           {/* D3 mount point */}
-          <div ref={mapRef} className="w-full" style={{ minHeight: 480 }} />
+          <div ref={mapRef} className="w-full" style={{ minHeight: 520 }} />
 
           {/* Loading overlay */}
           {!mapReady && (
