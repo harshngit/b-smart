@@ -282,12 +282,21 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   
   // Ad multi-select states
-  const [selectedCategories, setSelectedCategories] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [selectedCountries, setSelectedCountries] = useState([]);
+  const [selectedStates, setSelectedStates] = useState([]);
   const [totalBudgetCoins, setTotalBudgetCoins] = useState('');
+
+  // API-driven country/state/language data
+  const [allCountries, setAllCountries] = useState([]);
+  const [isLoadingCountries, setIsLoadingCountries] = useState(false);
+  const [statesByCountry, setStatesByCountry] = useState({}); // { countryName: [states] }
+  const [isLoadingStates, setIsLoadingStates] = useState(false);
+  const [languagesByState, setLanguagesByState] = useState({}); // { 'country|state': [languages] }
+  const [isLoadingLanguages, setIsLoadingLanguages] = useState(false);
   
-  // Accordion state: 'category' | 'language' | 'country' | null
+  // Accordion state: 'category' | 'country' | 'state' | 'language' | 'budget' | null
   const [openAccordion, setOpenAccordion] = useState(null);
 
   useEffect(() => {
@@ -305,6 +314,80 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       .finally(() => { if (active) setIsLoadingCategories(false); });
     return () => { active = false; };
   }, []);
+
+  // Fetch all countries (flat list) on mount
+  useEffect(() => {
+    let active = true;
+    setIsLoadingCountries(true);
+    fetch('https://api.bebsmart.in/api/countries')
+      .then(r => r.json())
+      .then(data => {
+        if (!active) return;
+        const list = Array.isArray(data) ? data : (data?.countries || data?.data || []);
+        setAllCountries(list);
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setIsLoadingCountries(false); });
+    return () => { active = false; };
+  }, []);
+
+  // When selectedCountries changes: fetch full data (states + languages) in one call
+  // API response shape: { success, country, count, data: [{ state, languages, cities }] }
+  useEffect(() => {
+    if (selectedCountries.length === 0) {
+      setStatesByCountry({});
+      setSelectedStates([]);
+      setLanguagesByState({});
+      setSelectedLanguages([]);
+      return;
+    }
+    setIsLoadingStates(true);
+    Promise.all(
+      selectedCountries.map(country =>
+        fetch(`https://api.bebsmart.in/api/countries/${encodeURIComponent(country)}/states`)
+          .then(r => r.json())
+          .then(res => {
+            // response: { success, country, count, data: [{ state, languages, cities }] }
+            const stateData = Array.isArray(res) ? res : (res?.data || []);
+            return { country, stateData };
+          })
+          .catch(() => ({ country, stateData: [] }))
+      )
+    ).then(results => {
+      const newStatesByCountry = {};
+      results.forEach(({ country, stateData }) => {
+        newStatesByCountry[country] = stateData; // each item: { state, languages, cities }
+      });
+      setStatesByCountry(newStatesByCountry);
+      // Prune selected states no longer in any selected country
+      const allValidStateNames = new Set(
+        results.flatMap(({ stateData }) => stateData.map(s => s.state))
+      );
+      setSelectedStates(prev => prev.filter(s => allValidStateNames.has(s)));
+      setIsLoadingStates(false);
+    });
+  }, [selectedCountries]);
+
+  // When selectedStates changes: derive languages directly from statesByCountry data (no extra API call)
+  useEffect(() => {
+    if (selectedStates.length === 0) {
+      setLanguagesByState({});
+      setSelectedLanguages([]);
+      return;
+    }
+    const newLangMap = {};
+    selectedCountries.forEach(country => {
+      const stateDataArr = statesByCountry[country] || [];
+      const langs = stateDataArr
+        .filter(s => selectedStates.includes(s.state))
+        .flatMap(s => s.languages || []);
+      newLangMap[country] = [...new Set(langs)];
+    });
+    setLanguagesByState(newLangMap);
+    const allValidLangs = new Set(Object.values(newLangMap).flat());
+    setSelectedLanguages(prev => prev.filter(l => allValidLangs.has(l)));
+  }, [selectedStates, statesByCountry]);
+
 
   const [uploadStage, setUploadStage] = useState('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -851,10 +934,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               disable_comments: turnOffCommenting
             },
             content_type: media.some(m => m.type === 'video') ? 'reel' : 'post',
-            category: Array.isArray(selectedCategories) ? (selectedCategories[0] || '') : (selectedCategories || ''),
+            category: selectedCategory || '',
             tags: hashtags,
             target_language: selectedLanguages,
             target_location: selectedCountries,
+            target_states: selectedStates,
             total_budget_coins: parseFloat(totalBudgetCoins) || 0
           };
 
@@ -975,9 +1059,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     setCurrentIndex(0);
     setCaption('');
     
-    setSelectedCategories([]);
+    setSelectedCategory("");
     setSelectedLanguages([]);
     setSelectedCountries([]);
+    setSelectedStates([]);
     setTotalBudgetCoins('');
     
     setTags([]);
@@ -1739,13 +1824,13 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               {postType === 'ad' && (
                 <div className="px-4 pb-4 border-b border-gray-100 dark:border-gray-800 space-y-4 pt-4">
                   
-                  {/* Category Accordion */}
+                  {/* 1. Category Accordion — single select (radio) */}
                   <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                     <button
                       onClick={() => setOpenAccordion(openAccordion === 'category' ? null : 'category')}
                       className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
                     >
-                      <span>Category {selectedCategories.length > 0 && `(${selectedCategories[0]})`}</span>
+                      <span>Category {selectedCategory && `(${selectedCategory})`}</span>
                       <ChevronDown size={16} className={`transition-transform ${openAccordion === 'category' ? 'rotate-180' : ''}`} />
                     </button>
                     {openAccordion === 'category' && (
@@ -1758,9 +1843,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                               <input
                                 type="radio"
                                 name="ad_category"
-                                checked={selectedCategories.includes(cat)}
-                                onChange={() => setSelectedCategories([cat])}
-                                className="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
+                                checked={selectedCategory === cat}
+                                onChange={() => setSelectedCategory(cat)}
+                                className="accent-blue-600"
                               />
                               <span className="text-sm dark:text-gray-200">{cat}</span>
                             </label>
@@ -1770,71 +1855,170 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     )}
                   </div>
 
-                  {/* Language Accordion */}
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => setOpenAccordion(openAccordion === 'language' ? null : 'language')}
-                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
-                    >
-                      <span>Target Language {selectedLanguages.length > 0 && `(${selectedLanguages.length})`}</span>
-                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'language' ? 'rotate-180' : ''}`} />
-                    </button>
-                    {openAccordion === 'language' && (
-                      <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
-                        {LANGUAGES.map(lang => (
-                          <label key={lang} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
-                            <input
-                              type="checkbox"
-                              checked={selectedLanguages.includes(lang)}
-                              onChange={() => {
-                                if (selectedLanguages.includes(lang)) setSelectedLanguages(selectedLanguages.filter(l => l !== lang));
-                                else setSelectedLanguages([...selectedLanguages, lang]);
-                              }}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm dark:text-gray-200">{lang}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Country Accordion */}
+                  {/* 2. Country Accordion — multiple select (checkbox) */}
                   <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                     <button
                       onClick={() => setOpenAccordion(openAccordion === 'country' ? null : 'country')}
                       className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
                     >
-                      <span>Target Country {selectedCountries.length > 0 && `(${selectedCountries.length})`}</span>
+                      <span>Target Country {selectedCountries.length > 0 && `(${selectedCountries.length} selected)`}</span>
                       <ChevronDown size={16} className={`transition-transform ${openAccordion === 'country' ? 'rotate-180' : ''}`} />
                     </button>
                     {openAccordion === 'country' && (
                       <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
-                        {COUNTRIES.map(country => (
-                          <label key={country} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
-                            <input
-                              type="checkbox"
-                              checked={selectedCountries.includes(country)}
-                              onChange={() => {
-                                if (selectedCountries.includes(country)) setSelectedCountries(selectedCountries.filter(c => c !== country));
-                                else setSelectedCountries([...selectedCountries, country]);
-                              }}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm dark:text-gray-200">{country}</span>
-                          </label>
-                        ))}
+                        {isLoadingCountries ? (
+                          <div className="p-2 text-xs text-gray-500">Loading countries...</div>
+                        ) : allCountries.length === 0 ? (
+                          <div className="p-2 text-xs text-gray-400">No countries available</div>
+                        ) : (
+                          allCountries.map(c => {
+                            const name = typeof c === 'string' ? c : (c.name || c.country);
+                            return (
+                              <label key={name} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCountries.includes(name)}
+                                  onChange={() => {
+                                    if (selectedCountries.includes(name)) {
+                                      setSelectedCountries(selectedCountries.filter(x => x !== name));
+                                    } else {
+                                      setSelectedCountries([...selectedCountries, name]);
+                                    }
+                                  }}
+                                  className="accent-blue-600"
+                                />
+                                <span className="text-sm dark:text-gray-200">{name}</span>
+                              </label>
+                            );
+                          })
+                        )}
                       </div>
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Total Budget (Coins) *</label>
-                    <input
-                      type="number" value={totalBudgetCoins} onChange={(e) => setTotalBudgetCoins(e.target.value)}
-                      placeholder="e.g. 1000"
-                      className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
+                  {/* 3. State Accordion — multiple select, shown only when countries selected */}
+                  {selectedCountries.length > 0 && (
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setOpenAccordion(openAccordion === 'state' ? null : 'state')}
+                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
+                      >
+                        <span>Target State {selectedStates.length > 0 && `(${selectedStates.length} selected)`}</span>
+                        <ChevronDown size={16} className={`transition-transform ${openAccordion === 'state' ? 'rotate-180' : ''}`} />
+                      </button>
+                      {openAccordion === 'state' && (
+                        <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
+                          {isLoadingStates ? (
+                            <div className="p-2 text-xs text-gray-500">Loading states...</div>
+                          ) : (
+                            selectedCountries.map(country => {
+                              const states = statesByCountry[country] || [];
+                              if (states.length === 0) return null;
+                              return (
+                                <div key={country}>
+                                  <div className="px-2 pt-2 pb-1 text-xs font-bold text-gray-400 uppercase tracking-wide">{country}</div>
+                                  {states.map(st => {
+                                    // Each st is { state, languages, cities }
+                                    const stateName = st.state || (typeof st === 'string' ? st : st.name);
+                                    return (
+                                      <label key={stateName} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedStates.includes(stateName)}
+                                          onChange={() => {
+                                            if (selectedStates.includes(stateName)) {
+                                              setSelectedStates(selectedStates.filter(x => x !== stateName));
+                                            } else {
+                                              setSelectedStates([...selectedStates, stateName]);
+                                            }
+                                          }}
+                                          className="accent-blue-600"
+                                        />
+                                        <span className="text-sm dark:text-gray-200">{stateName}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 4. Language Accordion — multiple select, shown only when states selected */}
+                  {selectedStates.length > 0 && (
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setOpenAccordion(openAccordion === 'language' ? null : 'language')}
+                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
+                      >
+                        <span>Target Language {selectedLanguages.length > 0 && `(${selectedLanguages.length} selected)`}</span>
+                        <ChevronDown size={16} className={`transition-transform ${openAccordion === 'language' ? 'rotate-180' : ''}`} />
+                      </button>
+                      {openAccordion === 'language' && (
+                        <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
+                          {isLoadingLanguages ? (
+                            <div className="p-2 text-xs text-gray-500">Loading languages...</div>
+                          ) : Object.keys(languagesByState).length === 0 ? (
+                            <div className="p-2 text-xs text-gray-400">No languages found for selected states</div>
+                          ) : (
+                            selectedCountries.map(country => {
+                              const langs = languagesByState[country] || [];
+                              if (langs.length === 0) return null;
+                              return (
+                                <div key={country}>
+                                  <div className="px-2 pt-2 pb-1 text-xs font-bold text-gray-400 uppercase tracking-wide">{country}</div>
+                                  {langs.map(langName => {
+                                    return (
+                                      <label key={langName} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedLanguages.includes(langName)}
+                                          onChange={() => {
+                                            if (selectedLanguages.includes(langName)) {
+                                              setSelectedLanguages(selectedLanguages.filter(x => x !== langName));
+                                            } else {
+                                              setSelectedLanguages([...selectedLanguages, langName]);
+                                            }
+                                          }}
+                                          className="accent-blue-600"
+                                        />
+                                        <span className="text-sm dark:text-gray-200">{langName}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 5. Budget */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setOpenAccordion(openAccordion === 'budget' ? null : 'budget')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
+                    >
+                      <span>Total Budget (Coins) {totalBudgetCoins && `(${totalBudgetCoins})`}</span>
+                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'budget' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openAccordion === 'budget' && (
+                      <div className="p-3 bg-white dark:bg-black">
+                        <input
+                          type="number"
+                          value={totalBudgetCoins}
+                          onChange={(e) => setTotalBudgetCoins(e.target.value)}
+                          placeholder="e.g. 1000"
+                          className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Minimum 100 coins required</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
