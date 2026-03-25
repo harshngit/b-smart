@@ -790,17 +790,20 @@ const Ads = ({ feedMode = 'user' }) => {
         setTimeout(() => dispatch(fetchWallet()), 3000);
       }
 
-      // Show coin reward POPUP
-      const rewardAmount = (coinsRewarded && Number(coinsRewarded) > 0)
-        ? Number(coinsRewarded)
-        : (() => {
-            const adCoins = adsRef.current.find(a => String(a._id) === String(adId))?.coins_reward;
-            return adCoins && Number(adCoins) > 0 ? Number(adCoins) : 10;
-          })();
-      setViewRewardPopup({ amount: rewardAmount });
-      const toastId = Date.now();
-      setCoinToast({ amount: rewardAmount, id: toastId });
-      setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
+      // Show coin reward POPUP — only when rewarded is explicitly true
+      const isRewarded = resData?.rewarded === true;
+      if (isRewarded) {
+        const rewardAmount = (coinsRewarded && Number(coinsRewarded) > 0)
+          ? Number(coinsRewarded)
+          : (() => {
+              const adCoins = adsRef.current.find(a => String(a._id) === String(adId))?.coins_reward;
+              return adCoins && Number(adCoins) > 0 ? Number(adCoins) : 10;
+            })();
+        setViewRewardPopup({ amount: rewardAmount });
+        const toastId = Date.now();
+        setCoinToast({ amount: rewardAmount, id: toastId });
+        setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
+      }
     } catch (err) {
       console.error('View tracking failed:', err);
     }
@@ -1473,10 +1476,14 @@ const Ads = ({ feedMode = 'user' }) => {
                               if (end !== null && ct >= end) {
                                 setProgress(100);
                                 const key = String(a._id);
-                                if (!viewFiredForAdId.current.has(key)) {
-                                  viewFiredForAdId.current.add(key);
-                                  trackView(a._id);
-                                }
+                                // Always fire on every complete watch
+                                trackView(a._id);
+                                // Clear guards so next full watch fires again
+                                viewFiredForAdId.current.delete(key);
+                                viewedIdsRef.current.delete(key);
+                                try {
+                                  sessionStorage.setItem('ads_viewed_ids', JSON.stringify([...viewedIdsRef.current]));
+                                } catch { /* ignore */ }
                                 // Replay from start
                                 vid.currentTime = start > 0 ? start : 0;
                                 setProgress(0);
@@ -1498,10 +1505,15 @@ const Ads = ({ feedMode = 'user' }) => {
                               setIsPausedByUser(false);
 
                               const key = String(a._id);
-                              if (!viewFiredForAdId.current.has(key)) {
-                                viewFiredForAdId.current.add(key);
-                                trackView(a._id);
-                              }
+                              // Always fire trackView on every complete watch (re-watch included)
+                              trackView(a._id);
+
+                              // Clear both guards so the NEXT full watch fires again
+                              viewFiredForAdId.current.delete(key);
+                              viewedIdsRef.current.delete(key);
+                              try {
+                                sessionStorage.setItem('ads_viewed_ids', JSON.stringify([...viewedIdsRef.current]));
+                              } catch { /* ignore */ }
 
                               // Replay the video from the beginning
                               const vid = videoRefs.current[index];

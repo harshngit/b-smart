@@ -318,14 +318,16 @@ const Sidebar = ({ onOpenCreateModal }) => {
                   </div>
                   {mode === 'dark' && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
                 </button>
-                <Link
-                  to="/settings"
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
-                  onClick={() => setIsMoreDropdownOpen(false)}
-                >
-                  <Target size={18} />
-                  Settings
-                </Link>
+                {!isVendor && (
+                  <Link
+                    to="/settings"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
+                    onClick={() => setIsMoreDropdownOpen(false)}
+                  >
+                    <Target size={18} />
+                    Settings
+                  </Link>
+                )}
               </div>
             )}
             <button

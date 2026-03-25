@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -28,7 +28,7 @@ const Profile = () => {
     const [profileUser, setProfileUser] = useState(null);
     const isOwnProfile = !userId || (currentUser && (userId === currentUser.id || userId === currentUser._id));
 
-    const [activeTab, setActiveTab] = useState('all');
+    const [activeTab, setActiveTab] = useState(null); // initialized after profileUser loads
     const [userPosts, setUserPosts] = useState([]);
     const [loadingPosts, setLoadingPosts] = useState(true);
     const [selectedPost, setSelectedPost] = useState(null);
@@ -39,6 +39,7 @@ const Profile = () => {
     const [loadingAds, setLoadingAds] = useState(false);
     const [followed, setFollowed] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
+    const [vendorInfo, setVendorInfo] = useState(null);
 
     const onlyPosts = userPosts.filter(p => p.type !== 'reel');
     const onlyReels = userPosts.filter(p => p.type === 'reel');
@@ -69,7 +70,12 @@ const Profile = () => {
         fetchProfileUser();
     }, [userId, currentUser, isOwnProfile]);
 
-    // ── Fetch posts ─────────────────────────────────────────────────────────
+    // Set default tab based on role
+    useEffect(() => {
+        if (profileUser) {
+            setActiveTab(profileUser.role === 'vendor' ? 'ads' : 'all');
+        }
+    }, [profileUser?.role]); // eslint-disable-line
     useEffect(() => {
         const fetchPosts = async () => {
             const profileUserId = profileUser?._id || profileUser?.id;
@@ -136,7 +142,21 @@ const Profile = () => {
         }
     }, [profileUser?.role, profileUser?._id, profileUser?.id]); // eslint-disable-line
 
-    // ── Follow toggle ────────────────────────────────────────────────────────
+    // ── Fetch vendor business info ───────────────────────────────────────────
+    useEffect(() => {
+        const fetchVendorInfo = async () => {
+            const profileUserId = profileUser?._id || profileUser?.id;
+            if (!profileUserId || profileUser?.role !== 'vendor') return;
+            try {
+                const res = await api.get(`/vendors/${profileUserId}`);
+                const data = res?.data;
+                setVendorInfo(data?.vendor || data?.business || data || null);
+            } catch (e) {
+                console.error('Error fetching vendor info:', e);
+            }
+        };
+        fetchVendorInfo();
+    }, [profileUser?._id, profileUser?.id, profileUser?.role]); // eslint-disable-line
     const handleFollow = async () => {
         if (followLoading) return;
         setFollowLoading(true);
@@ -187,6 +207,12 @@ const Profile = () => {
     const getAdThumbnail = (ad) => {
         const m = ad.media?.[0];
         if (!m) return null;
+        // For video ads prefer the thumbnail image
+        if (m.media_type === 'video' && m.thumbnails?.length > 0) {
+            const t = m.thumbnails[0];
+            if (t.fileUrl && t.fileUrl.startsWith('http')) return t.fileUrl;
+            if (t.fileName) return `${BASE_URL}/uploads/${t.fileName}`;
+        }
         if (m.fileUrl && m.fileUrl.startsWith('http')) return m.fileUrl;
         if (m.fileName) return `${BASE_URL}/uploads/${m.fileName}`;
         return null;
@@ -222,14 +248,61 @@ const Profile = () => {
 
     const isVendor = profileUser.role === 'vendor';
 
-    const tabConfig = [
-        { key: 'all',   label: 'All',   icon: <Grid size={22} /> },
-        { key: 'posts', label: 'Posts', icon: <Grid size={22} /> },
-        { key: 'reels', label: 'Reels', icon: <Video size={22} /> },
-        ...(isVendor ? [{ key: 'ads', label: 'Ads', icon: <Megaphone size={22} /> }] : []),
-    ];
+    const tabConfig = isVendor
+        ? [{ key: 'ads', label: 'Ads', icon: <Megaphone size={22} /> }]
+        : [
+            { key: 'all',   label: 'All',   icon: <Grid size={22} /> },
+            { key: 'posts', label: 'Posts', icon: <Grid size={22} /> },
+            { key: 'reels', label: 'Reels', icon: <Video size={22} /> },
+          ];
 
-    // ── Ads Grid (vendor tab) ─────────────────────────────────────────────────
+    // ── Vendor Business Info Card ─────────────────────────────────────────────
+    const VendorBusinessCard = () => {
+        if (!isVendor || !vendorInfo) return null;
+        const fields = [
+            { icon: <Building2 size={15} className="text-orange-500 flex-shrink-0" />, label: 'Company', value: vendorInfo.company_name || vendorInfo.registered_name },
+            { icon: <FileText size={15} className="text-orange-500 flex-shrink-0" />, label: 'Registered As', value: vendorInfo.registered_name },
+            { icon: <Briefcase size={15} className="text-orange-500 flex-shrink-0" />, label: 'Industry', value: vendorInfo.industry },
+            { icon: <Hash size={15} className="text-orange-500 flex-shrink-0" />, label: 'Reg. Number', value: vendorInfo.registration_number },
+            { icon: <Hash size={15} className="text-orange-500 flex-shrink-0" />, label: 'Tax ID', value: vendorInfo.tax_id },
+            { icon: <Calendar size={15} className="text-orange-500 flex-shrink-0" />, label: 'Est. Year', value: vendorInfo.year_established },
+            { icon: <Briefcase size={15} className="text-orange-500 flex-shrink-0" />, label: 'Company Type', value: vendorInfo.company_type },
+        ].filter(f => f.value);
+
+        return (
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-gray-900 dark:to-gray-800 border border-orange-100 dark:border-orange-900/30 rounded-2xl p-5 mb-6">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-orange-400 to-pink-500 flex items-center justify-center shadow-sm">
+                        <Building2 size={16} className="text-white" />
+                    </div>
+                    <h3 className="font-bold text-gray-900 dark:text-white text-sm">Business Information</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    {fields.map(({ icon, label, value }) => (
+                        <div key={label} className="flex items-start gap-2 bg-white dark:bg-gray-800/60 rounded-xl px-3 py-2.5 shadow-sm">
+                            {icon}
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{label}</p>
+                                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{value}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderContent = () => {
+        if (activeTab === null) return null;
+        if (activeTab === 'ads') return <AdsGrid />;
+        return <PostGrid />;
+    };
+    const renderContentMobile = () => {
+        if (activeTab === null) return null;
+        if (activeTab === 'ads') return <AdsGrid containerClass="pb-24" />;
+        return <PostGrid containerClass="pb-24" />;
+    };
+
     const AdsGrid = ({ containerClass = '' }) => (
         <div className={`${containerClass}`}>
             {loadingAds ? (
@@ -451,6 +524,12 @@ const Profile = () => {
                             </div>
                         )}
                     </div>
+                {/* Vendor Business Info (mobile) */}
+                {isVendor && vendorInfo && (
+                    <div className="px-4 pt-3 pb-1">
+                        <VendorBusinessCard />
+                    </div>
+                )}
                 </div>
 
                 {/* Mobile Tabs */}
@@ -467,7 +546,7 @@ const Profile = () => {
                     ))}
                 </div>
 
-                {activeTab === 'ads' ? <AdsGrid containerClass="pb-24" /> : <PostGrid containerClass="pb-24" />}
+                {renderContentMobile()}
             </div>
 
 
@@ -572,6 +651,9 @@ const Profile = () => {
                     )}
                 </div>
 
+                {/* Vendor Business Info */}
+                <VendorBusinessCard />
+
                 {/* Desktop Tabs */}
                 <div className="flex justify-center gap-14 border-t border-gray-200 dark:border-gray-800 -mt-px mb-0">
                     {tabConfig.map(tab => (
@@ -586,7 +668,7 @@ const Profile = () => {
                     ))}
                 </div>
 
-                {activeTab === 'ads' ? <AdsGrid /> : <PostGrid />}
+                {renderContent()}
 
                 {/* Floating Wallet — reads from Redux, stays live */}
                 <div className="fixed bottom-8 right-8 z-50 hover:scale-105 transition-transform cursor-pointer">
