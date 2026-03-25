@@ -3,7 +3,7 @@ import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import commentService from '../services/commentServiceJS';
 import {
-  Heart, MessageCircle, Send, MoreHorizontal, Music2,
+  Heart, MessageCircle, Send, MoreHorizontal,
   Volume2, VolumeX, Bookmark, ChevronLeft, Search,
   ShoppingBag, Loader2, UserPlus, UserCheck, X, Smile, Trash2
 } from 'lucide-react';
@@ -1292,19 +1292,99 @@ const Ads = ({ feedMode = 'user' }) => {
                 </button>
               ))}
             </div>
-            {/* Mobile Wallet Balance Badge */}
-            <Link to="/wallet" className="shrink-0 flex items-center gap-1.5 bg-black/50 backdrop-blur-md border border-white/20 rounded-full px-2.5 py-1.5">
-              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
-                </svg>
-              </div>
-              <div className="flex flex-col leading-none">
-                <span className="text-[9px] text-white/60 font-medium">Balance</span>
-                <span className="text-[11px] font-bold text-white">Coins {walletBalance}</span>
-              </div>
-            </Link>
+            {/* Mobile Topbar right: Search + Wallet compact */}
+            <div className="shrink-0 flex items-center gap-2">
+              {/* Search button */}
+              <button
+                onClick={handleSearchOpen}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-md border border-white/20 active:scale-90 transition-transform"
+              >
+                <Search size={16} className="text-white" />
+              </button>
+              {/* Compact wallet pill */}
+              <Link to="/wallet" className="flex items-center gap-1 bg-black/40 backdrop-blur-md border border-white/20 rounded-full px-2 py-1">
+                <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+                  </svg>
+                </div>
+                <span className="text-[11px] font-bold text-white">{walletBalance}</span>
+              </Link>
+            </div>
           </div>
+
+          {/* Mobile Search overlay — slides in from top when open */}
+          {searchOpen && (
+            <div className="md:hidden absolute top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md px-3 pt-3 pb-3">
+              <div className="flex items-center gap-2 bg-white/15 rounded-full px-3 py-2">
+                <Search size={15} className="text-white/70 shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={handleSearchInput}
+                  placeholder="Search ads, users…"
+                  className="flex-1 bg-transparent text-sm outline-none text-white placeholder-white/50"
+                  autoFocus
+                />
+                {searchLoading
+                  ? <Loader2 size={14} className="animate-spin text-white/60 shrink-0" />
+                  : searchQuery
+                    ? <button onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDropdownVisible(false); }}><X size={14} className="text-white/60" /></button>
+                    : null
+                }
+                <button onClick={handleSearchClose} className="text-xs font-semibold text-white/70 ml-1 shrink-0">Cancel</button>
+              </div>
+              {/* Mobile search results */}
+              {searchDropdownVisible && (
+                <div className="mt-2 bg-black/90 rounded-2xl border border-white/10 overflow-hidden max-h-64 overflow-y-auto">
+                  {searchLoading && (
+                    <div className="flex items-center justify-center py-6 gap-2 text-white/50">
+                      <Loader2 size={14} className="animate-spin" />
+                      <span className="text-xs">Searching…</span>
+                    </div>
+                  )}
+                  {!searchLoading && searchResults.length === 0 && searchQuery.trim() && (
+                    <div className="flex flex-col items-center py-6 gap-1 text-white/40">
+                      <Search size={18} className="opacity-40" />
+                      <span className="text-xs">No results for "{searchQuery}"</span>
+                    </div>
+                  )}
+                  {!searchLoading && searchResults.map(item => {
+                    if (item._type === 'user') return (
+                      <button key={item._id || item.id} onClick={() => handleSearchResultClick(item)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] shrink-0">
+                          <div className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center">
+                            {item.avatar_url
+                              ? <img src={item.avatar_url} alt="" className="w-full h-full object-cover" />
+                              : <span className="text-[10px] font-bold text-white">{(item.username || '?')[0].toUpperCase()}</span>
+                            }
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-white truncate">{item.full_name || item.username}</div>
+                          {item.username && <div className="text-xs text-white/50">@{item.username}</div>}
+                        </div>
+                      </button>
+                    );
+                    const thumb = item.media?.[0]?.fileUrl || item.media?.[0]?.thumbnail_url;
+                    return (
+                      <button key={item._id} onClick={() => handleSearchResultClick(item)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left">
+                        <div className="w-9 h-9 rounded-xl overflow-hidden bg-white/10 shrink-0">
+                          {thumb ? <img src={thumb} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white/40"><ShoppingBag size={12}/></div>}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-white truncate">{item.caption || item.title || 'Ad'}</div>
+                          {item.category && <span className="text-[10px] text-white/50">{item.category}</span>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
 
           {/* Loading */}
@@ -1481,31 +1561,40 @@ const Ads = ({ feedMode = 'user' }) => {
 
                       {/* Bottom info — clears bottom nav (64px) on mobile */}
                       <div className="absolute bottom-0 left-0 w-full p-4 md:pb-6 z-20" style={{ paddingRight: '60px' }}>
-                        {/* Vendor row */}
+                        {/* Vendor row — name is clickable → public profile */}
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          {a.user_id?.avatar_url
-                            ? <img src={a.user_id.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover shrink-0" alt="user" />
-                            : <div className="w-8 h-8 rounded-full border border-white/30 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                {(a.vendor_id?.business_name || 'A')[0]}
-                              </div>
-                          }
-                          <span className="font-bold text-white text-sm">
-                            {a.vendor_id?.business_name || a.user_id?.username}
-                          </span>
+                          <button
+                            onClick={() => {
+                              const uid = a.user_id?._id || a.user_id?.id || a.vendor_id?._id;
+                              if (uid) navigate(`/profile/${uid}`);
+                            }}
+                            className="flex items-center gap-2 active:opacity-70 transition-opacity"
+                          >
+                            {a.user_id?.avatar_url
+                              ? <img src={a.user_id.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover shrink-0" alt="user" />
+                              : <div className="w-8 h-8 rounded-full border border-white/30 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                  {(a.vendor_id?.business_name || 'A')[0]}
+                                </div>
+                            }
+                            <span className="font-bold text-white text-sm hover:underline decoration-white/60 underline-offset-2">
+                              {a.vendor_id?.business_name || a.user_id?.username}
+                            </span>
+                          </button>
                           {a.total_budget_coins > 0 && (
                             <div className="flex items-center gap-1 bg-amber-500/20 border border-amber-400/40 rounded-full px-1.5 py-0.5">
                               <CoinIcon size={11} />
                               <span className="text-amber-300 text-[10px] font-bold">{fmt(a.total_budget_coins)}</span>
                             </div>
                           )}
-                          {/* Follow button */}
                           <FollowButton userId={a.user_id?._id} mobile />
                         </div>
 
                         <Caption text={a.caption} />
 
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-white/60 text-[10px]">{a.category}</span>
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          {a.category && (
+                            <span className="text-white/70 text-[10px] bg-white/10 px-2 py-0.5 rounded-full">{a.category}</span>
+                          )}
                           {a.hashtags?.slice(0, 3).map(h => (
                             <span key={h} className="text-white/50 text-[10px]">#{h}</span>
                           ))}
@@ -1513,13 +1602,30 @@ const Ads = ({ feedMode = 'user' }) => {
 
                         {a.product_offer?.length > 0 && <ProductOffer offer={a.product_offer[0]} />}
 
-                        <div className="flex items-center gap-1.5 text-white/70 text-xs mt-1.5">
-                          <Music2 size={11} />
-                          <div className="overflow-hidden w-36">
-                            <span className="whitespace-nowrap" style={{ animation: 'marquee 6s linear infinite' }}>
-                              {a.target_location?.join(', ') || 'Global'} · {a.target_language?.join(', ') || 'All Languages'}
+                        {/* Target language + location pills — replaces music marquee */}
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {a.target_language?.slice(0, 3).map(lang => (
+                            <span key={lang} className="flex items-center gap-1 text-[10px] font-medium text-white/80 bg-white/10 backdrop-blur-sm border border-white/15 px-2 py-0.5 rounded-full">
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                              {lang}
                             </span>
-                          </div>
+                          ))}
+                          {a.target_language?.length > 3 && (
+                            <span className="text-[10px] font-medium text-white/60 bg-white/10 px-2 py-0.5 rounded-full">
+                              +{a.target_language.length - 3}
+                            </span>
+                          )}
+                          {a.target_location?.slice(0, 2).map(loc => (
+                            <span key={loc} className="flex items-center gap-1 text-[10px] font-medium text-white/80 bg-white/10 backdrop-blur-sm border border-white/15 px-2 py-0.5 rounded-full">
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                              {loc}
+                            </span>
+                          ))}
+                          {a.target_location?.length > 2 && (
+                            <span className="text-[10px] font-medium text-white/60 bg-white/10 px-2 py-0.5 rounded-full">
+                              +{a.target_location.length - 2} more
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -1560,21 +1666,27 @@ const Ads = ({ feedMode = 'user' }) => {
         </div>
       </div>
 
-      {/* Nav arrows */}
+      {/* Nav arrows — visible in both light and dark mode */}
       <div className="hidden md:flex fixed right-5 top-1/2 -translate-y-1/2 z-40 flex-col gap-3">
         <button
           onClick={() => goToIndex(currentIndex - 1)}
           disabled={currentIndex === 0}
-          className="w-12 h-12 rounded-full dark:bg-white/10 border border-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center hover:bg-white/25 hover:scale-110 active:scale-95 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+          className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 hover:scale-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            className="stroke-gray-800 dark:stroke-white">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
         </button>
         <button
           onClick={() => goToIndex(currentIndex + 1)}
           disabled={currentIndex === ads.length - 1}
-          className="w-12 h-12 rounded-full bg-white/10 border border-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center hover:bg-white/25 hover:scale-110 active:scale-95 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+          className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 hover:scale-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            className="stroke-gray-800 dark:stroke-white">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </button>
       </div>
 
@@ -1758,7 +1870,6 @@ const Ads = ({ feedMode = 'user' }) => {
           from { opacity: 0; transform: translateX(-16px); }
           to   { opacity: 1; transform: translateX(0); }
         }
-        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 
         .scrollbar-none::-webkit-scrollbar { display: none; }
         .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }

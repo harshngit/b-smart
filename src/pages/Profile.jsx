@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, TrendingUp, BarChart2, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -8,11 +8,22 @@ import PostDetailModal from '../components/PostDetailModal';
 import AvatarCropModal from '../components/AvatarCropModal';
 import { setUser } from '../store/authSlice';
 
+// ─── helpers ──────────────────────────────────────────────────────────────────
+const fmt = (n = 0) => {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
+    return String(n);
+};
+
+const BASE_URL = 'https://api.bebsmart.in';
+
 const Profile = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { userId } = useParams();
     const { userObject: currentUser } = useSelector((state) => state.auth);
+    // Read wallet from Redux wallet slice (kept live by Layout.jsx)
+    const walletBalance = useSelector((state) => state.wallet?.balance ?? 0);
 
     const [profileUser, setProfileUser] = useState(null);
     const isOwnProfile = !userId || (currentUser && (userId === currentUser.id || userId === currentUser._id));
@@ -23,16 +34,20 @@ const Profile = () => {
     const [selectedPost, setSelectedPost] = useState(null);
     const [showAvatarModal, setShowAvatarModal] = useState(false);
 
-    const allPosts = userPosts;
-    const onlyPosts = userPosts.filter(p => p.type !== 'reel' && p.type !== 'ad');
+    // Vendor-specific state
+    const [userAds, setUserAds] = useState([]);
+    const [loadingAds, setLoadingAds] = useState(false);
+    const [followed, setFollowed] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
+
+    const onlyPosts = userPosts.filter(p => p.type !== 'reel');
     const onlyReels = userPosts.filter(p => p.type === 'reel');
-    const onlyAds = userPosts.filter(p => p.type === 'ad');
     const displayedPosts =
         activeTab === 'reels' ? onlyReels :
         activeTab === 'posts' ? onlyPosts :
-        activeTab === 'ads' ? onlyAds :
-        allPosts;
+        userPosts;
 
+    // ── Fetch profile user ──────────────────────────────────────────────────
     useEffect(() => {
         const fetchProfileUser = async () => {
             if (isOwnProfile) {
@@ -40,7 +55,7 @@ const Profile = () => {
             } else {
                 try {
                     const response = await api.get(`/users/${userId}`);
-                    setProfileUser(response.data);
+                    setProfileUser(response.data?.user || response.data);
                 } catch (error) {
                     console.error('Error fetching user profile:', error);
                     try {
@@ -54,12 +69,7 @@ const Profile = () => {
         fetchProfileUser();
     }, [userId, currentUser, isOwnProfile]);
 
-    const handlePostClick = (post) => {
-        const id = post._id || post.id;
-        if (window.innerWidth < 768 && id) navigate(`/post/${id}`);
-        else setSelectedPost(post);
-    };
-
+    // ── Fetch posts ─────────────────────────────────────────────────────────
     useEffect(() => {
         const fetchPosts = async () => {
             const profileUserId = profileUser?._id || profileUser?.id;
@@ -81,6 +91,66 @@ const Profile = () => {
         };
         fetchPosts();
     }, [profileUser]);
+
+    // ── Fetch ads (for vendor profiles) ────────────────────────────────────
+    const fetchAds = useCallback(async () => {
+        const profileUserId = profileUser?._id || profileUser?.id;
+        if (!profileUserId || profileUser?.role !== 'vendor') return;
+        setLoadingAds(true);
+        try {
+            let list = [];
+            // Try multiple endpoints to get this vendor's ads
+            const attempts = [
+                () => api.get(`/ads`, { params: { vendor_id: profileUserId, status: 'active', limit: 50 } }),
+                () => api.get(`/ads/feed`, { params: { vendor_id: profileUserId, limit: 50 } }),
+                () => api.get(`/users/${profileUserId}/ads`),
+                () => api.get(`/vendors/${profileUserId}/ads`),
+            ];
+            for (const attempt of attempts) {
+                try {
+                    const res = await attempt();
+                    const data = res?.data;
+                    list = Array.isArray(data) ? data : (data?.ads || data?.data || []);
+                    if (list.length > 0) break;
+                } catch { /* try next */ }
+            }
+            setUserAds(list);
+        } catch (e) {
+            console.error('Error fetching vendor ads:', e);
+        } finally {
+            setLoadingAds(false);
+        }
+    }, [profileUser]);
+
+    // Auto-fetch ads when we know it's a vendor and the ads tab is opened
+    useEffect(() => {
+        if (profileUser?.role === 'vendor' && activeTab === 'ads' && userAds.length === 0) {
+            fetchAds();
+        }
+    }, [activeTab, profileUser, fetchAds, userAds.length]);
+
+    // Also pre-fetch ads right after profile loads (so the count shows)
+    useEffect(() => {
+        if (profileUser?.role === 'vendor') {
+            fetchAds();
+        }
+    }, [profileUser?.role, profileUser?._id, profileUser?.id]); // eslint-disable-line
+
+    // ── Follow toggle ────────────────────────────────────────────────────────
+    const handleFollow = async () => {
+        if (followLoading) return;
+        setFollowLoading(true);
+        const was = followed;
+        setFollowed(!was);
+        try {
+            const endpoint = was ? '/unfollow' : '/follow';
+            await api.post(endpoint, { followedUserId: profileUser?._id || profileUser?.id });
+        } catch {
+            setFollowed(was);
+        } finally {
+            setFollowLoading(false);
+        }
+    };
 
     const getInitials = (name) => {
         if (!name) return 'U';
@@ -113,12 +183,27 @@ const Profile = () => {
         return media.fileUrl || media.image || 'https://via.placeholder.com/300';
     };
 
+    // Get thumbnail for ad
+    const getAdThumbnail = (ad) => {
+        const m = ad.media?.[0];
+        if (!m) return null;
+        if (m.fileUrl && m.fileUrl.startsWith('http')) return m.fileUrl;
+        if (m.fileName) return `${BASE_URL}/uploads/${m.fileName}`;
+        return null;
+    };
+
+    const handlePostClick = (post) => {
+        const id = post._id || post.id;
+        if (window.innerWidth < 768 && id) navigate(`/post/${id}`);
+        else setSelectedPost(post);
+    };
+
     const highlights = [
         { id: 1, title: 'Travel', img: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=150&h=150&fit=crop' },
-        { id: 2, title: 'Work', img: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=150&h=150&fit=crop' },
-        { id: 3, title: 'Life', img: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=150&h=150&fit=crop' },
-        { id: 4, title: 'Tech', img: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=150&h=150&fit=crop' },
-        { id: 5, title: 'Music', img: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=150&h=150&fit=crop' },
+        { id: 2, title: 'Work',   img: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=150&h=150&fit=crop' },
+        { id: 3, title: 'Life',   img: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=150&h=150&fit=crop' },
+        { id: 4, title: 'Tech',   img: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=150&h=150&fit=crop' },
+        { id: 5, title: 'Music',  img: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=150&h=150&fit=crop' },
     ];
 
     if (!profileUser) {
@@ -135,13 +220,74 @@ const Profile = () => {
         </svg>
     );
 
+    const isVendor = profileUser.role === 'vendor';
+
     const tabConfig = [
         { key: 'all',   label: 'All',   icon: <Grid size={22} /> },
         { key: 'posts', label: 'Posts', icon: <Grid size={22} /> },
         { key: 'reels', label: 'Reels', icon: <Video size={22} /> },
-        ...(profileUser.role === 'vendor' ? [{ key: 'ads', label: 'Ads', icon: <Megaphone size={22} /> }] : []),
+        ...(isVendor ? [{ key: 'ads', label: 'Ads', icon: <Megaphone size={22} /> }] : []),
     ];
 
+    // ── Ads Grid (vendor tab) ─────────────────────────────────────────────────
+    const AdsGrid = ({ containerClass = '' }) => (
+        <div className={`${containerClass}`}>
+            {loadingAds ? (
+                <div className="col-span-3 flex flex-col items-center py-16 gap-3 bg-white dark:bg-black">
+                    <Loader2 className="w-7 h-7 animate-spin text-orange-500" />
+                    <span className="text-sm text-gray-400">Loading ads…</span>
+                </div>
+            ) : userAds.length === 0 ? (
+                <div className="col-span-3 bg-white dark:bg-black py-14 text-center">
+                    <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Megaphone size={30} className="text-gray-300 dark:text-gray-600" />
+                    </div>
+                    <h3 className="font-semibold text-base text-gray-900 dark:text-white mb-1">No Ads Yet</h3>
+                    {isOwnProfile && (
+                        <Link to="/create-ad" className="text-blue-500 text-sm font-semibold mt-1 inline-block">Create ad now</Link>
+                    )}
+                </div>
+            ) : (
+                <div className="grid grid-cols-3 gap-[1px] bg-gray-200 dark:bg-gray-800">
+                    {userAds.map((ad) => {
+                        const thumb = getAdThumbnail(ad);
+                        const isVideo = ad.media?.[0]?.media_type === 'video';
+                        return (
+                            <div key={ad._id || ad.id}
+                                className="aspect-square bg-gray-100 dark:bg-gray-900 relative group cursor-pointer overflow-hidden"
+                                onClick={() => navigate(`/ads`)}>
+                                {/* Active badge */}
+                                {ad.status === 'active' && (
+                                    <div className="absolute top-1.5 left-1.5 z-10">
+                                        <span className="text-[9px] font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full">AD</span>
+                                    </div>
+                                )}
+                                {isVideo && (
+                                    <div className="absolute top-1.5 right-1.5 z-10">
+                                        <Video size={15} className="text-white drop-shadow" fill="white" />
+                                    </div>
+                                )}
+                                {thumb ? (
+                                    <img src={thumb} alt={ad.caption || 'Ad'} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-100 to-pink-100 dark:from-gray-800 dark:to-gray-700">
+                                        <Megaphone size={28} className="text-orange-400 dark:text-gray-500" />
+                                    </div>
+                                )}
+                                {/* Hover overlay */}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-4 text-white font-bold">
+                                    <div className="flex items-center gap-1.5"><Heart fill="white" size={16}/> {fmt(ad.likes_count || 0)}</div>
+                                    <div className="flex items-center gap-1.5"><Eye size={16}/> {fmt(ad.views_count || ad.unique_views_count || 0)}</div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+
+    // ── Posts Grid ────────────────────────────────────────────────────────────
     const PostGrid = ({ containerClass = '' }) => (
         <div className={`grid grid-cols-3 gap-[1px] bg-gray-200 dark:bg-gray-800 ${containerClass}`}>
             {loadingPosts ? (
@@ -151,32 +297,25 @@ const Profile = () => {
             ) : displayedPosts.length === 0 ? (
                 <div className="col-span-3 bg-white dark:bg-black py-14 text-center">
                     <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        {activeTab === 'reels' ? <Video size={30} className="text-gray-300 dark:text-gray-600" />
-                            : activeTab === 'ads' ? <Megaphone size={30} className="text-gray-300 dark:text-gray-600" />
+                        {activeTab === 'reels'
+                            ? <Video size={30} className="text-gray-300 dark:text-gray-600" />
                             : <Grid size={30} className="text-gray-300 dark:text-gray-600" />}
                     </div>
                     <h3 className="font-semibold text-base text-gray-900 dark:text-white mb-1">
-                        {activeTab === 'reels' ? 'No Reels Yet' : activeTab === 'ads' ? 'No Ads Yet' : 'No Posts Yet'}
+                        {activeTab === 'reels' ? 'No Reels Yet' : 'No Posts Yet'}
                     </h3>
-                    <Link to={activeTab === 'ads' ? '/create-ad' : '/create'} className="text-blue-500 text-sm font-semibold mt-1 inline-block">
-                        Create now
-                    </Link>
+                    {isOwnProfile && (
+                        <Link to="/create" className="text-blue-500 text-sm font-semibold mt-1 inline-block">Create now</Link>
+                    )}
                 </div>
             ) : (
                 displayedPosts.map((post) => (
-                    <div
-                        key={post._id || post.id}
+                    <div key={post._id || post.id}
                         className="aspect-square bg-gray-100 dark:bg-gray-900 relative group cursor-pointer overflow-hidden"
-                        onClick={() => handlePostClick(post)}
-                    >
+                        onClick={() => handlePostClick(post)}>
                         {post.type === 'reel' && (
                             <div className="absolute top-1.5 right-1.5 z-10">
                                 <Video size={15} className="text-white drop-shadow" fill="white" />
-                            </div>
-                        )}
-                        {post.type === 'ad' && (
-                            <div className="absolute top-1.5 left-1.5 z-10">
-                                <span className="text-[9px] font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full">AD</span>
                             </div>
                         )}
                         <img src={getPostThumbnail(post)} alt="Post" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200" />
@@ -243,9 +382,10 @@ const Profile = () => {
                                 { val: profileUser.posts_count ?? userPosts.length, label: 'Posts' },
                                 { val: profileUser.followers_count || 0, label: 'Followers' },
                                 { val: profileUser.following_count || 0, label: 'Following' },
+                                ...(isVendor ? [{ val: userAds.length, label: 'Ads' }] : []),
                             ].map(({ val, label }) => (
                                 <div key={label} className="flex flex-col items-center">
-                                    <span className="font-bold text-base text-gray-900 dark:text-white">{val}</span>
+                                    <span className="font-bold text-base text-gray-900 dark:text-white">{fmt(val)}</span>
                                     <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
                                 </div>
                             ))}
@@ -255,14 +395,14 @@ const Profile = () => {
                     {/* Bio */}
                     <div className="mb-3">
                         <div className="font-bold text-sm text-gray-900 dark:text-white">{profileUser.full_name}</div>
-                        {profileUser.role === 'vendor' && (
+                        {isVendor && (
                             <span className="inline-block text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full mt-0.5 mb-0.5">
                                 Vendor
                             </span>
                         )}
-                        {profileUser.bio ? (
+                        {profileUser.bio && (
                             <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{profileUser.bio}</div>
-                        ) : null}
+                        )}
                     </div>
 
                     {/* Action Buttons */}
@@ -270,14 +410,20 @@ const Profile = () => {
                         {isOwnProfile ? (
                             <>
                                 <Link to="/edit-profile" className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">Edit profile</Link>
-                                <Link to="/archive" className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">View archive</Link>
+                                <Link to={isVendor ? '/vendor/profile' : '/archive'} className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">
+                                    {isVendor ? 'Business Profile' : 'View archive'}
+                                </Link>
                                 <Link to="/settings" className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-2 rounded-lg">
                                     <Settings size={18} />
                                 </Link>
                             </>
                         ) : (
                             <>
-                                <button className="flex-1 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-semibold py-1.5 rounded-lg hover:opacity-90 transition-opacity">Follow</button>
+                                <button onClick={handleFollow} disabled={followLoading}
+                                    className="flex-1 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-semibold py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-1">
+                                    {followLoading && <Loader2 size={12} className="animate-spin" />}
+                                    {followed ? 'Following' : 'Follow'}
+                                </button>
                                 <button className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg">Message</button>
                                 <button className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-2 rounded-lg"><MoreHorizontal size={18} /></button>
                             </>
@@ -307,10 +453,7 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* Vendor Ad Panel (mobile) */}
-                
-
-                {/* Mobile Tabs — icon only, Instagram style */}
+                {/* Mobile Tabs */}
                 <div className="flex border-t border-gray-200 dark:border-gray-800 sticky top-[53px] bg-white dark:bg-black z-30">
                     {tabConfig.map(tab => (
                         <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -318,14 +461,13 @@ const Profile = () => {
                                 activeTab === tab.key
                                     ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
                                     : 'border-transparent text-gray-400 dark:text-gray-600'
-                            }`}
-                        >
+                            }`}>
                             {tab.icon}
                         </button>
                     ))}
                 </div>
 
-                <PostGrid containerClass="pb-24" />
+                {activeTab === 'ads' ? <AdsGrid containerClass="pb-24" /> : <PostGrid containerClass="pb-24" />}
             </div>
 
 
@@ -338,8 +480,7 @@ const Profile = () => {
                     <div className="relative flex-shrink-0">
                         <div
                             onClick={() => isOwnProfile && setShowAvatarModal(true)}
-                            className={`w-[150px] h-[150px] rounded-full p-[3px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 transition-opacity ${isOwnProfile ? 'cursor-pointer hover:opacity-90' : ''}`}
-                        >
+                            className={`w-[150px] h-[150px] rounded-full p-[3px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 transition-opacity ${isOwnProfile ? 'cursor-pointer hover:opacity-90' : ''}`}>
                             <div className="w-full h-full rounded-full bg-white dark:bg-black p-[3px] overflow-hidden">
                                 {profileUser.avatar_url ? (
                                     <img src={profileUser.avatar_url} className="w-full h-full rounded-full object-cover" alt="Profile" />
@@ -360,22 +501,25 @@ const Profile = () => {
 
                     {/* Info */}
                     <div className="flex flex-col flex-1 pt-1 min-w-0">
-                        {/* Username row */}
                         <div className="flex flex-wrap items-center gap-3 mb-4">
                             <h2 className="text-2xl font-light text-gray-900 dark:text-white">{profileUser.username}</h2>
                             <VerifiedBadge />
-                            {profileUser.role === 'vendor' && (
+                            {isVendor && (
                                 <span className="text-xs font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full">Vendor</span>
                             )}
                             {isOwnProfile ? (
                                 <>
                                     <Link to="/edit-profile" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">Edit profile</Link>
-                                    <Link to="/archive" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">View archive</Link>
+                                    {isVendor && <Link to="/vendor/profile" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">Business Profile</Link>}
                                     <Link to="/settings" className="p-2 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><Settings size={22} /></Link>
                                 </>
                             ) : (
                                 <>
-                                    <button className="px-5 py-1.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity">Follow</button>
+                                    <button onClick={handleFollow} disabled={followLoading}
+                                        className="px-5 py-1.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-1">
+                                        {followLoading && <Loader2 size={12} className="animate-spin" />}
+                                        {followed ? 'Following' : 'Follow'}
+                                    </button>
                                     <button className="px-5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-semibold rounded-lg text-sm">Message</button>
                                     <button className="p-2 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><MoreHorizontal size={22} /></button>
                                 </>
@@ -388,9 +532,10 @@ const Profile = () => {
                                 { val: profileUser.posts_count ?? userPosts.length, label: 'posts' },
                                 { val: profileUser.followers_count || 0, label: 'followers' },
                                 { val: profileUser.following_count || 0, label: 'following' },
+                                ...(isVendor ? [{ val: userAds.length, label: 'ads' }] : []),
                             ].map(({ val, label }) => (
                                 <span key={label} className="text-sm text-gray-700 dark:text-gray-300">
-                                    <span className="font-semibold text-gray-900 dark:text-white">{val}</span> {label}
+                                    <span className="font-semibold text-gray-900 dark:text-white">{fmt(val)}</span> {label}
                                 </span>
                             ))}
                         </div>
@@ -427,9 +572,6 @@ const Profile = () => {
                     )}
                 </div>
 
-                {/* Vendor Ad Panel (desktop) */}
-             
-
                 {/* Desktop Tabs */}
                 <div className="flex justify-center gap-14 border-t border-gray-200 dark:border-gray-800 -mt-px mb-0">
                     {tabConfig.map(tab => (
@@ -438,34 +580,30 @@ const Profile = () => {
                                 activeTab === tab.key
                                     ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
                                     : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                            }`}
-                        >
+                            }`}>
                             {React.cloneElement(tab.icon, { size: 12 })} {tab.label}
                         </button>
                     ))}
                 </div>
 
-                <PostGrid />
+                {activeTab === 'ads' ? <AdsGrid /> : <PostGrid />}
 
-                {/* Floating Wallet */}
+                {/* Floating Wallet — reads from Redux, stays live */}
                 <div className="fixed bottom-8 right-8 z-50 hover:scale-105 transition-transform cursor-pointer">
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-full shadow-xl border border-gray-100 dark:border-gray-800 p-1 pr-4">
+                    <Link to="/wallet" className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-full shadow-xl border border-gray-100 dark:border-gray-800 p-1 pr-4">
                         <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center text-white shadow">
                             <Wallet size={20} />
                         </div>
                         <div className="flex flex-col">
                             <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Balance</span>
-                            <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                {currentUser?.wallet?.balance ? Math.floor(Number(currentUser.wallet.balance)) : 0} Coins
-                            </span>
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">{walletBalance} Coins</span>
                         </div>
-                    </div>
+                    </Link>
                 </div>
             </div>
 
             {/* Modals */}
             <PostDetailModal isOpen={!!selectedPost} post={selectedPost} onClose={() => setSelectedPost(null)} />
-
             <AvatarCropModal
                 isOpen={showAvatarModal}
                 onClose={() => setShowAvatarModal(false)}
