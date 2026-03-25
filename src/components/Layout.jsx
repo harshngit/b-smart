@@ -7,14 +7,23 @@ import Sidebar from './Sidebar';
 import CreatePostModal from './CreatePostModal';
 import api from '../lib/api';
 import { fetchMe, setUser } from '../store/authSlice';
+import { fetchWallet } from '../store/walletSlice';
 
 const Layout = () => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
+  const walletBalance = useSelector((state) => state.wallet.balance);
   const isExcludedPage = ['/profile', '/settings', '/promote'].includes(location.pathname);
   const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
   const showTopBar = !isExcludedPage && !isFullScreenPage;
+
+  // Fetch wallet on mount and poll every 30s to keep balance live
+  useEffect(() => {
+    dispatch(fetchWallet());
+    const interval = setInterval(() => dispatch(fetchWallet()), 30000);
+    return () => clearInterval(interval);
+  }, [dispatch]);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState('post');
@@ -348,7 +357,7 @@ const Layout = () => {
         </div>
       )}
 
-      {/* Floating Wallet for Desktop */}
+      {/* Floating Wallet for Desktop — balance from Redux wallet slice */}
       {!isExcludedPage && (
         <Link
           to="/wallet"
@@ -364,7 +373,7 @@ const Layout = () => {
           <div className="flex flex-col">
             <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Balance</span>
             <span className="text-sm font-bold text-gray-900 dark:text-white">
-              Coins {userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0}
+              Coins {walletBalance}
             </span>
           </div>
         </Link>

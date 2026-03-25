@@ -1,105 +1,65 @@
 import { useState, useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
 import api from "../../lib/api";
+import {
+  Building2, User, Handshake, ChevronDown, ChevronUp,
+  Globe, Mail, Phone, MapPin, Edit3, Check, X,
+  Loader2, AlertCircle, CheckCircle2, Instagram,
+  Facebook, Linkedin, Twitter, Plus, Trash2, Save
+} from "lucide-react";
 
 // ─── Reusable Field Components ───────────────────────────────────────────────
-
-const Field = ({ label, children, required, span = 1 }) => (
-  <div className={`col-span-${span} sm:col-span-${span}`}>
-    <label className="block text-xs font-semibold mb-1.5 tracking-wide text-gray-500 dark:text-gray-400">
-      {label}{required && <span className="text-insta-pink ml-1">*</span>}
+const Field = ({ label, children, required }) => (
+  <div>
+    <label className="block text-[10px] font-bold mb-1 tracking-widest uppercase text-gray-400 dark:text-gray-500">
+      {label}{required && <span className="text-pink-500 ml-0.5">*</span>}
     </label>
     {children}
   </div>
 );
 
+const inputCls = `w-full px-3.5 py-2.5 rounded-xl text-sm transition-all outline-none
+  bg-gray-50 dark:bg-gray-900
+  border border-gray-200 dark:border-gray-800
+  text-gray-900 dark:text-white
+  placeholder:text-gray-400 dark:placeholder:text-gray-600
+  focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500
+  disabled:opacity-50 disabled:cursor-not-allowed`;
+
 const Input = ({ type = "text", placeholder, value, onChange, disabled, icon }) => (
   <div className="relative">
-    {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm opacity-50">{icon}</span>}
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      className={`w-full px-3.5 py-2.5 rounded-xl text-sm transition-all outline-none 
-        bg-gray-50 dark:bg-gray-900 
-        border border-gray-200 dark:border-gray-800 
-        text-gray-900 dark:text-white 
-        placeholder:text-gray-400 dark:placeholder:text-gray-600
-        focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink
-        disabled:opacity-60 disabled:cursor-not-allowed
-        ${icon ? 'pl-9' : ''}
-      `}
-    />
+    {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm opacity-40">{icon}</span>}
+    <input type={type} placeholder={placeholder} value={value} onChange={onChange} disabled={disabled}
+      className={`${inputCls} ${icon ? 'pl-9' : ''}`} />
   </div>
 );
 
-const Select = ({ options, value, onChange, disabled, placeholder }) => {
+const SelectField = ({ options, value, onChange, disabled, placeholder }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
-    const handler = (e) => {
-      if (!ref.current || ref.current.contains(e.target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const h = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
   }, []);
-  const current = value || "";
-  const choose = (v) => {
-    onChange({ target: { value: v } });
-    setOpen(false);
-  };
-  const display = current || placeholder || "Select";
+  const choose = (v) => { onChange({ target: { value: v } }); setOpen(false); };
   return (
     <div className="relative" ref={ref}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && setOpen((v) => !v)}
-        className="w-full px-3.5 py-2.5 rounded-xl text-sm transition-all outline-none 
-          bg-gray-50 dark:bg-gray-900 
-          border border-gray-200 dark:border-gray-800 
-          text-gray-900 dark:text-white 
-          placeholder:text-gray-400 dark:placeholder:text-gray-600
-          focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink
-          disabled:opacity-60 disabled:cursor-not-allowed
-          flex items-center justify-between"
-      >
-        <span className={`${current ? "" : "text-gray-400 dark:text-gray-600"}`}>{display}</span>
-        <svg
-          className={`w-4 h-4 ml-2 transition-transform ${open ? "rotate-180" : ""}`}
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-        </svg>
+      <button type="button" disabled={disabled} onClick={() => !disabled && setOpen(v => !v)}
+        className={`${inputCls} flex items-center justify-between`}>
+        <span className={value ? "text-gray-900 dark:text-white" : "text-gray-400 dark:text-gray-600"}>{value || placeholder || "Select"}</span>
+        <ChevronDown className={`w-4 h-4 ml-2 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && !disabled && (
-        <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg">
-          <div className="max-h-60 overflow-auto py-1">
-            {placeholder && (
-              <div
-                onClick={() => choose("")}
-                className={`px-3.5 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${current === "" ? "bg-insta-pink/10 text-insta-pink" : "text-gray-700 dark:text-gray-300"}`}
-              >
-                {placeholder}
+        <div className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl overflow-hidden">
+          <div className="max-h-48 overflow-auto py-1">
+            {placeholder && <div onClick={() => choose("")} className="px-3.5 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400">{placeholder}</div>}
+            {options.map(opt => (
+              <div key={opt} onClick={() => choose(opt)}
+                className={`px-3.5 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${opt === value ? "text-pink-600 font-semibold bg-pink-50 dark:bg-pink-900/20" : "text-gray-700 dark:text-gray-300"}`}>
+                {opt}
               </div>
-            )}
-            {options.map((opt) => {
-              const active = opt === current;
-              return (
-                <div
-                  key={opt}
-                  onClick={() => choose(opt)}
-                  className={`px-3.5 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${active ? "bg-insta-pink/10 text-insta-pink" : "text-gray-700 dark:text-gray-300"}`}
-                >
-                  {opt}
-                </div>
-              );
-            })}
+            ))}
           </div>
         </div>
       )}
@@ -108,168 +68,115 @@ const Select = ({ options, value, onChange, disabled, placeholder }) => {
 };
 
 const Textarea = ({ placeholder, value, onChange, disabled, rows = 4 }) => (
-  <textarea
-    placeholder={placeholder}
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    rows={rows}
-    className="w-full px-3.5 py-2.5 rounded-xl text-sm transition-all outline-none 
-      bg-gray-50 dark:bg-gray-900 
-      border border-gray-200 dark:border-gray-800 
-      text-gray-900 dark:text-white 
-      placeholder:text-gray-400 dark:placeholder:text-gray-600
-      focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink
-      disabled:opacity-60 disabled:cursor-not-allowed resize-y"
-  />
+  <textarea placeholder={placeholder} value={value} onChange={onChange} disabled={disabled} rows={rows}
+    className={`${inputCls} resize-y`} />
 );
 
 // ─── Completion Bar ───────────────────────────────────────────────────────────
 const CompletionBar = ({ pct }) => (
-  <div className="p-4 md:p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+  <div className="px-5 py-4 rounded-2xl bg-gray-900 dark:bg-gray-900 border border-gray-800">
     <div className="flex justify-between items-center mb-2">
-      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Profile Completion</span>
-      <span className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-pink-600">
-        {pct}%
-      </span>
+      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profile Completion</span>
+      <span className="text-sm font-black bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-pink-500">{pct}%</span>
     </div>
-    <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-      <div
-        className="h-full rounded-full bg-gradient-to-r from-orange-500 to-pink-600 transition-all duration-500 ease-out"
-        style={{ width: `${pct}%` }}
-      />
+    <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
+      <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-pink-600 transition-all duration-700"
+        style={{ width: `${pct}%` }} />
     </div>
-    {pct < 100 && (
-      <p className="text-xs mt-2 text-gray-400 dark:text-gray-500">
-        Complete all fields to submit for verification
-      </p>
-    )}
+    {pct < 100 && <p className="text-[10px] mt-1.5 text-gray-500">Complete all fields to submit for verification</p>}
   </div>
 );
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-const Badge = ({ status }) => {
-  const styles = {
-    verified: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
-    pending: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-    draft: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
-  };
-  const label = { verified: "Verified ✓", pending: "Pending Review", draft: "Draft" };
+// ─── Section Divider ──────────────────────────────────────────────────────────
+const SectionDivider = ({ children }) => (
+  <div className="col-span-1 md:col-span-2 flex items-center gap-3 mt-6 mb-2">
+    <span className="text-[10px] font-black text-pink-500 uppercase tracking-widest whitespace-nowrap">{children}</span>
+    <div className="flex-1 h-px bg-pink-100 dark:bg-pink-900/30" />
+  </div>
+);
 
+// ─── Collapsible Section (mobile accordion) ───────────────────────────────────
+const CollapsibleSection = ({ title, icon: Icon, iconColor = "text-pink-500", children, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${styles[status] || styles.draft}`}>
-      {label[status] || label.draft}
-    </span>
+    <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3.5 text-left active:bg-gray-50 dark:active:bg-gray-800 transition-colors">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-7 h-7 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center ${iconColor}`}>
+            <Icon size={14} />
+          </div>
+          <span className="text-sm font-bold text-gray-900 dark:text-white">{title}</span>
+        </div>
+        {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+      </button>
+      {open && <div className="px-4 pb-4 space-y-3.5 border-t border-gray-50 dark:border-gray-800 pt-4">{children}</div>}
+    </div>
   );
 };
 
 // ─── Empty form defaults ──────────────────────────────────────────────────────
 const EMPTY_FORM = {
-  // from company_details (read-only display)
-  companyName: "",
-  registeredName: "",
-  regNumber: "",
-  taxId: "",
-  yearEstablished: "",
-  companyType: "",
-  // from user_id (read-only display)
-  userEmail: "",
-  userPhone: "",
-  userFullName: "",
-  // editable — business_details
-  industry: "",
-  businessNature: "",
-  coverage: "",
-  country: "",
-  // editable — online_presence
-  website: "",
-  email: "",
-  phone: "",
-  addressLine1: "",
-  addressLine2: "",
-  city: "",
-  pincode: "",
-  state: "",
-  addressCountry: "",
-  // editable — social_media_links
-  instagram: "",
-  facebook: "",
-  linkedin: "",
-  twitter: "",
-  // editable — company_description
-  description: "",
+  companyName: "", registeredName: "", regNumber: "", taxId: "",
+  yearEstablished: "", companyType: "", userEmail: "", userPhone: "",
+  userFullName: "", industry: "", businessNature: "", coverage: "",
+  country: "", website: "", email: "", phone: "",
+  addressLine1: "", addressLine2: "", city: "", pincode: "",
+  state: "", addressCountry: "", instagram: "", facebook: "",
+  linkedin: "", twitter: "", description: "", profileCompletion: 0,
 };
 
-// ─── Map API response → form state ───────────────────────────────────────────
 const mapApiToForm = (data) => ({
-  // company_details (read-only)
-  companyName:      data.company_details?.company_name     ?? "",
-  registeredName:   data.company_details?.registered_name  ?? "",
+  companyName:      data.company_details?.company_name       ?? "",
+  registeredName:   data.company_details?.registered_name    ?? "",
   regNumber:        data.company_details?.registration_number ?? "",
-  taxId:            data.company_details?.tax_id            ?? "",
-  yearEstablished:  data.company_details?.year_established  ?? "",
-  companyType:      data.company_details?.company_type      ?? "",
-  // user_id info (read-only)
-  userEmail:        data.user_id?.email                     ?? "",
-  userPhone:        data.user_id?.phone                     ?? "",
-  userFullName:     data.user_id?.full_name                 ?? "",
-  // business_details
-  industry:         data.business_details?.industry_category ?? "",
-  businessNature:   data.business_details?.business_nature  ?? "",
-  coverage:         data.business_details?.service_coverage  ?? "",
-  country:          data.business_details?.country           ?? "",
-  // online_presence
-  website:          data.online_presence?.website_url        ?? "",
-  email:            data.online_presence?.company_email      ?? "",
-  phone:            data.online_presence?.phone_number       ?? "",
+  taxId:            data.company_details?.tax_id              ?? "",
+  yearEstablished:  data.company_details?.year_established    ?? "",
+  companyType:      data.company_details?.company_type        ?? "",
+  userEmail:        data.user_id?.email                       ?? "",
+  userPhone:        data.user_id?.phone                       ?? "",
+  userFullName:     data.user_id?.full_name                   ?? "",
+  industry:         data.business_details?.industry_category  ?? "",
+  businessNature:   data.business_details?.business_nature    ?? "",
+  coverage:         data.business_details?.service_coverage   ?? "",
+  country:          data.business_details?.country            ?? "",
+  website:          data.online_presence?.website_url         ?? "",
+  email:            data.online_presence?.company_email       ?? "",
+  phone:            data.online_presence?.phone_number        ?? "",
   addressLine1:     data.online_presence?.address?.address_line1 ?? "",
   addressLine2:     data.online_presence?.address?.address_line2 ?? "",
-  city:             data.online_presence?.address?.city      ?? "",
-  pincode:          data.online_presence?.address?.pincode   ?? "",
-  state:            data.online_presence?.address?.state     ?? "",
-  addressCountry:   data.online_presence?.address?.country   ?? "",
-  // social_media_links
-  instagram:        data.social_media_links?.instagram       ?? "",
-  facebook:         data.social_media_links?.facebook        ?? "",
-  linkedin:         data.social_media_links?.linkedin        ?? "",
-  twitter:          data.social_media_links?.twitter         ?? "",
-  // company_description
-  description:      data.company_description                 ?? "",
-  // meta
-  profileCompletion: data.profile_completion_percentage      ?? 0,
+  city:             data.online_presence?.address?.city       ?? "",
+  pincode:          data.online_presence?.address?.pincode    ?? "",
+  state:            data.online_presence?.address?.state      ?? "",
+  addressCountry:   data.online_presence?.address?.country    ?? "",
+  instagram:        data.social_media_links?.instagram        ?? "",
+  facebook:         data.social_media_links?.facebook         ?? "",
+  linkedin:         data.social_media_links?.linkedin         ?? "",
+  twitter:          data.social_media_links?.twitter          ?? "",
+  description:      data.company_description                  ?? "",
+  profileCompletion: data.profile_completion_percentage       ?? 0,
 });
 
-// ─── Map form state → POST request body ──────────────────────────────────────
 const mapFormToBody = (form) => ({
   business_details: {
-    industry_category: form.industry       || "",
-    business_nature:   form.businessNature || "",
-    service_coverage:  form.coverage       || "",
-    country:           form.country        || "",
+    industry_category: form.industry, business_nature: form.businessNature,
+    service_coverage: form.coverage, country: form.country,
   },
   online_presence: {
-    website_url:    form.website  || "",
-    company_email:  form.email    || "",
-    phone_number:   form.phone    || "",
+    website_url: form.website, company_email: form.email, phone_number: form.phone,
     address: {
-      address_line1: form.addressLine1   || "",
-      address_line2: form.addressLine2   || "",
-      city:          form.city           || "",
-      pincode:       form.pincode        || "",
-      state:         form.state          || "",
-      country:       form.addressCountry || "",
+      address_line1: form.addressLine1, address_line2: form.addressLine2,
+      city: form.city, pincode: form.pincode, state: form.state, country: form.addressCountry,
     },
   },
   social_media_links: {
-    instagram: form.instagram || "",
-    facebook:  form.facebook  || "",
-    linkedin:  form.linkedin  || "",
-    twitter:   form.twitter   || "",
+    instagram: form.instagram, facebook: form.facebook,
+    linkedin: form.linkedin, twitter: form.twitter,
   },
-  company_description: form.description || "",
+  company_description: form.description,
 });
 
-// ─── Sub Tab: Company Information ────────────────────────────────────────────
+// ─── CompanyInfo ──────────────────────────────────────────────────────────────
 const CompanyInfo = () => {
   const { userObject } = useSelector((state) => state.auth);
   const [editing, setEditing] = useState(false);
@@ -279,52 +186,33 @@ const CompanyInfo = () => {
   const [error, setError] = useState("");
   const [logoPreview, setLogoPreview] = useState(null);
   const fileRef = useRef();
-
   const [form, setForm] = useState(EMPTY_FORM);
-
   const userId = userObject?._id || userObject?.id;
 
-  // ── Fetch profile ────────────────────────────────────────────────────────
   const fetchProfile = async () => {
     if (!userId) return;
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
       const res = await api.get(`/vendors/profile/${userId}`);
-      if (res.data) {
-        setForm(mapApiToForm(res.data));
-      }
-    } catch (err) {
-      console.error("Failed to fetch vendor profile:", err);
-      setError("Failed to load profile. Please refresh.");
-    } finally {
-      setLoading(false);
-    }
+      if (res.data) setForm(mapApiToForm(res.data));
+    } catch { setError("Failed to load profile. Please refresh."); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchProfile();
-  }, [userId]);
+  useEffect(() => { fetchProfile(); }, [userId]);
 
-  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+  const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
-  // ── Save (POST) then re-fetch ────────────────────────────────────────────
   const handleSave = async () => {
     if (!userId) return;
-    setSaving(true);
-    setError("");
+    setSaving(true); setError("");
     try {
       await api.post(`/vendors/profile/${userId}`, mapFormToBody(form));
-      await fetchProfile(); // re-fetch fresh data
-      setSaved(true);
-      setEditing(false);
+      await fetchProfile();
+      setSaved(true); setEditing(false);
       setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      console.error("Failed to save vendor profile:", err);
-      setError("Failed to save changes. Please try again.");
-    } finally {
-      setSaving(false);
-    }
+    } catch { setError("Failed to save changes. Please try again."); }
+    finally { setSaving(false); }
   };
 
   const handleLogo = (e) => {
@@ -335,374 +223,383 @@ const CompanyInfo = () => {
   const D = !editing;
   const pct = form.profileCompletion;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-gray-400 dark:text-gray-500">Loading profile...</span>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center py-20 gap-3">
+      <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-sm text-gray-400">Loading profile…</span>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-
-      {/* Header row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Company Information</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your business profile and registration details.</p>
+    <div className="space-y-5">
+      {/* Banners */}
+      {saved && (
+        <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-xl text-sm font-semibold">
+          <CheckCircle2 size={16} /> Profile updated successfully.
         </div>
-        <div className="flex items-center gap-3">
-          {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+      )}
+      {error && (
+        <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-semibold">
+          <AlertCircle size={16} /> {error}
+        </div>
+      )}
+
+      {/* ── Profile Hero Card ─────────────────────────────────────────────── */}
+      <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+        {/* Cover banner */}
+        <div className="h-28 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 relative overflow-hidden">
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+          />
+        </div>
+
+        {/* Avatar + actions row */}
+        <div className="px-5 pb-5">
+          <div className="flex items-end justify-between" style={{ marginTop: "-36px" }}>
+            {/* Avatar */}
+            <div
+              onClick={() => editing && fileRef.current.click()}
+              className={`w-[72px] h-[72px] rounded-2xl flex items-center justify-center overflow-hidden bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-lg flex-shrink-0 ${editing ? "cursor-pointer ring-2 ring-dashed ring-pink-500/60" : ""}`}
             >
-              ✏️ Edit Profile
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setEditing(false); setError(""); }}
-                disabled={saving}
-                className="px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 transition-all disabled:opacity-60 flex items-center gap-2"
-              >
-                {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
+              {logoPreview
+                ? <img src={logoPreview} alt="logo" className="w-full h-full object-cover" />
+                : <span className="text-3xl">🏢</span>}
             </div>
-          )}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogo} />
+
+            {/* Edit / Save buttons */}
+            <div className="flex gap-2 pb-1">
+              {!editing ? (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm"
+                >
+                  <Edit3 size={13} /> Edit Profile
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { setEditing(false); setError(""); }}
+                    className="flex items-center gap-1 px-3.5 py-2 rounded-xl text-xs font-bold text-gray-500 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+                  >
+                    <X size={12} /> Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-md shadow-pink-500/20 disabled:opacity-60 hover:opacity-90 transition-all"
+                  >
+                    {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                    {saving ? "Saving…" : "Save Changes"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Company info */}
+          <div className="mt-3">
+            <div className="text-lg font-black text-gray-900 dark:text-white">{form.companyName || "—"}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {[form.userFullName, form.userEmail].filter(Boolean).join(" · ")}
+            </div>
+            {editing && (
+              <button onClick={() => fileRef.current.click()} className="text-[11px] font-semibold text-pink-600 dark:text-pink-400 mt-1.5 hover:underline">
+                Change Logo
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {saved && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 animate-fade-in">
-          ✅ Profile updated successfully.
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          ⚠️ {error}
-        </div>
-      )}
-
+      {/* Completion bar */}
       <CompletionBar pct={pct} />
 
-      {/* Logo / Company header */}
-      <div className="flex items-center gap-5 p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
-        <div
-          onClick={() => editing && fileRef.current.click()}
-          className={`w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-gray-800 transition-all
-            ${editing ? "cursor-pointer ring-2 ring-dashed ring-pink-500/50 hover:bg-gray-200 dark:hover:bg-gray-700" : ""}
-          `}
-        >
-          {logoPreview
-            ? <img src={logoPreview} alt="logo" className="w-full h-full object-cover" />
-            : <span className="text-3xl">🏢</span>}
-        </div>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogo} />
-        <div>
-          <div className="text-base font-bold text-gray-900 dark:text-white">{form.companyName || "—"}</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {[form.userFullName, form.userEmail].filter(Boolean).join(" · ")}
+      {/* ── Desktop: single grid form ───────────────────────────────────────── */}
+      <div className="hidden md:block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+
+          <SectionDivider>Registration Details</SectionDivider>
+
+          <Field label="Company Name" required><Input value={form.companyName} disabled placeholder="Company Name" /></Field>
+          <Field label="Registered Name" required><Input value={form.registeredName} disabled placeholder="Legal registered name" /></Field>
+          <Field label="Registration Number"><Input value={form.regNumber} disabled placeholder="CIN / Reg. No." /></Field>
+          <Field label="Tax ID / VAT / GST"><Input value={form.taxId} disabled placeholder="GSTIN / VAT ID" /></Field>
+          <Field label="Year Established"><Input value={form.yearEstablished} disabled placeholder="Year" /></Field>
+          <Field label="Company Type"><Input value={form.companyType} disabled placeholder="Company type" /></Field>
+
+          <SectionDivider>Business Details</SectionDivider>
+
+          <Field label="Industry Category">
+            <SelectField value={form.industry} onChange={set("industry")} disabled={D}
+              options={["Digital Marketing","E-Commerce","FMCG","Healthcare","Education","Finance","Real Estate","Technology","Retail","Shoes","Other"]}
+              placeholder="Select industry" />
+          </Field>
+          <Field label="Business Nature">
+            <SelectField value={form.businessNature} onChange={set("businessNature")} disabled={D}
+              options={["Advertising Agency","Brand / Advertiser","Publisher","Influencer Network","Reseller","Technology Partner","Manufacturer","Retailer"]}
+              placeholder="Select nature" />
+          </Field>
+          <Field label="Service Coverage">
+            <SelectField value={form.coverage} onChange={set("coverage")} disabled={D}
+              options={["Pan India","Regional","City-Level","International"]}
+              placeholder="Select coverage" />
+          </Field>
+          <Field label="Country">
+            <SelectField value={form.country} onChange={set("country")} disabled={D}
+              options={["India","United States","United Kingdom","UAE","Singapore","Australia","Canada"]}
+              placeholder="Select country" />
+          </Field>
+
+          <SectionDivider>Contact & Online Presence</SectionDivider>
+
+          <Field label="Website URL"><Input type="url" value={form.website} onChange={set("website")} disabled={D} icon="🌐" placeholder="https://yourwebsite.com" /></Field>
+          <Field label="Company Email" required><Input type="email" value={form.email} onChange={set("email")} disabled={D} icon="✉️" placeholder="company@email.com" /></Field>
+          <Field label="Phone Number"><Input type="tel" value={form.phone} onChange={set("phone")} disabled={D} icon="📞" placeholder="+91 00000 00000" /></Field>
+          <Field label="Address Line 1"><Input value={form.addressLine1} onChange={set("addressLine1")} disabled={D} placeholder="Street / Building" /></Field>
+          <Field label="Address Line 2"><Input value={form.addressLine2} onChange={set("addressLine2")} disabled={D} placeholder="Area / Locality" /></Field>
+          <Field label="City"><Input value={form.city} onChange={set("city")} disabled={D} placeholder="City" /></Field>
+          <Field label="Pincode"><Input value={form.pincode} onChange={set("pincode")} disabled={D} placeholder="Pincode" /></Field>
+          <Field label="State"><Input value={form.state} onChange={set("state")} disabled={D} placeholder="State" /></Field>
+          <Field label="Address Country"><Input value={form.addressCountry} onChange={set("addressCountry")} disabled={D} placeholder="Country" /></Field>
+
+          <SectionDivider>Company Description</SectionDivider>
+
+          <div className="col-span-2">
+            <Field label="About the Company">
+              <Textarea value={form.description} onChange={set("description")} disabled={D} rows={4}
+                placeholder="Describe what your company does, services offered, target audience…" />
+            </Field>
           </div>
-          {editing && (
-            <button
-              onClick={() => fileRef.current.click()}
-              className="text-xs font-semibold text-pink-600 dark:text-pink-400 mt-2 hover:underline"
-            >
-              Change Logo
+
+          <SectionDivider>Social Media Links</SectionDivider>
+
+          <Field label="Instagram">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-pink-500"><Instagram size={14} /></span>
+              <input type="url" value={form.instagram} onChange={set("instagram")} disabled={D} placeholder="https://instagram.com/…" className={`${inputCls} pl-9`} />
+            </div>
+          </Field>
+          <Field label="Facebook">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500"><Facebook size={14} /></span>
+              <input type="url" value={form.facebook} onChange={set("facebook")} disabled={D} placeholder="https://facebook.com/…" className={`${inputCls} pl-9`} />
+            </div>
+          </Field>
+          <Field label="LinkedIn">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-700"><Linkedin size={14} /></span>
+              <input type="url" value={form.linkedin} onChange={set("linkedin")} disabled={D} placeholder="https://linkedin.com/…" className={`${inputCls} pl-9`} />
+            </div>
+          </Field>
+          <Field label="Twitter / X">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sky-500"><Twitter size={14} /></span>
+              <input type="url" value={form.twitter} onChange={set("twitter")} disabled={D} placeholder="https://twitter.com/…" className={`${inputCls} pl-9`} />
+            </div>
+          </Field>
+
+        </div>
+      </div>
+
+      {/* ── Mobile: collapsible accordions ─────────────────────────────────── */}
+      <div className="md:hidden space-y-3">
+        <CollapsibleSection title="Registration Details" icon={Building2} defaultOpen>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Company Name" required><Input value={form.companyName} disabled placeholder="Company Name" /></Field>
+            <Field label="Registered Name" required><Input value={form.registeredName} disabled placeholder="Legal name" /></Field>
+            <Field label="Reg. Number"><Input value={form.regNumber} disabled placeholder="CIN / Reg. No." /></Field>
+            <Field label="Tax ID / GST"><Input value={form.taxId} disabled placeholder="GSTIN" /></Field>
+            <Field label="Year Est."><Input value={form.yearEstablished} disabled placeholder="Year" /></Field>
+            <Field label="Type"><Input value={form.companyType} disabled placeholder="Type" /></Field>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Business Details" icon={Globe} iconColor="text-blue-500" defaultOpen>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Industry">
+              <SelectField value={form.industry} onChange={set("industry")} disabled={D}
+                options={["Digital Marketing","E-Commerce","FMCG","Healthcare","Education","Finance","Real Estate","Technology","Retail","Shoes","Other"]}
+                placeholder="Industry" />
+            </Field>
+            <Field label="Nature">
+              <SelectField value={form.businessNature} onChange={set("businessNature")} disabled={D}
+                options={["Advertising Agency","Brand / Advertiser","Publisher","Influencer Network","Reseller","Technology Partner","Manufacturer","Retailer"]}
+                placeholder="Nature" />
+            </Field>
+            <Field label="Coverage">
+              <SelectField value={form.coverage} onChange={set("coverage")} disabled={D}
+                options={["Pan India","Regional","City-Level","International"]} placeholder="Coverage" />
+            </Field>
+            <Field label="Country">
+              <SelectField value={form.country} onChange={set("country")} disabled={D}
+                options={["India","United States","United Kingdom","UAE","Singapore","Australia","Canada"]} placeholder="Country" />
+            </Field>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Contact & Address" icon={MapPin} iconColor="text-green-500">
+          <div className="space-y-3">
+            <Field label="Website URL"><Input type="url" value={form.website} onChange={set("website")} disabled={D} icon="🌐" placeholder="https://yourwebsite.com" /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Company Email" required><Input type="email" value={form.email} onChange={set("email")} disabled={D} icon="✉️" placeholder="company@email.com" /></Field>
+              <Field label="Phone"><Input type="tel" value={form.phone} onChange={set("phone")} disabled={D} icon="📞" placeholder="+91" /></Field>
+            </div>
+            <Field label="Address Line 1"><Input value={form.addressLine1} onChange={set("addressLine1")} disabled={D} placeholder="Street / Building" /></Field>
+            <Field label="Address Line 2"><Input value={form.addressLine2} onChange={set("addressLine2")} disabled={D} placeholder="Area / Locality" /></Field>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="City"><Input value={form.city} onChange={set("city")} disabled={D} placeholder="City" /></Field>
+              <Field label="Pincode"><Input value={form.pincode} onChange={set("pincode")} disabled={D} placeholder="Pincode" /></Field>
+              <Field label="State"><Input value={form.state} onChange={set("state")} disabled={D} placeholder="State" /></Field>
+            </div>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Company Description" icon={Edit3} iconColor="text-purple-500">
+          <Field label="About the Company">
+            <Textarea value={form.description} onChange={set("description")} disabled={D} rows={4}
+              placeholder="Describe what your company does…" />
+          </Field>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Social Media Links" icon={Globe} iconColor="text-orange-500">
+          <div className="space-y-3">
+            {[
+              { label: "Instagram", key: "instagram", color: "text-pink-500", Icon: Instagram },
+              { label: "Facebook",  key: "facebook",  color: "text-blue-500", Icon: Facebook },
+              { label: "LinkedIn",  key: "linkedin",  color: "text-blue-700", Icon: Linkedin },
+              { label: "Twitter / X", key: "twitter", color: "text-sky-500",  Icon: Twitter },
+            ].map(({ label, key, color, Icon }) => (
+              <Field key={key} label={label}>
+                <div className="relative">
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${color}`}><Icon size={14} /></span>
+                  <input type="url" value={form[key]} onChange={set(key)} disabled={D}
+                    placeholder={`https://${key}.com/…`} className={`${inputCls} pl-9`} />
+                </div>
+              </Field>
+            ))}
+          </div>
+        </CollapsibleSection>
+      </div>
+
+      {/* Floating save bar when editing (mobile) */}
+      {editing && (
+        <div className="md:hidden fixed bottom-[68px] left-4 right-4 z-40 bg-gray-900 dark:bg-gray-950 rounded-2xl shadow-2xl shadow-black/40 flex items-center justify-between px-4 py-3 border border-gray-800">
+          <span className="text-xs font-semibold text-gray-300">Unsaved changes</span>
+          <div className="flex gap-2">
+            <button onClick={() => { setEditing(false); setError(""); }}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-gray-400 border border-gray-700 active:scale-95 transition-all">
+              Discard
             </button>
-          )}
+            <button onClick={handleSave} disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-orange-500 to-pink-600 text-white disabled:opacity-60 active:scale-95 transition-all">
+              {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* Form Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-5">
-
-        {/* ── Registration Details (read-only from GET) ── */}
-        <div className="col-span-1 md:col-span-2 text-xs font-bold text-pink-600 uppercase tracking-widest border-b border-pink-100 dark:border-pink-900/30 pb-2 mb-1 mt-2">
-          Registration Details
-        </div>
-
-        <Field label="Company Name" required span={1}><Input value={form.companyName} disabled placeholder="Company Name" /></Field>
-        <Field label="Registered Name" required span={1}><Input value={form.registeredName} disabled placeholder="Legal registered name" /></Field>
-        <Field label="Registration Number" span={1}><Input value={form.regNumber} disabled placeholder="CIN / Reg. No." /></Field>
-        <Field label="Tax ID / VAT / GST" span={1}><Input value={form.taxId} disabled placeholder="GSTIN / VAT ID" /></Field>
-        <Field label="Year Established" span={1}><Input value={form.yearEstablished} disabled placeholder="Year" /></Field>
-        <Field label="Company Type" span={1}><Input value={form.companyType} disabled placeholder="Company type" /></Field>
-
-        {/* ── Business Details (editable) ── */}
-        <div className="col-span-1 md:col-span-2 text-xs font-bold text-pink-600 uppercase tracking-widest border-b border-pink-100 dark:border-pink-900/30 pb-2 mb-1 mt-4">
-          Business Details
-        </div>
-
-        <Field label="Industry Category" span={1}>
-          <Select value={form.industry} onChange={set("industry")} disabled={D}
-            options={["Digital Marketing", "E-Commerce", "FMCG", "Healthcare", "Education", "Finance", "Real Estate", "Technology", "Retail", "Shoes", "Other"]}
-            placeholder="Select industry" />
-        </Field>
-        <Field label="Business Nature" span={1}>
-          <Select value={form.businessNature} onChange={set("businessNature")} disabled={D}
-            options={["Advertising Agency", "Brand / Advertiser", "Publisher", "Influencer Network", "Reseller", "Technology Partner", "Manufacturer", "Retailer"]}
-            placeholder="Select nature" />
-        </Field>
-        <Field label="Service Coverage" span={1}>
-          <Select value={form.coverage} onChange={set("coverage")} disabled={D}
-            options={["Pan India", "Regional", "City-Level", "International"]}
-            placeholder="Select coverage" />
-        </Field>
-        <Field label="Country" span={1}>
-          <Select value={form.country} onChange={set("country")} disabled={D}
-            options={["India", "United States", "United Kingdom", "UAE", "Singapore", "Australia", "Canada"]}
-            placeholder="Select country" />
-        </Field>
-
-        {/* ── Contact & Online Presence (editable) ── */}
-        <div className="col-span-1 md:col-span-2 text-xs font-bold text-pink-600 uppercase tracking-widest border-b border-pink-100 dark:border-pink-900/30 pb-2 mb-1 mt-4">
-          Contact & Online Presence
-        </div>
-
-        <Field label="Website URL" span={1}><Input type="url" value={form.website} onChange={set("website")} disabled={D} icon="🌐" placeholder="https://yourwebsite.com" /></Field>
-        <Field label="Company Email" required span={1}><Input type="email" value={form.email} onChange={set("email")} disabled={D} icon="✉️" placeholder="company@email.com" /></Field>
-        <Field label="Phone Number" span={1}><Input type="tel" value={form.phone} onChange={set("phone")} disabled={D} icon="📞" placeholder="+91 00000 00000" /></Field>
-
-        {/* Address fields */}
-        <Field label="Address Line 1" span={1}><Input value={form.addressLine1} onChange={set("addressLine1")} disabled={D} placeholder="Street / Building" /></Field>
-        <Field label="Address Line 2" span={1}><Input value={form.addressLine2} onChange={set("addressLine2")} disabled={D} placeholder="Area / Locality" /></Field>
-        <Field label="City" span={1}><Input value={form.city} onChange={set("city")} disabled={D} placeholder="City" /></Field>
-        <Field label="Pincode" span={1}><Input value={form.pincode} onChange={set("pincode")} disabled={D} placeholder="Pincode" /></Field>
-        <Field label="State" span={1}><Input value={form.state} onChange={set("state")} disabled={D} placeholder="State" /></Field>
-        <Field label="Address Country" span={1}><Input value={form.addressCountry} onChange={set("addressCountry")} disabled={D} placeholder="Country" /></Field>
-
-        {/* ── Company Description (editable) ── */}
-        <div className="col-span-1 md:col-span-2 text-xs font-bold text-pink-600 uppercase tracking-widest border-b border-pink-100 dark:border-pink-900/30 pb-2 mb-1 mt-4">
-          Company Description
-        </div>
-        <Field label="About the Company" span={2}>
-          <Textarea value={form.description} onChange={set("description")} disabled={D} rows={4}
-            placeholder="Describe what your company does, services offered, target audience..." />
-        </Field>
-
-        {/* ── Social Media Links (editable) ── */}
-        <div className="col-span-1 md:col-span-2 text-xs font-bold text-pink-600 uppercase tracking-widest border-b border-pink-100 dark:border-pink-900/30 pb-2 mb-1 mt-4">
-          Social Media Links
-        </div>
-        <Field label="Instagram" span={1}><Input type="url" value={form.instagram} onChange={set("instagram")} disabled={D} icon="📸" placeholder="https://instagram.com/..." /></Field>
-        <Field label="Facebook" span={1}><Input type="url" value={form.facebook} onChange={set("facebook")} disabled={D} icon="👤" placeholder="https://facebook.com/..." /></Field>
-        <Field label="LinkedIn" span={1}><Input type="url" value={form.linkedin} onChange={set("linkedin")} disabled={D} icon="💼" placeholder="https://linkedin.com/..." /></Field>
-        <Field label="Twitter / X" span={1}><Input type="url" value={form.twitter} onChange={set("twitter")} disabled={D} icon="🐦" placeholder="https://twitter.com/..." /></Field>
-
-      </div>
+      )}
     </div>
   );
 };
 
-// ─── Sub Tab: Primary Contact ─────────────────────────────────────────────────
+// ─── PrimaryContact ───────────────────────────────────────────────────────────
 const PrimaryContact = () => {
   const { userObject } = useSelector((state) => state.auth);
   const userId = userObject?._id || userObject?.id;
-
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [newContact, setNewContact] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    position: "",
-    notes: ""
-  });
+  const [newContact, setNewContact] = useState({ name: "", email: "", phone: "", position: "", notes: "" });
   const [addError, setAddError] = useState("");
 
-  // Fetch contacts
   const fetchContacts = async () => {
     if (!userId) return;
     setLoading(true);
-    try {
-      const res = await api.get(`/vendors/${userId}/contacts`);
-      setContacts(res.data || []);
-    } catch (err) {
-      console.error("Failed to fetch contacts", err);
-      setError("Failed to load contacts.");
-    } finally {
-      setLoading(false);
-    }
+    try { const res = await api.get(`/vendors/${userId}/contacts`); setContacts(res.data || []); }
+    catch { setError("Failed to load contacts."); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchContacts();
-  }, [userId]);
+  useEffect(() => { fetchContacts(); }, [userId]);
 
   const toggleEdit = (id) => setContacts(c => c.map(x => x._id === id ? { ...x, editing: !x.editing } : x));
-  
-  const remove = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this contact?")) return;
-    try {
-      await api.delete(`/vendors/${userId}/contacts/${id}`);
-      setContacts(c => c.filter(x => x._id !== id));
-    } catch (err) {
-      console.error("Failed to delete contact", err);
-      alert("Failed to delete contact.");
-    }
-  };
-
   const setField = (id, k, v) => setContacts(c => c.map(x => x._id === id ? { ...x, [k]: v } : x));
+
+  const remove = async (id) => {
+    if (!window.confirm("Remove this contact?")) return;
+    try { await api.delete(`/vendors/${userId}/contacts/${id}`); setContacts(c => c.filter(x => x._id !== id)); }
+    catch { alert("Failed to delete contact."); }
+  };
 
   const saveEdit = async (contact) => {
     try {
-      const payload = {
-        name: contact.name,
-        email: contact.email,
-        phone: contact.phone,
-        position: contact.position,
-        notes: contact.notes
-      };
-      await api.put(`/vendors/${userId}/contacts/${contact._id}`, payload);
+      await api.put(`/vendors/${userId}/contacts/${contact._id}`, {
+        name: contact.name, email: contact.email, phone: contact.phone,
+        position: contact.position, notes: contact.notes,
+      });
       toggleEdit(contact._id);
-    } catch (err) {
-      console.error("Failed to update contact", err);
-      alert("Failed to update contact.");
-    }
+    } catch { alert("Failed to update contact."); }
   };
 
-  const openAdd = () => {
-    setAddError("");
-    setNewContact({ name: "", email: "", phone: "", position: "", notes: "" });
-    setAddOpen(true);
-  };
-  
-  const closeAdd = () => {
-    setAddError("");
-    setAddOpen(false);
-  };
-  
-  const setNew = (k) => (e) => setNewContact((p) => ({ ...p, [k]: e.target.value }));
-  
+  const setNew = (k) => (e) => setNewContact(p => ({ ...p, [k]: e.target.value }));
+
   const saveNew = async () => {
-    const name = (newContact.name || "").trim();
-    const email = (newContact.email || "").trim();
-    if (!name || !email) {
-      setAddError("Name and Email are required.");
-      return;
-    }
-    
+    if (!(newContact.name || "").trim() || !(newContact.email || "").trim()) { setAddError("Name and Email are required."); return; }
     setSaving(true);
     try {
-      const payload = {
-        name,
-        email,
-        phone: (newContact.phone || "").trim(),
-        position: (newContact.position || "").trim(),
-        notes: (newContact.notes || "").trim()
-      };
-      const res = await api.post(`/vendors/${userId}/contacts`, payload);
+      const res = await api.post(`/vendors/${userId}/contacts`, { ...newContact });
       setContacts(prev => [...prev, res.data]);
-      closeAdd();
-    } catch (err) {
-      console.error("Failed to add contact", err);
-      setAddError(err.response?.data?.message || "Failed to add contact.");
-    } finally {
-      setSaving(false);
-    }
+      setAddOpen(false);
+    } catch (err) { setAddError(err.response?.data?.message || "Failed to add contact."); }
+    finally { setSaving(false); }
   };
 
-  useEffect(() => {
-    if (!addOpen) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") closeAdd();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [addOpen]);
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Primary Contact Persons</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage who handles communications and ad approvals.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage who handles communications and ad approvals.</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity"
-        >
-          + Add Contact
+        <button onClick={() => { setAddError(""); setNewContact({ name:"",email:"",phone:"",position:"",notes:"" }); setAddOpen(true); }}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm hover:opacity-90 transition-all">
+          <Plus size={14} /> Add Contact
         </button>
       </div>
 
-      {loading && <div className="text-center py-10 text-gray-500">Loading contacts...</div>}
-      {error && <div className="text-center py-10 text-red-500">{error}</div>}
+      {loading && <div className="text-center py-10 text-gray-400 text-sm">Loading…</div>}
+      {error && <div className="text-center py-10 text-red-500 text-sm">{error}</div>}
 
+      {/* Add sheet */}
       {addOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeAdd();
-          }}
-        >
-          <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl">
-            <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && setAddOpen(false)}>
+          <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
+            <div className="sm:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-200 dark:bg-gray-700" /></div>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
               <div>
-                <div className="text-lg font-bold text-gray-900 dark:text-white">Add Contact</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add a primary contact person for your vendor account.</div>
+                <div className="text-base font-black text-gray-900 dark:text-white">Add Contact</div>
+                <div className="text-xs text-gray-500 mt-0.5">Add a primary contact person</div>
               </div>
-              <button
-                type="button"
-                onClick={closeAdd}
-                className="px-3 py-1.5 rounded-xl text-sm font-semibold bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                ✕
-              </button>
+              <button onClick={() => setAddOpen(false)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"><X size={16} /></button>
             </div>
-
-            <div className="p-5 sm:p-6">
-              {addError && (
-                <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-semibold">
-                  {addError}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="Full Name" required span={1}><Input value={newContact.name} onChange={setNew("name")} placeholder="Full Name" /></Field>
-                <Field label="Email" required span={1}><Input type="email" value={newContact.email} onChange={setNew("email")} icon="✉️" placeholder="email@company.com" /></Field>
-                <Field label="Phone" span={1}><Input type="tel" value={newContact.phone} onChange={setNew("phone")} icon="📱" placeholder="+91 00000 00000" /></Field>
-                <Field label="Position" span={1}><Input value={newContact.position} onChange={setNew("position")} placeholder="e.g. Marketing Head" /></Field>
-                <Field label="Notes" span={2}><Input value={newContact.notes} onChange={setNew("notes")} placeholder="Additional notes..." /></Field>
+            <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+              {addError && <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 text-xs px-3 py-2 rounded-xl font-semibold"><AlertCircle size={14}/>{addError}</div>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Full Name" required><Input value={newContact.name} onChange={setNew("name")} placeholder="Full Name" /></Field>
+                <Field label="Position"><Input value={newContact.position} onChange={setNew("position")} placeholder="e.g. Marketing Head" /></Field>
+                <Field label="Email" required><Input type="email" value={newContact.email} onChange={setNew("email")} icon="✉️" placeholder="email@company.com" /></Field>
+                <Field label="Phone"><Input type="tel" value={newContact.phone} onChange={setNew("phone")} icon="📱" placeholder="+91 00000 00000" /></Field>
               </div>
+              <Field label="Notes"><Input value={newContact.notes} onChange={setNew("notes")} placeholder="Additional notes…" /></Field>
             </div>
-
-            <div className="p-5 sm:p-6 border-t border-gray-100 dark:border-gray-800 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeAdd}
-                disabled={saving}
-                className="px-4 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveNew}
-                disabled={saving}
-                className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 transition-all flex items-center gap-2"
-              >
-                {saving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                Add Contact
+            <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 flex gap-3">
+              <button onClick={() => setAddOpen(false)} disabled={saving} className="flex-1 py-3 rounded-2xl text-sm font-bold border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200">Cancel</button>
+              <button onClick={saveNew} disabled={saving} className="flex-1 py-3 rounded-2xl text-sm font-bold bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/20 disabled:opacity-60 flex items-center justify-center gap-2">
+                {saving && <Loader2 size={13} className="animate-spin" />} Add Contact
               </button>
             </div>
           </div>
@@ -710,196 +607,151 @@ const PrimaryContact = () => {
       )}
 
       <div className="grid gap-4">
-        {contacts.map((c) => (
-          <div key={c._id} className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 transition-all hover:border-gray-200 dark:hover:border-gray-700">
-            <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold text-lg flex items-center justify-center flex-shrink-0">
-                  {c.name ? c.name[0].toUpperCase() : "?"}
-                </div>
+        {contacts.map(c => (
+          <div key={c._id} className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 overflow-hidden hover:border-gray-200 dark:hover:border-gray-700 transition-colors">
+            <div className="flex items-center gap-3 px-4 py-4">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 text-white font-black text-lg flex items-center justify-center flex-shrink-0">
+                {c.name ? c.name[0].toUpperCase() : "?"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name || "Contact"}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.position}</div>
                 {!c.editing && (
-                  <div>
-                    <div className="font-bold text-gray-900 dark:text-white">{c.name || "New Contact"}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{c.position}</div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">✉️ {c.email}</span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">📱 {c.phone}</span>
-                    </div>
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    {c.email && <span className="flex items-center gap-1 text-[10px] text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-lg"><Mail size={9}/>{c.email}</span>}
+                    {c.phone && <span className="flex items-center gap-1 text-[10px] text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-lg"><Phone size={9}/>{c.phone}</span>}
                   </div>
                 )}
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => c.editing ? saveEdit(c) : toggleEdit(c._id)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {c.editing ? "✓ Save" : "✏️ Edit"}
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button onClick={() => c.editing ? saveEdit(c) : toggleEdit(c._id)}
+                  className={`p-2 rounded-xl text-xs transition-colors ${c.editing ? "bg-green-100 dark:bg-green-900/30 text-green-600" : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"}`}>
+                  {c.editing ? <Check size={14} /> : <Edit3 size={14} />}
                 </button>
-                <button
-                  onClick={() => remove(c._id)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                >
-                  🗑 Remove
+                <button onClick={() => remove(c._id)} className="p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                  <Trash2 size={14} />
                 </button>
               </div>
             </div>
-
             {c.editing && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 animate-fade-in">
-                <Field label="Full Name" required span={1}><Input value={c.name} onChange={e => setField(c._id, "name", e.target.value)} placeholder="Full Name" /></Field>
-                <Field label="Email" required span={1}><Input type="email" value={c.email} onChange={e => setField(c._id, "email", e.target.value)} icon="✉️" placeholder="email@company.com" /></Field>
-                <Field label="Phone" span={1}><Input type="tel" value={c.phone} onChange={e => setField(c._id, "phone", e.target.value)} icon="📱" placeholder="+91 00000 00000" /></Field>
-                <Field label="Position" span={1}><Input value={c.position} onChange={e => setField(c._id, "position", e.target.value)} placeholder="e.g. Marketing Head" /></Field>
-                <Field label="Notes" span={2}><Input value={c.notes} onChange={e => setField(c._id, "notes", e.target.value)} placeholder="Additional notes..." /></Field>
+              <div className="px-4 pb-4 pt-2 border-t border-gray-50 dark:border-gray-800 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Full Name" required><Input value={c.name} onChange={e => setField(c._id, "name", e.target.value)} placeholder="Full Name" /></Field>
+                <Field label="Position"><Input value={c.position} onChange={e => setField(c._id, "position", e.target.value)} placeholder="Position" /></Field>
+                <Field label="Email" required><Input type="email" value={c.email} onChange={e => setField(c._id, "email", e.target.value)} icon="✉️" placeholder="email@company.com" /></Field>
+                <Field label="Phone"><Input type="tel" value={c.phone} onChange={e => setField(c._id, "phone", e.target.value)} icon="📱" placeholder="+91" /></Field>
+                <div className="md:col-span-2"><Field label="Notes"><Input value={c.notes} onChange={e => setField(c._id, "notes", e.target.value)} placeholder="Notes…" /></Field></div>
               </div>
             )}
           </div>
         ))}
+        {!loading && contacts.length === 0 && (
+          <div className="flex flex-col items-center py-16 gap-3 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+            <User size={32} className="text-gray-300 dark:text-gray-600" />
+            <p className="text-sm text-gray-400">No contacts yet</p>
+            <button onClick={() => { setAddError(""); setAddOpen(true); }} className="text-xs font-semibold text-pink-500 hover:underline">+ Add your first contact</button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// ─── Sub Tab: Sales Officer ───────────────────────────────────────────────────
+// ─── SalesOfficer ─────────────────────────────────────────────────────────────
 const SalesOfficer = () => {
   const [officer, setOfficer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchOfficer = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await api.get("/sales/my-officer");
-        // API returns { assigned_sales_officer: {...} } or { assigned_sales_officer: null }
-        setOfficer(res.data?.assigned_sales_officer || null);
-      } catch (err) {
-        console.error("Failed to fetch sales officer:", err);
-        setError("Failed to load sales officer details.");
-      } finally {
-        setLoading(false);
-      }
+    const load = async () => {
+      setLoading(true); setError("");
+      try { const res = await api.get("/sales/my-officer"); setOfficer(res.data?.assigned_sales_officer || null); }
+      catch { setError("Failed to load sales officer details."); }
+      finally { setLoading(false); }
     };
-    fetchOfficer();
+    load();
   }, []);
 
   const initials = (name) =>
-    (name || "")
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase())
-      .join("") || "?";
+    (name || "").split(" ").filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join("") || "?";
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-gray-400 dark:text-gray-500">Loading sales officer...</span>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center py-20 gap-3">
+      <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-sm text-gray-400">Loading…</span>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Associated Sales Officer</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Your dedicated account manager from our sales team.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Your dedicated account manager from our sales team.</p>
         </div>
-        <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-          Read Only
-        </span>
+        <span className="text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 uppercase tracking-widest">Read Only</span>
       </div>
 
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          ⚠️ {error}
-        </div>
-      )}
+      {error && <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-semibold"><AlertCircle size={16}/>{error}</div>}
 
       {!error && !officer && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+        <div className="flex flex-col items-center py-16 gap-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
           <span className="text-4xl">🤝</span>
           <p className="text-base font-semibold text-gray-700 dark:text-gray-300">No Sales Officer Assigned</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 text-center max-w-xs">
-            A dedicated sales account manager will be assigned to your account soon.
-          </p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center max-w-xs">A dedicated sales account manager will be assigned to your account soon.</p>
         </div>
       )}
 
       {officer && (
-        <>
-          {/* Officer Card */}
-          <div className="flex flex-col md:flex-row gap-6 items-center p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-blue-500/20 flex-shrink-0">
-              {officer.avatar_url
-                ? <img src={officer.avatar_url} alt="" className="w-full h-full object-cover rounded-2xl" />
-                : initials(officer.full_name || officer.username)
-              }
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+            <div className="h-20 bg-gradient-to-r from-blue-500 to-indigo-600 relative overflow-hidden">
+              <div className="absolute inset-0 opacity-20" style={{backgroundImage:'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize:'16px 16px'}} />
             </div>
-            <div className="flex-1 text-center md:text-left">
-              <div className="text-xl font-bold text-gray-900 dark:text-white">
-                {officer.full_name || officer.username || "Sales Officer"}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Sales Account Manager
-                {officer.username && (
-                  <span className="ml-2 text-gray-400">· @{officer.username}</span>
-                )}
-              </div>
-              <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-3">
+            <div className="px-5 pb-5">
+              <div className="flex items-end justify-between" style={{ marginTop: "-28px" }}>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg border-4 border-white dark:border-gray-900 flex-shrink-0">
+                  {officer.avatar_url
+                    ? <img src={officer.avatar_url} alt="" className="w-full h-full object-cover rounded-xl" />
+                    : initials(officer.full_name || officer.username)}
+                </div>
                 {officer.email && (
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
-                    ✉️ {officer.email}
-                  </span>
-                )}
-                {officer.phone && (
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
-                    📞 {officer.phone}
-                  </span>
-                )}
-                {officer.location && (
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
-                    📍 {officer.location}
-                  </span>
+                  <a href={`mailto:${officer.email}`}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all mb-1">
+                    <Mail size={12} /> Email Officer
+                  </a>
                 )}
               </div>
-            </div>
-            <div className="flex flex-col gap-2 min-w-[160px]">
-              {officer.email && (
-                <a
-                  href={`mailto:${officer.email}`}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 text-center"
-                >
-                  ✉️ Email Officer
-                </a>
-              )}
+              <div className="mt-3">
+                <div className="text-base font-black text-gray-900 dark:text-white">{officer.full_name || officer.username || "Sales Officer"}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Sales Account Manager{officer.username && ` · @${officer.username}`}</div>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {officer.email && <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700"><Mail size={11}/>{officer.email}</span>}
+                  {officer.phone && <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700"><Phone size={11}/>{officer.phone}</span>}
+                  {officer.location && <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700"><MapPin size={11}/>{officer.location}</span>}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Officer Details Grid */}
-          <div className="p-6 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
-            <div className="text-xs font-bold text-pink-600 uppercase tracking-widest mb-4">Officer Details</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+            <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest mb-4">Officer Details</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
-                ["Sales Officer Name", officer.full_name || officer.username || "—"],
+                ["Name", officer.full_name || officer.username || "—"],
                 ["Username", officer.username ? `@${officer.username}` : "—"],
-                ["Email Address", officer.email || "—"],
-                ["Phone Number", officer.phone || "—"],
+                ["Email", officer.email || "—"],
+                ["Phone", officer.phone || "—"],
                 ["Location", officer.location || "—"],
               ].map(([label, value]) => (
-                <div key={label}>
-                  <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">{label}</div>
+                <div key={label} className="py-3 border-b border-gray-50 dark:border-gray-800 last:border-0">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</div>
                   <div className="text-sm font-semibold text-gray-900 dark:text-white">{value}</div>
                 </div>
               ))}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -908,46 +760,67 @@ const SalesOfficer = () => {
 // ─── Root Component ───────────────────────────────────────────────────────────
 export default function VendorProfile() {
   const [tab, setTab] = useState(0);
-  const tabs = ["🏢 Company Information", "👤 Primary Contact", "🤝 Sales Officer"];
+
+  const TABS = [
+    { label: "Company Information", mobileLabel: "Company", icon: Building2 },
+    { label: "Primary Contact",     mobileLabel: "Contacts", icon: User },
+    { label: "Sales Officer",       mobileLabel: "Sales",    icon: Handshake },
+  ];
+
+  const tabContent = [<CompanyInfo />, <PrimaryContact />, <SalesOfficer />];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
 
-        {/* Page Header */}
-        <div className="mb-8 animate-fade-in">
+      {/* ── Desktop layout ── */}
+      <div className="hidden md:block max-w-7xl mx-auto p-6 md:p-8">
+        <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-red-500 to-pink-600">
-              Vendor Profile
-            </span>
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-red-500 to-pink-600">Vendor Profile</span>
           </h1>
           <p className="text-gray-500 dark:text-gray-400">Manage your business identity, team, and account settings</p>
         </div>
 
-        {/* Sub-Tabs */}
+        {/* Desktop tab pills */}
         <div className="flex flex-wrap gap-1 mb-8 p-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-fit shadow-sm">
-          {tabs.map((t, i) => (
-            <button
-              key={i}
-              onClick={() => setTab(i)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 
-                ${tab === i
-                  ? "bg-gray-900 dark:bg-white text-white dark:text-black shadow-md"
-                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                }`}
-            >
-              {t}
-            </button>
-          ))}
+          {TABS.map((t, i) => {
+            const Icon = t.icon;
+            return (
+              <button key={i} onClick={() => setTab(i)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${tab === i ? "bg-gray-900 dark:bg-white text-white dark:text-black shadow-md" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"}`}>
+                <Icon size={15} /> {t.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Tab Content */}
-        <div className="animate-fade-in">
-          {tab === 0 && <CompanyInfo />}
-          {tab === 1 && <PrimaryContact />}
-          {tab === 2 && <SalesOfficer />}
+        <div>{tabContent[tab]}</div>
+      </div>
+
+      {/* ── Mobile layout ── */}
+      <div className="md:hidden flex flex-col min-h-screen">
+        {/* Sticky mobile header */}
+        <div className="sticky top-[52px] z-20 bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800 px-4 pt-3 pb-0">
+          <h1 className="text-xl font-extrabold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-red-500 to-pink-600">
+            Vendor Profile
+          </h1>
+          <div className="flex gap-0">
+            {TABS.map((t, i) => {
+              const Icon = t.icon;
+              return (
+                <button key={i} onClick={() => setTab(i)}
+                  className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-bold transition-all border-b-2 ${tab === i ? "border-[#fa3f5e] text-[#fa3f5e]" : "border-transparent text-gray-400"}`}>
+                  <Icon size={16} />
+                  {t.mobileLabel}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
+        <div className="flex-1 p-4 pb-28">
+          {tabContent[tab]}
+        </div>
       </div>
     </div>
   );

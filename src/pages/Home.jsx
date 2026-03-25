@@ -47,23 +47,19 @@ const adAuthHeaders = () => {
 
 // ── Location Bar ──────────────────────────────────────────────────────────────
 const LocationBar = () => (
-  <div className="sticky top-0 z-10 bg-white dark:bg-black mb-2 border-b border-gray-200 dark:border-gray-800">
-    <div className="flex items-center justify-between lg:px-4 lg:py-3 gap-4">
-      <div className="hidden md:flex items-center gap-1">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange transition-opacity duration-300" style={{ fontFamily: 'cursive' }}>
-          B-Smart
-        </h1>
-      </div>
-      <div className="flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg cursor-pointer group hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors w-full md:w-auto md:min-w-[300px]">
+  <div className="hidden md:block sticky top-0 z-10 bg-white dark:bg-black mb-2 border-b border-gray-200 dark:border-gray-800">
+    <div className="flex items-center justify-between px-4 py-3 gap-4">
+      <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange" style={{ fontFamily: 'cursive' }}>
+        B-Smart
+      </h1>
+      <div className="flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg cursor-pointer group hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors w-auto min-w-[300px]">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="p-1.5 bg-white dark:bg-black rounded-full shadow-sm shrink-0">
             <MapPin size={14} className="text-red-500" />
           </div>
-          <div className="flex flex-col flex-1 min-w-0 text-left">
-            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">Plat No.20, 2nd Floor, Shivaram Nivas, Sri...</span>
-          </div>
+          <span className="text-sm font-bold text-gray-900 dark:text-white truncate">Plat No.20, 2nd Floor, Shivaram Nivas, Sri...</span>
         </div>
-        <ChevronDown size={16} className="text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300 transition-colors shrink-0 ml-2" />
+        <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
       </div>
     </div>
   </div>

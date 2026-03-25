@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import commentService from '../services/commentServiceJS';
 import {
   Heart, MessageCircle, Send, MoreHorizontal, Music2,
   Volume2, VolumeX, Bookmark, ChevronLeft, Search,
   ShoppingBag, Loader2, UserPlus, UserCheck, X, Smile, Trash2
 } from 'lucide-react';
+import { fetchWallet, setWalletBalance } from '../store/walletSlice';
 
 const BASE_URL = 'https://api.bebsmart.in';
 const IMAGE_AD_DURATION = 15; // seconds for image ads
@@ -520,6 +521,8 @@ const Caption = ({ text }) => {
 // ─── Main Component ────────────────────────────────────────────────────────────
 const Ads = ({ feedMode = 'user' }) => {
   const { userObject } = useSelector((state) => state.auth);
+  const walletBalance = useSelector((state) => state.wallet.balance);
+  const dispatch = useDispatch();
   const isVendorUser = userObject?.role === 'vendor';
 
   const currentUserId = userObject?._id || userObject?.id || null;
@@ -537,27 +540,6 @@ const Ads = ({ feedMode = 'user' }) => {
       document.documentElement.style.overflow = prevHtmlOverflow;
       document.body.style.overflow = prevBodyOverflow;
     };
-  }, []);
-
-  // ── Wallet balance state ─────────────────────────────────────────────────
-  const [walletBalance, setWalletBalance] = useState(
-    userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0
-  );
-
-  const fetchWalletBalance = useCallback(async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/api/wallet`, { headers: authHeaders() });
-      if (!res.ok) return;
-      const data = await res.json();
-      // Handle various backend response shapes
-      const bal =
-        data?.balance ??
-        data?.wallet?.balance ??
-        data?.data?.balance ??
-        data?.data?.wallet?.balance ??
-        data?.user?.wallet?.balance;
-      if (bal !== undefined && bal !== null) setWalletBalance(Math.floor(Number(bal)));
-    } catch { /* silent */ }
   }, []);
 
   // ── Search state ────────────────────────────────────────────────────────────
@@ -612,6 +594,8 @@ const Ads = ({ feedMode = 'user' }) => {
   const videoRefs = useRef({});
   const progressIntervalRef = useRef(null);
   const imageTimerRef = useRef(null);
+  // Track manually paused video (user tapped to pause/resume)
+  const [isPausedByUser, setIsPausedByUser] = useState(false);
 
   // Measure action-panel position so comment popup arrow aligns correctly
   useEffect(() => {
@@ -732,6 +716,13 @@ const Ads = ({ feedMode = 'user' }) => {
 
   useEffect(() => { fetchAds(activeCategory); }, [activeCategory, fetchAds]);
 
+  // Fetch wallet on mount and every 30s using Redux — keeps balance live across the app
+  useEffect(() => {
+    dispatch(fetchWallet());
+    const interval = setInterval(() => dispatch(fetchWallet()), 30000);
+    return () => clearInterval(interval);
+  }, [dispatch]);
+
   const adsRef = useRef(ads);
   useEffect(() => { adsRef.current = ads; }, [ads]);
 
@@ -756,34 +747,50 @@ const Ads = ({ feedMode = 'user' }) => {
     } catch { /* sessionStorage unavailable — in-memory ref still guards */ }
 
     try {
+      // Fix: send user.id as string — backend expects { "user": { "id": "..." } }
+      const body = { user: { id: currentUserId ? String(currentUserId) : undefined } };
       const res = await fetch(`${BASE_URL}/api/ads/${adId}/view`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : '' } }),
+        body: JSON.stringify(body),
       });
+      // Accept 200/201 as success; treat 4xx/5xx as failure but don't crash
+      let resData = {};
+      try { resData = await res.json(); } catch { /* non-JSON body */ }
+
       if (!res.ok) {
+        // Remove from viewed so it can retry once on next visit
         viewedIdsRef.current.delete(key);
-        throw new Error(`HTTP ${res.status}`);
+        console.warn(`View API returned ${res.status}:`, resData);
+        // Still refresh wallet — some backends credit coins but return non-2xx
+        dispatch(fetchWallet());
+        setTimeout(() => dispatch(fetchWallet()), 1500);
+        return;
       }
+
       // Parse response — backend may return updated wallet/coins directly
-      const resData = await res.json().catch(() => ({}));
       const directBal =
         resData?.wallet?.balance ??
         resData?.user?.wallet?.balance ??
         resData?.balance ??
-        resData?.data?.balance;
+        resData?.data?.balance ??
+        resData?.coins;
       const coinsRewarded =
         resData?.coins_rewarded ??
         resData?.coins ??
         resData?.reward ??
         resData?.data?.coins_rewarded;
-      if (directBal !== undefined) {
-        setWalletBalance(Math.floor(Number(directBal)));
+
+      if (directBal !== undefined && directBal !== null) {
+        dispatch(setWalletBalance(directBal));
       } else {
-        // Fallback: poll wallet endpoint (give backend 800ms to settle)
-        setTimeout(() => fetchWalletBalance(), 800);
+        // Immediately + retry to ensure the credit shows up
+        dispatch(fetchWallet());
+        setTimeout(() => dispatch(fetchWallet()), 1000);
+        setTimeout(() => dispatch(fetchWallet()), 3000);
       }
-      // Show coin reward POPUP (first-time view only — guard already ensures this runs once)
+
+      // Show coin reward POPUP
       const rewardAmount = (coinsRewarded && Number(coinsRewarded) > 0)
         ? Number(coinsRewarded)
         : (() => {
@@ -791,14 +798,13 @@ const Ads = ({ feedMode = 'user' }) => {
             return adCoins && Number(adCoins) > 0 ? Number(adCoins) : 10;
           })();
       setViewRewardPopup({ amount: rewardAmount });
-      // Also keep the small toast as fallback
       const toastId = Date.now();
       setCoinToast({ amount: rewardAmount, id: toastId });
       setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
     } catch (err) {
       console.error('View tracking failed:', err);
     }
-  }, [currentUserId, fetchWalletBalance]);
+  }, [currentUserId, dispatch]);
 
   // tracks ad _id strings that have already received a view API call (never double-fires)
   const viewFiredForAdId = useRef(new Set());
@@ -838,7 +844,43 @@ const Ads = ({ feedMode = 'user' }) => {
     return () => clearInterval(progressIntervalRef.current);
   }, [currentIndex, trackView]);
 
+  // ── Imperatively play/pause videos when currentIndex or ads list changes ──────
+  // autoPlay={isCurrent} only fires on initial mount and is blocked by browsers for
+  // unmuted video. We must call .play() imperatively every time the current ad changes,
+  // including the very first load when ads arrive from the API (currentIndex stays 0).
+  useEffect(() => {
+    if (ads.length === 0) return;
+    const currentAd = ads[currentIndex];
+    if (!currentAd) return;
+    const isVideo = currentAd.media?.[0]?.media_type === 'video';
 
+    // Pause all other videos immediately
+    Object.entries(videoRefs.current).forEach(([idx, vid]) => {
+      if (vid && Number(idx) !== currentIndex && !vid.paused) vid.pause();
+    });
+
+    if (!isVideo) return;
+
+    // Don't auto-play if user explicitly paused
+    if (isPausedByUser) return;
+
+    // Small delay to ensure the <video> element is in the DOM after React render
+    const timer = setTimeout(() => {
+      const vid = videoRefs.current[currentIndex];
+      if (!vid) return;
+      const m = currentAd.media?.[0];
+      const start = m?.timing_window?.start ?? m?.video_meta?.selected_start ?? 0;
+      vid.currentTime = start > 0 ? start : 0;
+      const playPromise = vid.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Browser blocked autoplay — user must interact first; silently ignore
+        });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, ads, isPausedByUser]);
 
   // ── Navigation ───────────────────────────────────────────────────────────────
   const goToIndex = useCallback((index) => {
@@ -848,6 +890,7 @@ const Ads = ({ feedMode = 'user' }) => {
     isAnimatingRef.current = true;
     const curVid = videoRefs.current[currentIndex];
     if (curVid) curVid.pause();
+    setIsPausedByUser(false); // reset pause state when navigating
     setCurrentIndex(next);
     setTimeout(() => { isAnimatingRef.current = false; }, 500);
   }, [currentIndex, ads.length]);
@@ -874,7 +917,18 @@ const Ads = ({ feedMode = 'user' }) => {
     setTouchStartY(null);
   };
 
-  // ── Like ─────────────────────────────────────────────────────────────────────
+  // ── Tap to pause / resume video ──────────────────────────────────────────────
+  const handleVideoTap = useCallback((index) => {
+    const vid = videoRefs.current[index];
+    if (!vid) return;
+    if (vid.paused) {
+      vid.play().catch(() => {});
+      setIsPausedByUser(false);
+    } else {
+      vid.pause();
+      setIsPausedByUser(true);
+    }
+  }, []);
   const toggleLike = useCallback(async (adId) => {
     const isLiked = likedIds.has(adId);
 
@@ -893,20 +947,44 @@ const Ads = ({ feedMode = 'user' }) => {
       const res = await fetch(`${BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : '' } }),
+        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : undefined } }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      // Parse response for direct wallet update
+      let resData = {};
+      try { resData = await res.json(); } catch { /* non-JSON */ }
+
+      const directBal =
+        resData?.wallet?.balance ??
+        resData?.user?.wallet?.balance ??
+        resData?.balance ??
+        resData?.data?.balance ??
+        resData?.coins;
+
+      if (directBal !== undefined && directBal !== null) {
+        // Backend returned balance directly — use it
+        dispatch(setWalletBalance(directBal));
+      } else {
+        // Poll wallet: immediately, then at 1s and 3s intervals to catch delayed credits
+        dispatch(fetchWallet());
+        setTimeout(() => dispatch(fetchWallet()), 1000);
+        setTimeout(() => dispatch(fetchWallet()), 3000);
+      }
+
       // Show like/dislike coin reward popup
-      setLikeRewardPopup({ amount: 10, isLike: !isLiked });
+      const coinsRewarded = resData?.coins_rewarded ?? resData?.reward ?? resData?.coins ?? 10;
+      setLikeRewardPopup({ amount: Number(coinsRewarded) || 10, isLike: !isLiked });
+
     } catch (err) {
       console.error('Like failed:', err);
-      // Rollback
+      // Rollback optimistic update
       setLikedIds(prev => { const s = new Set(prev); isLiked ? s.add(adId) : s.delete(adId); return s; });
       setAds(prev => prev.map(a => a._id === adId
         ? { ...a, likes_count: a.likes_count + (isLiked ? 1 : -1), is_liked_by_me: isLiked }
         : a));
     }
-  }, [likedIds, currentUserId]);
+  }, [likedIds, currentUserId, dispatch]);
 
   // ── Dislike ───────────────────────────────────────────────────────────────────
 
@@ -1067,11 +1145,17 @@ const Ads = ({ feedMode = 'user' }) => {
     <div className={`flex flex-col dark:bg-black overflow-hidden ${pageHeightClass}`}>
 
       {/* Desktop top bar */}
-      <div className="hidden md:flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1">
+      <div className="hidden md:flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0 relative overflow-visible">
+        {/* Back button — hidden when search open */}
+        <button
+          onClick={() => navigate(-1)}
+          className={`p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1 shrink-0 transition-all duration-300 ${searchOpen ? 'opacity-0 w-0 overflow-hidden mr-0 p-0' : 'opacity-100'}`}
+        >
           <ChevronLeft size={16} />
         </button>
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
+
+        {/* Category pills — shrink/hide when search open */}
+        <div className={`flex items-center gap-1 overflow-x-auto scrollbar-none transition-all duration-300 ${searchOpen ? 'w-0 opacity-0 overflow-hidden flex-none' : 'flex-1 opacity-100'}`}>
           {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)}
               className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all
@@ -1082,11 +1166,12 @@ const Ads = ({ feedMode = 'user' }) => {
             </button>
           ))}
         </div>
-        {/* Desktop Search */}
-        <div ref={searchContainerRef} className="relative ml-4 shrink-0">
+
+        {/* Search — expands to full width */}
+        <div ref={searchContainerRef} className={`transition-all duration-300 ease-in-out shrink-0 ${searchOpen ? 'flex-1' : ''}`}>
           {searchOpen ? (
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full px-3 py-1.5 w-64">
-              <Search size={14} className="text-gray-400 shrink-0" />
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 w-full">
+              <Search size={15} className="text-gray-400 shrink-0" />
               <input
                 ref={searchInputRef}
                 value={searchQuery}
@@ -1096,84 +1181,96 @@ const Ads = ({ feedMode = 'user' }) => {
               />
               {searchLoading
                 ? <Loader2 size={14} className="animate-spin text-gray-400 shrink-0" />
-                : <button onClick={handleSearchClose}><X size={14} className="text-gray-400 hover:text-gray-700 dark:hover:text-white" /></button>
+                : searchQuery
+                  ? <button onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDropdownVisible(false); searchInputRef.current?.focus(); }}>
+                      <X size={14} className="text-gray-400 hover:text-gray-700 dark:hover:text-white" />
+                    </button>
+                  : null
               }
+              <button onClick={handleSearchClose} className="text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white ml-1 shrink-0">
+                Cancel
+              </button>
             </div>
           ) : (
-            <button onClick={handleSearchOpen} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500">
+            <button onClick={handleSearchOpen} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 transition-colors">
               <Search size={18} />
             </button>
           )}
 
-          {/* Desktop Dropdown */}
-          {searchDropdownVisible && searchResults.length > 0 && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden z-50 max-h-96 overflow-y-auto">
-              {/* Users section */}
-              {searchResults.filter(r => r._type === 'user').length > 0 && (
-                <div>
-                  <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">People</div>
-                  {searchResults.filter(r => r._type === 'user').map(u => (
-                    <button key={u._id || u.id} onClick={() => handleSearchResultClick(u)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
-                      <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] shrink-0">
-                        <div className="w-full h-full rounded-full bg-white dark:bg-[#1c1c1e] overflow-hidden flex items-center justify-center">
-                          {u.avatar_url
-                            ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
-                            : <span className="text-xs font-bold text-gray-700 dark:text-white">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
-                          }
-                        </div>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</div>
-                        {u.username && <div className="text-xs text-gray-400 truncate">@{u.username}</div>}
-                      </div>
-                    </button>
-                  ))}
+          {/* Desktop Search Dropdown */}
+          {searchOpen && searchDropdownVisible && (
+            <div className="absolute left-0 right-0 top-full mt-1 mx-4 bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 z-50 max-h-96 overflow-y-auto">
+              {searchLoading && (
+                <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span className="text-sm">Searching…</span>
                 </div>
               )}
-              {/* Ads section */}
-              {searchResults.filter(r => r._type === 'ad').length > 0 && (
-                <div>
-                  <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Ads</div>
-                  {searchResults.filter(r => r._type === 'ad').map(ad => {
-                    const adUser = ad.user_id || ad.vendor_id || {};
-                    const thumb = ad.media?.[0]?.fileUrl || ad.media?.[0]?.thumbnail_url;
-                    return (
-                      <button key={ad._id} onClick={() => handleSearchResultClick(ad)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
-                        <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0">
-                          {thumb
-                            ? <img src={thumb} alt="" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center text-gray-400"><ShoppingBag size={14} /></div>
-                          }
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{ad.caption || ad.title || 'Ad'}</div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            {ad.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium">{ad.category}</span>}
-                            {typeof adUser === 'object' && adUser.username && <span className="text-[10px] text-gray-400">@{adUser.username}</span>}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {/* No results */}
-              {searchResults.length === 0 && !searchLoading && searchQuery.trim() && (
+              {!searchLoading && searchResults.length === 0 && searchQuery.trim() && (
                 <div className="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
                   <Search size={20} className="opacity-40" />
                   <span className="text-sm">No results for "{searchQuery}"</span>
                 </div>
               )}
+              {!searchLoading && searchResults.length > 0 && (
+                <>
+                  {/* Users */}
+                  {searchResults.filter(r => r._type === 'user').length > 0 && (
+                    <div>
+                      <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">People</div>
+                      {searchResults.filter(r => r._type === 'user').map(u => (
+                        <button key={u._id || u.id} onClick={() => handleSearchResultClick(u)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
+                          <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] shrink-0">
+                            <div className="w-full h-full rounded-full bg-white dark:bg-[#1c1c1e] overflow-hidden flex items-center justify-center">
+                              {u.avatar_url
+                                ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                                : <span className="text-xs font-bold text-gray-700 dark:text-white">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
+                              }
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</div>
+                            {u.username && <div className="text-xs text-gray-400 truncate">@{u.username}</div>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Ads */}
+                  {searchResults.filter(r => r._type === 'ad').length > 0 && (
+                    <div>
+                      <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Ads</div>
+                      {searchResults.filter(r => r._type === 'ad').map(adItem => {
+                        const adUser = adItem.user_id || adItem.vendor_id || {};
+                        const thumb = adItem.media?.[0]?.fileUrl || adItem.media?.[0]?.thumbnail_url;
+                        return (
+                          <button key={adItem._id} onClick={() => handleSearchResultClick(adItem)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
+                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0">
+                              {thumb
+                                ? <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                : <div className="w-full h-full flex items-center justify-center text-gray-400"><ShoppingBag size={14} /></div>
+                              }
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{adItem.caption || adItem.title || 'Ad'}</div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {adItem.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium">{adItem.category}</span>}
+                                {typeof adUser === 'object' && adUser.username && <span className="text-[10px] text-gray-400">@{adUser.username}</span>}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
       </div>
-
-      {/* Feed */}
-      {/* Mobile: black full-screen, card centred and capped at 430px wide */}
-      {/* Desktop: white/dark bg, centred phone-card layout */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <div
           className="flex-1 flex items-center justify-center relative overflow-hidden h-full bg-black md:bg-white dark:bg-black"
@@ -1265,59 +1362,89 @@ const Ads = ({ feedMode = 'user' }) => {
 
                       {/* Media */}
                       {isVideo ? (
-                        <video
-                          ref={el => { videoRefs.current[index] = el; }}
-                          src={src}
-                          className="w-full h-full object-cover"
-                          muted={isMuted}
-                          playsInline
-                          autoPlay={isCurrent}
-                          loop={false}
-                          onLoadedMetadata={e => {
-                            // Seek to trimmed start once metadata (duration) is known
-                            if (!isCurrent) return;
-                            const m = a.media?.[0];
-                            const start = m?.timing_window?.start ?? m?.video_meta?.selected_start ?? 0;
-                            if (start > 0) e.target.currentTime = start;
-                          }}
-                          onTimeUpdate={e => {
-                            if (!isCurrent) return;
-                            const vid = e.target;
-                            const m = a.media?.[0];
-                            const start   = m?.timing_window?.start    ?? m?.video_meta?.selected_start  ?? 0;
-                            const end     = m?.timing_window?.end      ?? m?.video_meta?.selected_end    ?? null;
-                            const dur     = m?.video_meta?.final_duration ?? null;
-                            const ct      = vid.currentTime;
+                        <div className="w-full h-full relative" onClick={() => isCurrent && handleVideoTap(index)}>
+                          <video
+                            ref={el => { videoRefs.current[index] = el; }}
+                            src={src}
+                            className="w-full h-full object-cover"
+                            muted={isMuted}
+                            playsInline
+                            autoPlay={isCurrent}
+                            loop={false}
+                            onLoadedMetadata={e => {
+                              const m = a.media?.[0];
+                              const start = m?.timing_window?.start ?? m?.video_meta?.selected_start ?? 0;
+                              if (start > 0) e.target.currentTime = start;
+                              // Fallback: if this is the current video and it's not playing yet, play it
+                              if (isCurrent && e.target.paused && !isPausedByUser) {
+                                e.target.play().catch(() => {});
+                              }
+                            }}
+                            onTimeUpdate={e => {
+                              if (!isCurrent) return;
+                              const vid = e.target;
+                              const m = a.media?.[0];
+                              const start   = m?.timing_window?.start    ?? m?.video_meta?.selected_start  ?? 0;
+                              const end     = m?.timing_window?.end      ?? m?.video_meta?.selected_end    ?? null;
+                              const dur     = m?.video_meta?.final_duration ?? null;
+                              const ct      = vid.currentTime;
 
-                            // Hit the trim end → stop, mark 100%, fire view
-                            if (end !== null && ct >= end) {
-                              vid.pause();
+                              // Hit the trim end → stop, mark 100%, fire view, then replay
+                              if (end !== null && ct >= end) {
+                                setProgress(100);
+                                const key = String(a._id);
+                                if (!viewFiredForAdId.current.has(key)) {
+                                  viewFiredForAdId.current.add(key);
+                                  trackView(a._id);
+                                }
+                                // Replay from start
+                                vid.currentTime = start > 0 ? start : 0;
+                                setProgress(0);
+                                setIsPausedByUser(false);
+                                vid.play().catch(() => {});
+                                return;
+                              }
+
+                              // Move progress bar
+                              if (dur && dur > 0) {
+                                setProgress(Math.min(((ct - start) / dur) * 100, 100));
+                              } else if (vid.duration > 0) {
+                                setProgress((ct / vid.duration) * 100);
+                              }
+                            }}
+                            onEnded={() => {
+                              if (!isCurrent) return;
                               setProgress(100);
+                              setIsPausedByUser(false);
+
                               const key = String(a._id);
                               if (!viewFiredForAdId.current.has(key)) {
                                 viewFiredForAdId.current.add(key);
                                 trackView(a._id);
                               }
-                              return;
-                            }
 
-                            // Move progress bar
-                            if (dur && dur > 0) {
-                              setProgress(Math.min(((ct - start) / dur) * 100, 100));
-                            } else if (vid.duration > 0) {
-                              setProgress((ct / vid.duration) * 100);
-                            }
-                          }}
-                          onEnded={() => {
-                            if (!isCurrent) return;
-                            setProgress(100);
-                            const key = String(a._id);
-                            if (!viewFiredForAdId.current.has(key)) {
-                              viewFiredForAdId.current.add(key);
-                              trackView(a._id);
-                            }
-                          }}
-                        />
+                              // Replay the video from the beginning
+                              const vid = videoRefs.current[index];
+                              if (vid) {
+                                const m = a.media?.[0];
+                                const start = m?.timing_window?.start ?? m?.video_meta?.selected_start ?? 0;
+                                vid.currentTime = start > 0 ? start : 0;
+                                setProgress(0);
+                                vid.play().catch(() => {});
+                              }
+                            }}
+                          />
+                          {/* Pause/Play overlay — shows briefly on tap */}
+                          {isCurrent && isPausedByUser && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+                                  <path d="M8 5v14l11-7z"/>
+                                </svg>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ) : src ? (
                         <img src={src} className="w-full h-full object-cover"
                           alt={a.caption || a.vendor_id?.business_name || 'Ad'}

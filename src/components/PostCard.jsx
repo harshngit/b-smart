@@ -204,13 +204,18 @@ const ExpandCaption = ({ username, userId, text, isAd }) => {
 // ─── Media Renderer ────────────────────────────────────────────────────────────
 const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [videoReady, setVideoReady] = useState(false);
+  const [videoReady, setVideoReady]     = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const videoRef = useRef(null);
+  const [isMuted, setIsMuted]           = useState(true);
+  // userPaused: true when the user manually tapped to pause — prevents IntersectionObserver
+  // from auto-resuming until they scroll away and back
+  const [userPaused, setUserPaused]     = useState(false);
+
+  const videoRef      = useRef(null);
+  const containerRef  = useRef(null);
+  const isVisibleRef  = useRef(false);
 
   const currentItem = mediaItems[currentIndex] || {};
-  // posts use type:'video', ads use media_type:'video'
   const isVideo = currentItem.type === 'video' || currentItem.media_type === 'video';
 
   const getThumbnailUrl = (item) => {
@@ -224,16 +229,14 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
 
   const getVideoTiming = (item) => {
     const n = v => (typeof v === 'number' && isFinite(v)) ? v : (parseFloat(v) || 0);
-    // Ad: uses video_meta or timing_window
     if (item?.video_meta || item?.timing_window) {
       const meta = item.video_meta || {};
-      const tw = item.timing_window || {};
+      const tw   = item.timing_window || {};
       return { start: n(meta.selected_start ?? tw.start ?? 0), end: n(meta.selected_end ?? tw.end ?? 0) };
     }
-    // Post: uses timing
     const t = item?.timing || {};
     let start = n(t.start ?? item?.['finalLength-start'] ?? 0);
-    let end = n(t.end ?? item?.['finallength-end'] ?? 0);
+    let end   = n(t.end   ?? item?.['finallength-end']   ?? 0);
     const dur = n(item?.videoLength ?? item?.totalLenght ?? item?.duration ?? 0);
     if (start < 0) start = 0;
     if (!end && dur > 0) end = dur;
@@ -246,9 +249,68 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
   const { start: trimStart, end: trimEnd } = getVideoTiming(currentItem);
   const showThumb = thumbnailUrl && !videoReady;
 
-  const goNext = (e) => { e.stopPropagation(); setCurrentIndex(i => (i + 1) % mediaItems.length); setVideoReady(false); setVideoPlaying(false); };
-  const goPrev = (e) => { e.stopPropagation(); setCurrentIndex(i => (i - 1 + mediaItems.length) % mediaItems.length); setVideoReady(false); setVideoPlaying(false); };
-  const toggleMute = (e) => { e.stopPropagation(); if (videoRef.current) videoRef.current.muted = !isMuted; setIsMuted(m => !m); };
+  // ── IntersectionObserver: auto play when ≥50% visible, pause when not ───────
+  useEffect(() => {
+    if (!isVideo) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry.isIntersecting;
+        const vid = videoRef.current;
+        if (!vid) return;
+        if (entry.isIntersecting) {
+          // Only auto-play if the user hasn't manually paused
+          if (!userPaused) {
+            vid.play().catch(() => {});
+          }
+        } else {
+          // Always pause when scrolled out of view, and reset userPaused
+          // so it auto-resumes next time they scroll back
+          vid.pause();
+          setUserPaused(false);
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isVideo, userPaused, currentIndex]);
+
+  // ── When carousel slide changes, reset state ─────────────────────────────────
+  const goNext = (e) => {
+    e.stopPropagation();
+    setCurrentIndex(i => (i + 1) % mediaItems.length);
+    setVideoReady(false);
+    setVideoPlaying(false);
+    setUserPaused(false);
+  };
+  const goPrev = (e) => {
+    e.stopPropagation();
+    setCurrentIndex(i => (i - 1 + mediaItems.length) % mediaItems.length);
+    setVideoReady(false);
+    setVideoPlaying(false);
+    setUserPaused(false);
+  };
+  const toggleMute = (e) => {
+    e.stopPropagation();
+    if (videoRef.current) videoRef.current.muted = !isMuted;
+    setIsMuted(m => !m);
+  };
+  const togglePlayPause = (e) => {
+    e.stopPropagation();
+    const vid = videoRef.current;
+    if (!vid) return;
+    if (vid.paused) {
+      vid.play().catch(() => {});
+      setUserPaused(false);
+    } else {
+      vid.pause();
+      setUserPaused(true);
+    }
+  };
 
   if (!mediaItems.length) return (
     <div className="flex items-center justify-center bg-gradient-to-br from-purple-900 to-pink-900" style={{ minHeight: 280 }}>
@@ -260,9 +322,10 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
   );
 
   return (
-    <div className="w-full bg-black overflow-hidden relative group">
+    <div ref={containerRef} className="w-full bg-black overflow-hidden relative group">
       {isVideo ? (
         <div className="relative w-full">
+          {/* Thumbnail shown until video is ready */}
           {thumbnailUrl && (
             <img src={thumbnailUrl} alt="thumbnail"
               className="w-full h-auto max-h-[600px] object-contain"
@@ -270,42 +333,55 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
           )}
           <video
             ref={videoRef}
+            key={`${currentItem.fileUrl || currentItem.url}-${currentIndex}`}
             src={currentItem.fileUrl || currentItem.url}
             className="w-full h-auto max-h-[600px] object-contain"
             style={{ display: videoReady ? 'block' : 'none' }}
-            autoPlay muted={isMuted} playsInline
+            muted={isMuted}
+            playsInline
+            loop={false}
             poster={thumbnailUrl || undefined}
-            data-start={trimStart} data-end={trimEnd}
+            data-start={trimStart}
+            data-end={trimEnd}
             onLoadedMetadata={(e) => {
               setVideoReady(true);
               const s = Number(e.currentTarget.dataset.start || 0);
               if (s > 0 && isFinite(s)) e.currentTarget.currentTime = s;
+              // Auto-play if visible and not user-paused
+              if (isVisibleRef.current && !userPaused) {
+                e.currentTarget.play().catch(() => {});
+              }
             }}
             onCanPlay={() => setVideoReady(true)}
             onPlay={() => setVideoPlaying(true)}
             onPause={() => setVideoPlaying(false)}
-            onEnded={() => setVideoPlaying(false)}
+            onEnded={() => {
+              setVideoPlaying(false);
+              // Loop back to trim start
+              const s = trimStart > 0 ? trimStart : 0;
+              if (videoRef.current) { videoRef.current.currentTime = s; videoRef.current.play().catch(() => {}); }
+            }}
             onTimeUpdate={(e) => {
               const v = e.currentTarget;
               const eVal = Number(v.dataset.end || 0);
-              const s = Number(v.dataset.start || 0);
+              const s    = Number(v.dataset.start || 0);
               if (eVal > 0 && isFinite(eVal) && v.currentTime >= eVal) {
                 v.currentTime = isFinite(s) && s > 0 ? s : 0;
-                v.pause();
+                v.play().catch(() => {});
               }
             }}
           />
           {/* Tap to play/pause overlay */}
-          <div className="absolute inset-0 z-[5] cursor-pointer flex items-center justify-center"
-            onClick={(e) => { e.stopPropagation(); if (!videoRef.current) return; videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause(); }}>
+          <div className="absolute inset-0 z-[5] cursor-pointer flex items-center justify-center" onClick={togglePlayPause}>
             {!videoPlaying && (
               <div className="w-14 h-14 rounded-full bg-black/40 flex items-center justify-center pointer-events-none">
                 <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
               </div>
             )}
           </div>
-          {/* Mute */}
-          <button onClick={toggleMute} className="absolute bottom-3 right-3 z-20 bg-black/55 hover:bg-black/75 text-white p-2 rounded-full transition-all opacity-0 group-hover:opacity-100">
+          {/* Mute button */}
+          <button onClick={toggleMute}
+            className="absolute bottom-3 right-3 z-20 bg-black/55 hover:bg-black/75 text-white p-2 rounded-full transition-all opacity-0 group-hover:opacity-100">
             {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
           <PeopleTagsOverlay tags={peopleTags} visible={videoReady || !!thumbnailUrl} />

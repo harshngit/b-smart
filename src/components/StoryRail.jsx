@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import StoryViewer from './StoryViewer';
 import api from '../lib/api';
 import { useSelector } from 'react-redux';
+import { Plus } from 'lucide-react';
 
 const StoryRail = () => {
   const [stories, setStories] = useState([]);
@@ -19,12 +20,9 @@ const StoryRail = () => {
         const feedStories = (response.data || []).map((story) => {
           const media = story.preview_item?.media;
           const rawAvatarUrl = story.user?.avatar_url || '';
-          const avatarUrl =
-            rawAvatarUrl && rawAvatarUrl.trim() !== '' ? rawAvatarUrl : '';
-
+          const avatarUrl = rawAvatarUrl.trim() !== '' ? rawAvatarUrl : '';
           let previewUrl = '';
           let previewDurationSec = 5;
-
           if (Array.isArray(media) && media.length > 0) {
             const first = media[0];
             previewUrl = first.thumbnail || first.url || '';
@@ -33,7 +31,6 @@ const StoryRail = () => {
             previewUrl = media.thumbnail || media.url || '';
             previewDurationSec = media.durationSec || 5;
           }
-
           return {
             id: story._id,
             userId: story.user?._id || story.user_id,
@@ -51,155 +48,121 @@ const StoryRail = () => {
             try {
               const res = await api.get(`/stories/${story.id}/items`);
               const items = Array.isArray(res.data) ? res.data : [];
-
               let imageUrl = story.imageUrl;
               let previewDurationSec = story.previewDurationSec;
-
               if (items.length > 0) {
                 const firstItem = items[0];
                 const mediaArr = firstItem.media;
                 if (Array.isArray(mediaArr) && mediaArr.length > 0) {
                   const firstMedia = mediaArr[0];
-                  imageUrl =
-                    firstMedia.thumbnail || firstMedia.url || imageUrl;
-                  previewDurationSec =
-                    firstMedia.durationSec || previewDurationSec;
+                  imageUrl = firstMedia.thumbnail || firstMedia.url || imageUrl;
+                  previewDurationSec = firstMedia.durationSec || previewDurationSec;
                 }
               }
-
-              return {
-                ...story,
-                imageUrl,
-                previewDurationSec,
-                itemsCount: items.length,
-              };
-            } catch (err) {
-              console.error('Error fetching story items for rail:', err);
+              return { ...story, imageUrl, previewDurationSec, itemsCount: items.length };
+            } catch {
               return story;
             }
           })
         );
 
         let finalStories = storiesWithItems;
-
         if (userObject) {
           const currentUserId = userObject.id || userObject._id;
           const ownIndex = storiesWithItems.findIndex(
-            (s) =>
-              (s.userId && s.userId === currentUserId) ||
-              (s.username && s.username === userObject.username)
+            (s) => (s.userId && s.userId === currentUserId) || (s.username && s.username === userObject.username)
           );
-
           if (ownIndex !== -1) {
-            const ownStory = {
-              ...storiesWithItems[ownIndex],
-              isUser: true,
-            };
-            finalStories = [
-              ownStory,
-              ...storiesWithItems.filter((_, i) => i !== ownIndex),
-            ];
+            finalStories = [{ ...storiesWithItems[ownIndex], isUser: true }, ...storiesWithItems.filter((_, i) => i !== ownIndex)];
           } else {
-            const yourStory = {
-              id: 'your_story',
-              username: 'Your Story',
-              isUser: true,
-              avatarUrl: userObject.avatar_url || '',
-              imageUrl: userObject.avatar_url || '',
-              previewDurationSec: 5,
-              itemsCount: 0,
-              seen: false,
-            };
-            finalStories = [yourStory, ...storiesWithItems];
+            finalStories = [
+              { id: 'your_story', username: userObject.username || 'Your Story', isUser: true, avatarUrl: userObject.avatar_url || '', imageUrl: userObject.avatar_url || '', previewDurationSec: 5, itemsCount: 0, seen: false },
+              ...storiesWithItems,
+            ];
           }
         } else {
-          const yourStory = {
-            id: 'your_story',
-            username: 'Your Story',
-            isUser: true,
-            avatarUrl: '',
-            imageUrl:
-              'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&auto=format&fit=crop&q=60',
-            previewDurationSec: 5,
-            itemsCount: 0,
-            seen: false,
-          };
-          finalStories = [yourStory, ...storiesWithItems];
+          finalStories = [
+            { id: 'your_story', username: 'Your Story', isUser: true, avatarUrl: '', imageUrl: '', previewDurationSec: 5, itemsCount: 0, seen: false },
+            ...storiesWithItems,
+          ];
         }
-
         setStories(finalStories);
       } catch (error) {
         console.error('Error fetching stories:', error);
-        const rawAvatar = userObject?.avatar_url || '';
-        const avatarUrl =
-          rawAvatar && rawAvatar.trim() !== '' ? rawAvatar : '';
-        const fallbackStories = [
-          {
-            id: 'your_story',
-            username: 'Your Story',
-            isUser: true,
-            avatarUrl,
-            imageUrl: avatarUrl,
-            previewDurationSec: 5,
-            itemsCount: 0,
-            seen: false,
-          },
-        ];
-        setStories(fallbackStories);
+        const avatarUrl = userObject?.avatar_url?.trim() || '';
+        setStories([{ id: 'your_story', username: userObject?.username || 'Your Story', isUser: true, avatarUrl, imageUrl: avatarUrl, previewDurationSec: 5, itemsCount: 0, seen: false }]);
       }
     };
-
     fetchStories();
   }, [userObject]);
 
   const handleStoryClick = (index) => {
     const story = stories[index];
     if (!story) return;
-    if (!story.itemsCount || story.itemsCount === 0) {
-      return;
-    }
+    if (story.isUser && (!story.itemsCount || story.itemsCount === 0)) return;
     setSelectedStoryIndex(index);
   };
 
   return (
     <>
-      <div className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 py-4 mb-2">
-        <div className="flex gap-4 overflow-x-auto px-4 no-scrollbar">
-          {stories.map((story, index) => (
-            <button
-              key={story.id}
-              className="flex flex-col items-center min-w-[70px] cursor-pointer"
-              onClick={() => handleStoryClick(index)}
-            >
-              <div
-                className={`w-16 h-16 rounded-full p-[2px] ${story.isUser && story.itemsCount === 0
-                  ? 'border-2 border-gray-300 dark:border-gray-700'
-                  : 'bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink'
-                  }`}
+      {/* ── Story Rail ── */}
+      <div className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 py-3">
+        <div className="flex gap-3 overflow-x-auto px-4 no-scrollbar pb-1">
+          {stories.map((story, index) => {
+            const isYourStory  = story.isUser && (!story.itemsCount || story.itemsCount === 0);
+            const hasSeen      = story.seen;
+            const hasStory     = story.itemsCount > 0;
+            const username     = story.isUser ? (story.username || 'Your Story') : story.username;
+            const displayName  = username.length > 10 ? username.slice(0, 9) + '…' : username;
+
+            return (
+              <button
+                key={story.id}
+                className="flex flex-col items-center gap-1 min-w-[72px] cursor-pointer flex-shrink-0 group"
+                onClick={() => handleStoryClick(index)}
               >
-                <div className="w-full h-full rounded-full bg-white dark:bg-black p-[2px] overflow-hidden flex items-center justify-center">
-                  {story.isUser ? (
-                    <div className="w-full h-full rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-xs font-bold text-white">
-                      {story.username ? story.username.charAt(0).toUpperCase() : 'U'}
+                {/* Avatar ring */}
+                <div className="relative">
+                  {/* Gradient ring: orange-pink for unseen, gray for seen / no story */}
+                  <div className={`
+                    w-[66px] h-[66px] rounded-full p-[2.5px] flex items-center justify-center
+                    ${isYourStory
+                      ? 'border-2 border-dashed border-gray-300 dark:border-gray-600 p-[2px]'
+                      : hasStory && !hasSeen
+                        ? 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-600'
+                        : 'bg-gradient-to-tr from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700'
+                    }
+                  `}>
+                    <div className="w-full h-full rounded-full bg-white dark:bg-black p-[2px]">
+                      {story.avatarUrl ? (
+                        <img
+                          src={story.avatarUrl}
+                          alt={username}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-600 flex items-center justify-center text-sm font-bold text-white">
+                          {username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
-                  ) : story.avatarUrl ? (
-                    <img
-                      src={story.avatarUrl}
-                      alt={story.username}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-xs font-bold text-white">
-                      {story.username ? story.username.charAt(0).toUpperCase() : 'U'}
+                  </div>
+
+                  {/* + badge for your story with no items */}
+                  {isYourStory && (
+                    <div className="absolute bottom-0 right-0 w-5 h-5 bg-blue-500 rounded-full border-2 border-white dark:border-black flex items-center justify-center shadow-sm">
+                      <Plus size={11} strokeWidth={3} className="text-white" />
                     </div>
                   )}
                 </div>
-              </div>
-              <span className="text-xs mt-1 truncate w-full text-center text-gray-700 dark:text-gray-200">
-                {story.isUser ? 'Your Story' : story.username}
-              </span>
-            </button>
-          ))}
+
+                {/* Username */}
+                <span className={`text-[11px] leading-tight text-center w-[72px] truncate ${story.isUser ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                  {story.isUser ? 'Your Story' : displayName}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
