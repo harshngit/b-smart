@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -41,6 +41,11 @@ const Profile = () => {
     const [followed, setFollowed] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
     const [vendorInfo, setVendorInfo] = useState(null);
+    const [rewardToast, setRewardToast] = useState(null);
+
+    const profileRewardMsRef = useRef(0);
+    const profileRewardTickRef = useRef(null);
+    const profileRewardSentRef = useRef(false);
 
     const onlyPosts = userPosts.filter(p => p.type !== 'reel');
     const onlyReels = userPosts.filter(p => p.type === 'reel');
@@ -76,7 +81,7 @@ const Profile = () => {
         if (profileUser) {
             setActiveTab(profileUser.role === 'vendor' ? 'ads' : 'all');
         }
-    }, [profileUser?.role]); // eslint-disable-line
+    }, [profileUser?.role]);
     useEffect(() => {
         const fetchPosts = async () => {
             const profileUserId = profileUser?._id || profileUser?.id;
@@ -192,6 +197,83 @@ const Profile = () => {
             setProfileUser(prev => (prev ? { ...prev, avatar_url: newAvatarUrl } : prev));
         }
     };
+
+    useEffect(() => {
+        if (!rewardToast) return undefined;
+        const timer = setTimeout(() => setRewardToast(null), 3500);
+        return () => clearTimeout(timer);
+    }, [rewardToast]);
+
+    useEffect(() => {
+        const profileUserId = profileUser?._id || profileUser?.id;
+        const isEligible =
+            Boolean(profileUserId) &&
+            profileUser?.role === 'vendor' &&
+            currentUser?.role === 'member' &&
+            !isOwnProfile;
+
+        profileRewardMsRef.current = 0;
+        profileRewardTickRef.current = null;
+        profileRewardSentRef.current = false;
+
+        if (!isEligible) return undefined;
+
+        const sendReward = async () => {
+            if (profileRewardSentRef.current) return;
+            profileRewardSentRef.current = true;
+            try {
+                const res = await api.post(`/vendors/profile/${profileUserId}/viewProfile`);
+                const coins = Number(res?.data?.coins_earned || 10);
+                setRewardToast({
+                    type: 'success',
+                    message: `You earned ${coins} coins for viewing this vendor profile.`,
+                });
+            } catch (error) {
+                const message = error?.response?.data?.message || '';
+                if (error?.response?.status === 429) return;
+                profileRewardSentRef.current = false;
+                setRewardToast({
+                    type: 'error',
+                    message: message || 'Unable to process vendor profile reward.',
+                });
+            }
+        };
+
+        const syncElapsed = () => {
+            if (document.visibilityState !== 'visible') {
+                profileRewardTickRef.current = null;
+                return;
+            }
+            const now = Date.now();
+            if (profileRewardTickRef.current == null) {
+                profileRewardTickRef.current = now;
+                return;
+            }
+            profileRewardMsRef.current += now - profileRewardTickRef.current;
+            profileRewardTickRef.current = now;
+
+            if (profileRewardMsRef.current >= 180000) {
+                sendReward();
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                profileRewardTickRef.current = Date.now();
+            } else {
+                syncElapsed();
+            }
+        };
+
+        handleVisibilityChange();
+        const interval = setInterval(syncElapsed, 1000);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [profileUser?._id, profileUser?.id, profileUser?.role, currentUser?.role, isOwnProfile]);
 
     const getPostThumbnail = (post) => {
         const media = post.media?.[0];
@@ -400,6 +482,15 @@ const Profile = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-black md:bg-gray-50 md:dark:bg-black">
+            {rewardToast && (
+                <div className={`fixed top-20 left-1/2 z-[80] -translate-x-1/2 rounded-xl border px-4 py-3 text-sm font-semibold shadow-lg ${
+                    rewardToast.type === 'success'
+                        ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400'
+                        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400'
+                }`}>
+                    {rewardToast.message}
+                </div>
+            )}
 
             {/* ═══════ MOBILE ═══════ */}
             <div className="md:hidden">
