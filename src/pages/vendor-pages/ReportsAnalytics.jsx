@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 
 const REPORTS = [
-  { id: "performance", label: "Performance Summary", endpoint: "/reports/summary", desc: "Overall campaign performance metrics", icon: TrendingUp, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/20" },
+  { id: "performance", label: "Performance Summary", endpoint: "/reports/performance-summary", desc: "Overall campaign performance metrics", icon: TrendingUp, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/20" },
   { id: "click", label: "Click Report", endpoint: "/reports/clicks", desc: "Detailed click-through analysis", icon: MousePointerClick, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
   { id: "engagement", label: "Engagement Report", endpoint: "/reports/engagement", desc: "Likes, shares, comments & interactions", icon: Heart, color: "text-pink-500", bg: "bg-pink-50 dark:bg-pink-900/20" },
   { id: "conversion", label: "Conversion Report", endpoint: "/reports/conversions", desc: "Conversion tracking & ROI insights", icon: Zap, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
@@ -128,18 +128,15 @@ const getWeekStart = (value) => {
 const normalizeRows = (reportId, data) => {
   const rows = Array.isArray(data?.data) ? data.data : Array.isArray(data?.rows) ? data.rows : Array.isArray(data) ? data : [];
   if (reportId === "performance") {
-    const overview = data?.overview || {};
-    const impressions = overview.total_impressions ?? 0;
-    const clicks = overview.total_clicks ?? 0;
-    const reach = overview.reach ?? 0;
-    return [{
-      date: 'Selected Range',
-      impressions,
-      clicks,
-      ctr: impressions > 0 ? +((clicks / impressions) * 100).toFixed(2) : 0,
-      reach,
-      frequency: reach > 0 ? +(impressions / reach).toFixed(2) : 0,
-    }];
+    const dataRows = Array.isArray(data?.data) ? data.data : [];
+    return dataRows.map((r) => ({
+      date: r.date ?? "-",
+      impressions: r.impressions ?? 0,
+      clicks: r.clicks ?? 0,
+      ctr: r.ctr ?? 0,
+      reach: r.reach ?? 0,
+      frequency: r.frequency ?? 0,
+    }));
   }
   if (reportId === "click") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Ad", impressions: r.impressions ?? 0, total_clicks: r.total_clicks ?? 0, unique_clicks: r.unique_clicks ?? 0, invalid_clicks: r.invalid_clicks ?? 0, click_rate: r.click_rate ?? 0, cpc: r.cpc ?? 0, coins_spent: r.coins_spent ?? 0 }));
   if (reportId === "engagement") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Ad", impressions: r.impressions ?? 0, likes: r.likes ?? 0, dislikes: r.dislikes ?? 0, comments: r.comments ?? 0, saves: r.saves ?? 0, engagement_rate: r.engagement_rate ?? 0 }));
@@ -424,9 +421,27 @@ export default function ReportsAnalytics() {
 
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:col-span-3">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-                <div>
-                  <h2 className="text-sm font-bold text-gray-900 dark:text-white">{currentReport?.label}</h2>
-                  <p className="mt-0.5 text-[11px] text-gray-400">{currentReport?.desc}</p>
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${currentReport?.bg ?? ""}`}>
+                    {currentReport ? <currentReport.icon size={16} className={currentReport.color} /> : null}
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-900 dark:text-white">{currentReport?.label}</h2>
+                    <p className="mt-0.5 text-[11px] text-gray-400">{currentReport?.desc}</p>
+                  </div>
+                </div>
+                {/* Column chips */}
+                <div className="hidden items-center gap-1.5 sm:flex">
+                  {(COLUMNS[selectedReport] || []).slice(0, 3).map((col) => (
+                    <span key={col[0]} className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                      {col[1]}
+                    </span>
+                  ))}
+                  {(COLUMNS[selectedReport] || []).length > 3 && (
+                    <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10px] font-bold text-gray-400 dark:border-gray-700 dark:bg-gray-800">
+                      +{(COLUMNS[selectedReport] || []).length - 3} more
+                    </span>
+                  )}
                 </div>
             </div>
 
@@ -480,7 +495,9 @@ export default function ReportsAnalytics() {
 
             {!reportLoading && rows.length > 0 ? (
               <div className="flex items-center justify-between border-t border-gray-50 bg-gray-50/50 px-5 py-3.5 dark:border-gray-800 dark:bg-gray-800/30">
-                <p className="text-xs text-gray-400">{rows.length} rows</p>
+                <p className="text-xs text-gray-400">
+                  {rows.length} rows · {PRESETS.find((p) => p.value === datePreset)?.label ?? "Custom range"}
+                </p>
                 <div className="flex items-center gap-2">
                   <button onClick={exportCsv} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"><FileDown size={12} /> Export CSV</button>
                   <button onClick={() => setExportMsg("PDF export is not implemented yet.") || setTimeout(() => setExportMsg(""), 2500)} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 px-3.5 py-2 text-xs font-bold text-white"><Download size={12} /> Download PDF</button>
