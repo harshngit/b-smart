@@ -32,6 +32,7 @@ const Profile = () => {
     const [userPosts, setUserPosts] = useState([]);
     const [loadingPosts, setLoadingPosts] = useState(true);
     const [selectedPost, setSelectedPost] = useState(null);
+    const [selectedAd, setSelectedAd] = useState(null);
     const [showAvatarModal, setShowAvatarModal] = useState(false);
 
     // Vendor-specific state
@@ -224,13 +225,8 @@ const Profile = () => {
         else setSelectedPost(post);
     };
 
-    const highlights = [
-        { id: 1, title: 'Travel', img: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=150&h=150&fit=crop' },
-        { id: 2, title: 'Work',   img: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=150&h=150&fit=crop' },
-        { id: 3, title: 'Life',   img: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=150&h=150&fit=crop' },
-        { id: 4, title: 'Tech',   img: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=150&h=150&fit=crop' },
-        { id: 5, title: 'Music',  img: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=150&h=150&fit=crop' },
-    ];
+
+
 
     if (!profileUser) {
         return (
@@ -328,7 +324,7 @@ const Profile = () => {
                         return (
                             <div key={ad._id || ad.id}
                                 className="aspect-square bg-gray-100 dark:bg-gray-900 relative group cursor-pointer overflow-hidden"
-                                onClick={() => navigate(`/ads`)}>
+                                onClick={() => setSelectedAd({ ...ad, item_type: 'ad' })}>
                                 {/* Active badge */}
                                 {ad.status === 'active' && (
                                     <div className="absolute top-1.5 left-1.5 z-10">
@@ -503,27 +499,6 @@ const Profile = () => {
                         )}
                     </div>
 
-                    {/* Highlights */}
-                    <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide">
-                        {highlights.map((h) => (
-                            <div key={h.id} className="flex flex-col items-center gap-1 flex-shrink-0">
-                                <div className="w-16 h-16 rounded-full p-[1.5px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500">
-                                    <div className="w-full h-full rounded-full bg-white dark:bg-black p-0.5 overflow-hidden">
-                                        <img src={h.img} alt={h.title} className="w-full h-full rounded-full object-cover" />
-                                    </div>
-                                </div>
-                                <span className="text-[10px] text-gray-900 dark:text-white truncate max-w-[60px] text-center">{h.title}</span>
-                            </div>
-                        ))}
-                        {isOwnProfile && (
-                            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                <div className="w-16 h-16 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center">
-                                    <Plus size={20} className="text-gray-400" />
-                                </div>
-                                <span className="text-[10px] text-gray-400">New</span>
-                            </div>
-                        )}
-                    </div>
                 {/* Vendor Business Info (mobile) */}
                 {isVendor && vendorInfo && (
                     <div className="px-4 pt-3 pb-1">
@@ -629,28 +604,6 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* Highlights */}
-                <div className="flex gap-7 overflow-x-auto pb-5 scrollbar-hide mb-6 px-4 border-b border-gray-200 dark:border-gray-800">
-                    {highlights.map((h) => (
-                        <div key={h.id} className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer group">
-                            <div className="w-[77px] h-[77px] rounded-full p-[1.5px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 group-hover:scale-105 transition-transform">
-                                <div className="w-full h-full rounded-full bg-white dark:bg-black p-[2px] overflow-hidden">
-                                    <img src={h.img} alt={h.title} className="w-full h-full rounded-full object-cover" />
-                                </div>
-                            </div>
-                            <span className="text-xs text-gray-900 dark:text-white text-center truncate max-w-[77px]">{h.title}</span>
-                        </div>
-                    ))}
-                    {isOwnProfile && (
-                        <div className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer group">
-                            <div className="w-[77px] h-[77px] rounded-full border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center group-hover:border-gray-400 transition-colors">
-                                <Plus size={28} className="text-gray-400" />
-                            </div>
-                            <span className="text-xs text-gray-500">New</span>
-                        </div>
-                    )}
-                </div>
-
                 {/* Vendor Business Info */}
                 <VendorBusinessCard />
 
@@ -686,6 +639,7 @@ const Profile = () => {
 
             {/* Modals */}
             <PostDetailModal isOpen={!!selectedPost} post={selectedPost} onClose={() => setSelectedPost(null)} />
+            <PostDetailModal isOpen={!!selectedAd} post={selectedAd} onClose={() => setSelectedAd(null)} />
             <AvatarCropModal
                 isOpen={showAvatarModal}
                 onClose={() => setShowAvatarModal(false)}

@@ -565,6 +565,7 @@ const Ads = ({ feedMode = 'user' }) => {
   const [coinToast, setCoinToast] = useState(null); // { amount, id }
   // Popup modals for coin rewards
   const [viewRewardPopup, setViewRewardPopup] = useState(null); // { amount } — shown first time only
+  const [viewRecordedPopup, setViewRecordedPopup] = useState(null); // { view_count } — shown when rewarded: false
   const [likeRewardPopup, setLikeRewardPopup] = useState(null); // { amount, isLike } — shown on every like/dislike
 
   // Track which ad IDs the current user has already viewed this session.
@@ -803,8 +804,10 @@ const Ads = ({ feedMode = 'user' }) => {
         const toastId = Date.now();
         setCoinToast({ amount: rewardAmount, id: toastId });
         setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
-      }
-    } catch (err) {
+      } else if (resData?.rewarded === false) {
+        // View was recorded but no coins rewarded this time
+        setViewRecordedPopup({ view_count: resData?.view_count ?? null });
+      }    } catch (err) {
       console.error('View tracking failed:', err);
     }
   }, [currentUserId, dispatch]);
@@ -993,6 +996,20 @@ const Ads = ({ feedMode = 'user' }) => {
 
   const toggleSave = useCallback((adId) => {
     setSavedIds(prev => { const s = new Set(prev); s.has(adId) ? s.delete(adId) : s.add(adId); return s; });
+  }, []);
+
+  // ── Ad Click Tracking ─────────────────────────────────────────────────────────
+  // Fires POST /api/ads/{id}/click when user clicks the vendor name/profile.
+  const trackAdClick = useCallback(async (adId) => {
+    if (!adId) return;
+    try {
+      await fetch(`${BASE_URL}/api/ads/${adId}/click`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+    } catch (err) {
+      console.warn('Ad click tracking failed:', err);
+    }
   }, []);
 
   // ── Comments Logic ────────────────────────────────────────────────────────────
@@ -1577,6 +1594,7 @@ const Ads = ({ feedMode = 'user' }) => {
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                           <button
                             onClick={() => {
+                              trackAdClick(a._id);
                               const uid = a.user_id?._id || a.user_id?.id || a.vendor_id?._id;
                               if (uid) navigate(`/profile/${uid}`);
                             }}
@@ -1805,6 +1823,44 @@ const Ads = ({ feedMode = 'user' }) => {
               className="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold py-2.5 rounded-2xl text-sm hover:opacity-90 active:scale-95 transition-all shadow-md"
             >
               Awesome! 🎉
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── View Recorded Popup (rewarded: false) ── */}
+      {viewRecordedPopup && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+          <div
+            className="pointer-events-auto bg-white dark:bg-[#1c1c1e] rounded-3xl shadow-2xl px-8 py-7 flex flex-col items-center gap-4 border border-gray-200 dark:border-white/10"
+            style={{ animation: 'popupIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards', minWidth: 260 }}
+          >
+            {/* Eye / view icon */}
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600 flex items-center justify-center shadow-lg shadow-gray-400/30" style={{ animation: 'coinPulse 0.6s ease-out' }}>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-black text-gray-700 dark:text-gray-200">View Recorded</p>
+              {viewRecordedPopup.view_count !== null && (
+                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                  Total views: <span className="font-bold text-gray-700 dark:text-gray-200">{viewRecordedPopup.view_count}</span>
+                </p>
+              )}
+              <p className="text-gray-500 dark:text-gray-400 text-xs mt-1.5">No coins rewarded for this view</p>
+            </div>
+            <button
+              onClick={() => setViewRecordedPopup(null)}
+              className="w-full bg-gradient-to-r from-gray-500 to-gray-700 text-white font-bold py-2.5 rounded-2xl text-sm hover:opacity-90 active:scale-95 transition-all shadow-md"
+            >
+              OK
             </button>
           </div>
         </div>
