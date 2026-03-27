@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import api from "../../lib/api";
 import {
   AlertCircle,
@@ -72,6 +74,33 @@ const COLUMNS = {
   financial: [
     ["period", "Period"], ["total_spend", "Total Spend"], ["coins_used", "Coins Used"], ["budget_used", "Budget Used", "percent"], ["cpm", "CPM", "decimal"], ["cost_per_lead", "Cost Per Lead", "decimal"],
   ],
+};
+
+// B SMART – minimal, clean, light theme
+const PDF_THEME = {
+  pageBg: [255, 255, 255],          // pure white page
+  headerBg: [255, 255, 255],        // white header area (no dark panel)
+  text: [30, 20, 40],               // near-black text
+  textMuted: [150, 130, 165],       // soft muted purple-grey
+  textLight: [190, 175, 205],       // lighter muted
+  white: [255, 255, 255],
+  border: [238, 228, 248],          // soft lavender border
+  divider: [240, 232, 252],         // very soft lavender divider
+  accentPink: [214, 41, 118],       // insta-pink   #d62976
+  accentOrange: [250, 126, 30],     // insta-orange #fa7e1e
+  accentPurple: [150, 47, 191],     // insta-purple #962fbf
+  accentYellow: [254, 218, 117],    // insta-yellow #feda75
+  metricBg: [252, 250, 255],        // near-white card bg
+  tableBg: [248, 244, 255],         // very light lavender alternating rows
+  tableHeader: [250, 245, 255],     // near-white table header
+  reports: {
+    performance: { accent: [250, 126, 30],  soft: [255, 245, 235] },   // orange
+    click:       { accent: [214, 41, 118],  soft: [255, 235, 245] },   // pink
+    engagement:  { accent: [150, 47, 191],  soft: [248, 235, 255] },   // purple
+    conversion:  { accent: [214, 41, 118],  soft: [255, 235, 245] },   // pink
+    geographic:  { accent: [150, 47, 191],  soft: [248, 235, 255] },   // purple
+    financial:   { accent: [250, 126, 30],  soft: [255, 245, 235] },   // orange
+  },
 };
 
 const asNum = (v) => Number(v || 0);
@@ -331,6 +360,249 @@ export default function ReportsAnalytics() {
     setTimeout(() => setExportMsg(""), 2500);
   };
 
+  const exportPdf = () => {
+    if (!rows.length) return;
+    const cols = COLUMNS[selectedReport] || [];
+    const reportTheme = PDF_THEME.reports[selectedReport] || PDF_THEME.reports.performance;
+    const doc = new jsPDF({
+      orientation: cols.length > 6 ? "landscape" : "portrait",
+      unit: "pt",
+      format: "a4",
+    });
+
+    const range = getRange(datePreset, startDate, endDate);
+    const filterParts = [];
+    if (range.startDate || range.endDate) {
+      filterParts.push(`${range.startDate || "All"} – ${range.endDate || "All"}`);
+    }
+    if (selectedAd !== "all") {
+      const selectedAdLabel = adOptions.find((o) => o.value === selectedAd)?.label || selectedAd;
+      filterParts.push(`Ad: ${selectedAdLabel}`);
+    }
+    if (country !== "all")  filterParts.push(`Country: ${country}`);
+    if (language !== "all") filterParts.push(`Language: ${language}`);
+    if (gender !== "all")   filterParts.push(`Gender: ${gender}`);
+
+    const pageW  = doc.internal.pageSize.getWidth();
+    const pageH  = doc.internal.pageSize.getHeight();
+    const summaryItems = SUMMARY_CARDS.map((card) => ({
+      label: card.label,
+      value: fmt(summary[card.key], card.kind),
+    }));
+    const margin = 36;
+    const contentW = pageW - margin * 2;
+
+    // ── PAGE BACKGROUND (white) ───────────────────────────────────────
+    doc.setFillColor(...PDF_THEME.pageBg);
+    doc.rect(0, 0, pageW, pageH, "F");
+
+    // ── HEADER ───────────────────────────────────────────────────────
+    // Logo badge – small, coloured square
+    const badgeSize = 38;
+    const badgeX = margin;
+    const badgeY = 28;
+    doc.setFillColor(...reportTheme.accent);
+    doc.roundedRect(badgeX, badgeY, badgeSize, badgeSize, 10, 10, "F");
+    doc.setTextColor(...PDF_THEME.white);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("B", badgeX + badgeSize / 2, badgeY + 26, { align: "center" });
+
+    // Brand + report name
+    const textX = badgeX + badgeSize + 12;
+    doc.setTextColor(...PDF_THEME.text);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text("B SMART", textX, badgeY + 16);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...reportTheme.accent);
+    doc.text(currentReport?.label || "Report", textX, badgeY + 31);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...PDF_THEME.textMuted);
+    doc.text(currentReport?.desc || "", textX, badgeY + 44);
+
+    // Report type pill (top-right, minimal outline style)
+    const pillW = 130, pillH = 22;
+    const pillX = pageW - margin - pillW;
+    const pillY = badgeY + 2;
+    doc.setDrawColor(...reportTheme.accent);
+    doc.setLineWidth(1.2);
+    doc.roundedRect(pillX, pillY, pillW, pillH, 11, 11, "D");
+    doc.setTextColor(...reportTheme.accent);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("VENDOR ANALYTICS", pillX + pillW / 2, pillY + 14.5, { align: "center" });
+
+    // Generated date
+    const now = new Date();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_THEME.textMuted);
+    doc.text(
+      `Generated: ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`,
+      pageW - margin,
+      badgeY + 36,
+      { align: "right" }
+    );
+
+    // Full-width thin divider under header
+    const headerBottom = badgeY + badgeSize + 14;
+    doc.setDrawColor(...PDF_THEME.divider);
+    doc.setLineWidth(1);
+    doc.line(margin, headerBottom, pageW - margin, headerBottom);
+
+    // ── FILTER CHIPS ─────────────────────────────────────────────────
+    let curY = headerBottom + 16;
+    if (filterParts.length) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...PDF_THEME.textMuted);
+      doc.text("FILTERS", margin, curY + 9);
+      let chipX = margin + doc.getTextWidth("FILTERS") + 10;
+      filterParts.forEach((part) => {
+        doc.setFontSize(7.5);
+        const chipW = doc.getTextWidth(part) + 18;
+        if (chipX + chipW > pageW - margin) { chipX = margin; curY += 18; }
+        doc.setFillColor(...reportTheme.soft);
+        doc.roundedRect(chipX, curY, chipW, 16, 8, 8, "F");
+        doc.setTextColor(...reportTheme.accent);
+        doc.setFont("helvetica", "bold");
+        doc.text(part, chipX + 9, curY + 11);
+        chipX += chipW + 6;
+      });
+      curY += 26;
+    }
+
+    // ── KEY METRICS LABEL ─────────────────────────────────────────────
+    curY += 4;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_THEME.textMuted);
+    doc.text("KEY METRICS", margin, curY);
+    doc.setDrawColor(...reportTheme.accent);
+    doc.setLineWidth(1.5);
+    doc.line(margin + doc.getTextWidth("KEY METRICS") + 6, curY - 2, margin + doc.getTextWidth("KEY METRICS") + 32, curY - 2);
+    curY += 10;
+
+    // ── METRIC CARDS ─────────────────────────────────────────────────
+    const cardGap = 10;
+    const cardW   = (contentW - cardGap * 2) / 3;
+    const cardH   = 58;
+    const metricAccents = [
+      PDF_THEME.accentOrange,
+      PDF_THEME.accentPink,
+      PDF_THEME.accentPurple,
+      PDF_THEME.accentPink,
+      PDF_THEME.accentPurple,
+      PDF_THEME.accentOrange,
+    ];
+
+    summaryItems.forEach((item, i) => {
+      const col = i % 3;
+      const row = Math.floor(i / 3);
+      const x   = margin + col * (cardW + cardGap);
+      const y   = curY + row * (cardH + cardGap);
+      const acc = metricAccents[i];
+
+      // Card: fill + soft border stroke — plain rect, no rounded corners
+      doc.setFillColor(...PDF_THEME.metricBg);
+      doc.setDrawColor(...PDF_THEME.border);
+      doc.setLineWidth(0.5);
+      doc.rect(x, y, cardW, cardH, "FD");
+
+      // Accent: clean thick line on the left edge, full card height
+      doc.setDrawColor(...acc);
+      doc.setLineWidth(3);
+      doc.line(x + 1.5, y, x + 1.5, y + cardH);
+
+      // Label
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...PDF_THEME.textMuted);
+      doc.text(item.label.toUpperCase(), x + 14, y + 20);
+
+      // Value
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(...PDF_THEME.text);
+      doc.text(String(item.value), x + 14, y + 46);
+    });
+
+    curY += 2 * cardH + cardGap + 18;
+
+    // ── DETAILED DATA LABEL ───────────────────────────────────────────
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_THEME.textMuted);
+    doc.text("DETAILED DATA", margin, curY);
+    doc.setDrawColor(...reportTheme.accent);
+    doc.setLineWidth(1.5);
+    doc.line(margin + doc.getTextWidth("DETAILED DATA") + 6, curY - 2, margin + doc.getTextWidth("DETAILED DATA") + 32, curY - 2);
+    curY += 10;
+
+    // ── TABLE ─────────────────────────────────────────────────────────
+    autoTable(doc, {
+      startY: curY,
+      head: [cols.map((c) => c[1])],
+      body: rows.map((row) => cols.map((c) => fmt(row[c[0]], c[2]))),
+      theme: "plain",
+      styles: {
+        fontSize: 8.5,
+        cellPadding: { top: 7, right: 10, bottom: 7, left: 10 },
+        overflow: "linebreak",
+        textColor: PDF_THEME.text,
+        font: "helvetica",
+        lineColor: PDF_THEME.divider,
+        lineWidth: 0.5,
+      },
+      headStyles: {
+        fillColor: PDF_THEME.tableHeader,
+        textColor: PDF_THEME.textMuted,
+        fontStyle: "bold",
+        halign: "left",
+        fontSize: 7.5,
+        cellPadding: { top: 9, right: 10, bottom: 9, left: 10 },
+        lineColor: PDF_THEME.border,
+        lineWidth: 0.6,
+      },
+      bodyStyles: {
+        fillColor: PDF_THEME.white,
+      },
+      alternateRowStyles: {
+        fillColor: PDF_THEME.tableBg,
+      },
+      columnStyles: Object.fromEntries(cols.map((_c, i) => [i, { cellWidth: "auto" }])),
+      margin: { left: margin, right: margin, top: 40, bottom: 52 },
+      // ── FOOTER ────────────────────────────────────────────────────
+      didDrawPage: (data) => {
+        // Thin 2-tone footer rule
+        doc.setDrawColor(...PDF_THEME.accentOrange);
+        doc.setLineWidth(1.2);
+        doc.line(margin, pageH - 36, pageW / 2, pageH - 36);
+        doc.setDrawColor(...PDF_THEME.accentPink);
+        doc.line(pageW / 2, pageH - 36, pageW - margin, pageH - 36);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(...PDF_THEME.textLight);
+        doc.text("B SMART · Vendor Analytics", margin, pageH - 22);
+        doc.text(`${rows.length} rows`, pageW / 2, pageH - 22, { align: "center" });
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...reportTheme.accent);
+        doc.text(`Page ${data.pageNumber}`, pageW - margin, pageH - 22, { align: "right" });
+      },
+    });
+
+    const safeName = (currentReport?.label || "report").toLowerCase().replace(/\s+/g, "_");
+    doc.save(`bsmart_${safeName}.pdf`);
+    setExportMsg("PDF downloaded successfully.");
+    setTimeout(() => setExportMsg(""), 2500);
+  };
+
   const clearFilters = () => {
     setDatePreset("30d");
     setStartDate("");
@@ -350,7 +622,7 @@ export default function ReportsAnalytics() {
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Vendor analytics is now wired to live report APIs.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setExportMsg("PDF export is not implemented yet.") || setTimeout(() => setExportMsg(""), 2500)} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"><Download size={13} /> Download PDF</button>
+            <button onClick={exportPdf} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"><Download size={13} /> Download PDF</button>
             <button onClick={exportCsv} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"><FileDown size={13} /> Export CSV</button>
             <button className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 px-3.5 py-2 text-xs font-bold text-white"><Send size={13} /> Schedule Email</button>
           </div>
@@ -500,7 +772,7 @@ export default function ReportsAnalytics() {
                 </p>
                 <div className="flex items-center gap-2">
                   <button onClick={exportCsv} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"><FileDown size={12} /> Export CSV</button>
-                  <button onClick={() => setExportMsg("PDF export is not implemented yet.") || setTimeout(() => setExportMsg(""), 2500)} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 px-3.5 py-2 text-xs font-bold text-white"><Download size={12} /> Download PDF</button>
+                  <button onClick={exportPdf} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 px-3.5 py-2 text-xs font-bold text-white"><Download size={12} /> Download PDF</button>
                 </div>
               </div>
             ) : null}
