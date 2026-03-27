@@ -348,6 +348,16 @@ const mediaUrl = (ad) => {
   return null;
 };
 
+const thumbnailUrl = (ad) => {
+  const m = ad?.media?.[0];
+  if (!m) return null;
+  // Use thumbnails[0].fileUrl first, then fallback to thumbnail_url, then fileUrl for images
+  if (m.thumbnails?.[0]?.fileUrl) return m.thumbnails[0].fileUrl;
+  if (m.thumbnail_url) return m.thumbnail_url;
+  if (m.media_type !== 'video' && m.fileUrl) return m.fileUrl;
+  return null;
+};
+
 // ─── Follow Button ─────────────────────────────────────────────────────────────
 const FollowButton = ({ userId, mobile = false }) => {
   const [followed, setFollowed] = useState(false);
@@ -805,8 +815,7 @@ const Ads = ({ feedMode = 'user' }) => {
         setCoinToast({ amount: rewardAmount, id: toastId });
         setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
       } else if (resData?.rewarded === false) {
-        // View was recorded but no coins rewarded this time
-        setViewRecordedPopup({ view_count: resData?.view_count ?? null });
+        // View was recorded but not rewarded — no popup shown
       }    } catch (err) {
       console.error('View tracking failed:', err);
     }
@@ -1263,15 +1272,34 @@ const Ads = ({ feedMode = 'user' }) => {
                       <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Ads</div>
                       {searchResults.filter(r => r._type === 'ad').map(adItem => {
                         const adUser = adItem.user_id || adItem.vendor_id || {};
-                        const thumb = adItem.media?.[0]?.fileUrl || adItem.media?.[0]?.thumbnail_url;
+                        const mediaItem = adItem.media?.[0];
+                        const isVideoAd = mediaItem?.media_type === 'video';
+                        const thumb = mediaItem?.thumbnails?.[0]?.fileUrl || mediaItem?.thumbnail_url || (!isVideoAd ? mediaItem?.fileUrl : null);
+                        const videoSrc = isVideoAd ? mediaItem?.fileUrl : null;
                         return (
                           <button key={adItem._id} onClick={() => handleSearchResultClick(adItem)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
-                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0">
-                              {thumb
-                                ? <img src={thumb} alt="" className="w-full h-full object-cover" />
-                                : <div className="w-full h-full flex items-center justify-center text-gray-400"><ShoppingBag size={14} /></div>
-                              }
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left group/adrow">
+                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0 relative">
+                              {isVideoAd && videoSrc ? (
+                                <>
+                                  {thumb && <img src={thumb} alt="" className="w-full h-full object-cover absolute inset-0 group-hover/adrow:opacity-0 transition-opacity duration-200" />}
+                                  <video
+                                    src={videoSrc}
+                                    className="w-full h-full object-cover opacity-0 group-hover/adrow:opacity-100 transition-opacity duration-200"
+                                    muted
+                                    playsInline
+                                    preload="none"
+                                    onMouseEnter={e => { e.currentTarget.currentTime = 0; e.currentTarget.play().catch(() => {}); }}
+                                    onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                                    onTimeUpdate={e => { if (e.currentTarget.currentTime >= 5) { e.currentTarget.pause(); e.currentTarget.currentTime = 0; } }}
+                                  />
+                                  {!thumb && <div className="w-full h-full flex items-center justify-center text-gray-400 absolute inset-0 group-hover/adrow:opacity-0"><ShoppingBag size={14} /></div>}
+                                </>
+                              ) : thumb ? (
+                                <img src={thumb} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400"><ShoppingBag size={14} /></div>
+                              )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{adItem.caption || adItem.title || 'Ad'}</div>
@@ -1387,12 +1415,32 @@ const Ads = ({ feedMode = 'user' }) => {
                         </div>
                       </button>
                     );
-                    const thumb = item.media?.[0]?.fileUrl || item.media?.[0]?.thumbnail_url;
+                    const mobileMediaItem = item.media?.[0];
+                    const isMobileVideoAd = mobileMediaItem?.media_type === 'video';
+                    const mobileThumb = mobileMediaItem?.thumbnails?.[0]?.fileUrl || mobileMediaItem?.thumbnail_url || (!isMobileVideoAd ? mobileMediaItem?.fileUrl : null);
+                    const mobileVideoSrc = isMobileVideoAd ? mobileMediaItem?.fileUrl : null;
                     return (
                       <button key={item._id} onClick={() => handleSearchResultClick(item)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left">
-                        <div className="w-9 h-9 rounded-xl overflow-hidden bg-white/10 shrink-0">
-                          {thumb ? <img src={thumb} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white/40"><ShoppingBag size={12}/></div>}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left group/mobadrow">
+                        <div className="w-9 h-9 rounded-xl overflow-hidden bg-white/10 shrink-0 relative">
+                          {isMobileVideoAd && mobileVideoSrc ? (
+                            <>
+                              {mobileThumb && <img src={mobileThumb} alt="" className="w-full h-full object-cover absolute inset-0 group-hover/mobadrow:opacity-0 transition-opacity duration-200" />}
+                              <video
+                                src={mobileVideoSrc}
+                                className="w-full h-full object-cover opacity-0 group-hover/mobadrow:opacity-100 transition-opacity duration-200"
+                                muted playsInline preload="none"
+                                onMouseEnter={e => { e.currentTarget.currentTime = 0; e.currentTarget.play().catch(() => {}); }}
+                                onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                                onTimeUpdate={e => { if (e.currentTarget.currentTime >= 5) { e.currentTarget.pause(); e.currentTarget.currentTime = 0; } }}
+                              />
+                              {!mobileThumb && <div className="w-full h-full flex items-center justify-center text-white/40 absolute inset-0 group-hover/mobadrow:opacity-0"><ShoppingBag size={12}/></div>}
+                            </>
+                          ) : mobileThumb ? (
+                            <img src={mobileThumb} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white/40"><ShoppingBag size={12}/></div>
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-white truncate">{item.caption || item.title || 'Ad'}</div>

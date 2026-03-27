@@ -377,8 +377,8 @@ const Profile = () => {
     };
     const renderContentMobile = () => {
         if (activeTab === null) return null;
-        if (activeTab === 'ads') return <AdsGrid containerClass="pb-24" />;
-        return <PostGrid containerClass="pb-24" />;
+        if (activeTab === 'ads') return <AdsGrid containerClass="" />;
+        return <PostGrid containerClass="" />;
     };
 
     const AdsGrid = ({ containerClass = '' }) => (
@@ -493,228 +493,244 @@ const Profile = () => {
             )}
 
             {/* ═══════ MOBILE ═══════ */}
-            <div className="md:hidden">
-                {/* Nav Bar */}
-                <div className="sticky top-0 bg-white/95 dark:bg-black/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex justify-between items-center z-40">
-                    <div className="flex items-center gap-1 min-w-0">
-                        {!isOwnProfile && (
-                            <button onClick={() => navigate(-1)} className="mr-2 flex-shrink-0">
-                                <ArrowLeft size={24} className="text-gray-900 dark:text-white" />
-                            </button>
-                        )}
-                        <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-1.5 truncate">
-                            {profileUser.username}
-                            <VerifiedBadge />
-                        </h1>
-                    </div>
-                    {isOwnProfile && (
-                        <div className="flex items-center gap-4 text-gray-900 dark:text-white flex-shrink-0">
-                            <Link to="/create"><Plus size={26} /></Link>
-                            <Link to="/settings"><Menu size={26} /></Link>
+            <div className="md:hidden flex flex-col h-[calc(120vh-60px)]">
+
+                {/* ── Fixed header block (username bar + profile info + tabs) ── */}
+                <div className="flex-shrink-0 bg-white dark:bg-black">
+                    {/* Nav Bar */}
+                    <div className="bg-white/95 dark:bg-black/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex justify-between items-center">
+                        <div className="flex items-center gap-1 min-w-0">
+                            {!isOwnProfile && (
+                                <button onClick={() => navigate(-1)} className="mr-2 flex-shrink-0">
+                                    <ArrowLeft size={24} className="text-gray-900 dark:text-white" />
+                                </button>
+                            )}
+                            <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-1.5 truncate">
+                                {profileUser.username}
+                                <VerifiedBadge />
+                            </h1>
                         </div>
-                    )}
+                        {isOwnProfile && (
+                            <div className="flex items-center gap-4 text-gray-900 dark:text-white flex-shrink-0">
+                                <Link to="/create"><Plus size={26} /></Link>
+                                <Link to="/settings"><Menu size={26} /></Link>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="px-4 pt-4 pb-2">
+                        {/* Avatar + Stats */}
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="relative flex-shrink-0">
+                                <div className="w-20 h-20 rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500">
+                                    <div className="w-full h-full rounded-full bg-white dark:bg-black p-[2px] overflow-hidden">
+                                        {profileUser.avatar_url ? (
+                                            <img src={profileUser.avatar_url} alt={profileUser.username} className="w-full h-full object-cover rounded-full" />
+                                        ) : (
+                                            <div className="w-full h-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center text-xl font-bold text-white rounded-full">
+                                                {getInitials(profileUser.full_name)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {isOwnProfile && (
+                                    <button type="button" onClick={() => setShowAvatarModal(true)}
+                                        className="absolute bottom-0 right-0 w-6 h-6 bg-blue-500 text-white rounded-full border-2 border-white dark:border-black flex items-center justify-center shadow">
+                                        <Plus size={12} strokeWidth={3} />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex flex-1 justify-around ml-4">
+                                {[
+                                    { val: profileUser.posts_count ?? userPosts.length, label: 'Posts' },
+                                    { val: profileUser.followers_count || 0, label: 'Followers' },
+                                    { val: profileUser.following_count || 0, label: 'Following' },
+                                    ...(isVendor ? [{ val: userAds.length, label: 'Ads' }] : []),
+                                ].map(({ val, label }) => (
+                                    <div key={label} className="flex flex-col items-center">
+                                        <span className="font-bold text-base text-gray-900 dark:text-white">{fmt(val)}</span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Bio */}
+                        <div className="mb-3">
+                            <div className="font-bold text-sm text-gray-900 dark:text-white">{profileUser.full_name}</div>
+                            {isVendor && (
+                                <span className="inline-block text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full mt-0.5 mb-0.5">
+                                    Vendor
+                                </span>
+                            )}
+                            {profileUser.bio && (
+                                <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{profileUser.bio}</div>
+                            )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 mb-4">
+                            {isOwnProfile ? (
+                                <>
+                                    <Link to="/edit-profile" className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">Edit profile</Link>
+                                    <Link to={isVendor ? '/vendor/profile' : '/archive'} className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">
+                                        {isVendor ? 'Business Profile' : 'View archive'}
+                                    </Link>
+                                    <Link to="/settings" className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-2 rounded-lg">
+                                        <Settings size={18} />
+                                    </Link>
+                                </>
+                            ) : (
+                                <>
+                                    <button onClick={handleFollow} disabled={followLoading}
+                                        className="flex-1 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-semibold py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-1">
+                                        {followLoading && <Loader2 size={12} className="animate-spin" />}
+                                        {followed ? 'Following' : 'Follow'}
+                                    </button>
+                                    <button className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg">Message</button>
+                                    <button className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-2 rounded-lg"><MoreHorizontal size={18} /></button>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Vendor Business Info (mobile) */}
+                        {isVendor && vendorInfo && (
+                            <div className="pb-2">
+                                <VendorBusinessCard />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Tabs — fixed, never scroll away */}
+                    <div className="flex border-t border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
+                        {tabConfig.map(tab => (
+                            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                                className={`flex-1 py-3 flex justify-center items-center border-b-[2px] transition-all ${
+                                    activeTab === tab.key
+                                        ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
+                                        : 'border-transparent text-gray-400 dark:text-gray-600'
+                                }`}>
+                                {tab.icon}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="px-4 pt-4 pb-2">
-                    {/* Avatar + Stats */}
-                    <div className="flex items-center justify-between mb-4">
+                {/* ── Scrollable grid only ── */}
+                <div className="flex-1 overflow-y-auto">
+                    {renderContentMobile()}
+                </div>
+            </div>
+
+
+            {/* ═══════ DESKTOP ═══════ */}
+            <div className="hidden md:flex flex-col h-[calc(100vh-0px)]">
+
+                {/* Static header — doesn't scroll */}
+                <div className="flex-shrink-0 max-w-[935px] mx-auto w-full pt-8 px-8">
+
+                    {/* Profile Header */}
+                    <div className="flex gap-16 items-start mb-11 px-4">
+                        {/* Avatar */}
                         <div className="relative flex-shrink-0">
-                            <div className="w-20 h-20 rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500">
-                                <div className="w-full h-full rounded-full bg-white dark:bg-black p-[2px] overflow-hidden">
+                            <div
+                                onClick={() => isOwnProfile && setShowAvatarModal(true)}
+                                className={`w-[150px] h-[150px] rounded-full p-[3px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 transition-opacity ${isOwnProfile ? 'cursor-pointer hover:opacity-90' : ''}`}>
+                                <div className="w-full h-full rounded-full bg-white dark:bg-black p-[3px] overflow-hidden">
                                     {profileUser.avatar_url ? (
-                                        <img src={profileUser.avatar_url} alt={profileUser.username} className="w-full h-full object-cover rounded-full" />
+                                        <img src={profileUser.avatar_url} className="w-full h-full rounded-full object-cover" alt="Profile" />
                                     ) : (
-                                        <div className="w-full h-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center text-xl font-bold text-white rounded-full">
-                                            {getInitials(profileUser.full_name)}
+                                        <div className="w-full h-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center text-5xl font-bold text-white rounded-full">
+                                            {getInitials(profileUser.full_name || profileUser.username)}
                                         </div>
                                     )}
                                 </div>
                             </div>
                             {isOwnProfile && (
                                 <button type="button" onClick={() => setShowAvatarModal(true)}
-                                    className="absolute bottom-0 right-0 w-6 h-6 bg-blue-500 text-white rounded-full border-2 border-white dark:border-black flex items-center justify-center shadow">
-                                    <Plus size={12} strokeWidth={3} />
+                                    className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center border-2 border-white dark:border-black shadow-md hover:bg-blue-600 transition-colors">
+                                    <Plus size={16} strokeWidth={2.5} />
                                 </button>
                             )}
                         </div>
-                        <div className="flex flex-1 justify-around ml-4">
-                            {[
-                                { val: profileUser.posts_count ?? userPosts.length, label: 'Posts' },
-                                { val: profileUser.followers_count || 0, label: 'Followers' },
-                                { val: profileUser.following_count || 0, label: 'Following' },
-                                ...(isVendor ? [{ val: userAds.length, label: 'Ads' }] : []),
-                            ].map(({ val, label }) => (
-                                <div key={label} className="flex flex-col items-center">
-                                    <span className="font-bold text-base text-gray-900 dark:text-white">{fmt(val)}</span>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
 
-                    {/* Bio */}
-                    <div className="mb-3">
-                        <div className="font-bold text-sm text-gray-900 dark:text-white">{profileUser.full_name}</div>
-                        {isVendor && (
-                            <span className="inline-block text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full mt-0.5 mb-0.5">
-                                Vendor
-                            </span>
-                        )}
-                        {profileUser.bio && (
-                            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{profileUser.bio}</div>
-                        )}
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 mb-5">
-                        {isOwnProfile ? (
-                            <>
-                                <Link to="/edit-profile" className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">Edit profile</Link>
-                                <Link to={isVendor ? '/vendor/profile' : '/archive'} className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">
-                                    {isVendor ? 'Business Profile' : 'View archive'}
-                                </Link>
-                                <Link to="/settings" className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-2 rounded-lg">
-                                    <Settings size={18} />
-                                </Link>
-                            </>
-                        ) : (
-                            <>
-                                <button onClick={handleFollow} disabled={followLoading}
-                                    className="flex-1 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-semibold py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-1">
-                                    {followLoading && <Loader2 size={12} className="animate-spin" />}
-                                    {followed ? 'Following' : 'Follow'}
-                                </button>
-                                <button className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg">Message</button>
-                                <button className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-2 rounded-lg"><MoreHorizontal size={18} /></button>
-                            </>
-                        )}
-                    </div>
-
-                {/* Vendor Business Info (mobile) */}
-                {isVendor && vendorInfo && (
-                    <div className="px-4 pt-3 pb-1">
-                        <VendorBusinessCard />
-                    </div>
-                )}
-                </div>
-
-                {/* Mobile Tabs */}
-                <div className="flex border-t border-gray-200 dark:border-gray-800 sticky top-[53px] bg-white dark:bg-black z-30">
-                    {tabConfig.map(tab => (
-                        <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                            className={`flex-1 py-3 flex justify-center items-center border-b-[2px] transition-all ${
-                                activeTab === tab.key
-                                    ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
-                                    : 'border-transparent text-gray-400 dark:text-gray-600'
-                            }`}>
-                            {tab.icon}
-                        </button>
-                    ))}
-                </div>
-
-                {renderContentMobile()}
-            </div>
-
-
-            {/* ═══════ DESKTOP ═══════ */}
-            <div className="hidden md:block max-w-[935px] mx-auto pt-8 px-4 pb-12">
-
-                {/* Profile Header */}
-                <div className="flex gap-16 items-start mb-11 px-4">
-                    {/* Avatar */}
-                    <div className="relative flex-shrink-0">
-                        <div
-                            onClick={() => isOwnProfile && setShowAvatarModal(true)}
-                            className={`w-[150px] h-[150px] rounded-full p-[3px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 transition-opacity ${isOwnProfile ? 'cursor-pointer hover:opacity-90' : ''}`}>
-                            <div className="w-full h-full rounded-full bg-white dark:bg-black p-[3px] overflow-hidden">
-                                {profileUser.avatar_url ? (
-                                    <img src={profileUser.avatar_url} className="w-full h-full rounded-full object-cover" alt="Profile" />
+                        {/* Info */}
+                        <div className="flex flex-col flex-1 pt-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-3 mb-4">
+                                <h2 className="text-2xl font-light text-gray-900 dark:text-white">{profileUser.username}</h2>
+                                <VerifiedBadge />
+                                {isVendor && (
+                                    <span className="text-xs font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full">Vendor</span>
+                                )}
+                                {isOwnProfile ? (
+                                    <>
+                                        <Link to="/edit-profile" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">Edit profile</Link>
+                                        {isVendor && <Link to="/vendor/profile" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">Business Profile</Link>}
+                                        <Link to="/settings" className="p-2 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><Settings size={22} /></Link>
+                                    </>
                                 ) : (
-                                    <div className="w-full h-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center text-5xl font-bold text-white rounded-full">
-                                        {getInitials(profileUser.full_name || profileUser.username)}
-                                    </div>
+                                    <>
+                                        <button onClick={handleFollow} disabled={followLoading}
+                                            className="px-5 py-1.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-1">
+                                            {followLoading && <Loader2 size={12} className="animate-spin" />}
+                                            {followed ? 'Following' : 'Follow'}
+                                        </button>
+                                        <button className="px-5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-semibold rounded-lg text-sm">Message</button>
+                                        <button className="p-2 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><MoreHorizontal size={22} /></button>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Stats */}
+                            <div className="flex gap-8 mb-4">
+                                {[
+                                    { val: profileUser.posts_count ?? userPosts.length, label: 'posts' },
+                                    { val: profileUser.followers_count || 0, label: 'followers' },
+                                    { val: profileUser.following_count || 0, label: 'following' },
+                                    ...(isVendor ? [{ val: userAds.length, label: 'ads' }] : []),
+                                ].map(({ val, label }) => (
+                                    <span key={label} className="text-sm text-gray-700 dark:text-gray-300">
+                                        <span className="font-semibold text-gray-900 dark:text-white">{fmt(val)}</span> {label}
+                                    </span>
+                                ))}
+                            </div>
+
+                            {/* Name + Bio */}
+                            <div className="max-w-sm">
+                                <div className="font-semibold text-sm text-gray-900 dark:text-white">{profileUser.full_name || profileUser.username}</div>
+                                {profileUser.bio && (
+                                    <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed mt-0.5">{profileUser.bio}</div>
                                 )}
                             </div>
                         </div>
-                        {isOwnProfile && (
-                            <button type="button" onClick={() => setShowAvatarModal(true)}
-                                className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center border-2 border-white dark:border-black shadow-md hover:bg-blue-600 transition-colors">
-                                <Plus size={16} strokeWidth={2.5} />
+                    </div>
+
+                    {/* Vendor Business Info */}
+                    <VendorBusinessCard />
+
+                    {/* Desktop Tabs — fixed, never scroll away */}
+                    <div className="flex justify-center gap-14 border-t border-gray-200 dark:border-gray-800 -mt-px">
+                        {tabConfig.map(tab => (
+                            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                                className={`flex items-center gap-1.5 py-4 border-t-[1px] text-[11px] font-semibold tracking-widest uppercase transition-all ${
+                                    activeTab === tab.key
+                                        ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
+                                        : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                                }`}>
+                                {React.cloneElement(tab.icon, { size: 12 })} {tab.label}
                             </button>
-                        )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex flex-col flex-1 pt-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-3 mb-4">
-                            <h2 className="text-2xl font-light text-gray-900 dark:text-white">{profileUser.username}</h2>
-                            <VerifiedBadge />
-                            {isVendor && (
-                                <span className="text-xs font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full">Vendor</span>
-                            )}
-                            {isOwnProfile ? (
-                                <>
-                                    <Link to="/edit-profile" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">Edit profile</Link>
-                                    {isVendor && <Link to="/vendor/profile" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">Business Profile</Link>}
-                                    <Link to="/settings" className="p-2 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><Settings size={22} /></Link>
-                                </>
-                            ) : (
-                                <>
-                                    <button onClick={handleFollow} disabled={followLoading}
-                                        className="px-5 py-1.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-1">
-                                        {followLoading && <Loader2 size={12} className="animate-spin" />}
-                                        {followed ? 'Following' : 'Follow'}
-                                    </button>
-                                    <button className="px-5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-semibold rounded-lg text-sm">Message</button>
-                                    <button className="p-2 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><MoreHorizontal size={22} /></button>
-                                </>
-                            )}
-                        </div>
-
-                        {/* Stats */}
-                        <div className="flex gap-8 mb-4">
-                            {[
-                                { val: profileUser.posts_count ?? userPosts.length, label: 'posts' },
-                                { val: profileUser.followers_count || 0, label: 'followers' },
-                                { val: profileUser.following_count || 0, label: 'following' },
-                                ...(isVendor ? [{ val: userAds.length, label: 'ads' }] : []),
-                            ].map(({ val, label }) => (
-                                <span key={label} className="text-sm text-gray-700 dark:text-gray-300">
-                                    <span className="font-semibold text-gray-900 dark:text-white">{fmt(val)}</span> {label}
-                                </span>
-                            ))}
-                        </div>
-
-                        {/* Name + Bio */}
-                        <div className="max-w-sm">
-                            <div className="font-semibold text-sm text-gray-900 dark:text-white">{profileUser.full_name || profileUser.username}</div>
-                            {profileUser.bio && (
-                                <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed mt-0.5">{profileUser.bio}</div>
-                            )}
-                        </div>
+                        ))}
                     </div>
                 </div>
 
-                {/* Vendor Business Info */}
-                <VendorBusinessCard />
-
-                {/* Desktop Tabs */}
-                <div className="flex justify-center gap-14 border-t border-gray-200 dark:border-gray-800 -mt-px mb-0">
-                    {tabConfig.map(tab => (
-                        <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                            className={`flex items-center gap-1.5 py-4 border-t-[1px] text-[11px] font-semibold tracking-widest uppercase transition-all ${
-                                activeTab === tab.key
-                                    ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
-                                    : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                            }`}>
-                            {React.cloneElement(tab.icon, { size: 12 })} {tab.label}
-                        </button>
-                    ))}
+                {/* Scrollable grid only */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="max-w-[935px] mx-auto px-4 pb-12">
+                        {renderContent()}
+                    </div>
                 </div>
 
-                {renderContent()}
-
-                {/* Floating Wallet — reads from Redux, stays live */}
+                {/* Floating Wallet */}
                 <div className="fixed bottom-8 right-8 z-50 hover:scale-105 transition-transform cursor-pointer">
                     <Link to="/wallet" className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-full shadow-xl border border-gray-100 dark:border-gray-800 p-1 pr-4">
                         <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center text-white shadow">

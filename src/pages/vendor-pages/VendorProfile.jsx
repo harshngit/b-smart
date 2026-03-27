@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
 import api from "../../lib/api";
+import AvatarCropModal from "../../components/AvatarCropModal";
 import {
   Building2, User, Handshake, ChevronDown, ChevronUp,
   Globe, Mail, Phone, MapPin, Edit3, Check, X,
@@ -185,6 +186,7 @@ const CompanyInfo = () => {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [logoPreview, setLogoPreview] = useState(null);
+  const [showLogoCropModal, setShowLogoCropModal] = useState(false);
   const fileRef = useRef();
   const [form, setForm] = useState(EMPTY_FORM);
   const userId = userObject?._id || userObject?.id;
@@ -246,27 +248,28 @@ const CompanyInfo = () => {
 
       {/* ── Profile Hero Card ─────────────────────────────────────────────── */}
       <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-        {/* Cover banner */}
-        <div className="h-28 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 relative overflow-hidden">
+        {/* Cover banner — tall gradient with dot pattern */}
+        <div className="h-36 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 relative overflow-hidden">
           <div
             className="absolute inset-0 opacity-20"
             style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "20px 20px" }}
           />
         </div>
 
-        {/* Avatar + actions row */}
+        {/* Logo + actions row — logo overlaps the gradient */}
         <div className="px-5 pb-5">
-          <div className="flex items-end justify-between" style={{ marginTop: "-36px" }}>
-            {/* Avatar */}
-            <div
-              onClick={() => editing && fileRef.current.click()}
-              className={`w-[72px] h-[72px] rounded-2xl flex items-center justify-center overflow-hidden bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-lg flex-shrink-0 ${editing ? "cursor-pointer ring-2 ring-dashed ring-pink-500/60" : ""}`}
+          <div className="flex items-end justify-between" style={{ marginTop: "-44px" }}>
+            {/* Logo — click opens AvatarCropModal */}
+            <button
+              type="button"
+              onClick={() => setShowLogoCropModal(true)}
+              className={`w-[80px] h-[80px] rounded-2xl flex items-center justify-center overflow-hidden bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-xl flex-shrink-0 transition-all ${editing ? "ring-2 ring-pink-500/60 ring-offset-2 cursor-pointer" : "cursor-pointer hover:opacity-90"}`}
+              title="Change Logo"
             >
               {logoPreview
                 ? <img src={logoPreview} alt="logo" className="w-full h-full object-cover" />
                 : <span className="text-3xl">🏢</span>}
-            </div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogo} />
+            </button>
 
             {/* Edit / Save buttons */}
             <div className="flex gap-2 pb-1">
@@ -304,17 +307,27 @@ const CompanyInfo = () => {
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {[form.userFullName, form.userEmail].filter(Boolean).join(" · ")}
             </div>
-            {editing && (
-              <button onClick={() => fileRef.current.click()} className="text-[11px] font-semibold text-pink-600 dark:text-pink-400 mt-1.5 hover:underline">
-                Change Logo
-              </button>
-            )}
+            <button
+              onClick={() => setShowLogoCropModal(true)}
+              className="text-[11px] font-semibold text-pink-600 dark:text-pink-400 mt-1.5 hover:underline"
+            >
+              Change Logo
+            </button>
           </div>
         </div>
       </div>
 
       {/* Completion bar */}
       <CompletionBar pct={pct} />
+
+      {/* ── Logo Crop Modal ───────────────────────────────────────────────── */}
+      <AvatarCropModal
+        isOpen={showLogoCropModal}
+        onClose={() => setShowLogoCropModal(false)}
+        onSuccess={(newUrl) => { setLogoPreview(newUrl); setShowLogoCropModal(false); }}
+        currentAvatar={logoPreview}
+        userName={form.companyName || "Logo"}
+      />
 
       {/* ── Desktop: single grid form ───────────────────────────────────────── */}
       <div className="hidden md:block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
@@ -705,19 +718,19 @@ const SalesOfficer = () => {
       {officer && (
         <div className="space-y-4">
           <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-            <div className="h-20 bg-gradient-to-r from-blue-500 to-indigo-600 relative overflow-hidden">
+            <div className="h-24 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 relative overflow-hidden">
               <div className="absolute inset-0 opacity-20" style={{backgroundImage:'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize:'16px 16px'}} />
             </div>
             <div className="px-5 pb-5">
-              <div className="flex items-end justify-between" style={{ marginTop: "-28px" }}>
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg border-4 border-white dark:border-gray-900 flex-shrink-0">
+              <div className="flex items-end justify-between" style={{ marginTop: "-32px" }}>
+                <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-xl flex-shrink-0 flex items-center justify-center">
                   {officer.avatar_url
-                    ? <img src={officer.avatar_url} alt="" className="w-full h-full object-cover rounded-xl" />
-                    : initials(officer.full_name || officer.username)}
+                    ? <img src={officer.avatar_url} alt="" className="w-full h-full object-cover" />
+                    : <span className="text-white font-black text-xl w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-400 to-pink-600">{initials(officer.full_name || officer.username)}</span>}
                 </div>
                 {officer.email && (
                   <a href={`mailto:${officer.email}`}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all mb-1">
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-orange-500 to-pink-600 text-white hover:opacity-90 shadow-md shadow-pink-500/20 transition-all mb-1">
                     <Mail size={12} /> Email Officer
                   </a>
                 )}

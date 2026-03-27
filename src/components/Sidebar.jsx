@@ -3,7 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2 } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
+import { logoutUser } from '../store/authSlice';
 import { useNotificationSocket } from '../hooks/useNotificationSocket';
+import PostDetailModal from './PostDetailModal';
 
 const Sidebar = ({ onOpenCreateModal }) => {
   const location = useLocation();
@@ -20,6 +22,16 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const dropdownRef = useRef(null);
   const moreDropdownRef = useRef(null);
   const notificationsRef = useRef(null);
+
+  // ── Sidebar Search state ─────────────────────────────────────────────────────
+  const [showSearch, setShowSearch] = useState(false);
+  const [sidebarSearchQuery, setSidebarSearchQuery] = useState('');
+  const [sidebarSearchResults, setSidebarSearchResults] = useState({ users: [], posts: [], reels: [] });
+  const [sidebarSearchLoading, setSidebarSearchLoading] = useState(false);
+  const [sidebarSelectedPost, setSidebarSelectedPost] = useState(null);
+  const sidebarSearchRef = useRef(null);
+  const sidebarSearchInputRef = useRef(null);
+  const sidebarSearchDebounce = useRef(null);
 
   // ── Notifications via shared WS hook ────────────────────────────────────────
   const isVendor = userObject?.role === 'vendor';
@@ -57,6 +69,11 @@ const Sidebar = ({ onOpenCreateModal }) => {
       if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
         setShowNotifications(false);
       }
+      if (sidebarSearchRef.current && !sidebarSearchRef.current.contains(event.target)) {
+        setShowSearch(false);
+        setSidebarSearchQuery('');
+        setSidebarSearchResults({ users: [], posts: [], reels: [] });
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -70,6 +87,50 @@ const Sidebar = ({ onOpenCreateModal }) => {
     return () => clearInterval(timer);
   }, []);
 
+  // ── Sidebar search fetch ─────────────────────────────────────────────────────
+  const runSidebarSearch = async (q) => {
+    const query = q.trim();
+    if (!query) { setSidebarSearchResults({ users: [], posts: [], reels: [] }); return; }
+    setSidebarSearchLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+      const res = await fetch(`https://api.bebsmart.in/api/search?q=${encodeURIComponent(query)}&limit=15`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const r = data.results || {};
+        setSidebarSearchResults({
+          users: (r.users || []).slice(0, 6),
+          posts: (r.posts || []).slice(0, 5),
+          reels: (r.reels || []).slice(0, 5),
+        });
+      } else {
+        setSidebarSearchResults({ users: [], posts: [], reels: [] });
+      }
+    } catch { setSidebarSearchResults({ users: [], posts: [], reels: [] }); }
+    finally { setSidebarSearchLoading(false); }
+  };
+
+  const handleSidebarSearchInput = (e) => {
+    const q = e.target.value;
+    setSidebarSearchQuery(q);
+    clearTimeout(sidebarSearchDebounce.current);
+    if (!q.trim()) { setSidebarSearchResults({ users: [], posts: [], reels: [] }); return; }
+    sidebarSearchDebounce.current = setTimeout(() => runSidebarSearch(q), 350);
+  };
+
+  const openSidebarSearch = () => {
+    setShowSearch(true);
+    setShowNotifications(false);
+    setTimeout(() => sidebarSearchInputRef.current?.focus(), 80);
+  };
+
+  const closeSidebarSearch = () => {
+    setShowSearch(false);
+    setSidebarSearchQuery('');
+    setSidebarSearchResults({ users: [], posts: [], reels: [] });
+  };
+
   const navItems = isVendor ? [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/vendor/dashboard' },
     { icon: User, label: 'Vendor Profile', path: '/vendor/profile' },
@@ -80,7 +141,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
     { icon: Settings, label: 'Settings', path: '/vendor/settings' },
   ] : [
     { icon: Home, label: 'Home', path: '/' },
-    { icon: Search, label: 'Search', path: '/search' },
+    { icon: Search, label: 'Search', path: null, action: openSidebarSearch },
     { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
     { icon: Clapperboard, label: 'Reels', path: '/reels' },
     { icon: Target, label: 'Ads', path: '/ads' },
@@ -115,6 +176,28 @@ const Sidebar = ({ onOpenCreateModal }) => {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path || (item.label === 'Create' && isCreateDropdownOpen);
+
+            if (item.label === 'Search') {
+              return (
+                <div key={item.label} className="relative" ref={sidebarSearchRef}>
+                  <button
+                    onClick={openSidebarSearch}
+                    className={`group w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 ${showSearch ? 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white shadow-md' : 'hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-900 dark:text-white'}`}
+                  >
+                    <div className="min-w-[24px]">
+                      <Icon
+                        size={24}
+                        className={`${showSearch ? 'text-white' : 'text-gray-900 dark:text-white'} transition-transform duration-150 group-hover:scale-110 ${!showSearch && 'group-hover:text-black dark:group-hover:text-white'}`}
+                        strokeWidth={showSearch ? 2.5 : 2}
+                      />
+                    </div>
+                    <span className={`text-base font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${!showSearch && 'group-hover:text-black dark:group-hover:text-white'} ${isHovered ? 'opacity-100 w-auto' : 'opacity-0 w-0'} ${showSearch ? 'text-white font-bold' : 'dark:text-white'}`}>
+                      Search
+                    </span>
+                  </button>
+                </div>
+              );
+            }
 
             if (item.label === 'Create') {
               return (
@@ -308,6 +391,24 @@ const Sidebar = ({ onOpenCreateModal }) => {
           <div className={`mt-auto pb-4 relative`} ref={moreDropdownRef}>
             {isMoreDropdownOpen && (
               <div className={`absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-2 z-[60] overflow-hidden ${isHovered ? 'translate-x-0' : 'translate-x-14'}`}>
+                {isVendor && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setIsMoreDropdownOpen(false);
+                        dispatch(logoutUser());
+                        navigate('/login');
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-sm font-medium text-red-500 dark:text-red-400 transition-colors"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      Log Out
+                    </button>
+                    <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
+                  </>
+                )}
                 <button
                   onClick={() => dispatch(toggleTheme())}
                   className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
@@ -346,6 +447,176 @@ const Sidebar = ({ onOpenCreateModal }) => {
           </div>
         </div>
       </div>
+      {/* ── Instagram-style Search Panel (desktop only, member only) ── */}
+      {showSearch && !isVendor && (
+        <>
+          {/* Backdrop — clicking closes */}
+          <div
+            className="hidden md:block fixed inset-0 z-[45]"
+            onClick={closeSidebarSearch}
+          />
+          {/* Panel slides in from the left, right beside the sidebar */}
+          <div
+            ref={sidebarSearchRef}
+            className="hidden md:flex flex-col fixed top-0 left-20 h-full w-[380px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl"
+            style={{ animation: 'slideInSearch 0.22s cubic-bezier(0.4,0,0.2,1)' }}
+          >
+            {/* Header */}
+            <div className="px-6 pt-8 pb-4">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Search</h2>
+                <button
+                  onClick={closeSidebarSearch}
+                  className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              {/* Search input */}
+              <div className="flex items-center gap-3 bg-gray-100 dark:bg-[#1c1c1e] rounded-xl px-4 py-2.5">
+                <Search size={16} className="text-gray-400 shrink-0" />
+                <input
+                  ref={sidebarSearchInputRef}
+                  value={sidebarSearchQuery}
+                  onChange={handleSidebarSearchInput}
+                  placeholder="Search"
+                  className="flex-1 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder-gray-400"
+                />
+                {sidebarSearchLoading ? (
+                  <svg className="animate-spin w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-20"/>
+                    <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                  </svg>
+                ) : sidebarSearchQuery ? (
+                  <button
+                    onClick={() => { setSidebarSearchQuery(''); setSidebarSearchResults({ users: [], posts: [], reels: [] }); sidebarSearchInputRef.current?.focus(); }}
+                    className="w-5 h-5 rounded-full bg-gray-400 dark:bg-gray-600 flex items-center justify-center shrink-0 hover:bg-gray-500 transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Results / Recent */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Empty state */}
+              {!sidebarSearchQuery.trim() && (
+                <div className="px-6 pt-2">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Recent</p>
+                  <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400 dark:text-gray-600">
+                    <Search size={28} className="opacity-30" />
+                    <p className="text-sm">No recent searches.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* No results */}
+              {sidebarSearchQuery.trim() && !sidebarSearchLoading && sidebarSearchResults.users.length === 0 && sidebarSearchResults.posts.length === 0 && sidebarSearchResults.reels.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
+                  <Search size={24} className="opacity-30" />
+                  <p className="text-sm">No results for "{sidebarSearchQuery}"</p>
+                </div>
+              )}
+
+              {/* Users */}
+              {sidebarSearchResults.users.length > 0 && (
+                <div className="pt-2">
+                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">People</p>
+                  {sidebarSearchResults.users.map(u => (
+                    <button
+                      key={u._id || u.id}
+                      onClick={() => { navigate(`/profile/${u._id || u.id}`); closeSidebarSearch(); }}
+                      className="w-full flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left"
+                    >
+                      <div className="w-11 h-11 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[2px] shrink-0">
+                        <div className="w-full h-full rounded-full bg-white dark:bg-black overflow-hidden flex items-center justify-center">
+                          {u.avatar_url || u.profile_picture
+                            ? <img src={u.avatar_url || u.profile_picture} alt="" className="w-full h-full object-cover" />
+                            : <span className="text-sm font-bold text-gray-700 dark:text-white">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
+                          }
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.name || u.username}</p>
+                        {u.username && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{u.username}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Posts — open PostDetailModal */}
+              {sidebarSearchResults.posts.length > 0 && (
+                <div className="pt-2">
+                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Posts</p>
+                  {sidebarSearchResults.posts.map(post => {
+                    const postThumb = post.media?.[0]?.thumbnails?.[0]?.fileUrl || post.media?.[0]?.thumbnail_url || post.media?.[0]?.fileUrl || post.media?.[0]?.url || post.image_url;
+                    return (
+                      <button key={post._id}
+                        onClick={() => setSidebarSelectedPost(post)}
+                        className="w-full flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left">
+                        <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0">
+                          {postThumb
+                            ? <img src={postThumb} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                              </div>
+                          }
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{post.caption || post.title || 'Post'}</p>
+                          {post.username && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{post.username}</p>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Reels — open PostDetailModal (type=reel) */}
+              {sidebarSearchResults.reels.length > 0 && (
+                <div className="pt-2 pb-4">
+                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Reels</p>
+                  {sidebarSearchResults.reels.map(reel => {
+                    const reelThumb = reel.media?.[0]?.thumbnails?.[0]?.fileUrl || reel.media?.[0]?.thumbnail_url || reel.thumbnail_url;
+                    return (
+                      <button key={reel._id}
+                        onClick={() => setSidebarSelectedPost(reel)}
+                        className="w-full flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left">
+                        <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0 relative">
+                          {reelThumb
+                            ? <img src={reelThumb} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                              </div>
+                          }
+                          <div className="absolute bottom-1 right-1 bg-black/60 rounded-sm p-0.5">
+                            <svg width="7" height="7" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{reel.caption || reel.title || 'Reel'}</p>
+                          {reel.username && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{reel.username}</p>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+          <style>{`@keyframes slideInSearch { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+        </>
+      )}
+
+      {/* ── PostDetailModal for sidebar search results ── */}
+      <PostDetailModal
+        isOpen={!!sidebarSelectedPost}
+        post={sidebarSelectedPost}
+        onClose={() => setSidebarSelectedPost(null)}
+      />
+
       {showVendorNotValidated && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">

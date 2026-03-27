@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Home, Plus, Target, User, LayoutDashboard, FileText,
-  Clapperboard, Settings, Megaphone, X, Coins
+  Clapperboard, Settings, Megaphone, X, Coins, Search
 } from 'lucide-react';
 
 const BottomNav = ({ onOpenCreateModal }) => {
@@ -41,7 +41,7 @@ const BottomNav = ({ onOpenCreateModal }) => {
     { icon: Target,       path: '/ads',     label: 'Ads'     },
     null,
     { icon: Clapperboard, path: '/reels',   label: 'Reels'   },
-    { icon: User,         path: '/profile', label: 'Profile' },
+    { icon: Search,       path: '/search',  label: 'Search'  },
   ];
 
   const navItems = isVendor ? vendorNav : memberNav;
