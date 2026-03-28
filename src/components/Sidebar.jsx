@@ -7,6 +7,13 @@ import { logoutUser } from '../store/authSlice';
 import { useNotificationSocket } from '../hooks/useNotificationSocket';
 import PostDetailModal from './PostDetailModal';
 
+const getSearchResultUser = (item) => {
+  if (!item) return {};
+  if (item.user_id && typeof item.user_id === 'object') return item.user_id;
+  if (item.user && typeof item.user === 'object') return item.user;
+  return {};
+};
+
 const Sidebar = ({ onOpenCreateModal }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -551,6 +558,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
                 <div className="pt-2">
                   <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Posts</p>
                   {sidebarSearchResults.posts.map(post => {
+                    const postUser = getSearchResultUser(post);
                     const postThumb = post.media?.[0]?.thumbnails?.[0]?.fileUrl || post.media?.[0]?.thumbnail_url || post.media?.[0]?.fileUrl || post.media?.[0]?.url || post.image_url;
                     return (
                       <button key={post._id}
@@ -566,7 +574,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{post.caption || post.title || 'Post'}</p>
-                          {post.username && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{post.username}</p>}
+                          {(postUser.username || postUser.full_name) && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{postUser.username || postUser.full_name}</p>}
                         </div>
                       </button>
                     );
@@ -579,6 +587,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
                 <div className="pt-2 pb-4">
                   <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Reels</p>
                   {sidebarSearchResults.reels.map(reel => {
+                    const reelUser = getSearchResultUser(reel);
                     const reelThumb = reel.media?.[0]?.thumbnails?.[0]?.fileUrl || reel.media?.[0]?.thumbnail_url || reel.thumbnail_url;
                     return (
                       <button key={reel._id}
@@ -597,7 +606,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{reel.caption || reel.title || 'Reel'}</p>
-                          {reel.username && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{reel.username}</p>}
+                          {(reelUser.username || reelUser.full_name) && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{reelUser.username || reelUser.full_name}</p>}
                         </div>
                       </button>
                     );

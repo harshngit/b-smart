@@ -11,6 +11,13 @@ const authHeaders = () => {
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 };
 
+const getSearchItemUser = (item) => {
+  if (!item) return {};
+  if (item.user_id && typeof item.user_id === 'object') return item.user_id;
+  if (item.user && typeof item.user === 'object') return item.user;
+  return {};
+};
+
 const Avatar = ({ src, name, size = 44 }) => (
   <div className="rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex-shrink-0" style={{ width: size, height: size, padding: 2 }}>
     <div className="w-full h-full rounded-full bg-white dark:bg-black overflow-hidden flex items-center justify-center">
@@ -275,6 +282,7 @@ export default function SearchPage() {
               </div>
               <div className="grid grid-cols-3 gap-[2px]">
                 {filteredPosts.map(post => {
+                  const postUser = getSearchItemUser(post);
                   const thumb = post.media?.[0]?.thumbnails?.[0]?.fileUrl
                     || post.media?.[0]?.thumbnail_url
                     || post.media?.[0]?.fileUrl
@@ -291,8 +299,8 @@ export default function SearchPage() {
                       }
                       {/* User info overlay on hover */}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-start justify-end p-2">
-                        {post.avatar_url && <img src={post.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover mb-1 border border-white/50" />}
-                        <p className="text-white text-[9px] font-bold leading-none">@{post.username}</p>
+                        {postUser.avatar_url && <img src={postUser.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover mb-1 border border-white/50" />}
+                        <p className="text-white text-[9px] font-bold leading-none">@{postUser.username || postUser.full_name || 'user'}</p>
                         {post.caption && <p className="text-white/80 text-[8px] leading-tight mt-0.5 line-clamp-2">{post.caption}</p>}
                       </div>
                     </button>
@@ -311,6 +319,7 @@ export default function SearchPage() {
               </div>
               <div className="grid grid-cols-3 gap-[2px]">
                 {filteredReels.map(reel => {
+                  const reelUser = getSearchItemUser(reel);
                   const thumb = reel.media?.[0]?.thumbnails?.[0]?.fileUrl
                     || reel.media?.[0]?.thumbnail_url
                     || reel.thumbnail_url;
@@ -329,8 +338,8 @@ export default function SearchPage() {
                       </div>
                       {/* Hover overlay */}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-start justify-end p-2">
-                        {reel.avatar_url && <img src={reel.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover mb-1 border border-white/50" />}
-                        <p className="text-white text-[9px] font-bold leading-none">@{reel.username}</p>
+                        {reelUser.avatar_url && <img src={reelUser.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover mb-1 border border-white/50" />}
+                        <p className="text-white text-[9px] font-bold leading-none">@{reelUser.username || reelUser.full_name || 'user'}</p>
                         {reel.caption && <p className="text-white/80 text-[8px] leading-tight mt-0.5 line-clamp-2">{reel.caption}</p>}
                       </div>
                     </button>
