@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight, Heart, Send, Volume2, VolumeX, Pause, Play, MoreHorizontal } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import api from '../lib/api';
+import ContentReportModal from './ContentReportModal';
 
 const DeleteStoryModal = ({ isOpen, onClose, onConfirm, isDeleting }) => {
   if (!isOpen) return null;
@@ -84,6 +85,7 @@ const StoryViewer = ({ initialStoryIndex, stories, onClose }) => {
   const [showDeleteModal, setShowDeleteModal]     = useState(false);
   const [isDeletingStory, setIsDeletingStory]     = useState(false);
   const [replyText, setReplyText]                 = useState('');
+  const [showReportModal, setShowReportModal]     = useState(false);
 
   const videoRef   = useRef(null);
   const touchX     = useRef(null);
@@ -320,25 +322,32 @@ const StoryViewer = ({ initialStoryIndex, stories, onClose }) => {
               className="text-white hover:opacity-80 transition-opacity drop-shadow">
               {isPaused ? <Play size={20} /> : <Pause size={20} />}
             </button>
-            {isOwner && storyItems.length > 0 && (
-              <div className="relative">
-                <button onClick={(e) => { e.stopPropagation(); setShowOptions(v => !v); }}
-                  className="text-white hover:opacity-80 transition-opacity drop-shadow">
-                  <MoreHorizontal size={22} />
-                </button>
-                {showOptions && (
-                  <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-900 rounded-xl shadow-xl py-1 z-50">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setShowOptions(false); setShowDeleteModal(true); }}
-                      disabled={isDeletingStory}
-                      className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60"
-                    >
-                      {isDeletingStory ? 'Deleting…' : 'Delete story'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isOwner) {
+                    setShowOptions(v => !v);
+                    return;
+                  }
+                  if (currentItem?._id) setShowReportModal(true);
+                }}
+                className="text-white hover:opacity-80 transition-opacity drop-shadow"
+              >
+                <MoreHorizontal size={22} />
+              </button>
+              {showOptions && isOwner && storyItems.length > 0 && (
+                <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-900 rounded-xl shadow-xl py-1 z-50">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowOptions(false); setShowDeleteModal(true); }}
+                    disabled={isDeletingStory}
+                    className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60"
+                  >
+                    {isDeletingStory ? 'Deleting…' : 'Delete story'}
+                  </button>
+                </div>
+              )}
+            </div>
             <button onClick={(e) => { e.stopPropagation(); onClose(); }}
               className="text-white hover:opacity-80 transition-opacity drop-shadow">
               <X size={26} strokeWidth={2.5} />
@@ -434,6 +443,14 @@ const StoryViewer = ({ initialStoryIndex, stories, onClose }) => {
           }
         }}
         isDeleting={isDeletingStory}
+      />
+      <ContentReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType="story"
+        contentId={currentItem?._id}
+        ownerUsername={currentStory?.username || ''}
+        contentUrl={window.location.href}
       />
     </div>
   );

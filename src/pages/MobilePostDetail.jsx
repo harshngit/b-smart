@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Send, Bookmark, Smile, ChevronLeft, ChevronRight, Trash2, X, Edit } from 'lucide-react';
 import api from '../lib/api';
 import commentService from '../services/commentService';
+import ContentReportModal from '../components/ContentReportModal';
 
 const DeleteModal = ({ isOpen, onClose, onConfirm, isDeleting }) => {
     if (!isOpen) return null;
@@ -63,6 +64,7 @@ const MobilePostDetail = () => {
     const [showOptions, setShowOptions] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
 
     // Check if current user is the post owner
     const isPostOwner = userObject && post && (
@@ -295,6 +297,9 @@ const MobilePostDetail = () => {
         }
     };
 
+    const reportContentType = post?.type === 'reel' ? 'reel' : 'post';
+    const reportContentUrl = post?._id ? `${window.location.origin}/${reportContentType === 'reel' ? 'reels' : 'posts'}/${post._id}` : window.location.href;
+
     // Format date relative (simple version)
     const formatDate = (dateString) => {
         if (!dateString) return '';
@@ -511,14 +516,18 @@ const MobilePostDetail = () => {
                     </div>
                 </div>
                 <div className="relative">
-                    {isPostOwner && (
-                        <button
-                            onClick={() => setShowOptions(!showOptions)}
-                            className="text-gray-900 dark:text-white p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                        >
-                            <MoreHorizontal size={20} />
-                        </button>
-                    )}
+                    <button
+                        onClick={() => {
+                            if (isPostOwner) {
+                                setShowOptions(!showOptions);
+                                return;
+                            }
+                            setShowReportModal(true);
+                        }}
+                        className="text-gray-900 dark:text-white p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                    >
+                        <MoreHorizontal size={20} />
+                    </button>
 
                     {showOptions && isPostOwner && (
                         <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50 animate-fade-in">
@@ -552,6 +561,14 @@ const MobilePostDetail = () => {
                 onClose={() => setShowDeleteModal(false)}
                 onConfirm={handleDeletePost}
                 isDeleting={isDeleting}
+            />
+            <ContentReportModal
+                isOpen={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                contentType={reportContentType}
+                contentId={post?._id || postId}
+                ownerUsername={postUser?.username || postUser?.full_name || ''}
+                contentUrl={reportContentUrl}
             />
 
             {/* Image/Media */}

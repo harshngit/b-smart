@@ -7,6 +7,7 @@ import {
 import { useSelector } from 'react-redux';
 import commentService from '../services/commentService';
 import api from '../lib/api';
+import ContentReportModal from '../components/ContentReportModal';
 
 const BASE_URL = 'https://api.bebsmart.in/api';
 
@@ -132,7 +133,7 @@ const FollowButton = ({ userId, initialFollowing = false }) => {
   );
 };
 
-const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSave }) => {
+const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSave, onMore }) => {
   const reelId = reel?._id || reel?.post_id;
   const likesCount = reel?.likes_count ?? 0;
   const commentsCount = reel?.comments_count ?? reel?.comments?.length ?? 0;
@@ -179,7 +180,7 @@ const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSav
         <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>Save</span>
       </button>
 
-      <button className="flex flex-col items-center gap-1">
+      <button onClick={() => onMore?.(reel)} className="flex flex-col items-center gap-1">
         <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
           ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
           <MoreHorizontal size={20} className={mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
@@ -553,6 +554,7 @@ const Reels = () => {
   const [touchStartY, setTouchStartY] = useState(null);
   const [videoErrors, setVideoErrors] = useState({});
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [reportReel, setReportReel] = useState(null);
   const isAnimatingRef = useRef(false);
   const videoRefs = useRef({});
   const actionPanelRef = useRef(null);
@@ -820,6 +822,7 @@ const Reels = () => {
                           onComment={() => { setCurrentIndex(index); setCommentsOpen(true); }}
                           onShare={handleShare}
                           onSave={handleSave}
+                          onMore={setReportReel}
                         />
                       </div>
                     )}
@@ -865,6 +868,7 @@ const Reels = () => {
                 onComment={() => setCommentsOpen(v => !v)}
                 onShare={handleShare}
                 onSave={handleSave}
+                onMore={setReportReel}
               />
             </div>
           )}
@@ -910,6 +914,15 @@ const Reels = () => {
           </div>
         </div>
       )}
+
+      <ContentReportModal
+        isOpen={!!reportReel}
+        onClose={() => setReportReel(null)}
+        contentType="reel"
+        contentId={reportReel?._id || reportReel?.post_id}
+        ownerUsername={reportReel?.user_id?.username || reportReel?.user_id?.full_name || ''}
+        contentUrl={reportReel ? `${window.location.origin}/reels/${reportReel._id || reportReel.post_id}` : ''}
+      />
 
       <style>{`
         @keyframes slideInLeft {

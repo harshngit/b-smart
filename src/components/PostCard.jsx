@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
+import ContentReportModal from './ContentReportModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 
@@ -461,6 +462,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   const [showOptions, setShowOptions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // ── Time formatting ────────────────────────────────────────────────────────
   const [nowTs, setNowTs] = useState(0);
@@ -580,6 +582,12 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   };
 
   const offer = isAd ? (post.product_offer?.[0] || null) : null;
+  const reportContentType = isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post');
+  const reportContentUrl = isAd
+    ? `${window.location.origin}/ads`
+    : post.type === 'reel'
+      ? `${window.location.origin}/reels/${postId}`
+      : `${window.location.origin}/posts/${postId}`;
 
   return (
     <div className="bg-white dark:bg-black mb-4 border-b border-gray-200 dark:border-gray-800 pb-4 md:rounded-lg md:border max-w-[470px] mx-auto">
@@ -621,30 +629,44 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
           )}
           <span className="text-[11px] text-gray-400 dark:text-gray-500">{formattedDate}</span>
 
-          {/* Post owner options */}
-          {isOwner && (
-            <div className="relative">
-              <button onClick={() => setShowOptions(s => !s)} className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                <MoreHorizontal size={20} />
-              </button>
-              {showOptions && (
-                <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50">
-                  <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors" onClick={() => setShowOptions(false)}>
-                    <Edit size={15} /> Edit Post
-                  </button>
-                  <button className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 transition-colors"
-                    onClick={() => { setShowOptions(false); setShowDeleteModal(true); }}>
-                    <Trash2 size={15} /> Delete Post
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="relative">
+            <button
+              onClick={() => {
+                if (isOwner) {
+                  setShowOptions(s => !s);
+                  return;
+                }
+                setShowReportModal(true);
+              }}
+              className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+            >
+              <MoreHorizontal size={20} />
+            </button>
+            {showOptions && isOwner && (
+              <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50">
+                <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors" onClick={() => setShowOptions(false)}>
+                  <Edit size={15} /> Edit Post
+                </button>
+                <button className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 transition-colors"
+                  onClick={() => { setShowOptions(false); setShowDeleteModal(true); }}>
+                  <Trash2 size={15} /> Delete Post
+                </button>
+              </div>
+            )}
+          </div>
 
         </div>
       </div>
 
       <DeleteModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleConfirmDelete} isDeleting={isDeleting} />
+      <ContentReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType={reportContentType}
+        contentId={postId}
+        ownerUsername={username}
+        contentUrl={reportContentUrl}
+      />
 
       {/* ── Media ─────────────────────────────────────────────────────────── */}
       <MediaRenderer mediaItems={mediaItems} isAdType={isAd} peopleTags={peopleTags} />

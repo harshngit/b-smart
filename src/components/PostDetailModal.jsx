@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import postCommentService from '../services/commentService';
 import adCommentService from '../services/commentServiceJS';
+import ContentReportModal from './ContentReportModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 
@@ -475,6 +476,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   const [showOptions, setShowOptions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // ── Init on open ────────────────────────────────────────────────────────────
 
@@ -659,6 +661,12 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   if (!isOpen || !post) return null;
 
   const offer = isAd ? (post.product_offer?.[0] || null) : null;
+  const reportContentType = isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post');
+  const reportContentUrl = isAd
+    ? `${window.location.origin}/ads`
+    : post.type === 'reel'
+      ? `${window.location.origin}/reels/${postId}`
+      : `${window.location.origin}/posts/${postId}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 md:p-10">
@@ -696,29 +704,44 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {isPostOwner && (
-                <div className="relative">
-                  <button onClick={() => setShowOptions(s => !s)} className="text-gray-900 dark:text-white hover:opacity-50 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                    <MoreHorizontal size={20} />
-                  </button>
-                  {showOptions && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50">
-                      <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors"
-                        onClick={() => { setShowOptions(false); alert('Edit coming soon'); }}>
-                        <Edit size={16} /> Edit Post
-                      </button>
-                      <button className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 transition-colors"
-                        onClick={() => { setShowOptions(false); setShowDeleteModal(true); }}>
-                        <Trash2 size={16} /> Delete Post
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    if (isPostOwner) {
+                      setShowOptions(s => !s);
+                      return;
+                    }
+                    setShowReportModal(true);
+                  }}
+                  className="text-gray-900 dark:text-white hover:opacity-50 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <MoreHorizontal size={20} />
+                </button>
+                {showOptions && isPostOwner && (
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50">
+                    <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors"
+                      onClick={() => { setShowOptions(false); alert('Edit coming soon'); }}>
+                      <Edit size={16} /> Edit Post
+                    </button>
+                    <button className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 transition-colors"
+                      onClick={() => { setShowOptions(false); setShowDeleteModal(true); }}>
+                      <Trash2 size={16} /> Delete Post
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <DeleteModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleDeletePost} isDeleting={isDeleting} />
+          <ContentReportModal
+            isOpen={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            contentType={reportContentType}
+            contentId={postId}
+            ownerUsername={username}
+            contentUrl={reportContentUrl}
+          />
 
           {/* Scrollable: post info + comments */}
           <div className="flex-1 overflow-y-auto p-3 md:p-4 scrollbar-hide">

@@ -8,6 +8,7 @@ import {
   ShoppingBag, Loader2, UserPlus, UserCheck, X, Smile, Trash2
 } from 'lucide-react';
 import { fetchWallet, setWalletBalance } from '../store/walletSlice';
+import ContentReportModal from '../components/ContentReportModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 const IMAGE_AD_DURATION = 15; // seconds for image ads
@@ -409,7 +410,7 @@ const FollowButton = ({ userId, mobile = false }) => {
 };
 
 // ─── Action Buttons ────────────────────────────────────────────────────────────
-const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile = false, onComment }) => (
+const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile = false, onComment, onMore }) => (
   <div className="flex flex-col items-center gap-4">
     {/* Like */}
     <button onClick={() => toggleLike(ad._id)} className="flex flex-col items-center gap-1">
@@ -459,7 +460,7 @@ const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile 
     </button>
 
     {/* More */}
-    <button className="flex flex-col items-center gap-1">
+    <button onClick={() => onMore?.(ad)} className="flex flex-col items-center gap-1">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
         ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
         <MoreHorizontal size={20} className={mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
@@ -577,6 +578,7 @@ const Ads = ({ feedMode = 'user' }) => {
   const [viewRewardPopup, setViewRewardPopup] = useState(null); // { amount } — shown first time only
   const [viewRecordedPopup, setViewRecordedPopup] = useState(null); // { view_count } — shown when rewarded: false
   const [likeRewardPopup, setLikeRewardPopup] = useState(null); // { amount, isLike } — shown on every like/dislike
+  const [reportAd, setReportAd] = useState(null);
 
   // Track which ad IDs the current user has already viewed this session.
   // Using a ref so it never triggers re-renders and persists across index changes.
@@ -1718,6 +1720,7 @@ const Ads = ({ feedMode = 'user' }) => {
                             savedIds={savedIds}
                             toggleSave={toggleSave}
                             onComment={openComments}
+                            onMore={setReportAd}
                           />
                         </div>
                       )}
@@ -1738,6 +1741,7 @@ const Ads = ({ feedMode = 'user' }) => {
                 savedIds={savedIds}
                 toggleSave={toggleSave}
                 onComment={openComments}
+                onMore={setReportAd}
               />
             </div>
           )}
@@ -1961,6 +1965,15 @@ const Ads = ({ feedMode = 'user' }) => {
           +{coinToast.amount} Coins Earned!
         </div>
       )}
+
+      <ContentReportModal
+        isOpen={!!reportAd}
+        onClose={() => setReportAd(null)}
+        contentType="ad"
+        contentId={reportAd?._id}
+        ownerUsername={reportAd?.vendor_id?.business_name || reportAd?.user_id?.username || ''}
+        contentUrl={`${window.location.origin}/ads`}
+      />
 
       <style>{`
         @keyframes popupIn {
