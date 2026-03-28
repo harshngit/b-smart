@@ -1,17 +1,138 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2 } from 'lucide-react';
+import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2 } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
 import { logoutUser } from '../store/authSlice';
 import { useNotificationSocket } from '../hooks/useNotificationSocket';
 import PostDetailModal from './PostDetailModal';
 
-const getSearchResultUser = (item) => {
-  if (!item) return {};
-  if (item.user_id && typeof item.user_id === 'object') return item.user_id;
-  if (item.user && typeof item.user === 'object') return item.user;
-  return {};
+const BASE_URL = 'https://api.bebsmart.in';
+
+const authHeaders = () => {
+  const token = localStorage.getItem('token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+};
+
+const getMediaUrl = (item) => {
+  const fileUrl = item?.media?.[0]?.fileUrl;
+  if (fileUrl) {
+    if (fileUrl.startsWith('http')) return fileUrl;
+    return `${BASE_URL}/uploads/${fileUrl}`;
+  }
+  return (
+    item?.media?.[0]?.thumbnails?.[0]?.fileUrl ||
+    item?.media?.[0]?.thumbnail_url ||
+    item?.media?.[0]?.url ||
+    item?.image_url ||
+    item?.thumbnail_url ||
+    null
+  );
+};
+
+// ── Mini Post card (2-col in sidebar) ────────────────────────────────────────
+const SidebarPostCard = ({ post, onClick }) => {
+  const thumb = getMediaUrl(post);
+  const user = post.user_id || {};
+  const username = user.username || post.username || '';
+  return (
+    <button onClick={() => onClick(post)}
+      className="group relative aspect-square overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 w-full transition-opacity active:opacity-75">
+      {thumb
+        ? <img src={thumb} alt="" className="w-full h-full object-cover" />
+        : <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+      }
+      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5">
+        {username && <span className="text-white text-[9px] font-bold truncate">@{username}</span>}
+        <div className="flex items-center gap-1.5">
+          <span className="flex items-center gap-0.5 text-white text-[9px] font-semibold">
+            <Heart size={8} className="fill-white" /> {post.likes_count ?? 0}
+          </span>
+          <span className="flex items-center gap-0.5 text-white text-[9px] font-semibold">
+            <MessageCircle size={8} className="fill-white" /> {post.comments_count ?? 0}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+};
+
+// ── Mini Reel card (2-col in sidebar, hover plays 5s) ────────────────────────
+const SidebarReelCard = ({ reel, onClick }) => {
+  const videoRef = useRef(null);
+  const hoverTimer = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const thumb = getMediaUrl(reel);
+  const user = reel.user_id || {};
+  const username = user.username || reel.username || '';
+  const fileName = reel?.media?.[0]?.fileName || reel?.media?.[0]?.fileUrl || '';
+  const isVideo = /\.(mp4|mov|webm|ogg)$/i.test(fileName) || reel?.media?.[0]?.type === 'video';
+  const videoSrc = isVideo ? (fileName.startsWith('http') ? fileName : `${BASE_URL}/uploads/${reel?.media?.[0]?.fileName || ''}`) : null;
+
+  const handleMouseEnter = () => {
+    if (!videoRef.current || !videoSrc) return;
+    hoverTimer.current = setTimeout(() => {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
+      setTimeout(() => {
+        if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; }
+        setIsPlaying(false);
+      }, 5000);
+    }, 200);
+  };
+
+  const handleMouseLeave = () => {
+    clearTimeout(hoverTimer.current);
+    if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; }
+    setIsPlaying(false);
+  };
+
+  return (
+    <button
+      onClick={() => onClick(reel)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="group relative aspect-square overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 w-full transition-opacity active:opacity-75"
+    >
+      {thumb && !isPlaying && <img src={thumb} alt="" className="w-full h-full object-cover" />}
+      {videoSrc && (
+        <video ref={videoRef} src={videoSrc} muted playsInline preload="none"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${isPlaying ? 'opacity-100' : 'opacity-0'}`} />
+      )}
+      {!thumb && !videoSrc && (
+        <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        </div>
+      )}
+      {!isPlaying && (
+        <div className="absolute top-1 right-1 bg-black/60 rounded-sm p-0.5">
+          <svg width="7" height="7" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+      )}
+      {isPlaying && (
+        <div className="absolute top-1 right-1 bg-pink-600 rounded-sm px-1 py-0.5">
+          <span className="text-white text-[7px] font-bold leading-none">▶</span>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5">
+        {username && <span className="text-white text-[9px] font-bold truncate">@{username}</span>}
+        <div className="flex items-center gap-1.5">
+          <span className="flex items-center gap-0.5 text-white text-[9px] font-semibold"><Heart size={8} className="fill-white" /> {reel.likes_count ?? 0}</span>
+          <span className="flex items-center gap-0.5 text-white text-[9px] font-semibold"><Eye size={8} /> {reel.views_count ?? 0}</span>
+        </div>
+      </div>
+      {videoSrc && !isPlaying && (
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center">
+            <Play size={12} fill="white" className="text-white ml-0.5" />
+          </div>
+        </div>
+      )}
+    </button>
+  );
 };
 
 const Sidebar = ({ onOpenCreateModal }) => {
@@ -20,6 +141,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const dispatch = useDispatch();
   const { mode } = useSelector((state) => state.theme);
   const { userObject } = useSelector((state) => state.auth);
+  const userId = userObject?._id || userObject?.id;
   const [isHovered, setIsHovered] = useState(false);
   const [isCreateDropdownOpen, setIsCreateDropdownOpen] = useState(false);
   const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
@@ -36,6 +158,13 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const [sidebarSearchResults, setSidebarSearchResults] = useState({ users: [], posts: [], reels: [] });
   const [sidebarSearchLoading, setSidebarSearchLoading] = useState(false);
   const [sidebarSelectedPost, setSidebarSelectedPost] = useState(null);
+  const [searchActiveTab, setSearchActiveTab] = useState('all');
+  const [searchHistory, setSearchHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [sidebarPostLimit, setSidebarPostLimit] = useState(10);
+  const [sidebarReelLimit, setSidebarReelLimit] = useState(10);
+  const [sidebarUserLimit, setSidebarUserLimit] = useState(10);
+  const [sidebarLoadingMore, setSidebarLoadingMore] = useState(false);
   const sidebarSearchRef = useRef(null);
   const sidebarSearchInputRef = useRef(null);
   const sidebarSearchDebounce = useRef(null);
@@ -80,6 +209,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
         setShowSearch(false);
         setSidebarSearchQuery('');
         setSidebarSearchResults({ users: [], posts: [], reels: [] });
+        setSearchActiveTab('all');
       }
     };
 
@@ -94,33 +224,84 @@ const Sidebar = ({ onOpenCreateModal }) => {
     return () => clearInterval(timer);
   }, []);
 
+  // ── Search History ───────────────────────────────────────────────────────────
+  const loadHistory = useCallback(async () => {
+    if (!userId) return;
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/search/history/${userId}`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setSearchHistory(Array.isArray(data) ? data : (data.history || data.data || []));
+      }
+    } catch { /* silent */ } finally { setHistoryLoading(false); }
+  }, [userId]);
+
+  const clearAllHistory = async () => {
+    if (!userId) return;
+    try {
+      await fetch(`${BASE_URL}/api/search/history/${userId}`, { method: 'DELETE', headers: authHeaders() });
+      setSearchHistory([]);
+    } catch { /* silent */ }
+  };
+
+  const deleteHistoryItem = async (historyId, e) => {
+    e.stopPropagation();
+    try {
+      await fetch(`${BASE_URL}/api/search/history/${userId}/${historyId}`, { method: 'DELETE', headers: authHeaders() });
+      setSearchHistory(prev => prev.filter(h => (h._id || h.id) !== historyId));
+    } catch { /* silent */ }
+  };
+
+  const handleHistoryClick = (item) => {
+    const q = typeof item === 'string' ? item : (item.query || item.keyword || item.text || '');
+    if (!q) return;
+    setSidebarSearchQuery(q);
+    setSearchActiveTab('all');
+    runSidebarSearch(q);
+  };
+
   // ── Sidebar search fetch ─────────────────────────────────────────────────────
-  const runSidebarSearch = async (q) => {
+  const runSidebarSearch = async (q, { uLimit = 10, pLimit = 10, rLimit = 10, showLoader = true } = {}) => {
     const query = q.trim();
     if (!query) { setSidebarSearchResults({ users: [], posts: [], reels: [] }); return; }
-    setSidebarSearchLoading(true);
+    if (showLoader) setSidebarSearchLoading(true);
+    else setSidebarLoadingMore(true);
     try {
-      const token = localStorage.getItem('token');
-      const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-      const res = await fetch(`https://api.bebsmart.in/api/search?q=${encodeURIComponent(query)}&limit=15`, { headers });
+      const maxLimit = Math.max(uLimit, pLimit, rLimit);
+      const res = await fetch(`${BASE_URL}/api/search?q=${encodeURIComponent(query)}&limit=${maxLimit}`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
         const r = data.results || {};
         setSidebarSearchResults({
-          users: (r.users || []).slice(0, 6),
-          posts: (r.posts || []).slice(0, 5),
-          reels: (r.reels || []).slice(0, 5),
+          users: (r.users || []).slice(0, uLimit),
+          posts: (r.posts || []).slice(0, pLimit),
+          reels: (r.reels || []).slice(0, rLimit),
         });
       } else {
         setSidebarSearchResults({ users: [], posts: [], reels: [] });
       }
     } catch { setSidebarSearchResults({ users: [], posts: [], reels: [] }); }
-    finally { setSidebarSearchLoading(false); }
+    finally { setSidebarSearchLoading(false); setSidebarLoadingMore(false); }
+  };
+
+  const handleSidebarLoadMore = async () => {
+    const newPostLimit = sidebarPostLimit + 10;
+    const newReelLimit = sidebarReelLimit + 10;
+    const newUserLimit = sidebarUserLimit + 10;
+    setSidebarPostLimit(newPostLimit);
+    setSidebarReelLimit(newReelLimit);
+    setSidebarUserLimit(newUserLimit);
+    await runSidebarSearch(sidebarSearchQuery, {
+      uLimit: newUserLimit, pLimit: newPostLimit, rLimit: newReelLimit, showLoader: false,
+    });
   };
 
   const handleSidebarSearchInput = (e) => {
     const q = e.target.value;
     setSidebarSearchQuery(q);
+    setSearchActiveTab('all');
+    setSidebarPostLimit(10); setSidebarReelLimit(10); setSidebarUserLimit(10);
     clearTimeout(sidebarSearchDebounce.current);
     if (!q.trim()) { setSidebarSearchResults({ users: [], posts: [], reels: [] }); return; }
     sidebarSearchDebounce.current = setTimeout(() => runSidebarSearch(q), 350);
@@ -129,6 +310,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const openSidebarSearch = () => {
     setShowSearch(true);
     setShowNotifications(false);
+    loadHistory();
     setTimeout(() => sidebarSearchInputRef.current?.focus(), 80);
   };
 
@@ -136,7 +318,30 @@ const Sidebar = ({ onOpenCreateModal }) => {
     setShowSearch(false);
     setSidebarSearchQuery('');
     setSidebarSearchResults({ users: [], posts: [], reels: [] });
+    setSearchActiveTab('all');
+    setSidebarPostLimit(10); setSidebarReelLimit(10); setSidebarUserLimit(10);
   };
+
+  // ── Derived tab data ─────────────────────────────────────────────────────────
+  const hasResults = sidebarSearchResults.users.length + sidebarSearchResults.posts.length + sidebarSearchResults.reels.length > 0;
+  const results = sidebarSearchResults;
+
+  const filteredUsers = searchActiveTab === 'posts' || searchActiveTab === 'reels' ? [] : results.users;
+  const filteredPosts = searchActiveTab === 'people' || searchActiveTab === 'reels' ? [] : results.posts;
+  const filteredReels = searchActiveTab === 'people' || searchActiveTab === 'posts' ? [] : results.reels;
+
+  const hasMoreSidebar = sidebarSearchQuery.trim() && hasResults && (
+    results.users.length >= sidebarUserLimit ||
+    results.posts.length >= sidebarPostLimit ||
+    results.reels.length >= sidebarReelLimit
+  );
+
+  const searchTabs = [
+    { key: 'all',    label: 'All' },
+    { key: 'people', label: `People${sidebarSearchQuery ? ` (${results.users.length})` : ''}` },
+    { key: 'posts',  label: `Posts${sidebarSearchQuery ? ` (${results.posts.length})` : ''}` },
+    { key: 'reels',  label: `Reels${sidebarSearchQuery ? ` (${results.reels.length})` : ''}` },
+  ];
 
   const navItems = isVendor ? [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/vendor/dashboard' },
@@ -227,47 +432,34 @@ const Sidebar = ({ onOpenCreateModal }) => {
                     </span>
                   </button>
 
-                  {/* Dropdown Menu */}
                   {isCreateDropdownOpen && (
                     <div className={`absolute left-0 top-full mt-2 w-48 bg-white dark:bg-[#262626] rounded-lg shadow-lg border border-gray-100 dark:border-gray-800 py-2 z-[60] overflow-hidden ${isHovered ? 'translate-x-0' : 'translate-x-14'}`}>
                       {!isVendor && (
                         <>
                           <button
-                            onClick={() => {
-                              onOpenCreateModal('post');
-                              setIsCreateDropdownOpen(false);
-                            }}
+                            onClick={() => { onOpenCreateModal('post'); setIsCreateDropdownOpen(false); }}
                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                           >
-                            <Image size={18} />
-                            Create Post
+                            <Image size={18} /> Create Post
                           </button>
                           <button
-                            onClick={() => {
-                              onOpenCreateModal('reel');
-                              setIsCreateDropdownOpen(false);
-                            }}
+                            onClick={() => { onOpenCreateModal('reel'); setIsCreateDropdownOpen(false); }}
                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                           >
-                            <Video size={18} />
-                            Upload Reel
+                            <Video size={18} /> Upload Reel
                           </button>
                         </>
                       )}
                       {isVendor && (
                         <button
                           onClick={() => {
-                            if (!userObject?.is_active) {
-                              setShowVendorNotValidated(true);
-                            } else {
-                              onOpenCreateModal('ad');
-                            }
+                            if (!userObject?.is_active) { setShowVendorNotValidated(true); }
+                            else { onOpenCreateModal('ad'); }
                             setIsCreateDropdownOpen(false);
                           }}
                           className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                         >
-                          <Megaphone size={18} />
-                          Upload Ad
+                          <Megaphone size={18} /> Upload Ad
                         </button>
                       )}
                     </div>
@@ -289,34 +481,28 @@ const Sidebar = ({ onOpenCreateModal }) => {
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                 </div>
-                <span
-                  className={`text-base font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${!isActive && 'group-hover:text-black dark:group-hover:text-white'} ${isHovered ? 'opacity-100 w-auto' : 'opacity-0 w-0'} ${isActive ? 'text-white font-bold' : ''}`}
-                >
+                <span className={`text-base font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${!isActive && 'group-hover:text-black dark:group-hover:text-white'} ${isHovered ? 'opacity-100 w-auto' : 'opacity-0 w-0'} ${isActive ? 'text-white font-bold' : ''}`}>
                   {item.label}
                 </span>
               </Link>
             );
           })}
+
+          {/* Notifications */}
           <div className="relative" ref={notificationsRef}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className={`group w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 ${showNotifications ? 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white shadow-md' : 'hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-900 dark:text-white'}`}
             >
               <div className="min-w-[24px] relative">
-                <Bell
-                  size={24}
-                  className={`${showNotifications ? 'text-white' : 'text-gray-900 dark:text-white'} transition-transform duration-150 group-hover:scale-110 ${!showNotifications && 'group-hover:text-black dark:group-hover:text-white'}`}
-                  strokeWidth={showNotifications ? 2.5 : 2}
-                />
+                <Bell size={24} className={`${showNotifications ? 'text-white' : 'text-gray-900 dark:text-white'} transition-transform duration-150 group-hover:scale-110 ${!showNotifications && 'group-hover:text-black dark:group-hover:text-white'}`} strokeWidth={showNotifications ? 2.5 : 2} />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center leading-none border border-white dark:border-black">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
               </div>
-              <span
-                className={`text-base font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${!showNotifications && 'group-hover:text-black dark:group-hover:text-white'} ${isHovered ? 'opacity-100 w-auto' : 'opacity-0 w-0'} ${showNotifications ? 'text-white font-bold' : ''}`}
-              >
+              <span className={`text-base font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${!showNotifications && 'group-hover:text-black dark:group-hover:text-white'} ${isHovered ? 'opacity-100 w-auto' : 'opacity-0 w-0'} ${showNotifications ? 'text-white font-bold' : ''}`}>
                 Notifications
               </span>
             </button>
@@ -326,9 +512,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
                   <div className="px-4 py-3 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-sm dark:text-white">Notifications</h3>
-                      {unreadCount > 0 && (
-                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-blue-600 text-white leading-none">{unreadCount}</span>
-                      )}
+                      {unreadCount > 0 && <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-blue-600 text-white leading-none">{unreadCount}</span>}
                     </div>
                     <div className="flex items-center gap-2">
                       {unreadCount > 0 && (
@@ -342,13 +526,11 @@ const Sidebar = ({ onOpenCreateModal }) => {
                   <div className="max-h-80 overflow-y-auto">
                     {notifLoading && notifications.length === 0 ? (
                       <div className="flex items-center justify-center py-8 text-gray-400 gap-2 text-xs">
-                        <span className="w-4 h-4 border-2 border-gray-300 border-t-pink-500 rounded-full animate-spin" />
-                        Loading…
+                        <span className="w-4 h-4 border-2 border-gray-300 border-t-pink-500 rounded-full animate-spin" /> Loading…
                       </div>
                     ) : notifications.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
-                        <Bell size={20} className="opacity-30" />
-                        <span className="text-xs">No notifications yet</span>
+                        <Bell size={20} className="opacity-30" /><span className="text-xs">No notifications yet</span>
                       </div>
                     ) : (
                       notifications.map(n => (
@@ -357,22 +539,14 @@ const Sidebar = ({ onOpenCreateModal }) => {
                           className={`group px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex gap-3 items-start cursor-pointer transition-colors relative ${!n.isRead ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
                         >
                           {!n.isRead && <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
-                          {/* Avatar + icon */}
                           <div className="relative flex-shrink-0">
                             {n.sender?.avatar_url
                               ? <img src={n.sender.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                              : <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-[10px] font-bold">
-                                  {(n.sender?.full_name || n.sender?.username || "U")[0]?.toUpperCase()}
-                                </div>
-                            }
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full ${notifTypeBg(n.type)} flex items-center justify-center ring-1 ring-white dark:ring-[#262626]`}>
-                              {notifTypeIcon(n.type)}
-                            </div>
+                              : <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-[10px] font-bold">{(n.sender?.full_name || n.sender?.username || "U")[0]?.toUpperCase()}</div>}
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full ${notifTypeBg(n.type)} flex items-center justify-center ring-1 ring-white dark:ring-[#262626]`}>{notifTypeIcon(n.type)}</div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-xs leading-snug ${!n.isRead ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>
-                              {n.message}
-                            </p>
+                            <p className={`text-xs leading-snug ${!n.isRead ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>{n.message}</p>
                             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{timeAgo(n.createdAt)}</p>
                           </div>
                           <button onClick={e => { e.stopPropagation(); deleteNotif(n._id); }}
@@ -394,23 +568,17 @@ const Sidebar = ({ onOpenCreateModal }) => {
             )}
           </div>
 
-          {/* Extra items commonly found in sidebar */}
+          {/* More dropdown */}
           <div className={`mt-auto pb-4 relative`} ref={moreDropdownRef}>
             {isMoreDropdownOpen && (
               <div className={`absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-2 z-[60] overflow-hidden ${isHovered ? 'translate-x-0' : 'translate-x-14'}`}>
                 {isVendor && (
                   <>
                     <button
-                      onClick={() => {
-                        setIsMoreDropdownOpen(false);
-                        dispatch(logoutUser());
-                        navigate('/login');
-                      }}
+                      onClick={() => { setIsMoreDropdownOpen(false); dispatch(logoutUser()); navigate('/login'); }}
                       className="w-full text-left px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-sm font-medium text-red-500 dark:text-red-400 transition-colors"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-                      </svg>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                       Log Out
                     </button>
                     <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
@@ -420,20 +588,12 @@ const Sidebar = ({ onOpenCreateModal }) => {
                   onClick={() => dispatch(toggleTheme())}
                   className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    {mode === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-                    Switch Appearance
-                  </div>
+                  <div className="flex items-center gap-3">{mode === 'dark' ? <Moon size={18} /> : <Sun size={18} />} Switch Appearance</div>
                   {mode === 'dark' && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
                 </button>
                 {!isVendor && (
-                  <Link
-                    to="/settings"
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
-                    onClick={() => setIsMoreDropdownOpen(false)}
-                  >
-                    <Target size={18} />
-                    Settings
+                  <Link to="/settings" className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200" onClick={() => setIsMoreDropdownOpen(false)}>
+                    <Target size={18} /> Settings
                   </Link>
                 )}
               </div>
@@ -442,41 +602,28 @@ const Sidebar = ({ onOpenCreateModal }) => {
               onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
               className="w-full group flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
             >
-              <div className="min-w-[24px]">
-                <Menu size={24} className="text-gray-900 dark:text-white transition-transform duration-150 group-hover:scale-110 group-hover:text-black dark:group-hover:text-white" />
-              </div>
-              <span
-                className={`text-base font-medium whitespace-nowrap overflow-hidden transition-all duration-300 group-hover:text-black dark:group-hover:text-white ${isHovered ? 'opacity-100 w-auto' : 'opacity-0 w-0'} dark:text-white`}
-              >
-                More
-              </span>
+              <div className="min-w-[24px]"><Menu size={24} className="text-gray-900 dark:text-white transition-transform duration-150 group-hover:scale-110 group-hover:text-black dark:group-hover:text-white" /></div>
+              <span className={`text-base font-medium whitespace-nowrap overflow-hidden transition-all duration-300 group-hover:text-black dark:group-hover:text-white ${isHovered ? 'opacity-100 w-auto' : 'opacity-0 w-0'} dark:text-white`}>More</span>
             </button>
           </div>
         </div>
       </div>
+
       {/* ── Instagram-style Search Panel (desktop only, member only) ── */}
       {showSearch && !isVendor && (
         <>
-          {/* Backdrop — clicking closes */}
-          <div
-            className="hidden md:block fixed inset-0 z-[45]"
-            onClick={closeSidebarSearch}
-          />
-          {/* Panel slides in from the left, right beside the sidebar */}
+          <div className="hidden md:block fixed inset-0 z-[45]" onClick={closeSidebarSearch} />
           <div
             ref={sidebarSearchRef}
-            className="hidden md:flex flex-col fixed top-0 left-20 h-full w-[380px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl"
+            className="hidden md:flex flex-col fixed top-0 left-20 h-full w-[400px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl"
             style={{ animation: 'slideInSearch 0.22s cubic-bezier(0.4,0,0.2,1)' }}
           >
             {/* Header */}
-            <div className="px-6 pt-8 pb-4">
-              <div className="flex items-center justify-between mb-6">
+            <div className="px-6 pt-8 pb-4 flex-shrink-0">
+              <div className="flex items-center justify-between mb-5">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Search</h2>
-                <button
-                  onClick={closeSidebarSearch}
-                  className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <button onClick={closeSidebarSearch} className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400">
+                  <X size={18} />
                 </button>
               </div>
               {/* Search input */}
@@ -496,41 +643,96 @@ const Sidebar = ({ onOpenCreateModal }) => {
                   </svg>
                 ) : sidebarSearchQuery ? (
                   <button
-                    onClick={() => { setSidebarSearchQuery(''); setSidebarSearchResults({ users: [], posts: [], reels: [] }); sidebarSearchInputRef.current?.focus(); }}
+                    onClick={() => { setSidebarSearchQuery(''); setSidebarSearchResults({ users: [], posts: [], reels: [] }); setSearchActiveTab('all'); sidebarSearchInputRef.current?.focus(); }}
                     className="w-5 h-5 rounded-full bg-gray-400 dark:bg-gray-600 flex items-center justify-center shrink-0 hover:bg-gray-500 transition-colors"
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <X size={10} color="white" strokeWidth={3} />
                   </button>
                 ) : null}
               </div>
+
+              {/* Filter Tabs — show when results exist */}
+              {sidebarSearchQuery.trim() && hasResults && (
+                <div className="flex gap-1.5 mt-3 overflow-x-auto scrollbar-none">
+                  {searchTabs.map(tab => (
+                    <button key={tab.key} onClick={() => setSearchActiveTab(tab.key)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                        searchActiveTab === tab.key
+                          ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}>
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Results / Recent */}
             <div className="flex-1 overflow-y-auto">
-              {/* Empty state */}
+
+              {/* ── Recent History (when no query) ── */}
               {!sidebarSearchQuery.trim() && (
-                <div className="px-6 pt-2">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Recent</p>
-                  <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400 dark:text-gray-600">
-                    <Search size={28} className="opacity-30" />
-                    <p className="text-sm">No recent searches.</p>
-                  </div>
+                <div>
+                  {historyLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <svg className="animate-spin w-5 h-5 text-gray-300 dark:text-gray-700" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-20"/>
+                        <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                  ) : searchHistory.length > 0 ? (
+                    <>
+                      <div className="flex items-center justify-between px-6 pt-4 pb-2">
+                        <span className="text-sm font-bold text-gray-900 dark:text-white">Recent</span>
+                        <button onClick={clearAllHistory} className="text-xs font-semibold text-[#fa3f5e] hover:opacity-80 transition-opacity">Clear all</button>
+                      </div>
+                      {searchHistory.map((item) => {
+                        const hId = item._id || item.id;
+                        const label = typeof item === 'string' ? item : (item.query || item.keyword || item.text || '');
+                        if (!label) return null;
+                        return (
+                          <div key={hId || label} onClick={() => handleHistoryClick(item)}
+                            className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                            <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
+                              <Clock size={15} className="text-gray-400" />
+                            </div>
+                            <span className="flex-1 text-sm text-gray-900 dark:text-white">{label}</span>
+                            {hId && (
+                              <button onClick={(e) => deleteHistoryItem(hId, e)}
+                                className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                <X size={13} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <div className="px-6 pt-4">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Recent</p>
+                      <div className="flex flex-col items-center justify-center py-14 gap-2 text-gray-400 dark:text-gray-600">
+                        <Search size={28} className="opacity-30" />
+                        <p className="text-sm">No recent searches.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* No results */}
-              {sidebarSearchQuery.trim() && !sidebarSearchLoading && sidebarSearchResults.users.length === 0 && sidebarSearchResults.posts.length === 0 && sidebarSearchResults.reels.length === 0 && (
+              {sidebarSearchQuery.trim() && !sidebarSearchLoading && !hasResults && (
                 <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
                   <Search size={24} className="opacity-30" />
                   <p className="text-sm">No results for "{sidebarSearchQuery}"</p>
                 </div>
               )}
 
-              {/* Users */}
-              {sidebarSearchResults.users.length > 0 && (
-                <div className="pt-2">
-                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">People</p>
-                  {sidebarSearchResults.users.map(u => (
+              {/* ── People ── */}
+              {filteredUsers.length > 0 && (
+                <div className="pt-1">
+                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">People · {results.users.length}</p>
+                  {filteredUsers.map(u => (
                     <button
                       key={u._id || u.id}
                       onClick={() => { navigate(`/profile/${u._id || u.id}`); closeSidebarSearch(); }}
@@ -544,73 +746,59 @@ const Sidebar = ({ onOpenCreateModal }) => {
                           }
                         </div>
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.name || u.username}</p>
                         {u.username && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{u.username}</p>}
+                        {u.followers_count !== undefined && (
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500">{u.followers_count} followers</p>
+                        )}
                       </div>
+                      {u.role && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${u.role === 'vendor' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
+                          {u.role === 'vendor' ? 'Vendor' : 'Member'}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
               )}
 
-              {/* Posts — open PostDetailModal */}
-              {sidebarSearchResults.posts.length > 0 && (
-                <div className="pt-2">
-                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Posts</p>
-                  {sidebarSearchResults.posts.map(post => {
-                    const postUser = getSearchResultUser(post);
-                    const postThumb = post.media?.[0]?.thumbnails?.[0]?.fileUrl || post.media?.[0]?.thumbnail_url || post.media?.[0]?.fileUrl || post.media?.[0]?.url || post.image_url;
-                    return (
-                      <button key={post._id}
-                        onClick={() => setSidebarSelectedPost(post)}
-                        className="w-full flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left">
-                        <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0">
-                          {postThumb
-                            ? <img src={postThumb} alt="" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                              </div>
-                          }
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{post.caption || post.title || 'Post'}</p>
-                          {(postUser.username || postUser.full_name) && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{postUser.username || postUser.full_name}</p>}
-                        </div>
-                      </button>
-                    );
-                  })}
+              {/* ── Posts — 2-col grid ── */}
+              {filteredPosts.length > 0 && (
+                <div className="pt-1">
+                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Posts · {results.posts.length}</p>
+                  <div className="grid grid-cols-2 gap-1.5 px-3">
+                    {filteredPosts.map(post => (
+                      <SidebarPostCard key={post._id} post={post} onClick={setSidebarSelectedPost} />
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Reels — open PostDetailModal (type=reel) */}
-              {sidebarSearchResults.reels.length > 0 && (
-                <div className="pt-2 pb-4">
-                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Reels</p>
-                  {sidebarSearchResults.reels.map(reel => {
-                    const reelUser = getSearchResultUser(reel);
-                    const reelThumb = reel.media?.[0]?.thumbnails?.[0]?.fileUrl || reel.media?.[0]?.thumbnail_url || reel.thumbnail_url;
-                    return (
-                      <button key={reel._id}
-                        onClick={() => setSidebarSelectedPost(reel)}
-                        className="w-full flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left">
-                        <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0 relative">
-                          {reelThumb
-                            ? <img src={reelThumb} alt="" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-                              </div>
-                          }
-                          <div className="absolute bottom-1 right-1 bg-black/60 rounded-sm p-0.5">
-                            <svg width="7" height="7" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                          </div>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{reel.caption || reel.title || 'Reel'}</p>
-                          {(reelUser.username || reelUser.full_name) && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{reelUser.username || reelUser.full_name}</p>}
-                        </div>
-                      </button>
-                    );
-                  })}
+              {/* ── Reels — 2-col grid with hover-to-play ── */}
+              {filteredReels.length > 0 && (
+                <div className="pt-1">
+                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Reels · {results.reels.length}</p>
+                  <div className="grid grid-cols-2 gap-1.5 px-3">
+                    {filteredReels.map(reel => (
+                      <SidebarReelCard key={reel._id} reel={reel} onClick={(r) => navigate(`/reels?id=${r._id}`)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Load More ── */}
+              {hasMoreSidebar && (
+                <div className="px-4 py-4">
+                  <button
+                    onClick={handleSidebarLoadMore}
+                    disabled={sidebarLoadingMore}
+                    className="w-full py-2.5 rounded-2xl border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {sidebarLoadingMore
+                      ? <><Loader2 size={13} className="animate-spin" /> Loading more…</>
+                      : 'Load more results'}
+                  </button>
                 </div>
               )}
             </div>
@@ -619,29 +807,16 @@ const Sidebar = ({ onOpenCreateModal }) => {
         </>
       )}
 
-      {/* ── PostDetailModal for sidebar search results ── */}
-      <PostDetailModal
-        isOpen={!!sidebarSelectedPost}
-        post={sidebarSelectedPost}
-        onClose={() => setSidebarSelectedPost(null)}
-      />
+      {/* PostDetailModal for sidebar search results */}
+      <PostDetailModal isOpen={!!sidebarSelectedPost} post={sidebarSelectedPost} onClose={() => setSidebarSelectedPost(null)} />
 
       {showVendorNotValidated && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">
-              Vendor account inactive
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
-              Your vendor account is inactive. Please contact support or wait for activation before uploading ads.
-            </p>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Vendor account inactive</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">Your vendor account is inactive. Please contact support or wait for activation before uploading ads.</p>
             <div className="flex justify-center">
-              <button
-                onClick={() => setShowVendorNotValidated(false)}
-                className="px-4 py-2.5 rounded-lg bg-insta-pink text-white font-medium hover:bg-insta-purple transition-colors"
-              >
-                OK
-              </button>
+              <button onClick={() => setShowVendorNotValidated(false)} className="px-4 py-2.5 rounded-lg bg-insta-pink text-white font-medium hover:bg-insta-purple transition-colors">OK</button>
             </div>
           </div>
         </div>

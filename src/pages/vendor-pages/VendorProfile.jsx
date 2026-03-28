@@ -6,7 +6,8 @@ import {
   Building2, User, Handshake, ChevronDown, ChevronUp,
   Globe, Mail, Phone, MapPin, Edit3, Check, X,
   Loader2, AlertCircle, CheckCircle2, Instagram,
-  Facebook, Linkedin, Twitter, Plus, Trash2, Save
+  Facebook, Linkedin, Twitter, Plus, Trash2, Save,
+  Shield, Star, BadgeCheck
 } from "lucide-react";
 
 // ─── Reusable Field Components ───────────────────────────────────────────────
@@ -96,7 +97,7 @@ const SectionDivider = ({ children }) => (
   </div>
 );
 
-// ─── Collapsible Section (mobile accordion) ───────────────────────────────────
+// ─── Collapsible Section ──────────────────────────────────────────────────────
 const CollapsibleSection = ({ title, icon: Icon, iconColor = "text-pink-500", children, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -234,7 +235,6 @@ const CompanyInfo = () => {
 
   return (
     <div className="space-y-5">
-      {/* Banners */}
       {saved && (
         <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-xl text-sm font-semibold">
           <CheckCircle2 size={16} /> Profile updated successfully.
@@ -246,9 +246,9 @@ const CompanyInfo = () => {
         </div>
       )}
 
-      {/* ── Profile Hero Card ─────────────────────────────────────────────── */}
+      {/* ── Profile Hero Card ── */}
       <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-        {/* Cover banner — tall gradient with dot pattern */}
+        {/* Cover banner */}
         <div className="h-36 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 relative overflow-hidden">
           <div
             className="absolute inset-0 opacity-20"
@@ -256,23 +256,28 @@ const CompanyInfo = () => {
           />
         </div>
 
-        {/* Logo + actions row — logo overlaps the gradient */}
+        {/* Logo + actions row */}
         <div className="px-5 pb-5">
-          <div className="flex items-end justify-between" style={{ marginTop: "-44px" }}>
-            {/* Logo — click opens AvatarCropModal */}
+          {/* Logo overlaps banner — negative margin pulls it up */}
+          <div className="flex items-start justify-between" style={{ marginTop: "-40px" }}>
+            {/* Logo button */}
             <button
               type="button"
               onClick={() => setShowLogoCropModal(true)}
-              className={`w-[80px] h-[80px] rounded-2xl flex items-center justify-center overflow-hidden bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-xl flex-shrink-0 transition-all ${editing ? "ring-2 ring-pink-500/60 ring-offset-2 cursor-pointer" : "cursor-pointer hover:opacity-90"}`}
+              className={`w-[80px] h-[80px] rounded-2xl flex items-center justify-center overflow-hidden bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-xl flex-shrink-0 transition-all relative ${editing ? "ring-2 ring-pink-500/60 ring-offset-2 cursor-pointer" : "cursor-pointer hover:opacity-90"}`}
               title="Change Logo"
             >
               {logoPreview
                 ? <img src={logoPreview} alt="logo" className="w-full h-full object-cover" />
                 : <span className="text-3xl">🏢</span>}
+              {/* Edit overlay on hover */}
+              <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                <Edit3 size={18} className="text-white" />
+              </div>
             </button>
 
-            {/* Edit / Save buttons */}
-            <div className="flex gap-2 pb-1">
+            {/* Edit / Save buttons — aligned to top right, with top padding matching banner height */}
+            <div className="flex gap-2 pt-10">
               {!editing ? (
                 <button
                   onClick={() => setEditing(true)}
@@ -301,7 +306,7 @@ const CompanyInfo = () => {
             </div>
           </div>
 
-          {/* Company info */}
+          {/* Company info below logo */}
           <div className="mt-3">
             <div className="text-lg font-black text-gray-900 dark:text-white">{form.companyName || "—"}</div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -320,7 +325,7 @@ const CompanyInfo = () => {
       {/* Completion bar */}
       <CompletionBar pct={pct} />
 
-      {/* ── Logo Crop Modal ───────────────────────────────────────────────── */}
+      {/* Logo Crop Modal */}
       <AvatarCropModal
         isOpen={showLogoCropModal}
         onClose={() => setShowLogoCropModal(false)}
@@ -329,7 +334,7 @@ const CompanyInfo = () => {
         userName={form.companyName || "Logo"}
       />
 
-      {/* ── Desktop: single grid form ───────────────────────────────────────── */}
+      {/* Desktop: single grid form */}
       <div className="hidden md:block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
 
@@ -416,7 +421,7 @@ const CompanyInfo = () => {
         </div>
       </div>
 
-      {/* ── Mobile: collapsible accordions ─────────────────────────────────── */}
+      {/* Mobile: collapsible accordions */}
       <div className="md:hidden space-y-3">
         <CollapsibleSection title="Registration Details" icon={Building2} defaultOpen>
           <div className="grid grid-cols-2 gap-3">
@@ -587,7 +592,6 @@ const PrimaryContact = () => {
       {loading && <div className="text-center py-10 text-gray-400 text-sm">Loading…</div>}
       {error && <div className="text-center py-10 text-red-500 text-sm">{error}</div>}
 
-      {/* Add sheet */}
       {addOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && setAddOpen(false)}>
           <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
@@ -697,37 +701,67 @@ const SalesOfficer = () => {
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Associated Sales Officer</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Your dedicated account manager from our sales team.</p>
         </div>
-        <span className="text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 uppercase tracking-widest">Read Only</span>
+        <span className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+          <Shield size={10} /> Read Only
+        </span>
       </div>
 
-      {error && <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-semibold"><AlertCircle size={16}/>{error}</div>}
+      {error && (
+        <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-semibold">
+          <AlertCircle size={16}/>{error}
+        </div>
+      )}
 
       {!error && !officer && (
-        <div className="flex flex-col items-center py-16 gap-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
-          <span className="text-4xl">🤝</span>
-          <p className="text-base font-semibold text-gray-700 dark:text-gray-300">No Sales Officer Assigned</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 text-center max-w-xs">A dedicated sales account manager will be assigned to your account soon.</p>
+        <div className="flex flex-col items-center py-20 gap-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-100 to-pink-100 dark:from-orange-900/30 dark:to-pink-900/30 flex items-center justify-center">
+            <Handshake size={36} className="text-orange-400" />
+          </div>
+          <div className="text-center">
+            <p className="text-base font-bold text-gray-700 dark:text-gray-300">No Sales Officer Assigned</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 max-w-xs mx-auto">A dedicated sales account manager will be assigned to your account soon.</p>
+          </div>
+          {/* Informational badges */}
+          <div className="flex flex-wrap justify-center gap-2 mt-2">
+            {["Personalized support", "Ad campaign guidance", "Priority access"].map(tag => (
+              <span key={tag} className="flex items-center gap-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-full">
+                <Star size={9} /> {tag}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
       {officer && (
         <div className="space-y-4">
+          {/* Officer Hero Card */}
           <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-            <div className="h-24 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 relative overflow-hidden">
+            {/* Gradient banner */}
+            <div className="h-28 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 relative overflow-hidden">
               <div className="absolute inset-0 opacity-20" style={{backgroundImage:'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize:'16px 16px'}} />
+              {/* Badge in top-right */}
+              <div className="absolute top-3 right-3 flex items-center gap-1 bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/30">
+                <BadgeCheck size={11} /> Sales Team
+              </div>
             </div>
-            <div className="px-5 pb-5">
-              <div className="flex items-end justify-between" style={{ marginTop: "-32px" }}>
-                <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-xl flex-shrink-0 flex items-center justify-center">
+
+            <div className="px-5 pb-6">
+              {/* Avatar + action row */}
+              <div className="flex items-end justify-between" style={{ marginTop: "-36px" }}>
+                {/* Avatar */}
+                <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-xl flex-shrink-0 flex items-center justify-center">
                   {officer.avatar_url
                     ? <img src={officer.avatar_url} alt="" className="w-full h-full object-cover" />
-                    : <span className="text-white font-black text-xl w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-400 to-pink-600">{initials(officer.full_name || officer.username)}</span>}
+                    : <span className="text-white font-black text-xl w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-400 to-pink-600">{initials(officer.full_name || officer.username)}</span>
+                  }
                 </div>
+                {/* Email button */}
                 {officer.email && (
                   <a href={`mailto:${officer.email}`}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-orange-500 to-pink-600 text-white hover:opacity-90 shadow-md shadow-pink-500/20 transition-all mb-1">
@@ -735,33 +769,68 @@ const SalesOfficer = () => {
                   </a>
                 )}
               </div>
+
+              {/* Name + role */}
               <div className="mt-3">
-                <div className="text-base font-black text-gray-900 dark:text-white">{officer.full_name || officer.username || "Sales Officer"}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Sales Account Manager{officer.username && ` · @${officer.username}`}</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-base font-black text-gray-900 dark:text-white">{officer.full_name || officer.username || "Sales Officer"}</div>
+                  <BadgeCheck size={16} className="text-pink-500 flex-shrink-0" />
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  Sales Account Manager{officer.username && ` · @${officer.username}`}
+                </div>
+
+                {/* Contact chips */}
                 <div className="flex flex-wrap gap-2 mt-3">
-                  {officer.email && <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700"><Mail size={11}/>{officer.email}</span>}
-                  {officer.phone && <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700"><Phone size={11}/>{officer.phone}</span>}
-                  {officer.location && <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700"><MapPin size={11}/>{officer.location}</span>}
+                  {officer.email && (
+                    <a href={`mailto:${officer.email}`} className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700 transition-colors">
+                      <Mail size={11} className="text-pink-500"/>{officer.email}
+                    </a>
+                  )}
+                  {officer.phone && (
+                    <a href={`tel:${officer.phone}`} className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700 transition-colors">
+                      <Phone size={11} className="text-green-500"/>{officer.phone}
+                    </a>
+                  )}
+                  {officer.location && (
+                    <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
+                      <MapPin size={11} className="text-blue-500"/>{officer.location}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Details grid card */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
             <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest mb-4">Officer Details</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 divide-y divide-gray-50 dark:divide-gray-800 sm:divide-y-0 sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-800">
               {[
-                ["Name", officer.full_name || officer.username || "—"],
+                ["Name",     officer.full_name || officer.username || "—"],
                 ["Username", officer.username ? `@${officer.username}` : "—"],
-                ["Email", officer.email || "—"],
-                ["Phone", officer.phone || "—"],
+                ["Email",    officer.email || "—"],
+                ["Phone",    officer.phone || "—"],
                 ["Location", officer.location || "—"],
               ].map(([label, value]) => (
-                <div key={label} className="py-3 border-b border-gray-50 dark:border-gray-800 last:border-0">
+                <div key={label} className="py-3 sm:px-4 first:sm:pl-0 last:sm:pr-0">
                   <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</div>
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">{value}</div>
+                  <div className="text-sm font-semibold text-gray-900 dark:text-white break-all">{value}</div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Info banner */}
+          <div className="flex items-start gap-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/30 rounded-2xl px-4 py-3.5">
+            <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Shield size={14} className="text-orange-500" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-orange-700 dark:text-orange-400">Your dedicated account manager</p>
+              <p className="text-xs text-orange-600/80 dark:text-orange-400/70 mt-0.5">
+                Reach out to your sales officer for campaign strategy, ad approvals, and priority support.
+              </p>
             </div>
           </div>
         </div>
@@ -785,7 +854,7 @@ export default function VendorProfile() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
 
-      {/* ── Desktop layout ── */}
+      {/* Desktop layout */}
       <div className="hidden md:block max-w-7xl mx-auto p-6 md:p-8">
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
@@ -810,9 +879,8 @@ export default function VendorProfile() {
         <div>{tabContent[tab]}</div>
       </div>
 
-      {/* ── Mobile layout ── */}
+      {/* Mobile layout */}
       <div className="md:hidden flex flex-col min-h-screen">
-        {/* Sticky mobile header */}
         <div className="sticky top-[52px] z-20 bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800 px-4 pt-3 pb-0">
           <h1 className="text-xl font-extrabold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-red-500 to-pink-600">
             Vendor Profile

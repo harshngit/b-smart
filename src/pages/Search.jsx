@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Search as SearchIcon, X, ArrowLeft, Loader2, Clock } from 'lucide-react';
+import { Search as SearchIcon, X, ArrowLeft, Loader2, Clock, Heart, MessageCircle, Eye, Play } from 'lucide-react';
 import PostDetailModal from '../components/PostDetailModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
@@ -11,11 +11,23 @@ const authHeaders = () => {
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 };
 
-const getSearchItemUser = (item) => {
-  if (!item) return {};
-  if (item.user_id && typeof item.user_id === 'object') return item.user_id;
-  if (item.user && typeof item.user === 'object') return item.user;
-  return {};
+const getMediaUrl = (item) => {
+  // Prefer fileUrl from first media object
+  const fileUrl = item?.media?.[0]?.fileUrl;
+  if (fileUrl) {
+    // If already absolute, use as-is; else prefix with BASE_URL/uploads
+    if (fileUrl.startsWith('http')) return fileUrl;
+    return `${BASE_URL}/uploads/${fileUrl}`;
+  }
+  // Fallbacks
+  return (
+    item?.media?.[0]?.thumbnails?.[0]?.fileUrl ||
+    item?.media?.[0]?.thumbnail_url ||
+    item?.media?.[0]?.url ||
+    item?.image_url ||
+    item?.thumbnail_url ||
+    null
+  );
 };
 
 const Avatar = ({ src, name, size = 44 }) => (
@@ -26,6 +38,183 @@ const Avatar = ({ src, name, size = 44 }) => (
     </div>
   </div>
 );
+
+// ── Post card (2-col grid) ────────────────────────────────────────────────────
+const PostCard = ({ post, onClick }) => {
+  const thumb = getMediaUrl(post);
+  const user = post.user_id || {};
+  const username = user.username || post.username || '';
+  const avatarUrl = user.avatar_url || post.avatar_url;
+
+  return (
+    <button onClick={() => onClick(post)}
+      className="group relative aspect-square overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 active:opacity-80 transition-opacity w-full">
+      {thumb
+        ? <img src={thumb} alt="" className="w-full h-full object-cover" />
+        : <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+      }
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+        {/* User */}
+        <div className="flex items-center gap-1.5">
+          {avatarUrl
+            ? <img src={avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover border border-white/50 shrink-0" />
+            : <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-orange-400 to-pink-500 shrink-0" />}
+          {username && <span className="text-white text-[10px] font-bold truncate">@{username}</span>}
+        </div>
+        {/* Stats */}
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-0.5 text-white text-[10px] font-semibold">
+            <Heart size={9} className="fill-white" /> {post.likes_count ?? 0}
+          </span>
+          <span className="flex items-center gap-0.5 text-white text-[10px] font-semibold">
+            <MessageCircle size={9} className="fill-white" /> {post.comments_count ?? 0}
+          </span>
+          {post.views_count !== undefined && (
+            <span className="flex items-center gap-0.5 text-white text-[10px] font-semibold">
+              <Eye size={9} /> {post.views_count}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+};
+
+// ── Reel card (2-col grid) with hover-to-play ────────────────────────────────
+const ReelCard = ({ reel, onClick }) => {
+  const videoRef = useRef(null);
+  const hoverTimer = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const thumb = getMediaUrl(reel);
+  const user = reel.user_id || {};
+  const username = user.username || reel.username || '';
+  const avatarUrl = user.avatar_url || reel.avatar_url;
+
+  // Determine if the media is a video
+  const fileName = reel?.media?.[0]?.fileName || reel?.media?.[0]?.fileUrl || '';
+  const isVideo = /\.(mp4|mov|webm|ogg)$/i.test(fileName) || reel?.media?.[0]?.type === 'video';
+
+  const videoSrc = isVideo
+    ? (fileName.startsWith('http') ? fileName : `${BASE_URL}/uploads/${reel?.media?.[0]?.fileName || ''}`)
+    : null;
+
+  const handleMouseEnter = () => {
+    if (!videoRef.current || !videoSrc) return;
+    hoverTimer.current = setTimeout(() => {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
+      // Stop after 5 seconds
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.currentTime = 0;
+        }
+        setIsPlaying(false);
+      }, 5000);
+    }, 200);
+  };
+
+  const handleMouseLeave = () => {
+    clearTimeout(hoverTimer.current);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+  };
+
+  return (
+    <button
+      onClick={() => onClick(reel)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="group relative aspect-square overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 active:opacity-80 transition-opacity w-full"
+    >
+      {/* Thumbnail image (always shown when not playing) */}
+      {thumb && !isPlaying && (
+        <img src={thumb} alt="" className="w-full h-full object-cover" />
+      )}
+
+      {/* Video element */}
+      {videoSrc && (
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          muted
+          playsInline
+          preload="none"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}
+        />
+      )}
+
+      {/* Fallback when no media */}
+      {!thumb && !videoSrc && (
+        <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        </div>
+      )}
+
+      {/* Reel badge (top-right) */}
+      {!isPlaying && (
+        <div className="absolute top-1.5 right-1.5 bg-black/60 rounded-md px-1.5 py-0.5 flex items-center gap-0.5">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+      )}
+
+      {/* Playing indicator */}
+      {isPlaying && (
+        <div className="absolute top-1.5 right-1.5 bg-pink-600 rounded-md px-1.5 py-0.5 flex items-center gap-0.5">
+          <span className="text-white text-[8px] font-bold">LIVE</span>
+        </div>
+      )}
+
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+        <div className="flex items-center gap-1.5">
+          {avatarUrl
+            ? <img src={avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover border border-white/50 shrink-0" />
+            : <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-orange-400 to-pink-500 shrink-0" />}
+          {username && <span className="text-white text-[10px] font-bold truncate">@{username}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-0.5 text-white text-[10px] font-semibold">
+            <Heart size={9} className="fill-white" /> {reel.likes_count ?? 0}
+          </span>
+          <span className="flex items-center gap-0.5 text-white text-[10px] font-semibold">
+            <Eye size={9} /> {reel.views_count ?? 0}
+          </span>
+        </div>
+      </div>
+
+      {/* Center play icon on hover (before playing starts) */}
+      {videoSrc && !isPlaying && (
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+            <Play size={16} fill="white" className="text-white ml-0.5" />
+          </div>
+        </div>
+      )}
+    </button>
+  );
+};
+
+// ── Load More Button ──────────────────────────────────────────────────────────
+const LoadMoreBtn = ({ loading, onClick, hasMore }) => {
+  if (!hasMore) return null;
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="w-full py-3 rounded-2xl border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 mt-2"
+    >
+      {loading ? <><Loader2 size={14} className="animate-spin" /> Loading more…</> : 'Load more'}
+    </button>
+  );
+};
 
 export default function SearchPage() {
   const navigate = useNavigate();
@@ -42,7 +231,13 @@ export default function SearchPage() {
   const [selectedPost, setSelectedPost] = useState(null);
   const [activeTab, setActiveTab]   = useState('all');
 
-  // Load history from API
+  // ── Pagination state ─────────────────────────────────────────────────────────
+  const [userLimit, setUserLimit]     = useState(10);
+  const [postLimit, setPostLimit]     = useState(10);
+  const [reelLimit, setReelLimit]     = useState(10);
+  const [loadingMore, setLoadingMore] = useState({ users: false, posts: false, reels: false });
+  const [totals, setTotals]           = useState({ users: 0, posts: 0, reels: 0 });
+
   const loadHistory = useCallback(async () => {
     if (!userId) return;
     setHistoryLoading(true);
@@ -52,7 +247,7 @@ export default function SearchPage() {
         const data = await res.json();
         setHistory(Array.isArray(data) ? data : (data.history || data.data || []));
       }
-    } catch { /* silent */ } finally { setHistoryLoading(false); }
+    } catch { } finally { setHistoryLoading(false); }
   }, [userId]);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
@@ -62,7 +257,7 @@ export default function SearchPage() {
     try {
       await fetch(`${BASE_URL}/api/search/history/${userId}`, { method: 'DELETE', headers: authHeaders() });
       setHistory([]);
-    } catch { /* silent */ }
+    } catch { }
   };
 
   const deleteHistoryItem = async (historyId, e) => {
@@ -70,33 +265,53 @@ export default function SearchPage() {
     try {
       await fetch(`${BASE_URL}/api/search/history/${userId}/${historyId}`, { method: 'DELETE', headers: authHeaders() });
       setHistory(prev => prev.filter(h => (h._id || h.id) !== historyId));
-    } catch { /* silent */ }
+    } catch { }
   };
 
-  // Run search against /api/search
-  const runSearch = useCallback(async (q) => {
+  // ── Core search ──────────────────────────────────────────────────────────────
+  const runSearch = useCallback(async (q, { uLimit = 10, pLimit = 10, rLimit = 10, append = false } = {}) => {
     const trimmed = q.trim();
     if (!trimmed) { setResults(null); return; }
-    setLoading(true);
+    if (!append) setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/search?q=${encodeURIComponent(trimmed)}&limit=20`, { headers: authHeaders() });
+      const maxLimit = Math.max(uLimit, pLimit, rLimit);
+      const res = await fetch(`${BASE_URL}/api/search?q=${encodeURIComponent(trimmed)}&limit=${maxLimit}`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
         const r = data.results || {};
-        setResults({
-          users: r.users || [],
-          posts: (r.posts || []),
-          reels: (r.reels || []),
+        const users = r.users || [];
+        const posts = r.posts || [];
+        const reels = r.reels || [];
+
+        setTotals({
+          users: data.totals?.users ?? users.length,
+          posts: data.totals?.posts ?? posts.length,
+          reels: data.totals?.reels ?? reels.length,
         });
+
+        if (append) {
+          setResults(prev => ({
+            users: users.slice(0, uLimit),
+            posts: posts.slice(0, pLimit),
+            reels: reels.slice(0, rLimit),
+          }));
+        } else {
+          setResults({
+            users: users.slice(0, uLimit),
+            posts: posts.slice(0, pLimit),
+            reels: reels.slice(0, rLimit),
+          });
+        }
       } else { setResults({ users: [], posts: [], reels: [] }); }
     } catch { setResults({ users: [], posts: [], reels: [] }); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setLoadingMore({ users: false, posts: false, reels: false }); }
   }, []);
 
   const handleInput = (e) => {
     const q = e.target.value;
     setQuery(q);
     setActiveTab('all');
+    setUserLimit(10); setPostLimit(10); setReelLimit(10);
     clearTimeout(debounceRef.current);
     if (!q.trim()) { setResults(null); return; }
     debounceRef.current = setTimeout(() => runSearch(q), 350);
@@ -106,9 +321,34 @@ export default function SearchPage() {
     const q = typeof item === 'string' ? item : (item.query || item.keyword || item.text || '');
     if (!q) return;
     setQuery(q);
+    setActiveTab('all');
+    setUserLimit(10); setPostLimit(10); setReelLimit(10);
     runSearch(q);
   };
 
+  // ── Load More handlers ───────────────────────────────────────────────────────
+  const loadMoreUsers = async () => {
+    const newLimit = userLimit + 10;
+    setUserLimit(newLimit);
+    setLoadingMore(p => ({ ...p, users: true }));
+    await runSearch(query, { uLimit: newLimit, pLimit: postLimit, rLimit: reelLimit, append: true });
+  };
+
+  const loadMorePosts = async () => {
+    const newLimit = postLimit + 10;
+    setPostLimit(newLimit);
+    setLoadingMore(p => ({ ...p, posts: true }));
+    await runSearch(query, { uLimit: userLimit, pLimit: newLimit, rLimit: reelLimit, append: true });
+  };
+
+  const loadMoreReels = async () => {
+    const newLimit = reelLimit + 10;
+    setReelLimit(newLimit);
+    setLoadingMore(p => ({ ...p, reels: true }));
+    await runSearch(query, { uLimit: userLimit, pLimit: postLimit, rLimit: newLimit, append: true });
+  };
+
+  // ── Derived data ─────────────────────────────────────────────────────────────
   const filteredUsers = (!results || activeTab === 'posts' || activeTab === 'reels') ? [] : (results?.users || []);
   const filteredPosts = (!results || activeTab === 'people' || activeTab === 'reels') ? [] : (results?.posts || []);
   const filteredReels = (!results || activeTab === 'people' || activeTab === 'posts') ? [] : (results?.reels || []);
@@ -120,6 +360,10 @@ export default function SearchPage() {
     { key: 'posts',  label: `Posts${results ? ` (${results.posts.length})` : ''}` },
     { key: 'reels',  label: `Reels${results ? ` (${results.reels.length})` : ''}` },
   ];
+
+  const hasMoreUsers = results && results.users.length >= userLimit;
+  const hasMorePosts = results && results.posts.length >= postLimit;
+  const hasMoreReels = results && results.reels.length >= reelLimit;
 
   return (
     <>
@@ -153,7 +397,7 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {/* Filter tabs — only when results exist */}
+        {/* Filter tabs */}
         {results && hasResults && (
           <div className="flex gap-1.5 px-3 py-2 border-b border-gray-100 dark:border-gray-800 overflow-x-auto scrollbar-none">
             {tabs.map(tab => (
@@ -172,7 +416,7 @@ export default function SearchPage() {
         {/* Body */}
         <div className="flex-1 overflow-y-auto pb-[80px]">
 
-          {/* History — shown when no query */}
+          {/* History */}
           {!query.trim() && (
             <>
               {historyLoading ? (
@@ -183,9 +427,7 @@ export default function SearchPage() {
                 <>
                   <div className="flex items-center justify-between px-4 pt-5 pb-3">
                     <span className="text-base font-bold text-gray-900 dark:text-white">Recent</span>
-                    <button onClick={clearAllHistory} className="text-xs font-semibold text-[#fa3f5e] hover:opacity-80 transition-opacity">
-                      Clear all
-                    </button>
+                    <button onClick={clearAllHistory} className="text-xs font-semibold text-[#fa3f5e] hover:opacity-80 transition-opacity">Clear all</button>
                   </div>
                   {history.map((item) => {
                     const hId  = item._id || item.id;
@@ -241,16 +483,16 @@ export default function SearchPage() {
             </div>
           )}
 
-          {/* ── People ─────────────────────────────────────────────────────── */}
+          {/* ── People ── */}
           {!loading && filteredUsers.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 px-4 pt-5 pb-2">
+            <section className="px-4">
+              <div className="flex items-center gap-2 pt-5 pb-2">
                 <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">People</p>
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600">· {results.users.length}</span>
               </div>
               {filteredUsers.map(u => (
                 <button key={u._id} onClick={() => navigate(`/profile/${u.username || u._id}`)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 active:bg-gray-100 dark:active:bg-white/10 transition-colors text-left">
+                  className="w-full flex items-center gap-3 py-3 hover:bg-gray-50 dark:hover:bg-white/5 active:bg-gray-100 dark:active:bg-white/10 transition-colors text-left rounded-xl px-2">
                   <Avatar src={u.avatar_url} name={u.username || u.full_name} size={44} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</p>
@@ -270,89 +512,45 @@ export default function SearchPage() {
                   )}
                 </button>
               ))}
+              <LoadMoreBtn loading={loadingMore.users} hasMore={hasMoreUsers} onClick={loadMoreUsers} />
             </section>
           )}
 
-          {/* ── Posts ──────────────────────────────────────────────────────── */}
+          {/* ── Posts — 2-col grid ── */}
           {!loading && filteredPosts.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 px-4 pt-5 pb-2">
+            <section className="px-3">
+              <div className="flex items-center gap-2 pt-5 pb-3 px-1">
                 <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Posts</p>
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600">· {results.posts.length}</span>
               </div>
-              <div className="grid grid-cols-3 gap-[2px]">
-                {filteredPosts.map(post => {
-                  const postUser = getSearchItemUser(post);
-                  const thumb = post.media?.[0]?.thumbnails?.[0]?.fileUrl
-                    || post.media?.[0]?.thumbnail_url
-                    || post.media?.[0]?.fileUrl
-                    || post.media?.[0]?.url
-                    || post.image_url;
-                  return (
-                    <button key={post._id} onClick={() => setSelectedPost(post)}
-                      className="aspect-square bg-gray-100 dark:bg-gray-900 overflow-hidden relative group active:opacity-80 transition-opacity">
-                      {thumb
-                        ? <img src={thumb} alt="" className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-gray-300 dark:text-gray-700">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                          </div>
-                      }
-                      {/* User info overlay on hover */}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-start justify-end p-2">
-                        {postUser.avatar_url && <img src={postUser.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover mb-1 border border-white/50" />}
-                        <p className="text-white text-[9px] font-bold leading-none">@{postUser.username || postUser.full_name || 'user'}</p>
-                        {post.caption && <p className="text-white/80 text-[8px] leading-tight mt-0.5 line-clamp-2">{post.caption}</p>}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="grid grid-cols-2 gap-2">
+                {filteredPosts.map(post => (
+                  <PostCard key={post._id} post={post} onClick={setSelectedPost} />
+                ))}
               </div>
+              <LoadMoreBtn loading={loadingMore.posts} hasMore={hasMorePosts} onClick={loadMorePosts} />
             </section>
           )}
 
-          {/* ── Reels ──────────────────────────────────────────────────────── */}
+          {/* ── Reels — 2-col grid with hover-to-play ── */}
           {!loading && filteredReels.length > 0 && (
-            <section className="pb-4">
-              <div className="flex items-center gap-2 px-4 pt-5 pb-2">
+            <section className="px-3 pb-4">
+              <div className="flex items-center gap-2 pt-5 pb-3 px-1">
                 <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Reels</p>
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600">· {results.reels.length}</span>
               </div>
-              <div className="grid grid-cols-3 gap-[2px]">
-                {filteredReels.map(reel => {
-                  const reelUser = getSearchItemUser(reel);
-                  const thumb = reel.media?.[0]?.thumbnails?.[0]?.fileUrl
-                    || reel.media?.[0]?.thumbnail_url
-                    || reel.thumbnail_url;
-                  return (
-                    <button key={reel._id} onClick={() => navigate(`/reels?id=${reel._id}`)}
-                      className="aspect-square bg-gray-100 dark:bg-gray-900 overflow-hidden relative group active:opacity-80 transition-opacity">
-                      {thumb
-                        ? <img src={thumb} alt="" className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-gray-300 dark:text-gray-700">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-                          </div>
-                      }
-                      {/* Play badge */}
-                      <div className="absolute top-1.5 right-1.5 bg-black/60 rounded-md px-1 py-0.5 flex items-center">
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                      </div>
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-start justify-end p-2">
-                        {reelUser.avatar_url && <img src={reelUser.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover mb-1 border border-white/50" />}
-                        <p className="text-white text-[9px] font-bold leading-none">@{reelUser.username || reelUser.full_name || 'user'}</p>
-                        {reel.caption && <p className="text-white/80 text-[8px] leading-tight mt-0.5 line-clamp-2">{reel.caption}</p>}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="grid grid-cols-2 gap-2">
+                {filteredReels.map(reel => (
+                  <ReelCard key={reel._id} reel={reel} onClick={(r) => navigate(`/reels?id=${r._id}`)} />
+                ))}
               </div>
+              <LoadMoreBtn loading={loadingMore.reels} hasMore={hasMoreReels} onClick={loadMoreReels} />
             </section>
           )}
 
         </div>
       </div>
 
-      {/* Post Detail Modal */}
       <PostDetailModal
         isOpen={!!selectedPost}
         post={selectedPost}
