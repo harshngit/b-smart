@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal,
-  Edit, Trash2, ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight,
   Volume2, VolumeX, UserPlus, UserCheck, ShoppingBag, Loader2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -9,6 +9,8 @@ import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import ContentReportModal from './ContentReportModal';
+import EditContentModal from './EditContentModal';
+import OwnerContentOptionsModal from './OwnerContentOptionsModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 
@@ -446,8 +448,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   const userId     = user._id || user.id || (typeof post.user_id === 'string' ? post.user_id : null);
   const postId     = post._id || post.id;
   const peopleTags = post.people_tags || [];
-  const isOwner    = !isAd && userObject && userId &&
-    String(userObject._id || userObject.id) === String(userId);
+  const viewerId   = userObject?._id || userObject?.id || null;
+  const isOwner    = !!(viewerId && userId && String(viewerId) === String(userId));
 
   const mediaItems = post.media?.length > 0
     ? post.media
@@ -463,6 +465,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // ── Time formatting ────────────────────────────────────────────────────────
   const [nowTs, setNowTs] = useState(0);
@@ -571,11 +574,11 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
-      await api.delete(`/posts/${postId}`);
+      await api.delete(isAd ? `/ads/${postId}` : `/posts/${postId}`);
       await new Promise(r => setTimeout(r, 900));
       onDelete?.(postId);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete post');
+      alert(err.response?.data?.message || `Failed to delete ${isAd ? 'ad' : 'post'}`);
       setIsDeleting(false);
       setShowDeleteModal(false);
     }
@@ -629,36 +632,46 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
           )}
           <span className="text-[11px] text-gray-400 dark:text-gray-500">{formattedDate}</span>
 
-          <div className="relative">
-            <button
-              onClick={() => {
-                if (isOwner) {
-                  setShowOptions(s => !s);
-                  return;
-                }
-                setShowReportModal(true);
-              }}
-              className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-            >
-              <MoreHorizontal size={20} />
-            </button>
-            {showOptions && isOwner && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50">
-                <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors" onClick={() => setShowOptions(false)}>
-                  <Edit size={15} /> Edit Post
-                </button>
-                <button className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 transition-colors"
-                  onClick={() => { setShowOptions(false); setShowDeleteModal(true); }}>
-                  <Trash2 size={15} /> Delete Post
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={() => {
+              if (isOwner) {
+                setShowOptions(true);
+                return;
+              }
+              setShowReportModal(true);
+            }}
+            className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+          >
+            <MoreHorizontal size={20} />
+          </button>
 
         </div>
       </div>
 
       <DeleteModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleConfirmDelete} isDeleting={isDeleting} />
+      <OwnerContentOptionsModal
+        isOpen={showOptions && isOwner}
+        onClose={() => setShowOptions(false)}
+        item={post}
+        contentType={isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post')}
+        contentUrl={reportContentUrl}
+        onEdit={() => {
+          setShowOptions(false);
+          setShowEditModal(true);
+        }}
+        onDelete={() => {
+          setShowOptions(false);
+          setShowDeleteModal(true);
+        }}
+        onUpdated={() => window.location.reload()}
+      />
+      <EditContentModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        item={post}
+        contentType={isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post')}
+        onSaved={() => window.location.reload()}
+      />
       <ContentReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Heart, MessageCircle, Send, Bookmark, MoreHorizontal,
-  Smile, ChevronLeft, ChevronRight, Trash2, Edit,
+  Smile, ChevronLeft, ChevronRight, Trash2,
   Volume2, VolumeX, UserPlus, UserCheck, ShoppingBag, Loader2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,8 @@ import api from '../lib/api';
 import postCommentService from '../services/commentService';
 import adCommentService from '../services/commentServiceJS';
 import ContentReportModal from './ContentReportModal';
+import EditContentModal from './EditContentModal';
+import OwnerContentOptionsModal from './OwnerContentOptionsModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 
@@ -475,6 +477,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   // Post options
   const [showOptions, setShowOptions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
 
@@ -647,7 +650,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   const handleDeletePost = async () => {
     setIsDeleting(true);
     try {
-      await api.delete(`/posts/${postId}`);
+      await api.delete(isAd ? `/ads/${postId}` : `/posts/${postId}`);
       await new Promise(r => setTimeout(r, 1000));
       onClose();
       window.location.reload();
@@ -704,36 +707,45 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    if (isPostOwner) {
-                      setShowOptions(s => !s);
-                      return;
-                    }
-                    setShowReportModal(true);
-                  }}
-                  className="text-gray-900 dark:text-white hover:opacity-50 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <MoreHorizontal size={20} />
-                </button>
-                {showOptions && isPostOwner && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#262626] rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50">
-                    <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors"
-                      onClick={() => { setShowOptions(false); alert('Edit coming soon'); }}>
-                      <Edit size={16} /> Edit Post
-                    </button>
-                    <button className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 transition-colors"
-                      onClick={() => { setShowOptions(false); setShowDeleteModal(true); }}>
-                      <Trash2 size={16} /> Delete Post
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => {
+                  if (isPostOwner) {
+                    setShowOptions(true);
+                    return;
+                  }
+                  setShowReportModal(true);
+                }}
+                className="text-gray-900 dark:text-white hover:opacity-50 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <MoreHorizontal size={20} />
+              </button>
             </div>
           </div>
 
           <DeleteModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleDeletePost} isDeleting={isDeleting} />
+          <OwnerContentOptionsModal
+            isOpen={showOptions && isPostOwner}
+            onClose={() => setShowOptions(false)}
+            item={post}
+            contentType={isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post')}
+            contentUrl={reportContentUrl}
+            onEdit={() => {
+              setShowOptions(false);
+              setShowEditModal(true);
+            }}
+            onDelete={() => {
+              setShowOptions(false);
+              setShowDeleteModal(true);
+            }}
+            onUpdated={(updated) => setPost(updated)}
+          />
+          <EditContentModal
+            isOpen={showEditModal}
+            onClose={() => setShowEditModal(false)}
+            item={post}
+            contentType={isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post')}
+            onSaved={(updated) => setPost(updated)}
+          />
           <ContentReportModal
             isOpen={showReportModal}
             onClose={() => setShowReportModal(false)}

@@ -8,6 +8,8 @@ import { useSelector } from 'react-redux';
 import commentService from '../services/commentService';
 import api from '../lib/api';
 import ContentReportModal from '../components/ContentReportModal';
+import EditContentModal from '../components/EditContentModal';
+import OwnerContentOptionsModal from '../components/OwnerContentOptionsModal';
 
 const BASE_URL = 'https://api.bebsmart.in/api';
 
@@ -555,12 +557,15 @@ const Reels = () => {
   const [videoErrors, setVideoErrors] = useState({});
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reportReel, setReportReel] = useState(null);
+  const [editReel, setEditReel] = useState(null);
+  const [ownerOptionsReel, setOwnerOptionsReel] = useState(null);
   const isAnimatingRef = useRef(false);
   const videoRefs = useRef({});
   const actionPanelRef = useRef(null);
   const [actionPanelRight, setActionPanelRight] = useState(100);
 
   const { userObject } = useSelector((state) => state.auth);
+  const currentUserId = userObject?._id || userObject?.id || null;
   const [walletBalance, setWalletBalance] = useState(
     userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0
   );
@@ -711,6 +716,14 @@ const Reels = () => {
   };
 
   const pageHeightClass = "h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]";
+  const handleReelMore = (reel) => {
+    const reelOwnerId = reel?.user_id?._id || reel?.user_id?.id || reel?.user_id;
+    if (currentUserId && reelOwnerId && String(currentUserId) === String(reelOwnerId)) {
+      setOwnerOptionsReel(reel);
+      return;
+    }
+    setReportReel(reel);
+  };
 
   if (loading) return (
     <div className={`w-full ${pageHeightClass} flex justify-center items-center dark:bg-black bg-white overflow-hidden`}>
@@ -822,7 +835,7 @@ const Reels = () => {
                           onComment={() => { setCurrentIndex(index); setCommentsOpen(true); }}
                           onShare={handleShare}
                           onSave={handleSave}
-                          onMore={setReportReel}
+                          onMore={handleReelMore}
                         />
                       </div>
                     )}
@@ -868,7 +881,7 @@ const Reels = () => {
                 onComment={() => setCommentsOpen(v => !v)}
                 onShare={handleShare}
                 onSave={handleSave}
-                onMore={setReportReel}
+                onMore={handleReelMore}
               />
             </div>
           )}
@@ -922,6 +935,44 @@ const Reels = () => {
         contentId={reportReel?._id || reportReel?.post_id}
         ownerUsername={reportReel?.user_id?.username || reportReel?.user_id?.full_name || ''}
         contentUrl={reportReel ? `${window.location.origin}/reels/${reportReel._id || reportReel.post_id}` : ''}
+      />
+      <OwnerContentOptionsModal
+        isOpen={!!ownerOptionsReel}
+        onClose={() => setOwnerOptionsReel(null)}
+        item={ownerOptionsReel}
+        contentType="reel"
+        contentUrl={ownerOptionsReel ? `${window.location.origin}/reels/${ownerOptionsReel._id || ownerOptionsReel.post_id}` : ''}
+        onEdit={() => {
+          setEditReel(ownerOptionsReel);
+          setOwnerOptionsReel(null);
+        }}
+        onDelete={() => {
+          const reelToDelete = ownerOptionsReel;
+          setOwnerOptionsReel(null);
+          if (!reelToDelete) return;
+          if (!window.confirm('Delete this reel?')) return;
+          api.delete(`/posts/${reelToDelete._id || reelToDelete.post_id}`)
+            .then(() => {
+              setReels((prev) => prev.filter((reel) => (reel._id || reel.post_id) !== (reelToDelete._id || reelToDelete.post_id)));
+            })
+            .catch((err) => {
+              alert(err?.response?.data?.message || 'Failed to delete reel.');
+            });
+        }}
+        onUpdated={(updated) => {
+          const updatedId = updated?._id || updated?.post_id;
+          setReels((prev) => prev.map((reel) => ((reel._id || reel.post_id) === updatedId ? { ...reel, ...updated } : reel)));
+        }}
+      />
+      <EditContentModal
+        isOpen={!!editReel}
+        onClose={() => setEditReel(null)}
+        item={editReel}
+        contentType="reel"
+        onSaved={(updated) => {
+          const updatedId = updated?._id || updated?.post_id;
+          setReels((prev) => prev.map((reel) => ((reel._id || reel.post_id) === updatedId ? { ...reel, ...updated } : reel)));
+        }}
       />
 
       <style>{`

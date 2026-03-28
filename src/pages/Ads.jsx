@@ -8,7 +8,10 @@ import {
   ShoppingBag, Loader2, UserPlus, UserCheck, X, Smile, Trash2
 } from 'lucide-react';
 import { fetchWallet, setWalletBalance } from '../store/walletSlice';
+import api from '../lib/api';
 import ContentReportModal from '../components/ContentReportModal';
+import EditContentModal from '../components/EditContentModal';
+import OwnerContentOptionsModal from '../components/OwnerContentOptionsModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 const IMAGE_AD_DURATION = 15; // seconds for image ads
@@ -579,6 +582,8 @@ const Ads = ({ feedMode = 'user' }) => {
   const [viewRecordedPopup, setViewRecordedPopup] = useState(null); // { view_count } — shown when rewarded: false
   const [likeRewardPopup, setLikeRewardPopup] = useState(null); // { amount, isLike } — shown on every like/dislike
   const [reportAd, setReportAd] = useState(null);
+  const [editAd, setEditAd] = useState(null);
+  const [ownerOptionsAd, setOwnerOptionsAd] = useState(null);
 
   // Track which ad IDs the current user has already viewed this session.
   // Using a ref so it never triggers re-renders and persists across index changes.
@@ -680,6 +685,14 @@ const Ads = ({ feedMode = 'user' }) => {
       navigate(`/profile/${item._id || item.id}`);
     }
     // For ads — just close and let user see feed; or navigate to ad detail if available
+  };
+  const handleAdMore = (ad) => {
+    const adOwnerId = ad?.user_id?._id || ad?.user_id?.id || ad?.user_id;
+    if (currentUserId && adOwnerId && String(currentUserId) === String(adOwnerId)) {
+      setOwnerOptionsAd(ad);
+      return;
+    }
+    setReportAd(ad);
   };
 
   // Close dropdown on outside click
@@ -1720,7 +1733,7 @@ const Ads = ({ feedMode = 'user' }) => {
                             savedIds={savedIds}
                             toggleSave={toggleSave}
                             onComment={openComments}
-                            onMore={setReportAd}
+                            onMore={handleAdMore}
                           />
                         </div>
                       )}
@@ -1741,7 +1754,7 @@ const Ads = ({ feedMode = 'user' }) => {
                 savedIds={savedIds}
                 toggleSave={toggleSave}
                 onComment={openComments}
-                onMore={setReportAd}
+                onMore={handleAdMore}
               />
             </div>
           )}
@@ -1973,6 +1986,44 @@ const Ads = ({ feedMode = 'user' }) => {
         contentId={reportAd?._id}
         ownerUsername={reportAd?.vendor_id?.business_name || reportAd?.user_id?.username || ''}
         contentUrl={`${window.location.origin}/ads`}
+      />
+      <OwnerContentOptionsModal
+        isOpen={!!ownerOptionsAd}
+        onClose={() => setOwnerOptionsAd(null)}
+        item={ownerOptionsAd}
+        contentType="ad"
+        contentUrl={`${window.location.origin}/ads`}
+        onEdit={() => {
+          setEditAd(ownerOptionsAd);
+          setOwnerOptionsAd(null);
+        }}
+        onDelete={() => {
+          const adToDelete = ownerOptionsAd;
+          setOwnerOptionsAd(null);
+          if (!adToDelete) return;
+          if (!window.confirm('Delete this ad?')) return;
+          api.delete(`/ads/${adToDelete._id}`)
+            .then(() => {
+              setAds((prev) => prev.filter((ad) => ad._id !== adToDelete._id));
+            })
+            .catch((err) => {
+              alert(err?.response?.data?.message || 'Failed to delete ad.');
+            });
+        }}
+        onUpdated={(updated) => {
+          const updatedId = updated?._id;
+          setAds((prev) => prev.map((ad) => (ad._id === updatedId ? { ...ad, ...updated } : ad)));
+        }}
+      />
+      <EditContentModal
+        isOpen={!!editAd}
+        onClose={() => setEditAd(null)}
+        item={editAd}
+        contentType="ad"
+        onSaved={(updated) => {
+          const updatedId = updated?._id;
+          setAds((prev) => prev.map((ad) => (ad._id === updatedId ? { ...ad, ...updated } : ad)));
+        }}
       />
 
       <style>{`
