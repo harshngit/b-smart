@@ -6,7 +6,7 @@ import {
   Shield, RefreshCw, X, Smartphone
 } from "lucide-react";
 
-const BASE = "https://api.bebsmart.in";
+const BASE = "https://api.bebsmart.in"; 
 
 const Toggle = ({ checked, onChange }) => (
   <label className="relative inline-flex items-center cursor-pointer">
