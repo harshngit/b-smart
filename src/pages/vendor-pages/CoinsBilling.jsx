@@ -6,7 +6,7 @@ import {
   Download, ArrowDownLeft, ArrowUpRight, RefreshCw,
   CheckCircle2, XCircle, Clock, Loader2, AlertCircle,
   TrendingDown, TrendingUp,
-  Wallet, Sparkles,
+  Wallet, Sparkles, Megaphone,
   ChevronLeft, ChevronRight, Star, Zap, Crown, Package,
   Tag, BadgeCheck, ChevronDown, ChevronUp
 } from "lucide-react";
@@ -74,6 +74,39 @@ const TIER_META = {
 };
 const getTierMeta = (tier = "") =>
   TIER_META[tier.toLowerCase()] || TIER_META.basic;
+
+const ProfileCompletionGateModal = ({ open, onClose, percentage = 0, required = 50 }) => {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-orange-500 via-red-500 to-pink-600" />
+        <div className="p-6 text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-900/20 mx-auto flex items-center justify-center">
+            <AlertCircle className="w-7 h-7 text-orange-500" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-black text-gray-900 dark:text-white">Complete your profile first</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+              Your profile completion is currently <span className="font-bold text-orange-500">{Math.round(Number(percentage || 0))}%</span>.
+              You need to complete it above <span className="font-bold text-pink-600">{required}%</span> before buying a package.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-600 text-white font-bold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-pink-500/20"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ─── Purchase Success Popup ───────────────────────────────────────────────────
 const PurchaseSuccessPopup = ({ pkg, onClose }) => {
@@ -379,9 +412,12 @@ const PackageCard = ({ pkg, onBuy }) => {
 
 // ─── Active Package Card ──────────────────────────────────────────────────────
 const ActivePackageCard = ({ refreshTrigger }) => {
+  const { userObject } = useSelector((state) => state.auth);
+  const userId = userObject?._id || userObject?.id;
   const [active, setActive]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
+  const [uploadedAdsCount, setUploadedAdsCount] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -402,6 +438,28 @@ const ActivePackageCard = ({ refreshTrigger }) => {
     };
     load();
   }, [refreshTrigger]);
+
+  useEffect(() => {
+    const loadAdsCount = async () => {
+      if (!userId) return;
+      try {
+        const res = await api.get(`/ads/user/${userId}`);
+        const ads = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data?.ads)
+          ? res.data.ads
+          : Array.isArray(res.data?.data)
+          ? res.data.data
+          : [];
+        setUploadedAdsCount(ads.length);
+      } catch (e) {
+        console.error("Could not load uploaded ads count.", e);
+        setUploadedAdsCount(0);
+      }
+    };
+
+    loadAdsCount();
+  }, [userId, refreshTrigger]);
 
   if (loading) {
     return (
@@ -450,6 +508,7 @@ const ActivePackageCard = ({ refreshTrigger }) => {
   const validityDays = pkg.validity_days  ?? 0;
   const adsMax       = pkg.ads_allowed_max ?? 0;
   const adsMin       = pkg.ads_allowed_min ?? 0;
+  const adsRemaining = Math.max(0, Number(adsMax || 0) - Number(uploadedAdsCount || 0));
   const coinsGranted = activeData.coins_credited ?? pkg.coins_granted ?? 0;
   const amountPaid   = activeData.amount_paid   ?? pkg.final_price    ?? 0;
   const features     = pkg.features || [];
@@ -485,7 +544,7 @@ const ActivePackageCard = ({ refreshTrigger }) => {
           </div>
 
           {/* Stats grid */}
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
             {/* Days Left — colour-coded */}
             <div className={`p-3 rounded-2xl text-center ${daysLeft !== null && daysLeft <= 3 ? "bg-red-50 dark:bg-red-900/20" : daysLeft !== null && daysLeft <= 7 ? "bg-amber-50 dark:bg-amber-900/20" : "bg-blue-50 dark:bg-blue-900/20"}`}>
               <CalendarDays className={`w-4 h-4 mx-auto mb-1 ${daysLeft !== null && daysLeft <= 3 ? "text-red-500" : daysLeft !== null && daysLeft <= 7 ? "text-amber-500" : "text-blue-500"}`} />
@@ -503,6 +562,14 @@ const ActivePackageCard = ({ refreshTrigger }) => {
                 <Receipt className="w-4 h-4 text-purple-500 mx-auto mb-1" />
                 <div className="text-base font-black text-purple-700 dark:text-purple-300">{adsMin}–{adsMax}</div>
                 <div className="text-[10px] text-purple-500 font-semibold uppercase tracking-wide">Ads Allowed</div>
+              </div>
+            )}
+
+            {adsMax > 0 && (
+              <div className="p-3 rounded-2xl bg-pink-50 dark:bg-pink-900/20 text-center">
+                <Megaphone className="w-4 h-4 text-pink-500 mx-auto mb-1" />
+                <div className="text-base font-black text-pink-700 dark:text-pink-300">{uploadedAdsCount}/{adsMax}</div>
+                <div className="text-[10px] text-pink-500 font-semibold uppercase tracking-wide">Ads Uploaded</div>
               </div>
             )}
 
@@ -571,6 +638,26 @@ const ActivePackageCard = ({ refreshTrigger }) => {
           </div>
         )}
 
+        {adsMax > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+              <span>Ad usage</span>
+              <span className={`font-bold ${adsRemaining === 0 ? "text-red-500" : "text-pink-600 dark:text-pink-400"}`}>
+                {uploadedAdsCount} / {adsMax} used
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${adsRemaining === 0 ? "bg-red-500" : "bg-gradient-to-r from-orange-500 to-pink-600"}`}
+                style={{ width: `${Math.min(100, Math.round((Number(uploadedAdsCount || 0) / Number(adsMax || 1)) * 100))}%` }}
+              />
+            </div>
+            <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+              {adsRemaining === 0 ? "You have reached your package ad limit. Upgrade your package to create more ads." : `${adsRemaining} ad slot${adsRemaining === 1 ? "" : "s"} remaining in your current package.`}
+            </div>
+          </div>
+        )}
+
         {/* Validity progress bar */}
         {daysLeft !== null && validityDays > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -594,13 +681,14 @@ const ActivePackageCard = ({ refreshTrigger }) => {
 };
 
 // ─── Packages Section ─────────────────────────────────────────────────────────
-const PackagesSection = ({ onBuySuccess }) => {
+const PackagesSection = ({ onBuySuccess, profileCompletion = 0 }) => {
   const [packages, setPackages]       = useState([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState("");
   const [buyTarget, setBuyTarget]     = useState(null);
   const [successPkg, setSuccessPkg]   = useState(null); // drives success popup
   const [activeRefresh, setActiveRefresh] = useState(0); // bump to re-fetch active pkg
+  const [showProfileGate, setShowProfileGate] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -623,6 +711,14 @@ const PackagesSection = ({ onBuySuccess }) => {
     setSuccessPkg(pkg);           // show success popup
     setActiveRefresh(n => n + 1); // refresh active package card
     onBuySuccess?.();             // refresh wallet balance in parent
+  };
+
+  const handleBuyAttempt = (pkg) => {
+    if (Number(profileCompletion || 0) <= 50) {
+      setShowProfileGate(true);
+      return;
+    }
+    setBuyTarget(pkg);
   };
 
   return (
@@ -677,7 +773,7 @@ const PackagesSection = ({ onBuySuccess }) => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {packages.map((pkg) => (
-            <PackageCard key={pkg._id || pkg.tier} pkg={pkg} onBuy={setBuyTarget} />
+            <PackageCard key={pkg._id || pkg.tier} pkg={pkg} onBuy={handleBuyAttempt} />
           ))}
         </div>
       )}
@@ -713,6 +809,13 @@ const PackagesSection = ({ onBuySuccess }) => {
           onClose={() => setSuccessPkg(null)}
         />
       )}
+
+      <ProfileCompletionGateModal
+        open={showProfileGate}
+        onClose={() => setShowProfileGate(false)}
+        percentage={profileCompletion}
+        required={50}
+      />
     </div>
   );
 };
@@ -723,7 +826,8 @@ const LIMIT = 7;
 
 export default function CoinsBilling() {
   const { userObject } = useSelector(s => s.auth);
-  const userId = userObject?._id;
+  const userId = userObject?._id || userObject?.id;
+  const [profileCompletion, setProfileCompletion] = useState(0);
 
   // Wallet
   const [wallet, setWallet]               = useState(null);
@@ -755,6 +859,17 @@ export default function CoinsBilling() {
     finally { setWalletLoading(false); }
   }, []);
 
+  const fetchVendorProfileCompletion = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const res = await api.get(`/vendors/profile/${userId}`);
+      setProfileCompletion(Number(res.data?.profile_completion_percentage || 0));
+    } catch (e) {
+      console.error("Failed to load vendor profile completion", e);
+      setProfileCompletion(0);
+    }
+  }, [userId]);
+
   // ── Fetch transaction history ──────────────────────────────────────────────
   const fetchHistory = useCallback(async () => {
     if (!userId) return;
@@ -777,6 +892,7 @@ export default function CoinsBilling() {
 
   useEffect(() => { fetchWallet(); }, [fetchWallet]);
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
+  useEffect(() => { fetchVendorProfileCompletion(); }, [fetchVendorProfileCompletion]);
 
   const handleApplyFilters = () => { setTxPage(1); fetchHistory(); setShowFilters(false); };
   const handleClearFilters = () => {
@@ -904,7 +1020,10 @@ export default function CoinsBilling() {
 
         {/* ── Packages Section (replaces modal) ── */}
         <div id="packages">
-          <PackagesSection onBuySuccess={fetchWallet} />
+        <PackagesSection
+          onBuySuccess={fetchWallet}
+          profileCompletion={profileCompletion}
+        />
         </div>
 
         {/* ── Transaction History ── */}

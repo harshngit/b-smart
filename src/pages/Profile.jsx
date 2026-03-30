@@ -324,7 +324,20 @@ const Profile = () => {
         </svg>
     );
 
+    const ValidationStatusBadge = ({ validated, compact = false }) => (
+        <span className={`inline-flex items-center rounded-full font-semibold ${
+            compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'
+        } ${
+            validated
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+        }`}>
+            {validated ? 'Validated' : 'Not Validated'}
+        </span>
+    );
+
     const isVendor = profileUser.role === 'vendor';
+    const vendorValidated = isVendor ? Boolean(profileUser?.validated ?? vendorInfo?.validated) : false;
 
     const tabConfig = isVendor
         ? [{ key: 'ads', label: 'Ads', icon: <Megaphone size={22} /> }]
@@ -507,7 +520,7 @@ const Profile = () => {
                             )}
                             <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-1.5 truncate">
                                 {profileUser.username}
-                                <VerifiedBadge />
+                                {isVendor && vendorValidated && <VerifiedBadge />}
                             </h1>
                         </div>
                         {isOwnProfile && (
@@ -559,9 +572,12 @@ const Profile = () => {
                         <div className="mb-3">
                             <div className="font-bold text-sm text-gray-900 dark:text-white">{profileUser.full_name}</div>
                             {isVendor && (
-                                <span className="inline-block text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full mt-0.5 mb-0.5">
-                                    Vendor
-                                </span>
+                                <div className="mt-0.5 mb-0.5 flex flex-wrap items-center gap-1.5">
+                                    <span className="inline-block text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                                        Vendor
+                                    </span>
+                                    <ValidationStatusBadge validated={vendorValidated} compact />
+                                </div>
                             )}
                             {profileUser.bio && (
                                 <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{profileUser.bio}</div>
@@ -658,9 +674,12 @@ const Profile = () => {
                         <div className="flex flex-col flex-1 pt-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-3 mb-4">
                                 <h2 className="text-2xl font-light text-gray-900 dark:text-white">{profileUser.username}</h2>
-                                <VerifiedBadge />
+                                {isVendor && vendorValidated && <VerifiedBadge />}
                                 {isVendor && (
-                                    <span className="text-xs font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full">Vendor</span>
+                                    <>
+                                        <span className="text-xs font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full">Vendor</span>
+                                        <ValidationStatusBadge validated={vendorValidated} />
+                                    </>
                                 )}
                                 {isOwnProfile ? (
                                     <>
@@ -698,6 +717,11 @@ const Profile = () => {
                             {/* Name + Bio */}
                             <div className="max-w-sm">
                                 <div className="font-semibold text-sm text-gray-900 dark:text-white">{profileUser.full_name || profileUser.username}</div>
+                                {isVendor && (
+                                    <div className="mt-2">
+                                        <ValidationStatusBadge validated={vendorValidated} />
+                                    </div>
+                                )}
                                 {profileUser.bio && (
                                     <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed mt-0.5">{profileUser.bio}</div>
                                 )}

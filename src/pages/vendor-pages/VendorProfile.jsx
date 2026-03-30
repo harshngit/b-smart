@@ -89,6 +89,20 @@ const CompletionBar = ({ pct }) => (
   </div>
 );
 
+const ValidationStatusBadge = ({ validated, status }) => {
+  const label = validated ? "Validated" : (status ? String(status).replaceAll("_", " ") : "Not Validated");
+  const classes = validated
+    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800";
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${classes}`}>
+      {validated ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+      {label}
+    </span>
+  );
+};
+
 // ─── Section Divider ──────────────────────────────────────────────────────────
 const SectionDivider = ({ children }) => (
   <div className="col-span-1 md:col-span-2 flex items-center gap-3 mt-6 mb-2">
@@ -126,6 +140,7 @@ const EMPTY_FORM = {
   addressLine1: "", addressLine2: "", city: "", pincode: "",
   state: "", addressCountry: "", instagram: "", facebook: "",
   linkedin: "", twitter: "", description: "", profileCompletion: 0,
+  validated: false, verificationStatus: "",
 };
 
 const mapApiToForm = (data) => ({
@@ -157,6 +172,8 @@ const mapApiToForm = (data) => ({
   twitter:          data.social_media_links?.twitter          ?? "",
   description:      data.company_description                  ?? "",
   profileCompletion: data.profile_completion_percentage       ?? 0,
+  validated:        data.validated === true,
+  verificationStatus: data.verification_status               ?? "",
 });
 
 const mapFormToBody = (form) => ({
@@ -308,7 +325,10 @@ const CompanyInfo = () => {
 
           {/* Company info below logo */}
           <div className="mt-3">
-            <div className="text-lg font-black text-gray-900 dark:text-white">{form.companyName || "—"}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-lg font-black text-gray-900 dark:text-white">{form.companyName || "—"}</div>
+              <ValidationStatusBadge validated={form.validated} status={form.verificationStatus} />
+            </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {[form.userFullName, form.userEmail].filter(Boolean).join(" · ")}
             </div>

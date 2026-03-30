@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import api from '../lib/api';
 import { logoutUser } from '../store/authSlice';
+import { fetchMe } from '../store/authSlice';
 import { toggleTheme } from '../store/themeSlice';
 import {
   ArrowLeft, Globe2, Bell, Shield, Lock, SlidersHorizontal,
@@ -89,7 +91,7 @@ const AlertBanner = ({ type, msg }) => {
 };
 
 // ── 2FA Modal ─────────────────────────────────────────────────────────────────
-const TwoFAModal = ({ mode, email, onClose, onDone }) => {
+const TwoFAModal = ({ mode, email, userId, onClose, onDone }) => {
   const [step, setStep] = useState(1);
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -111,7 +113,7 @@ const TwoFAModal = ({ mode, email, onClose, onDone }) => {
       const res = await fetch(`${BASE}/api/email/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ email, purpose: "verify_email" }),
+        body: JSON.stringify({ email, purpose: "two_factor" }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Failed to send OTP");
@@ -128,10 +130,15 @@ const TwoFAModal = ({ mode, email, onClose, onDone }) => {
       const res = await fetch(`${BASE}/api/email/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ email, otp, purpose: "verify_email" }),
+        body: JSON.stringify({ email, otp, purpose: "two_factor" }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Invalid OTP");
+      await api.put(`/users/${userId}`, {
+        twoFA: { enabled: mode === "enable" }
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       setSuccess(mode === "enable" ? "2FA enabled!" : "2FA disabled!");
       setTimeout(() => onDone(mode === "enable"), 1400);
     } catch (e) { setError(e.message); }
@@ -328,6 +335,7 @@ const ResetPasswordModal = ({ email, onClose }) => {
 
 // ── Security Screen ───────────────────────────────────────────────────────────
 const SecurityScreen = ({ onBack, email, userId }) => {
+  const dispatch = useDispatch();
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [twoFAModal, setTwoFAModal] = useState(null);
   const [showReset, setShowReset] = useState(false);
@@ -336,6 +344,18 @@ const SecurityScreen = ({ onBack, email, userId }) => {
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdSuccess, setPwdSuccess] = useState("");
   const [pwdError, setPwdError] = useState("");
+
+  useEffect(() => {
+    const loadMe = async () => {
+      try {
+        const res = await api.get('/auth/me');
+        setTwoFAEnabled(!!res.data?.twoFA?.enabled);
+      } catch (error) {
+        console.error('Failed to load 2FA status:', error);
+      }
+    };
+    loadMe();
+  }, []);
 
   const handleChangePassword = async () => {
     setPwdError(""); setPwdSuccess("");
@@ -477,8 +497,13 @@ const SecurityScreen = ({ onBack, email, userId }) => {
         <TwoFAModal
           mode={twoFAModal}
           email={email}
+          userId={userId}
           onClose={() => setTwoFAModal(null)}
-          onDone={(enabled) => { setTwoFAEnabled(enabled); setTwoFAModal(null); }}
+          onDone={async (enabled) => {
+            setTwoFAEnabled(enabled);
+            setTwoFAModal(null);
+            await dispatch(fetchMe());
+          }}
         />
       )}
       {showReset && <ResetPasswordModal email={email} onClose={() => setShowReset(false)} />}

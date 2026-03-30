@@ -36,6 +36,11 @@ export default function AdsManagement() {
 
   const { userObject } = useSelector((state) => state.auth);
   const userId = userObject?._id || userObject?.id;
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [activePackageAdsLimit, setActivePackageAdsLimit] = useState(0);
+  const [showInactivePopup, setShowInactivePopup] = useState(false);
+  const [showProfileGatePopup, setShowProfileGatePopup] = useState(false);
+  const [showAdLimitPopup, setShowAdLimitPopup] = useState(false);
 
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -119,6 +124,28 @@ export default function AdsManagement() {
     fetchAds();
   }, [userId, selectedCategory]);
 
+  useEffect(() => {
+    const fetchVendorProfile = async () => {
+      if (!userId) return;
+      try {
+        const [profileRes, packageRes] = await Promise.all([
+          api.get(`/vendors/profile/${userId}`),
+          api.get('/vendor-packages/my/active').catch(() => ({ data: null })),
+        ]);
+        setProfileCompletion(Number(profileRes.data?.profile_completion_percentage || 0));
+        const activePackage = packageRes?.data?.active_package || packageRes?.data?.package || packageRes?.data || null;
+        const packageData = activePackage?.package || activePackage || {};
+        setActivePackageAdsLimit(Number(packageData?.ads_allowed_max || 0));
+      } catch (err) {
+        console.error("Failed to load vendor profile completion", err);
+        setProfileCompletion(0);
+        setActivePackageAdsLimit(0);
+      }
+    };
+
+    fetchVendorProfile();
+  }, [userId]);
+
   const filteredAds = useMemo(() => {
     return ads.filter(ad => {
       const matchStatus = filterStatus === "All" || ad.status.toLowerCase() === filterStatus.toLowerCase();
@@ -132,6 +159,21 @@ export default function AdsManagement() {
 
   // ── Handler: open the CreatePost modal (same flow as Dashboard) ──────────
   const handleCreateAd = () => {
+    if (!userObject?.is_active) {
+      setShowInactivePopup(true);
+      return;
+    }
+
+    if (Number(profileCompletion || 0) <= 80) {
+      setShowProfileGatePopup(true);
+      return;
+    }
+
+    if (Number(activePackageAdsLimit || 0) <= 0 || ads.length >= Number(activePackageAdsLimit || 0)) {
+      setShowAdLimitPopup(true);
+      return;
+    }
+
     if (handleOpenCreateModal) {
       // Pass 'ad' so the modal knows to open in Ad creation mode
       handleOpenCreateModal("ad");
@@ -349,6 +391,65 @@ export default function AdsManagement() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {showInactivePopup && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Vendor account inactive</h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
+                Your vendor account is inactive. Please contact support or wait for activation before uploading ads.
+              </p>
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setShowInactivePopup(false)}
+                  className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 text-white font-medium hover:opacity-90 transition-opacity"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showProfileGatePopup && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Complete your profile first</h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center leading-relaxed">
+                Your profile completion is currently <span className="font-bold text-orange-500">{Math.round(Number(profileCompletion || 0))}%</span>.
+                You need to complete it above <span className="font-bold text-pink-600">80%</span> before uploading ads.
+              </p>
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setShowProfileGatePopup(false)}
+                  className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 text-white font-medium hover:opacity-90 transition-opacity"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showAdLimitPopup && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Upgrade your package</h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center leading-relaxed">
+                Your current package allows <span className="font-bold text-pink-600">{activePackageAdsLimit}</span> ads, and you have already uploaded <span className="font-bold text-orange-500">{ads.length}</span>.
+                Upgrade your package to create more ads.
+              </p>
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setShowAdLimitPopup(false)}
+                  className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 text-white font-medium hover:opacity-90 transition-opacity"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

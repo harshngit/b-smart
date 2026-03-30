@@ -229,6 +229,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [isDragging, setIsDragging] = useState(false);
   const [step, setStep] = useState('select');
   const { userObject } = useSelector((state) => state.auth);
+  const userId = userObject?._id || userObject?.id;
   const [postType, setPostType] = useState(initialType);
   
   useEffect(() => {
@@ -236,6 +237,45 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       setPostType(initialType);
     }
   }, [isOpen, initialType]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadVendorProfileData = async () => {
+      if (!isOpen || userObject?.role !== 'vendor' || !userId) return;
+      try {
+        const [profileRes, packageRes, adsRes] = await Promise.all([
+          api.get(`/vendors/profile/${userId}`),
+          api.get('/vendor-packages/my/active').catch(() => ({ data: null })),
+          api.get(`/ads/user/${userId}`).catch(() => ({ data: [] })),
+        ]);
+        if (!active) return;
+        setVendorProfileCompletion(Number(profileRes.data?.profile_completion_percentage || 0));
+
+        const activePackage = packageRes?.data?.active_package || packageRes?.data?.package || packageRes?.data || null;
+        const packageData = activePackage?.package || activePackage || {};
+        setActivePackageAdsLimit(Number(packageData?.ads_allowed_max || 0));
+
+        const ads = Array.isArray(adsRes?.data)
+          ? adsRes.data
+          : Array.isArray(adsRes?.data?.ads)
+          ? adsRes.data.ads
+          : Array.isArray(adsRes?.data?.data)
+          ? adsRes.data.data
+          : [];
+        setUploadedAdsCount(ads.length);
+      } catch (err) {
+        if (!active) return;
+        console.error('Failed to load vendor profile/ad package data', err);
+        setVendorProfileCompletion(0);
+        setActivePackageAdsLimit(0);
+        setUploadedAdsCount(0);
+      }
+    };
+
+    loadVendorProfileData();
+    return () => { active = false; };
+  }, [isOpen, userId, userObject?.role]);
 
   const [media, setMedia] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -254,6 +294,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showVendorNotValidated, setShowVendorNotValidated] = useState(false);
+  const [vendorProfileCompletion, setVendorProfileCompletion] = useState(0);
+  const [showAdProfileGate, setShowAdProfileGate] = useState(false);
+  const [activePackageAdsLimit, setActivePackageAdsLimit] = useState(0);
+  const [uploadedAdsCount, setUploadedAdsCount] = useState(0);
+  const [showAdLimitPopup, setShowAdLimitPopup] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [isLoadingAllUsers, setIsLoadingAllUsers] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -298,6 +343,22 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   
   // Accordion state: 'category' | 'country' | 'state' | 'language' | 'budget' | null
   const [openAccordion, setOpenAccordion] = useState(null);
+
+  const ensureAdProfileCompletion = useCallback(() => {
+    if (Number(vendorProfileCompletion || 0) <= 80) {
+      setShowAdProfileGate(true);
+      return false;
+    }
+    return true;
+  }, [vendorProfileCompletion]);
+
+  const ensureAdPackageLimit = useCallback(() => {
+    if (Number(activePackageAdsLimit || 0) <= 0 || Number(uploadedAdsCount || 0) >= Number(activePackageAdsLimit || 0)) {
+      setShowAdLimitPopup(true);
+      return false;
+    }
+    return true;
+  }, [activePackageAdsLimit, uploadedAdsCount]);
 
   useEffect(() => {
     let active = true;
@@ -914,7 +975,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           await api.post('https://api.bebsmart.in/api/posts/reels', payload);
 
         } else if (postType === 'ad') {
+          if (!ensureAdProfileCompletion()) {
+            setIsSubmitting(false);
+            setUploadStage('idle');
+            setUploadProgress(0);
+            return;
+          }
           // ── AD — new /api/ads endpoint with full schema ──
+          if (!ensureAdPackageLimit()) {
+            setIsSubmitting(false);
+            setUploadStage('idle');
+            setUploadProgress(0);
+            return;
+          }
           const mediaForApi = processedMedia.map(m => { const copy = { ...m }; delete copy._fileUrl; return copy; });
 
           const adPayload = {
@@ -1278,6 +1351,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     onClick={() => {
                       if (!userObject?.is_active) {
                         setShowVendorNotValidated(true);
+                      } else if (!ensureAdProfileCompletion()) {
+                        return;
+                      } else if (!ensureAdPackageLimit()) {
+                        return;
                       } else {
                         if (onOpenAdModal) onOpenAdModal();
                         else onClose();
@@ -2097,6 +2174,52 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">Your vendor account is not yet validated. Please refresh this page or wait 2–3 working days for verification before uploading ads.</p>
             <div className="flex justify-center">
               <button onClick={() => setShowVendorNotValidated(false)} className="px-4 py-2.5 rounded-lg bg-insta-pink text-white font-medium hover:bg-insta-purple transition-colors">OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdProfileGate && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+            <div className="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-900/20 mx-auto flex items-center justify-center mb-4">
+              <Megaphone size={26} className="text-orange-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Complete your profile first</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center leading-relaxed">
+              Your profile completion is currently <span className="font-bold text-orange-500">{Math.round(Number(vendorProfileCompletion || 0))}%</span>.
+              You need to complete it above <span className="font-bold text-pink-600">80%</span> before uploading ads.
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowAdProfileGate(false)}
+                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 text-white font-medium hover:opacity-90 transition-opacity"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdLimitPopup && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+            <div className="w-14 h-14 rounded-2xl bg-pink-50 dark:bg-pink-900/20 mx-auto flex items-center justify-center mb-4">
+              <Megaphone size={26} className="text-pink-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Upgrade your package</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center leading-relaxed">
+              Your current package allows <span className="font-bold text-pink-600">{activePackageAdsLimit}</span> ads, and you have already uploaded <span className="font-bold text-orange-500">{uploadedAdsCount}</span>.
+              Upgrade your package to create more ads.
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowAdLimitPopup(false)}
+                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 text-white font-medium hover:opacity-90 transition-opacity"
+              >
+                OK
+              </button>
             </div>
           </div>
         </div>

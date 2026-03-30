@@ -186,6 +186,7 @@ export default function VendorDashboard() {
   const navigate = useNavigate();
   const { handleOpenCreateModal } = useOutletContext() || {};
   const { userObject } = useSelector((state) => state.auth);
+  const userId = userObject?._id || userObject?.id;
 
   // Wallet state
   const [wallet, setWallet] = useState(null);
@@ -213,7 +214,7 @@ export default function VendorDashboard() {
 
   // ─── Fetch Wallet & History ───────────────────────────────────────────────
   const fetchWalletData = useCallback(async () => {
-    if (!userObject?._id) return;
+    if (!userId) return;
     setWalletLoading(true);
     setWalletError(null);
     try {
@@ -235,7 +236,7 @@ export default function VendorDashboard() {
       if (startDate) histParams.startDate = startDate;
       if (endDate) histParams.endDate = endDate;
 
-      const histRes = await api.get(`/wallet/vendor/${userObject._id}/history`, { params: histParams });
+      const histRes = await api.get(`/wallet/vendor/${userId}/history`, { params: histParams });
       setTransactions(histRes.data.transactions || []);
       if (histRes.data.total != null) setTotal(histRes.data.total);
     } catch (err) {
@@ -244,14 +245,14 @@ export default function VendorDashboard() {
     } finally {
       setWalletLoading(false);
     }
-  }, [userObject?._id, typeFilter, directionFilter, startDate, endDate]);
+  }, [userId, typeFilter, directionFilter, startDate, endDate]);
 
   // ─── Fetch Active Ads Count ───────────────────────────────────────────────
   const fetchActiveAds = useCallback(async () => {
-    if (!userObject?._id) return;
+    if (!userId) return;
     setAdsLoading(true);
     try {
-      const res = await api.get(`/ads/user/${userObject._id}`);
+      const res = await api.get(`/ads/user/${userId}`);
       const ads = res.data?.ads || res.data || [];
       const active = Array.isArray(ads)
         ? ads.filter((ad) => (ad.status || "").toLowerCase() === "active").length
@@ -263,7 +264,7 @@ export default function VendorDashboard() {
     } finally {
       setAdsLoading(false);
     }
-  }, [userObject?._id]);
+  }, [userId]);
 
   useEffect(() => {
     fetchWalletData();
@@ -275,11 +276,11 @@ export default function VendorDashboard() {
 
   // ─── Fetch Profile Completion ──────────────────────────────────────────
   useEffect(() => {
-    if (!userObject?._id) return;
-    api.get(`/vendors/profile/${userObject._id}`)
+    if (!userId) return;
+    api.get(`/vendors/profile/${userId}`)
       .then(res => setProfilePct(res.data?.profile_completion_percentage ?? null))
       .catch(() => {});
-  }, [userObject?._id]);
+  }, [userId]);
 
   // ─── Derived stats ────────────────────────────────────────────────────────
   const totalDebited = transactions

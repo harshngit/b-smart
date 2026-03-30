@@ -6,6 +6,55 @@ import authService from '../services/authService';
 import { login, fetchMe } from '../store/authSlice';
 import { ArrowLeft, Lock, User, LogIn, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 
+const OtpLoginModal = ({ email, otp, onChange, onClose, onSubmit, loading, error, message }) => {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#171b2a] p-6 shadow-2xl">
+        <div className="mb-5 text-center">
+          <h3 className="text-xl font-bold text-white">Enter OTP</h3>
+          <p className="mt-2 text-sm text-gray-300">
+            We sent a 6-digit verification code to <span className="font-semibold text-white">{email}</span>.
+          </p>
+        </div>
+        {message && (
+          <div className="mb-3 rounded-xl border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-300">
+            {message}
+          </div>
+        )}
+        {error && (
+          <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+        <input
+          value={otp}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="Enter 6-digit OTP"
+          className="w-full rounded-2xl border border-white/10 bg-[#0f1320] px-4 py-3 text-center font-semibold tracking-[0.35em] text-white outline-none focus:border-[#fa3f5e] focus:ring-2 focus:ring-[#fa3f5e]/20"
+          maxLength={6}
+        />
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-2xl border border-white/10 px-4 py-3 font-semibold text-gray-300 transition hover:bg-white/5"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={loading || otp.length < 6}
+            className="flex-1 rounded-2xl bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange px-4 py-3 font-bold text-white transition disabled:opacity-60"
+          >
+            {loading ? 'Verifying...' : 'Verify'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,6 +66,9 @@ const Login = () => {
   const [error, setError] = useState('');
   const [message, setMessage] = useState(location.state?.message || '');
   const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [pending2FA, setPending2FA] = useState(false);
+  const [twoFAEmail, setTwoFAEmail] = useState('');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -33,13 +85,22 @@ const Login = () => {
     try {
       const resultAction = await dispatch(login({
         email: identifier,
-        password
+        password,
+        ...(pending2FA ? { otp } : {}),
       }));
 
       if (login.fulfilled.match(resultAction)) {
-        console.log('Login Successful:', resultAction.payload);
-        console.log('User Profile:', resultAction.payload?.user || resultAction.payload);
-        navigate('/');
+        if (resultAction.payload?.requires_2fa) {
+          setPending2FA(true);
+          setTwoFAEmail(resultAction.payload?.email || identifier);
+          setMessage(resultAction.payload?.message || 'A verification code has been sent to your email.');
+        } else if (resultAction.payload?.token) {
+          console.log('Login Successful:', resultAction.payload);
+          console.log('User Profile:', resultAction.payload?.user || resultAction.payload);
+          navigate('/');
+        } else {
+          setError('Login failed');
+        }
       } else {
         setError(resultAction.payload || 'Login failed');
       }
@@ -48,6 +109,18 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOtpSubmit = async () => {
+    if (loading || otp.length < 6) return;
+    await handleSubmit({ preventDefault: () => {} });
+  };
+
+  const closeOtpModal = () => {
+    setPending2FA(false);
+    setOtp('');
+    setError('');
+    setMessage('');
   };
 
   const handleGoogleLogin = () => {
@@ -204,7 +277,7 @@ const Login = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Signing in...
+                  {pending2FA ? 'Verifying OTP...' : 'Signing in...'}
                 </span>
               ) : 'Sign In'}
             </button>
@@ -264,6 +337,18 @@ const Login = () => {
           </div>
         </div>
       </div>
+      {pending2FA && (
+        <OtpLoginModal
+          email={twoFAEmail || identifier}
+          otp={otp}
+          onChange={setOtp}
+          onClose={closeOtpModal}
+          onSubmit={handleOtpSubmit}
+          loading={loading}
+          error={error}
+          message={message}
+        />
+      )}
     </div>
   );
 };
