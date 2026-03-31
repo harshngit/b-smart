@@ -103,6 +103,45 @@ const ValidationStatusBadge = ({ validated, status }) => {
   );
 };
 
+const CompletionReminderModal = ({ pct, onClose, onEdit }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#171b2a] p-6 shadow-2xl">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500/20 to-pink-600/20 text-orange-400">
+        <AlertCircle size={26} />
+      </div>
+      <div className="text-center">
+        <h3 className="text-2xl font-black text-white">Complete your vendor profile</h3>
+        <p className="mt-3 text-sm leading-6 text-gray-300">
+          Your profile is currently <span className="font-bold text-orange-400">{pct}%</span> complete.
+          Please finish the remaining details to unlock the full vendor experience.
+        </p>
+      </div>
+      <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-orange-500 to-pink-600 transition-all duration-700"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="mt-6 flex gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 rounded-2xl border border-white/10 px-4 py-3 text-sm font-bold text-gray-300 transition hover:bg-white/5"
+        >
+          Later
+        </button>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex-1 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-pink-500/20 transition hover:opacity-90"
+        >
+          Complete Now
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 // ─── Section Divider ──────────────────────────────────────────────────────────
 const SectionDivider = ({ children }) => (
   <div className="col-span-1 md:col-span-2 flex items-center gap-3 mt-6 mb-2">
@@ -205,6 +244,7 @@ const CompanyInfo = () => {
   const [error, setError] = useState("");
   const [logoPreview, setLogoPreview] = useState(null);
   const [showLogoCropModal, setShowLogoCropModal] = useState(false);
+  const [showCompletionReminder, setShowCompletionReminder] = useState(false);
   const fileRef = useRef();
   const [form, setForm] = useState(EMPTY_FORM);
   const userId = userObject?._id || userObject?.id;
@@ -220,6 +260,12 @@ const CompanyInfo = () => {
   };
 
   useEffect(() => { fetchProfile(); }, [userId]);
+
+  useEffect(() => {
+    if (!loading && form.profileCompletion < 100) {
+      setShowCompletionReminder(true);
+    }
+  }, [loading, form.profileCompletion]);
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
@@ -252,6 +298,16 @@ const CompanyInfo = () => {
 
   return (
     <div className="space-y-5">
+      {showCompletionReminder && pct < 100 && (
+        <CompletionReminderModal
+          pct={pct}
+          onClose={() => setShowCompletionReminder(false)}
+          onEdit={() => {
+            setEditing(true);
+            setShowCompletionReminder(false);
+          }}
+        />
+      )}
       {saved && (
         <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-xl text-sm font-semibold">
           <CheckCircle2 size={16} /> Profile updated successfully.
