@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -42,6 +42,7 @@ const Profile = () => {
     const [followLoading, setFollowLoading] = useState(false);
     const [vendorInfo, setVendorInfo] = useState(null);
     const [rewardToast, setRewardToast] = useState(null);
+    const [favoriteProfile, setFavoriteProfile] = useState(false);
 
     const profileRewardMsRef = useRef(0);
     const profileRewardTickRef = useRef(null);
@@ -305,6 +306,37 @@ const Profile = () => {
         const id = post._id || post.id;
         if (window.innerWidth < 768 && id) navigate(`/post/${id}`);
         else setSelectedPost(post);
+    };
+
+    const handleShareProfile = async () => {
+        const slug = profileUser?._id || profileUser?.id || 'profile';
+        const shareUrl = `${window.location.origin}/profile/${slug}`;
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: profileUser.full_name || profileUser.username,
+                    text: `Check out ${profileUser.username} on B-Smart`,
+                    url: shareUrl,
+                });
+                return;
+            }
+        } catch {
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setRewardToast({
+                type: 'success',
+                message: 'Profile link copied to clipboard.',
+            });
+        } catch {
+            setRewardToast({
+                type: 'error',
+                message: 'Unable to copy profile link.',
+            });
+        }
     };
 
 
@@ -588,13 +620,36 @@ const Profile = () => {
                         <div className="flex gap-2 mb-4">
                             {isOwnProfile ? (
                                 <>
-                                    <Link to="/edit-profile" className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">Edit profile</Link>
-                                    <Link to={isVendor ? '/vendor/profile' : '/archive'} className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg text-center transition-colors">
-                                        {isVendor ? 'Business Profile' : 'View archive'}
+                                    <Link to="/edit-profile" className="flex-1 bg-gradient-to-r from-orange-400 via-orange-500 to-pink-600 text-white text-sm font-semibold py-2.5 rounded-xl text-center shadow-sm hover:opacity-95 transition-opacity">
+                                        Edit Profile
                                     </Link>
-                                    <Link to="/settings" className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-2 rounded-lg">
-                                        <Settings size={18} />
-                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={handleShareProfile}
+                                        className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                        aria-label="Share profile"
+                                    >
+                                        <Share2 size={19} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFavoriteProfile((prev) => !prev)}
+                                        className={`w-11 h-11 flex items-center justify-center rounded-xl border ${
+                                            favoriteProfile
+                                                ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white'
+                                        }`}
+                                        aria-label="Favourite profile"
+                                    >
+                                        <Star size={19} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                        aria-label="Chat"
+                                    >
+                                        <MessageCircle size={19} />
+                                    </button>
                                 </>
                             ) : (
                                 <>
@@ -683,8 +738,36 @@ const Profile = () => {
                                 )}
                                 {isOwnProfile ? (
                                     <>
-                                        <Link to="/edit-profile" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">Edit profile</Link>
-                                        {isVendor && <Link to="/vendor/profile" className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg text-sm transition-colors">Business Profile</Link>}
+                                        <Link to="/edit-profile" className="px-8 py-2.5 bg-gradient-to-r from-orange-400 via-orange-500 to-pink-600 text-white font-semibold rounded-xl text-sm shadow-sm hover:opacity-95 transition-opacity">
+                                            Edit profile
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            onClick={handleShareProfile}
+                                            className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
+                                            aria-label="Share profile"
+                                        >
+                                            <Share2 size={20} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFavoriteProfile((prev) => !prev)}
+                                            className={`w-11 h-11 flex items-center justify-center rounded-xl border transition-colors ${
+                                                favoriteProfile
+                                                    ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                                                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white'
+                                            }`}
+                                            aria-label="Favourite profile"
+                                        >
+                                            <Star size={20} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
+                                            aria-label="Chat"
+                                        >
+                                            <MessageCircle size={20} />
+                                        </button>
                                         <Link to="/settings" className="p-2 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><Settings size={22} /></Link>
                                     </>
                                 ) : (
