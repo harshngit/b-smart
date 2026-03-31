@@ -21,6 +21,8 @@ const getInitialValues = (contentType, item) => ({
   category: item?.category || '',
   targetLanguage: Array.isArray(item?.target_language) ? item.target_language.join(', ') : '',
   targetLocation: Array.isArray(item?.target_location) ? item.target_location.join(', ') : '',
+  targetStates: Array.isArray(item?.target_states) ? item.target_states.join(', ') : '',
+  totalBudgetCoins: item?.total_budget_coins != null ? String(item.total_budget_coins) : '',
   hideLikes: !!(item?.engagement_controls?.hide_likes_count ?? item?.hide_likes_count),
   disableComments: !!(item?.engagement_controls?.disable_comments ?? item?.turn_off_commenting),
 });
@@ -84,6 +86,8 @@ export default function EditContentModal({ isOpen, onClose, item, contentType = 
       { key: 'category', placeholder: 'Category' },
       { key: 'targetLanguage', placeholder: 'Target languages' },
       { key: 'targetLocation', placeholder: 'Target locations' },
+      { key: 'targetStates', placeholder: 'Target states' },
+      { key: 'totalBudgetCoins', placeholder: 'Total budget (coins)' },
     ];
   }, [contentType]);
 
@@ -113,6 +117,8 @@ export default function EditContentModal({ isOpen, onClose, item, contentType = 
             category: form.category,
             target_language: splitList(form.targetLanguage),
             target_location: splitList(form.targetLocation),
+            target_states: splitList(form.targetStates),
+            total_budget_coins: Number(form.totalBudgetCoins || 0),
             target_preferences: Array.isArray(item?.target_preferences) ? item.target_preferences : [],
           }
         : {

@@ -8,13 +8,18 @@ import CreatePostModal from './CreatePostModal';
 
 const VendorLayout = () => {
   const { userObject } = useSelector((state) => state.auth);
+  const isVendorValidated = Boolean(
+    userObject?.vendor_validated ??
+    userObject?.validated ??
+    userObject?.vendor?.validated
+  );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState('ad');
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [showVendorNotValidated, setShowVendorNotValidated] = useState(false);
 
   const handleOpenCreateModal = (type = 'ad') => {
-    if (userObject?.role === 'vendor' && !userObject?.is_active) {
+    if (userObject?.role === 'vendor' && type === 'ad' && !isVendorValidated) {
       setShowVendorNotValidated(true);
       return;
     }
@@ -53,10 +58,10 @@ const VendorLayout = () => {
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">
-              Vendor account inactive
+              Vendor verification pending
             </h3>
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
-              Your vendor account is inactive. Please contact support or wait for activation before uploading ads.
+              Your vendor account is not yet validated. Please wait for approval before uploading ads.
             </p>
             <div className="flex justify-center">
               <button

@@ -302,6 +302,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [allUsers, setAllUsers] = useState([]);
   const [isLoadingAllUsers, setIsLoadingAllUsers] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [adSubmitMode, setAdSubmitMode] = useState('publish');
   
   const CATEGORIES = [
     'Fashion', 'Electronics', 'Food & Dining', 'Beauty & Personal Care', 'Travel', 'Education',
@@ -343,6 +344,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   
   // Accordion state: 'category' | 'country' | 'state' | 'language' | 'budget' | null
   const [openAccordion, setOpenAccordion] = useState(null);
+  const isVendorValidated = Boolean(
+    userObject?.vendor_validated ??
+    userObject?.validated ??
+    userObject?.vendor?.validated
+  );
 
   const ensureAdProfileCompletion = useCallback(() => {
     if (Number(vendorProfileCompletion || 0) <= 80) {
@@ -692,7 +698,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     return 'custom';
   };
 
-  const handleNextStep = async () => {
+  const handleNextStep = async (submitMode = 'publish') => {
     if (step === 'crop') {
       const containerEl = cropContainerRef.current;
 
@@ -750,6 +756,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       setStep('share');
     } else if (step === 'share') {
       if (isSubmitting) return;
+      setAdSubmitMode(submitMode);
       setIsSubmitting(true);
       setUploadStage('converting');
       setUploadProgress(0);
@@ -1012,7 +1019,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             target_language: selectedLanguages,
             target_location: selectedCountries,
             target_states: selectedStates,
-            total_budget_coins: parseFloat(totalBudgetCoins) || 0
+            total_budget_coins: parseFloat(totalBudgetCoins) || 0,
+            status: submitMode === 'draft' ? 'draft' : 'pending'
           };
 
           await api.post('https://api.bebsmart.in/api/ads', adPayload);
@@ -1292,9 +1300,18 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               <h2 className="font-semibold text-base text-center dark:text-white flex-1">
                 {step === 'crop' ? 'Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Edit' : step === 'details' ? 'Ad Details' : 'Share'}
               </h2>
-              <div className="w-20 flex justify-end">
+              <div className="w-auto min-w-[140px] flex justify-end items-center gap-2">
+                {step === 'share' && postType === 'ad' && (
+                  <button
+                    onClick={() => handleNextStep('draft')}
+                    className="px-3 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40"
+                    disabled={!totalBudgetCoins || isSubmitting}
+                  >
+                    Save Draft
+                  </button>
+                )}
                 <button
-                  onClick={handleNextStep}
+                  onClick={() => handleNextStep('publish')}
                   className="text-[#0095f6] hover:text-[#00376b] dark:hover:text-blue-400 font-semibold text-sm transition-colors disabled:opacity-40"
                   disabled={step === 'share' && postType === 'ad' && (!totalBudgetCoins)}
                 >
@@ -1349,7 +1366,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 {userObject?.role === 'vendor' && (
                   <button
                     onClick={() => {
-                      if (!userObject?.is_active) {
+                      if (!isVendorValidated) {
                         setShowVendorNotValidated(true);
                       } else if (!ensureAdProfileCompletion()) {
                         return;
@@ -2171,7 +2188,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 md:hidden">
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Vendor verification pending</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">Your vendor account is not yet validated. Please refresh this page or wait 2–3 working days for verification before uploading ads.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">Your vendor account is not yet validated. Please wait for approval before uploading ads.</p>
             <div className="flex justify-center">
               <button onClick={() => setShowVendorNotValidated(false)} className="px-4 py-2.5 rounded-lg bg-insta-pink text-white font-medium hover:bg-insta-purple transition-colors">OK</button>
             </div>
@@ -2253,12 +2270,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               <p className="text-base font-semibold text-white">
                 {uploadStage === 'converting' && '✂️ Trimming video…'}
                 {uploadStage === 'uploading'  && '⬆️ Uploading…'}
-                {uploadStage === 'posting'    && '🚀 Publishing…'}
+                {uploadStage === 'posting'    && (postType === 'ad' && adSubmitMode === 'draft' ? '💾 Saving draft…' : '🚀 Publishing…')}
               </p>
               <p className="text-xs text-white/40">
                 {uploadStage === 'converting' && 'Applying your trim & crop'}
                 {uploadStage === 'uploading'  && 'Sending to server'}
-                {uploadStage === 'posting'    && 'Almost done!'}
+                {uploadStage === 'posting'    && (postType === 'ad' && adSubmitMode === 'draft' ? 'Saving your draft' : 'Almost done!')}
               </p>
             </div>
             <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
@@ -2279,7 +2296,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           setCaption('');
           setLocation('');
           setTags([]);
-          navigate('/');
+          navigate(postType === 'ad' ? '/vendor/ads-management' : '/');
         };
         return (
           <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(16px)' }}>
@@ -2314,10 +2331,22 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               </div>
               <div className="flex flex-col items-center gap-1.5 text-center">
                 <h3 className="text-xl font-bold text-white">
-                  {postType === 'reel' ? 'Reel Published! 🎉' : postType === 'ad' ? 'Ad Published! 🎉' : 'Post Shared! 🎉'}
+                  {postType === 'reel'
+                    ? 'Reel Published! 🎉'
+                    : postType === 'ad'
+                    ? adSubmitMode === 'draft'
+                      ? 'Ad Saved as Draft'
+                      : 'Ad Published! 🎉'
+                    : 'Post Shared! 🎉'}
                 </h3>
                 <p className="text-sm text-white/50">
-                  {postType === 'reel' ? 'Your reel is now live' : postType === 'ad' ? 'Your ad is now running' : 'Your post has been shared'}
+                  {postType === 'reel'
+                    ? 'Your reel is now live'
+                    : postType === 'ad'
+                    ? adSubmitMode === 'draft'
+                      ? 'Your ad has been saved and can be published later'
+                      : 'Your ad is now submitted for review'
+                    : 'Your post has been shared'}
                 </p>
               </div>
               <div className="w-full h-px" style={{ background: 'linear-gradient(90deg,transparent,#d62976,transparent)' }} />
@@ -2342,7 +2371,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             </div>
             <div className="flex gap-3 w-full">
               <button onClick={() => { setUploadStage('idle'); setUploadProgress(0); setUploadError(''); }} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
-              <button onClick={() => { setUploadStage('idle'); setUploadProgress(0); setUploadError(''); handleNextStep(); }} className="flex-1 py-3 rounded-xl text-white font-semibold text-sm transition-all active:scale-95" style={{ background: 'linear-gradient(135deg, #f472b6, #a855f7)' }}>Try Again</button>
+              <button onClick={() => { setUploadStage('idle'); setUploadProgress(0); setUploadError(''); handleNextStep(adSubmitMode); }} className="flex-1 py-3 rounded-xl text-white font-semibold text-sm transition-all active:scale-95" style={{ background: 'linear-gradient(135deg, #f472b6, #a855f7)' }}>Try Again</button>
             </div>
           </div>
         </div>

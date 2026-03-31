@@ -2,8 +2,9 @@ import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useSelector } from "react-redux";
 import api from "../../lib/api";
+import EditContentModal from "../../components/EditContentModal";
 import { 
-  Search, Eye, Edit3, Trash2,
+  Search, Eye, Edit3, Trash2, Pause, Play, Send,
   ChevronLeft, ChevronRight, Plus
 } from "lucide-react";
 
@@ -37,10 +38,13 @@ export default function AdsManagement() {
   const { userObject } = useSelector((state) => state.auth);
   const userId = userObject?._id || userObject?.id;
   const [profileCompletion, setProfileCompletion] = useState(0);
+  const [vendorValidated, setVendorValidated] = useState(false);
   const [activePackageAdsLimit, setActivePackageAdsLimit] = useState(0);
   const [showInactivePopup, setShowInactivePopup] = useState(false);
   const [showProfileGatePopup, setShowProfileGatePopup] = useState(false);
   const [showAdLimitPopup, setShowAdLimitPopup] = useState(false);
+  const [editingAd, setEditingAd] = useState(null);
+  const [actionKey, setActionKey] = useState("");
 
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -51,6 +55,38 @@ export default function AdsManagement() {
   
   const [filterStatus] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const normalizeAd = (ad) => ({
+    id: ad._id || ad.id,
+    _id: ad._id || ad.id,
+    name: ad.caption || ad.title || "Untitled Ad",
+    caption: ad.caption || ad.title || "",
+    category: ad.category || "Uncategorized",
+    status: ad.status || "draft",
+    username: ad.user_id?.username || ad.user_id?.full_name || "—",
+    businessName: ad.vendor_id?.business_name || "—",
+    totalCoins: ad.total_budget_coins || ad.budget || 0,
+    total_budget_coins: ad.total_budget_coins || ad.budget || 0,
+    coinsUsed: ad.total_coins_spent || ad.spend || 0,
+    views: ad.views_count || 0,
+    uniqueViews: ad.unique_views_count || 0,
+    completedViews: ad.completed_views_count || 0,
+    likes: ad.likes_count || 0,
+    comments: ad.comments_count || 0,
+    contentType: ad.content_type || "—",
+    content_type: ad.content_type || "reel",
+    location: ad.location || "—",
+    createdAt: ad.createdAt ? new Date(ad.createdAt).toLocaleDateString() : "-",
+    media: ad.media || [],
+    hashtags: ad.hashtags || ad.tags || [],
+    target_language: ad.target_language || [],
+    target_location: ad.target_location || [],
+    target_states: ad.target_states || [],
+    tagged_users: ad.tagged_users || [],
+    engagement_controls: ad.engagement_controls || {},
+    user_id: ad.user_id,
+    vendor_id: ad.vendor_id,
+  });
 
   // Fetch Categories
   useEffect(() => {
@@ -93,7 +129,7 @@ export default function AdsManagement() {
           ? res.data.data
           : [];
 
-        const normalizedAds = adsData.map(ad => ({
+        const normalizedAdsLegacy = adsData.map(ad => ({
           id: ad._id || ad.id,
           name: ad.caption || ad.title || "Untitled Ad",
           category: ad.category || "Uncategorized",
@@ -112,6 +148,7 @@ export default function AdsManagement() {
           createdAt: ad.createdAt ? new Date(ad.createdAt).toLocaleDateString() : "-",
         }));
 
+        const normalizedAds = adsData.map(normalizeAd);
         setAds(normalizedAds);
       } catch (err) {
         console.error("Failed to fetch ads", err);
@@ -133,12 +170,14 @@ export default function AdsManagement() {
           api.get('/vendor-packages/my/active').catch(() => ({ data: null })),
         ]);
         setProfileCompletion(Number(profileRes.data?.profile_completion_percentage || 0));
+        setVendorValidated(Boolean(profileRes.data?.validated));
         const activePackage = packageRes?.data?.active_package || packageRes?.data?.package || packageRes?.data || null;
         const packageData = activePackage?.package || activePackage || {};
         setActivePackageAdsLimit(Number(packageData?.ads_allowed_max || 0));
       } catch (err) {
         console.error("Failed to load vendor profile completion", err);
         setProfileCompletion(0);
+        setVendorValidated(false);
         setActivePackageAdsLimit(0);
       }
     };
@@ -159,7 +198,7 @@ export default function AdsManagement() {
 
   // ── Handler: open the CreatePost modal (same flow as Dashboard) ──────────
   const handleCreateAd = () => {
-    if (!userObject?.is_active) {
+    if (!vendorValidated) {
       setShowInactivePopup(true);
       return;
     }
@@ -180,6 +219,124 @@ export default function AdsManagement() {
     } else {
       // Fallback: navigate to the dedicated create page if modal isn't available
       navigate("/vendor/ads-management/create");
+    }
+  };
+
+  const handleAdUpdated = (updatedData) => {
+    const updatedAd = normalizeAd(updatedData?.ad || updatedData?.data || updatedData || {});
+    if (!updatedAd?.id) {
+      setEditingAd(null);
+      return;
+    }
+
+    setAds((prev) => prev.map((ad) => (ad.id === updatedAd.id ? { ...ad, ...updatedAd } : ad)));
+    setEditingAd(null);
+  };
+
+  const handleAdStatusChange = async (adId, nextStatus) => {
+    const nextActionKey = `${adId}:${nextStatus}`;
+    try {
+      setActionKey(nextActionKey);
+      setError("");
+      const { data } = await api.patch(`/ads/${adId}/metadata`, { status: nextStatus });
+      const updatedAd = normalizeAd(data?.ad || data?.data || data || {});
+      setAds((prev) => prev.map((ad) => (ad.id === updatedAd.id ? { ...ad, ...updatedAd } : ad)));
+    } catch (err) {
+      console.error(`Failed to update ad status to ${nextStatus}`, err);
+      setError(err?.response?.data?.message || "Failed to update ad status.");
+    } finally {
+      setActionKey("");
+    }
+  };
+
+  const handleDeleteAd = async (adId) => {
+    if (!window.confirm("Delete this ad?")) return;
+
+    const nextActionKey = `${adId}:delete`;
+    try {
+      setActionKey(nextActionKey);
+      setError("");
+      await api.delete(`/ads/${adId}`);
+      setAds((prev) => prev.filter((ad) => ad.id !== adId));
+      setEditingAd((prev) => (prev?.id === adId ? null : prev));
+    } catch (err) {
+      console.error("Failed to delete ad", err);
+      setError(err?.response?.data?.message || "Failed to delete ad.");
+    } finally {
+      setActionKey("");
+    }
+  };
+
+  const renderAdActions = (ad, compact = false) => {
+    const isBusy = (suffix) => actionKey === `${ad.id}:${suffix}`;
+    const buttonClass = compact
+      ? "p-2 text-gray-400 transition-colors"
+      : "p-2 rounded-lg transition-colors";
+
+    return (
+      <>
+        <button
+          onClick={() => navigate(`/vendor/ads-management/${ad.id}`)}
+          className={`${buttonClass} hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400`}
+          title="View"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleEditAd(ad.id)}
+          className={`${buttonClass} hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500`}
+          title="Edit"
+        >
+          <Edit3 className="w-4 h-4" />
+        </button>
+        {ad.status === "draft" && (
+          <button
+            onClick={() => handleAdStatusChange(ad.id, "pending")}
+            className={`${buttonClass} hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 disabled:opacity-50`}
+            title="Submit draft"
+            disabled={isBusy("pending")}
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        )}
+        {ad.status === "active" && (
+          <button
+            onClick={() => handleAdStatusChange(ad.id, "paused")}
+            className={`${buttonClass} hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600 dark:text-amber-400 disabled:opacity-50`}
+            title="Pause"
+            disabled={isBusy("paused")}
+          >
+            <Pause className="w-4 h-4" />
+          </button>
+        )}
+        {ad.status === "paused" && (
+          <button
+            onClick={() => handleAdStatusChange(ad.id, "active")}
+            className={`${buttonClass} hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 disabled:opacity-50`}
+            title="Resume"
+            disabled={isBusy("active")}
+          >
+            <Play className="w-4 h-4" />
+          </button>
+        )}
+        <button
+          onClick={() => handleDeleteAd(ad.id)}
+          className={`${buttonClass} hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 disabled:opacity-50`}
+          title="Delete"
+          disabled={isBusy("delete")}
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </>
+    );
+  };
+
+  const handleEditAd = async (adId) => {
+    try {
+      const { data } = await api.get(`/ads/${adId}`);
+      setEditingAd(normalizeAd(data?.ad || data?.data || data || {}));
+    } catch (err) {
+      console.error("Failed to fetch ad details", err);
     }
   };
 
@@ -307,19 +464,7 @@ export default function AdsManagement() {
                       <td className="p-4 text-xs text-gray-500 dark:text-gray-400">{ad.createdAt}</td>
                       <td className="p-4 pr-6 text-right">
                         <div className="flex justify-end items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => navigate(`/vendor/ads-management/${ad.id}`)}
-                            className="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 transition-colors"
-                            title="View"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors" title="Edit">
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors" title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {renderAdActions(ad)}
                         </div>
                       </td>
                     </tr>
@@ -369,9 +514,8 @@ export default function AdsManagement() {
 
                   <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
                     <div className="text-xs text-gray-400">{ad.createdAt}</div>
-                    <div className="flex gap-1">
-                      <button className="p-2 text-gray-400 hover:text-blue-500"><Edit3 className="w-4 h-4" /></button>
-                      <button className="p-2 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      {renderAdActions(ad, true)}
                     </div>
                   </div>
                 </div>
@@ -397,9 +541,11 @@ export default function AdsManagement() {
         {showInactivePopup && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Vendor account inactive</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">
+                Vendor verification pending
+              </h3>
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center">
-                Your vendor account is inactive. Please contact support or wait for activation before uploading ads.
+                Your vendor account is not yet validated. Please wait for approval before creating ads.
               </p>
               <div className="flex justify-center">
                 <button
@@ -452,6 +598,14 @@ export default function AdsManagement() {
             </div>
           </div>
         )}
+
+        <EditContentModal
+          isOpen={!!editingAd}
+          onClose={() => setEditingAd(null)}
+          item={editingAd}
+          contentType="ad"
+          onSaved={handleAdUpdated}
+        />
       </div>
     </div>
   );
