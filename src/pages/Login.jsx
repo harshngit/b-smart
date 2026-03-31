@@ -84,6 +84,7 @@ const Login = () => {
 
     try {
       const resultAction = await dispatch(login({
+        identifier,
         email: identifier,
         password,
         ...(pending2FA ? { otp } : {}),

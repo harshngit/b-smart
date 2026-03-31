@@ -593,7 +593,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
       : `${window.location.origin}/posts/${postId}`;
 
   return (
-    <div className="bg-white dark:bg-black mb-4 border-b border-gray-200 dark:border-gray-800 pb-4 md:rounded-lg md:border max-w-[470px] mx-auto">
+    <div className="relative isolate overflow-hidden bg-white dark:bg-black mb-4 border-b border-gray-200 dark:border-gray-800 pb-4 md:rounded-lg md:border max-w-[470px] mx-auto">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between p-3">

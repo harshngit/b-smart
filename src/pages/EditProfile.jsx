@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { supabase } from '../lib/supabase';
-import { setUser } from '../store/authSlice';
-import { ArrowLeft, Camera, Loader2 } from 'lucide-react';
+import api from '../lib/api';
+import AvatarCropModal from '../components/AvatarCropModal';
+import { fetchMe, setUser } from '../store/authSlice';
+import { ArrowLeft, Camera } from 'lucide-react';
 
 const EditProfile = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
+  const userId = userObject?._id || userObject?.id || '';
   
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [form, setForm] = useState({
     full_name: '',
     username: '',
@@ -37,65 +39,33 @@ const EditProfile = () => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const uploadAvatar = async (event) => {
-    try {
-      setUploading(true);
-
-      if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('You must select an image to upload.');
-      }
-
-      const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${userObject.id}/${fileName}`;
-
-      let { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      setForm(prev => ({ ...prev, avatar_url: publicUrl }));
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
+
+    if (!userId) {
+      alert('User session not found. Please login again.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const updates = {
-        id: userObject.id,
-        full_name: form.full_name,
-        username: form.username,
+        full_name: form.full_name.trim(),
+        username: form.username.trim(),
         bio: form.bio,
-        phone: form.phone,
+        phone: form.phone.trim(),
         avatar_url: form.avatar_url,
-        updated_at: new Date(),
       };
 
-      const { error } = await supabase.from('users').upsert(updates);
+      const { data } = await api.put(`/users/${userId}`, updates);
+      const updatedUser = data?.user || data?.data || data || { ...userObject, ...updates };
 
-      if (error) {
-        throw error;
-      }
-
-      // Update Redux state
-      dispatch(setUser({ ...userObject, ...updates }));
+      dispatch(setUser({ ...userObject, ...updatedUser }));
+      dispatch(fetchMe());
       navigate('/profile');
     } catch (error) {
-      alert(error.message);
+      alert(error?.response?.data?.message || error.message || 'Failed to update profile.');
     } finally {
       setLoading(false);
     }
@@ -128,7 +98,7 @@ const EditProfile = () => {
       <div className="max-w-xl mx-auto p-4">
         {/* Avatar Section */}
         <div className="flex flex-col items-center mb-8">
-          <div className="relative group cursor-pointer">
+          <div className="relative group cursor-pointer" onClick={() => setShowAvatarModal(true)}>
             <div className="w-24 h-24 rounded-full p-[2px] bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink mb-3">
               <div className="w-full h-full rounded-full bg-white dark:bg-black p-[2px] overflow-hidden relative">
                 {form.avatar_url ? (
@@ -149,30 +119,13 @@ const EditProfile = () => {
                 </div>
               </div>
             </div>
-            
-            <label className="absolute inset-0 cursor-pointer" htmlFor="avatar-upload">
-              <input
-                type="file"
-                id="avatar-upload"
-                accept="image/*"
-                onChange={uploadAvatar}
-                disabled={uploading}
-                className="hidden"
-              />
-            </label>
           </div>
           
           <button 
             className="text-insta-pink font-semibold text-sm"
-            onClick={() => document.getElementById('avatar-upload').click()}
-            disabled={uploading}
+            onClick={() => setShowAvatarModal(true)}
           >
-            {uploading ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="animate-spin" size={14} />
-                Uploading...
-              </span>
-            ) : 'Change Profile Photo'}
+            Change Profile Photo
           </button>
         </div>
 
@@ -227,6 +180,18 @@ const EditProfile = () => {
           </div>
         </form>
       </div>
+
+      <AvatarCropModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        currentAvatar={form.avatar_url}
+        userName={form.full_name || form.username}
+        onSuccess={(newAvatarUrl) => {
+          const safeUrl = newAvatarUrl || form.avatar_url;
+          setForm((prev) => ({ ...prev, avatar_url: safeUrl }));
+          dispatch(setUser({ ...userObject, avatar_url: safeUrl }));
+        }}
+      />
     </div>
   );
 };
