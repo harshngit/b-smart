@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Navigate, useNavigate, Link } from 'react-router-dom';
+import { Navigate, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import commentService from '../services/commentServiceJS';
 import {
@@ -393,7 +393,7 @@ const FollowButton = ({ userId, mobile = false }) => {
     <button
       onClick={toggle}
       disabled={loading}
-      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all
+      className={`shrink-0 whitespace-nowrap flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all
         ${followed
           ? mobile
             ? 'border border-white/40 bg-white/20 text-white backdrop-blur-sm'
@@ -537,6 +537,7 @@ const Ads = ({ feedMode = 'user' }) => {
   const { userObject } = useSelector((state) => state.auth);
   const walletBalance = useSelector((state) => state.wallet.balance);
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isVendorUser = userObject?.role === 'vendor';
 
   const currentUserId = userObject?._id || userObject?.id || null;
@@ -562,8 +563,12 @@ const Ads = ({ feedMode = 'user' }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchDropdownVisible, setSearchDropdownVisible] = useState(false);
+  const [hoveredUserId, setHoveredUserId] = useState(null);
+  const [userPreviewCache, setUserPreviewCache] = useState({});
+  const [userPreviewLoadingId, setUserPreviewLoadingId] = useState(null);
   const searchInputRef = React.useRef(null);
   const searchContainerRef = React.useRef(null);
+  const requestedAdFetchRef = useRef('');
 
   const [categories] = useState(FALLBACK_CATEGORIES);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -577,9 +582,6 @@ const Ads = ({ feedMode = 'user' }) => {
   const [likedIds, setLikedIds] = useState(new Set());
   const [savedIds, setSavedIds] = useState(new Set());
   const [coinToast, setCoinToast] = useState(null); // { amount, id }
-  // Popup modals for coin rewards
-  const [viewRewardPopup, setViewRewardPopup] = useState(null); // { amount } — shown first time only
-  const [viewRecordedPopup, setViewRecordedPopup] = useState(null); // { view_count } — shown when rewarded: false
   const [likeRewardPopup, setLikeRewardPopup] = useState(null); // { amount, isLike } — shown on every like/dislike
   const [reportAd, setReportAd] = useState(null);
   const [editAd, setEditAd] = useState(null);
@@ -677,15 +679,52 @@ const Ads = ({ feedMode = 'user' }) => {
     setSearchQuery('');
     setSearchResults([]);
     setSearchDropdownVisible(false);
+    setHoveredUserId(null);
   };
 
   const handleSearchResultClick = (item) => {
     handleSearchClose();
     if (item._type === 'user') {
       navigate(`/profile/${item._id || item.id}`);
+      return;
     }
-    // For ads — just close and let user see feed; or navigate to ad detail if available
+    if (item._type === 'ad') {
+      const adId = item._id || item.id;
+      if (!adId) return;
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('ad', adId);
+      setSearchParams(nextParams, { replace: true });
+    }
   };
+
+  const handleUserHover = useCallback(async (user) => {
+    const userId = user?._id || user?.id;
+    if (!userId) return;
+
+    setHoveredUserId(userId);
+    if (userPreviewCache[userId]) return;
+
+    try {
+      setUserPreviewLoadingId(userId);
+      const { data } = await api.get(`/users/${userId}`);
+      const preview = data?.user || data?.data || data || {};
+      setUserPreviewCache((prev) => ({ ...prev, [userId]: preview }));
+    } catch (err) {
+      console.error('Failed to load user preview', err);
+      setUserPreviewCache((prev) => ({
+        ...prev,
+        [userId]: {
+          _id: userId,
+          username: user?.username || '',
+          full_name: user?.full_name || user?.username || 'User',
+          avatar_url: user?.avatar_url || '',
+          bio: user?.bio || '',
+        }
+      }));
+    } finally {
+      setUserPreviewLoadingId((current) => (current === userId ? null : current));
+    }
+  }, [userPreviewCache]);
   const handleAdMore = (ad) => {
     const adOwnerId = ad?.user_id?._id || ad?.user_id?.id || ad?.user_id;
     if (currentUserId && adOwnerId && String(currentUserId) === String(adOwnerId)) {
@@ -741,6 +780,52 @@ const Ads = ({ feedMode = 'user' }) => {
   }, []);
 
   useEffect(() => { fetchAds(activeCategory); }, [activeCategory, fetchAds]);
+
+  useEffect(() => {
+    const targetAdId = searchParams.get('ad');
+    if (!targetAdId) return;
+
+    const existingIndex = ads.findIndex((ad) => String(ad._id || ad.id) === String(targetAdId));
+    if (existingIndex >= 0) {
+      setCurrentIndex(existingIndex);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('ad');
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
+
+    if (loading || requestedAdFetchRef.current === targetAdId) return;
+    requestedAdFetchRef.current = targetAdId;
+
+    let cancelled = false;
+
+    const fetchTargetAd = async () => {
+      try {
+        const { data } = await api.get(`/ads/${targetAdId}`);
+        const fetchedAd = data?.ad || data?.data || data || null;
+        if (cancelled || !fetchedAd?._id) return;
+
+        setAds((prev) => [fetchedAd, ...prev.filter((ad) => String(ad._id || ad.id) !== String(fetchedAd._id))]);
+        setCurrentIndex(0);
+
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('ad');
+        setSearchParams(nextParams, { replace: true });
+      } catch (err) {
+        console.error('Failed to load searched ad', err);
+      } finally {
+        if (requestedAdFetchRef.current === targetAdId) {
+          requestedAdFetchRef.current = '';
+        }
+      }
+    };
+
+    fetchTargetAd();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ads, loading, searchParams, setSearchParams]);
 
   // Fetch wallet on mount and every 30s using Redux — keeps balance live across the app
   useEffect(() => {
@@ -816,7 +901,7 @@ const Ads = ({ feedMode = 'user' }) => {
         setTimeout(() => dispatch(fetchWallet()), 3000);
       }
 
-      // Show coin reward POPUP — only when rewarded is explicitly true
+      // Show only the top coin toast when rewarded is explicitly true.
       const isRewarded = resData?.rewarded === true;
       if (isRewarded) {
         const rewardAmount = (coinsRewarded && Number(coinsRewarded) > 0)
@@ -825,13 +910,11 @@ const Ads = ({ feedMode = 'user' }) => {
               const adCoins = adsRef.current.find(a => String(a._id) === String(adId))?.coins_reward;
               return adCoins && Number(adCoins) > 0 ? Number(adCoins) : 10;
             })();
-        setViewRewardPopup({ amount: rewardAmount });
         const toastId = Date.now();
         setCoinToast({ amount: rewardAmount, id: toastId });
         setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
-      } else if (resData?.rewarded === false) {
-        // View was recorded but not rewarded — no popup shown
-      }    } catch (err) {
+      }
+    } catch (err) {
       console.error('View tracking failed:', err);
     }
   }, [currentUserId, dispatch]);
@@ -1262,9 +1345,18 @@ const Ads = ({ feedMode = 'user' }) => {
                   {searchResults.filter(r => r._type === 'user').length > 0 && (
                     <div>
                       <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">People</div>
-                      {searchResults.filter(r => r._type === 'user').map(u => (
-                        <button key={u._id || u.id} onClick={() => handleSearchResultClick(u)}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
+                      {searchResults.filter(r => r._type === 'user').map(u => {
+                        const previewUserId = u._id || u.id;
+                        const preview = userPreviewCache[previewUserId];
+                        const isPreviewOpen = hoveredUserId === previewUserId;
+                        return (
+                        <button
+                          key={previewUserId}
+                          onClick={() => handleSearchResultClick(u)}
+                          onMouseEnter={() => handleUserHover(u)}
+                          onMouseLeave={() => setHoveredUserId((current) => (current === previewUserId ? null : current))}
+                          className="relative w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                        >
                           <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] shrink-0">
                             <div className="w-full h-full rounded-full bg-white dark:bg-[#1c1c1e] overflow-hidden flex items-center justify-center">
                               {u.avatar_url
@@ -1277,8 +1369,46 @@ const Ads = ({ feedMode = 'user' }) => {
                             <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</div>
                             {u.username && <div className="text-xs text-gray-400 truncate">@{u.username}</div>}
                           </div>
+                          {isPreviewOpen && (
+                            <div className="absolute left-full top-1/2 ml-4 -translate-y-1/2 w-72 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-[#111317]/95 backdrop-blur-xl shadow-2xl p-4 z-20">
+                              <div className="flex items-center gap-3">
+                                <Avatar
+                                  src={preview?.avatar_url || u.avatar_url}
+                                  username={preview?.username || preview?.full_name || u.username || u.full_name}
+                                  size="md"
+                                />
+                                <div className="min-w-0">
+                                  <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                    {preview?.full_name || u.full_name || u.username}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                    @{preview?.username || u.username || 'user'}
+                                  </div>
+                                </div>
+                              </div>
+                              <p className="mt-3 text-xs leading-5 text-gray-600 dark:text-gray-300 min-h-[40px]">
+                                {userPreviewLoadingId === previewUserId
+                                  ? 'Loading preview...'
+                                  : preview?.bio || 'No bio added yet.'}
+                              </p>
+                              <div className="mt-3 flex items-center gap-4 text-xs">
+                                <div>
+                                  <span className="font-bold text-gray-900 dark:text-white">{fmt(preview?.posts_count || preview?.postsCount || 0)}</span>
+                                  <span className="ml-1 text-gray-500 dark:text-gray-400">posts</span>
+                                </div>
+                                <div>
+                                  <span className="font-bold text-gray-900 dark:text-white">{fmt(preview?.followers_count || preview?.followersCount || 0)}</span>
+                                  <span className="ml-1 text-gray-500 dark:text-gray-400">followers</span>
+                                </div>
+                                <div>
+                                  <span className="font-bold text-gray-900 dark:text-white">{fmt(preview?.following_count || preview?.followingCount || 0)}</span>
+                                  <span className="ml-1 text-gray-500 dark:text-gray-400">following</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </button>
-                      ))}
+                      )})}
                     </div>
                   )}
                   {/* Ads */}
@@ -1292,24 +1422,35 @@ const Ads = ({ feedMode = 'user' }) => {
                         const thumb = mediaItem?.thumbnails?.[0]?.fileUrl || mediaItem?.thumbnail_url || (!isVideoAd ? mediaItem?.fileUrl : null);
                         const videoSrc = isVideoAd ? mediaItem?.fileUrl : null;
                         return (
-                          <button key={adItem._id} onClick={() => handleSearchResultClick(adItem)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left group/adrow">
+                          <button
+                            key={adItem._id || adItem.id}
+                            onClick={() => handleSearchResultClick(adItem)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left group/adrow"
+                          >
                             <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0 relative">
                               {isVideoAd && videoSrc ? (
-                                <>
-                                  {thumb && <img src={thumb} alt="" className="w-full h-full object-cover absolute inset-0 group-hover/adrow:opacity-0 transition-opacity duration-200" />}
-                                  <video
-                                    src={videoSrc}
-                                    className="w-full h-full object-cover opacity-0 group-hover/adrow:opacity-100 transition-opacity duration-200"
-                                    muted
-                                    playsInline
-                                    preload="none"
-                                    onMouseEnter={e => { e.currentTarget.currentTime = 0; e.currentTarget.play().catch(() => {}); }}
-                                    onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
-                                    onTimeUpdate={e => { if (e.currentTarget.currentTime >= 5) { e.currentTarget.pause(); e.currentTarget.currentTime = 0; } }}
-                                  />
-                                  {!thumb && <div className="w-full h-full flex items-center justify-center text-gray-400 absolute inset-0 group-hover/adrow:opacity-0"><ShoppingBag size={14} /></div>}
-                                </>
+                                <video
+                                  src={videoSrc}
+                                  poster={thumb || undefined}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                  playsInline
+                                  preload="metadata"
+                                  onMouseEnter={e => {
+                                    e.currentTarget.currentTime = 0;
+                                    e.currentTarget.play().catch(() => {});
+                                  }}
+                                  onMouseLeave={e => {
+                                    e.currentTarget.pause();
+                                    e.currentTarget.currentTime = 0;
+                                  }}
+                                  onTimeUpdate={e => {
+                                    if (e.currentTarget.currentTime >= 5) {
+                                      e.currentTarget.pause();
+                                      e.currentTarget.currentTime = 0;
+                                    }
+                                  }}
+                                />
                               ) : thumb ? (
                                 <img src={thumb} alt="" className="w-full h-full object-cover" />
                               ) : (
@@ -1552,18 +1693,10 @@ const Ads = ({ feedMode = 'user' }) => {
                               const dur     = m?.video_meta?.final_duration ?? null;
                               const ct      = vid.currentTime;
 
-                              // Hit the trim end → stop, mark 100%, fire view, then replay
+                              // Hit the trim end → mark 100%, record the first complete view, then replay
                               if (end !== null && ct >= end) {
                                 setProgress(100);
-                                const key = String(a._id);
-                                // Always fire on every complete watch
                                 trackView(a._id);
-                                // Clear guards so next full watch fires again
-                                viewFiredForAdId.current.delete(key);
-                                viewedIdsRef.current.delete(key);
-                                try {
-                                  sessionStorage.setItem('ads_viewed_ids', JSON.stringify([...viewedIdsRef.current]));
-                                } catch { /* ignore */ }
                                 // Replay from start
                                 vid.currentTime = start > 0 ? start : 0;
                                 setProgress(0);
@@ -1584,16 +1717,8 @@ const Ads = ({ feedMode = 'user' }) => {
                               setProgress(100);
                               setIsPausedByUser(false);
 
-                              const key = String(a._id);
-                              // Always fire trackView on every complete watch (re-watch included)
+                              // Record only the first complete watch for this ad in the current session.
                               trackView(a._id);
-
-                              // Clear both guards so the NEXT full watch fires again
-                              viewFiredForAdId.current.delete(key);
-                              viewedIdsRef.current.delete(key);
-                              try {
-                                sessionStorage.setItem('ads_viewed_ids', JSON.stringify([...viewedIdsRef.current]));
-                              } catch { /* ignore */ }
 
                               // Replay the video from the beginning
                               const vid = videoRefs.current[index];
@@ -1654,14 +1779,14 @@ const Ads = ({ feedMode = 'user' }) => {
                       {/* Bottom info — clears bottom nav (64px) on mobile */}
                       <div className="absolute bottom-0 left-0 w-full p-4 md:pb-6 z-20" style={{ paddingRight: '60px' }}>
                         {/* Vendor row — name is clickable → public profile */}
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <div className="flex items-center gap-2 mb-2 flex-nowrap min-w-0">
                           <button
                             onClick={() => {
                               trackAdClick(a._id);
                               const uid = a.user_id?._id || a.user_id?.id || a.vendor_id?._id;
                               if (uid) navigate(`/profile/${uid}`);
                             }}
-                            className="flex items-center gap-2 active:opacity-70 transition-opacity"
+                            className="flex items-center gap-2 active:opacity-70 transition-opacity min-w-0 flex-1"
                           >
                             {a.user_id?.avatar_url
                               ? <img src={a.user_id.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover shrink-0" alt="user" />
@@ -1669,12 +1794,12 @@ const Ads = ({ feedMode = 'user' }) => {
                                   {(a.vendor_id?.business_name || 'A')[0]}
                                 </div>
                             }
-                            <span className="font-bold text-white text-sm hover:underline decoration-white/60 underline-offset-2">
+                            <span className="font-bold text-white text-sm hover:underline decoration-white/60 underline-offset-2 truncate">
                               {a.vendor_id?.business_name || a.user_id?.username}
                             </span>
                           </button>
                           {a.total_budget_coins > 0 && (
-                            <div className="flex items-center gap-1 bg-amber-500/20 border border-amber-400/40 rounded-full px-1.5 py-0.5">
+                            <div className="shrink-0 flex items-center gap-1 bg-amber-500/20 border border-amber-400/40 rounded-full px-1.5 py-0.5">
                               <CoinIcon size={11} />
                               <span className="text-amber-300 text-[10px] font-bold">{fmt(a.total_budget_coins)}</span>
                             </div>
@@ -1861,7 +1986,7 @@ const Ads = ({ feedMode = 'user' }) => {
       )}
 
       {/* ── View Reward Popup (first-time watch) ── */}
-      {viewRewardPopup && (
+      {false && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
           <div
             className="pointer-events-auto bg-white dark:bg-[#1c1c1e] rounded-3xl shadow-2xl px-8 py-7 flex flex-col items-center gap-4 border border-amber-200 dark:border-amber-500/30"
@@ -1894,7 +2019,7 @@ const Ads = ({ feedMode = 'user' }) => {
       )}
 
       {/* ── View Recorded Popup (rewarded: false) ── */}
-      {viewRecordedPopup && (
+      {false && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
           <div
             className="pointer-events-auto bg-white dark:bg-[#1c1c1e] rounded-3xl shadow-2xl px-8 py-7 flex flex-col items-center gap-4 border border-gray-200 dark:border-white/10"
