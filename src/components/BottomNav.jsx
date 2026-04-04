@@ -26,7 +26,7 @@ const BottomNav = ({ onOpenCreateModal }) => {
   const activeColor   = 'text-[#fa3f5e]';
   const inactiveColor = 'text-gray-500 dark:text-gray-400';
 
-  const hideBottomNav = ['/create-ad'].includes(location.pathname);
+  const hideBottomNav = ['/create-ad'].includes(location.pathname) || location.pathname.startsWith('/messages');
   if (hideBottomNav) return null;
 
   // Vendor: 3 left | FAB center | 3 right

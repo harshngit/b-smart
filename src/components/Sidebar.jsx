@@ -4,7 +4,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2 } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
 import { logoutUser } from '../store/authSlice';
+import { setConversations } from '../store/chatSlice';
 import { useNotificationSocket } from '../hooks/useNotificationSocket';
+import { getConversations as getChatConversations } from '../services/chatService';
 import PostDetailModal from './PostDetailModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
@@ -141,6 +143,9 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const dispatch = useDispatch();
   const { mode } = useSelector((state) => state.theme);
   const { userObject } = useSelector((state) => state.auth);
+  const chatUnreadCount = useSelector((state) =>
+    Object.values(state.chat?.unreadCounts || {}).reduce((sum, count) => sum + Number(count || 0), 0)
+  );
   const userId = userObject?._id || userObject?.id;
   const isVendorValidated = Boolean(
     userObject?.vendor_validated ??
@@ -199,6 +204,16 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const notifTypeIcon = (type) => NOTIF_ICON[type] || <Bell size={12} className="text-gray-500" />;
   const notifTypeBg   = (type) => NOTIF_BG[type]   || "bg-gray-100 dark:bg-gray-800";
 
+  const syncChatConversations = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const conversations = await getChatConversations();
+      dispatch(setConversations(Array.isArray(conversations) ? conversations : []));
+    } catch (error) {
+      console.error('Failed to sync chat conversations:', error);
+    }
+  }, [dispatch, userId]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -228,6 +243,30 @@ const Sidebar = ({ onOpenCreateModal }) => {
     const timer = setInterval(() => setNowTs(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!userId) return undefined;
+
+    syncChatConversations();
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncChatConversations();
+      }
+    }, 15000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncChatConversations();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [syncChatConversations, userId]);
 
   // ── Search History ───────────────────────────────────────────────────────────
   const loadHistory = useCallback(async () => {
@@ -361,6 +400,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
     { icon: Search, label: 'Search', path: null, action: openSidebarSearch },
     { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
     { icon: Clapperboard, label: 'Reels', path: '/reels' },
+    { icon: MessageCircle, label: 'Messages', path: '/messages' },
     { icon: Target, label: 'Ads', path: '/ads' },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
@@ -392,7 +432,9 @@ const Sidebar = ({ onOpenCreateModal }) => {
         <div className="flex-1 flex flex-col gap-2 px-3">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path || (item.label === 'Create' && isCreateDropdownOpen);
+            const isActive = item.path
+              ? (item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path))
+              : item.label === 'Create' && isCreateDropdownOpen;
 
             if (item.label === 'Search') {
               return (
@@ -479,12 +521,17 @@ const Sidebar = ({ onOpenCreateModal }) => {
                 to={item.path}
                 className={`group flex items-center gap-4 p-3 rounded-xl transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white shadow-md' : 'hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-900 dark:text-white'}`}
               >
-                <div className="min-w-[24px]">
+                <div className="min-w-[24px] relative">
                   <Icon
                     size={24}
                     className={`${isActive ? 'text-white' : 'text-gray-900 dark:text-white'} transition-transform duration-150 group-hover:scale-110 ${!isActive && 'group-hover:text-black dark:group-hover:text-white'}`}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
+                  {item.label === 'Messages' && chatUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-500 text-white text-[9px] font-black flex items-center justify-center leading-none border border-white dark:border-black">
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                    </span>
+                  )}
                 </div>
                 <span className={`text-base font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${!isActive && 'group-hover:text-black dark:group-hover:text-white'} ${isHovered ? 'opacity-100 w-auto' : 'opacity-0 w-0'} ${isActive ? 'text-white font-bold' : ''}`}>
                   {item.label}

@@ -7,6 +7,7 @@ import api from '../lib/api';
 import PostDetailModal from '../components/PostDetailModal';
 import AvatarCropModal from '../components/AvatarCropModal';
 import { setUser } from '../store/authSlice';
+import { createOrGetConversation } from '../services/chatService';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n = 0) => {
@@ -40,6 +41,7 @@ const Profile = () => {
     const [loadingAds, setLoadingAds] = useState(false);
     const [followed, setFollowed] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
+    const [messageLoading, setMessageLoading] = useState(false);
     const [vendorInfo, setVendorInfo] = useState(null);
     const [rewardToast, setRewardToast] = useState(null);
     const [favoriteProfile, setFavoriteProfile] = useState(false);
@@ -336,6 +338,33 @@ const Profile = () => {
                 type: 'error',
                 message: 'Unable to copy profile link.',
             });
+        }
+    };
+
+    const handleOpenMessages = async () => {
+        if (messageLoading) return;
+
+        if (isOwnProfile) {
+            navigate('/messages');
+            return;
+        }
+
+        const participantId = profileUser?._id || profileUser?.id;
+        if (!participantId) return;
+
+        setMessageLoading(true);
+        try {
+            const conversation = await createOrGetConversation(participantId);
+            if (conversation?._id) {
+                navigate(`/messages/${conversation._id}`);
+            } else {
+                navigate('/messages');
+            }
+        } catch (error) {
+            console.error('Failed to open conversation:', error);
+            navigate('/messages');
+        } finally {
+            setMessageLoading(false);
         }
     };
 
@@ -645,6 +674,7 @@ const Profile = () => {
                                     </button>
                                     <button
                                         type="button"
+                                        onClick={handleOpenMessages}
                                         className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                         aria-label="Chat"
                                     >
@@ -658,7 +688,13 @@ const Profile = () => {
                                         {followLoading && <Loader2 size={12} className="animate-spin" />}
                                         {followed ? 'Following' : 'Follow'}
                                     </button>
-                                    <button className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg">Message</button>
+                                    <button
+                                        onClick={handleOpenMessages}
+                                        disabled={messageLoading}
+                                        className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-semibold py-1.5 rounded-lg disabled:opacity-60"
+                                    >
+                                        {messageLoading ? 'Opening...' : 'Message'}
+                                    </button>
                                     <button className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-2 rounded-lg"><MoreHorizontal size={18} /></button>
                                 </>
                             )}
@@ -763,6 +799,7 @@ const Profile = () => {
                                         </button>
                                         <button
                                             type="button"
+                                            onClick={handleOpenMessages}
                                             className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
                                             aria-label="Chat"
                                         >
@@ -777,7 +814,13 @@ const Profile = () => {
                                             {followLoading && <Loader2 size={12} className="animate-spin" />}
                                             {followed ? 'Following' : 'Follow'}
                                         </button>
-                                        <button className="px-5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-semibold rounded-lg text-sm">Message</button>
+                                        <button
+                                            onClick={handleOpenMessages}
+                                            disabled={messageLoading}
+                                            className="px-5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-semibold rounded-lg text-sm disabled:opacity-60"
+                                        >
+                                            {messageLoading ? 'Opening...' : 'Message'}
+                                        </button>
                                         <button className="p-2 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><MoreHorizontal size={22} /></button>
                                     </>
                                 )}

@@ -14,8 +14,9 @@ const Layout = () => {
   const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
   const walletBalance = useSelector((state) => state.wallet.balance);
-  const isExcludedPage = ['/profile', '/settings', '/promote'].includes(location.pathname);
-  const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
+  const isMessagesPage = location.pathname.startsWith('/messages');
+  const isExcludedPage = ['/profile', '/settings', '/promote'].includes(location.pathname) || isMessagesPage;
+  const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname) || isMessagesPage;
   const showTopBar = !isExcludedPage && !isFullScreenPage;
 
   // Fetch wallet on mount and poll every 30s to keep balance live
@@ -207,13 +208,11 @@ const Layout = () => {
         {showTopBar && <TopBar />}
 
         <div className={`
-          ${showTopBar ? 'pt-16 md:pt-4' : 'pt-0 md:pt-4'}
+          ${showTopBar ? 'pt-16 md:pt-4' : 'pt-0 md:pt-0'}
           w-full
-          md:max-w-[calc(100%-80px)]
-          lg:max-w-4xl
+          ${isMessagesPage ? 'md:max-w-none lg:max-w-none' : 'md:max-w-[calc(100%-80px)] lg:max-w-4xl'}
           mx-auto
-          px-0
-          md:px-8
+          ${isMessagesPage ? 'px-0 md:px-0' : 'px-0 md:px-8'}
         `}>
           <Outlet />
         </div>

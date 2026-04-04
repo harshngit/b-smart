@@ -1,8 +1,10 @@
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.bebsmart.in/api';
+
 // Create an Axios instance
 const api = axios.create({
-	baseURL: 'https://api.bebsmart.in/api', // Default to localhost:5000 if not set
+	baseURL: API_BASE_URL,
 	headers: {
 		'Content-Type': 'application/json',
 	},

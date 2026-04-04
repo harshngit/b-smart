@@ -27,6 +27,7 @@ import Notifications from './pages/Notifications';
 import VendorNotifications from './pages/vendor-pages/VendorNotifications';
 import ProtectedRoute from './components/ProtectedRoute';
 import Search from './pages/Search';
+import ChatPage from './pages/ChatPage';
 
 import VendorLayout from './components/VendorLayout';
 import VendorDashboard from './pages/vendor-pages/Dashboard';
@@ -107,6 +108,8 @@ function App() {
           <Route path="/settings"         element={<Settings />} />
           <Route path="/notifications"    element={<Notifications />} />
           <Route path="/search"           element={<Search />} />
+          <Route path="/messages"         element={<ChatPage />} />
+          <Route path="/messages/:conversationId" element={<ChatPage />} />
         </Route>
 
         <Route path="/vendor" element={
