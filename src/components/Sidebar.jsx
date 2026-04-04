@@ -4,9 +4,17 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2 } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
 import { logoutUser } from '../store/authSlice';
-import { setConversations } from '../store/chatSlice';
+import {
+  setTypingUser,
+  setUnreadCount,
+  updateLastMessage,
+  setConversations,
+  markConversationRead,
+} from '../store/chatSlice';
 import { useNotificationSocket } from '../hooks/useNotificationSocket';
+import { initChatSocket, removeChatSocketCallbacks } from '../socket/chatSocket';
 import { getConversations as getChatConversations } from '../services/chatService';
+import { store } from '../store/store';
 import PostDetailModal from './PostDetailModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
@@ -144,9 +152,11 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const { mode } = useSelector((state) => state.theme);
   const { userObject } = useSelector((state) => state.auth);
   const chatUnreadCount = useSelector((state) =>
-    Object.values(state.chat?.unreadCounts || {}).reduce((sum, count) => sum + Number(count || 0), 0)
+    Object.values(state.chat?.unreadCounts || {})
+      .reduce((sum, count) => sum + Number(count || 0), 0)
   );
   const userId = userObject?._id || userObject?.id;
+  const token = localStorage.getItem('token');
   const isVendorValidated = Boolean(
     userObject?.vendor_validated ??
     userObject?.validated ??
@@ -178,6 +188,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const sidebarSearchRef = useRef(null);
   const sidebarSearchInputRef = useRef(null);
   const sidebarSearchDebounce = useRef(null);
+  const sidebarSocketCallbacksRef = useRef(null);
 
   // ── Notifications via shared WS hook ────────────────────────────────────────
   const isVendor = userObject?.role === 'vendor';
@@ -213,6 +224,82 @@ const Sidebar = ({ onOpenCreateModal }) => {
       console.error('Failed to sync chat conversations:', error);
     }
   }, [dispatch, userId]);
+
+  useEffect(() => {
+    if (!userId || !token) return;
+
+    const onNewMessage = (message) => {
+      const incomingConversationId = String(
+        message?.conversationId?._id ||
+        message?.conversationId || ''
+      );
+      if (!incomingConversationId) return;
+
+      dispatch(updateLastMessage({
+        conversationId: incomingConversationId,
+        lastMessage: message,
+        lastMessageAt: message.createdAt || new Date().toISOString(),
+      }));
+
+      const currentPath = window.location.pathname;
+      const isViewingThisChat =
+        currentPath === `/messages/${incomingConversationId}`;
+
+      if (!isViewingThisChat) {
+        const freshState = store.getState();
+        const currentCount =
+          freshState.chat?.unreadCounts?.[incomingConversationId] || 0;
+        dispatch(setUnreadCount({
+          conversationId: incomingConversationId,
+          count: currentCount + 1,
+        }));
+
+        const conversationExists = freshState.chat?.conversations?.some(
+          (c) => String(c._id) === incomingConversationId
+        );
+        if (!conversationExists) {
+          getChatConversations()
+            .then((data) => {
+              if (Array.isArray(data)) dispatch(setConversations(data));
+            })
+            .catch(() => {});
+        }
+      }
+    };
+
+    const onUserTyping = ({ conversationId, userId: typingUserId }) => {
+      dispatch(setTypingUser({
+        conversationId,
+        userId: typingUserId,
+        isTyping: true,
+      }));
+    };
+
+    const onUserStopTyping = ({ conversationId, userId: typingUserId }) => {
+      dispatch(setTypingUser({
+        conversationId,
+        userId: typingUserId,
+        isTyping: false,
+      }));
+    };
+
+    const callbacks = {
+      onNewMessage,
+      onUserTyping,
+      onUserStopTyping,
+      onMessageSeenUpdate: () => {},
+      onMessageRemoved: () => {},
+    };
+
+    sidebarSocketCallbacksRef.current = callbacks;
+    initChatSocket(token, callbacks, userId);
+
+    return () => {
+      if (sidebarSocketCallbacksRef.current) {
+        removeChatSocketCallbacks(sidebarSocketCallbacksRef.current);
+      }
+    };
+  }, [userId, token, dispatch]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {

@@ -1,4 +1,5 @@
 import api from '../lib/api';
+import { disconnectChatSocket } from '../socket/chatSocket';
 
 const authService = {
   login: async (credentials) => {
@@ -10,6 +11,7 @@ const authService = {
     return response.data;
   },
   logout: () => {
+    disconnectChatSocket();
     localStorage.removeItem('token');
     delete api.defaults.headers.common['Authorization'];
   },

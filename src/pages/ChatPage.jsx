@@ -13,12 +13,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import * as chatService from '../services/chatService';
 import {
-  disconnectChatSocket,
   emitStopTyping,
   emitTyping,
   initChatSocket,
   joinRoom,
   leaveRoom,
+  removeChatSocketCallbacks,
 } from '../socket/chatSocket';
 import {
   appendMessage,
@@ -117,13 +117,88 @@ const Avatar = ({ user, className = 'h-10 w-10' }) => {
 };
 
 const TypingIndicator = () => (
-  <div className="mb-2 flex items-end gap-2">
-    <div className="w-7" />
-    <div className="flex items-center gap-1 rounded-2xl bg-[#262626] px-3 py-2">
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-300 [animation-delay:-0.3s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-300 [animation-delay:-0.15s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-300" />
+  <div className="mb-3 flex items-end gap-2">
+    <div className="w-7 h-7 flex-shrink-0" />
+    <div
+      className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-[#262626] px-4 py-3"
+      style={{ minWidth: '60px' }}
+    >
+      <span className="typing-dot" style={{ animationDelay: '0ms' }} />
+      <span className="typing-dot" style={{ animationDelay: '200ms' }} />
+      <span className="typing-dot" style={{ animationDelay: '400ms' }} />
     </div>
+  </div>
+);
+
+const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '😡', '👍'];
+
+const ReactionPicker = ({ onSelect, mine }) => (
+  <div
+    className={`absolute ${mine ? 'right-0' : 'left-0'} -top-10 z-50 
+                  flex gap-1 rounded-full bg-[#1a1a1a] border border-white/10 
+                  px-2 py-1.5 shadow-xl`}
+    onClick={(e) => e.stopPropagation()}
+  >
+    {REACTION_EMOJIS.map((emoji) => (
+      <button
+        key={emoji}
+        onClick={() => onSelect(emoji)}
+        className="text-base transition-transform hover:scale-125 
+                     active:scale-95 leading-none"
+      >
+        {emoji}
+      </button>
+    ))}
+  </div>
+);
+
+const MessageActions = ({ message, mine, onReply, onReact, onMore }) => (
+  <div
+    className={`flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 
+                  transition-opacity duration-150 flex-shrink-0
+                  ${mine ? 'flex-row' : 'flex-row-reverse'}`}
+    onClick={(e) => e.stopPropagation()}
+  >
+    <button
+      onClick={(e) => onMore(e, message)}
+      className="rounded-full p-1.5 text-gray-500 hover:text-white 
+                   hover:bg-white/10 transition-colors"
+      title="More"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="5" cy="12" r="2"/>
+        <circle cx="12" cy="12" r="2"/>
+        <circle cx="19" cy="12" r="2"/>
+      </svg>
+    </button>
+    <button
+      onClick={() => onReply(message)}
+      className="rounded-full p-1.5 text-gray-500 hover:text-white 
+                   hover:bg-white/10 transition-colors"
+      title="Reply"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
+             stroke="currentColor" strokeWidth="2" strokeLinecap="round" 
+             strokeLinejoin="round">
+        <polyline points="9 17 4 12 9 7"/>
+        <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+      </svg>
+    </button>
+    <button
+      onClick={() => onReact(message)}
+      className="rounded-full p-1.5 text-gray-500 hover:text-white 
+                   hover:bg-white/10 transition-colors"
+      title="React"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
+             stroke="currentColor" strokeWidth="2" strokeLinecap="round" 
+             strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M8 13s1.5 2 4 2 4-2 4-2"/>
+        <line x1="9" y1="9" x2="9.01" y2="9"/>
+        <line x1="15" y1="9" x2="15.01" y2="9"/>
+      </svg>
+    </button>
   </div>
 );
 
@@ -138,6 +213,9 @@ export default function ChatPage() {
   const contextRef = useRef(null);
   const longPressRef = useRef(null);
   const activeConversationIdRef = useRef(null);
+  const chatPageCallbacksRef = useRef(null);
+  const onNewMessageRef = useRef(null);
+  const onMessageRemovedRef = useRef(null);
   const messagesRef = useRef([]);
   const unreadCountsRef = useRef({});
   const currentUserIdRef = useRef('');
@@ -147,6 +225,10 @@ export default function ChatPage() {
   const [replyTo, setReplyTo] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [reactions, setReactions] = useState({});
+  const [reactionPickerFor, setReactionPickerFor] = useState(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState(null);
 
   const {
     conversations,
@@ -327,6 +409,10 @@ export default function ChatPage() {
     }));
   }, [dispatch, refreshConversationOrdering]);
 
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+  }, [onNewMessage]);
+
   const onMessageRemoved = useCallback(({ conversationId, messageId }) => {
     const deletedAt = new Date().toISOString();
     dispatch(removeMessage({ messageId, deletedAt }));
@@ -345,35 +431,46 @@ export default function ChatPage() {
   }, [activeConversation?.createdAt, dispatch, refreshConversationOrdering]);
 
   useEffect(() => {
+    onMessageRemovedRef.current = onMessageRemoved;
+  }, [onMessageRemoved]);
+
+  useEffect(() => {
     if (!token) return undefined;
 
-    initChatSocket(token, {
-      onNewMessage,
-      onUserTyping: ({ conversationId, userId }) => dispatch(setTypingUser({ conversationId, userId, isTyping: true })),
-      onUserStopTyping: ({ conversationId, userId }) => dispatch(setTypingUser({ conversationId, userId, isTyping: false })),
-      onMessageSeenUpdate: ({ conversationId, messageId, userId, seenAt }) => {
-        if (!messagesRef.current.some((message) => message._id === messageId)) return;
-        const nextMessages = messagesRef.current.map((message) => (
-          message._id === messageId
+    const callbacks = {
+      onNewMessage: (...args) => onNewMessageRef.current?.(...args),
+      onUserTyping: ({ conversationId, userId: typingUserId }) =>
+        dispatch(setTypingUser({ conversationId, userId: typingUserId, isTyping: true })),
+      onUserStopTyping: ({ conversationId, userId: typingUserId }) =>
+        dispatch(setTypingUser({ conversationId, userId: typingUserId, isTyping: false })),
+      onMessageSeenUpdate: ({ conversationId, messageId, userId: seenUserId, seenAt }) => {
+        if (!messagesRef.current.some((m) => m._id === messageId)) return;
+        const nextMessages = messagesRef.current.map((m) =>
+          m._id === messageId
             ? {
-                ...message,
-                seenBy: Array.from(new Set([...(message.seenBy || []), userId])),
-                seenAt: seenAt || message.seenAt,
+                ...m,
+                seenBy: Array.from(new Set([...(m.seenBy || []), seenUserId])),
+                seenAt: seenAt || m.seenAt,
               }
-            : message
-        ));
+            : m
+        );
         messagesRef.current = nextMessages;
         dispatch(setMessages(nextMessages));
       },
-      onMessageRemoved: onMessageRemoved,
-    }, currentUserId);
+      onMessageRemoved: (...args) => onMessageRemovedRef.current?.(...args),
+    };
+
+    chatPageCallbacksRef.current = callbacks;
+    initChatSocket(token, callbacks, currentUserId);
 
     return () => {
       if (roomRef.current) leaveRoom(roomRef.current);
       roomRef.current = null;
-      disconnectChatSocket();
+      if (chatPageCallbacksRef.current) {
+        removeChatSocketCallbacks(chatPageCallbacksRef.current);
+      }
     };
-  }, [currentUserId, dispatch, onMessageRemoved, onNewMessage, token]);
+  }, [currentUserId, dispatch, token]);
 
   useEffect(() => {
     if (!activeId) return undefined;
@@ -427,6 +524,13 @@ export default function ChatPage() {
     return () => window.removeEventListener('click', handler);
   }, []);
 
+  useEffect(() => {
+    if (!reactionPickerFor) return undefined;
+    const handler = () => setReactionPickerFor(null);
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, [reactionPickerFor]);
+
   const stopTyping = useCallback(() => {
     if (activeConversation?._id && currentUserId) emitStopTyping(activeConversation._id, currentUserId);
   }, [activeConversation, currentUserId]);
@@ -454,6 +558,7 @@ export default function ChatPage() {
 
   const handleSend = async (customPayload = null) => {
     if (!activeConversation?._id || !currentUserId) return;
+    if (sending) return;
     const payload = customPayload || {
       text: input.trim(),
       mediaUrl: '',
@@ -463,6 +568,7 @@ export default function ChatPage() {
 
     if (!payload.text && !payload.mediaUrl) return;
 
+    setSending(true);
     try {
       const created = await chatService.sendMessage(activeConversation._id, payload);
       const enriched = { ...created, replyTo: payload.replyTo || null };
@@ -475,6 +581,8 @@ export default function ChatPage() {
       stopTyping();
     } catch (error) {
       console.error('Failed to send message:', error);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -514,8 +622,48 @@ export default function ChatPage() {
     }
   };
 
+  const handleReply = (message) => {
+    const senderName =
+      String(message?.sender?._id || message?.sender) === String(currentUserId)
+        ? 'You'
+        : getUserName(otherUser);
+    setReplyTo({
+      messageId: message._id,
+      text: message.text || 'Attachment',
+      senderName,
+      senderId: message?.sender?._id || message?.sender,
+    });
+    setReactionPickerFor(null);
+    setContextMenu(null);
+  };
+
+  const handleReact = (message) => {
+    setReactionPickerFor((prev) =>
+      prev === message._id ? null : message._id
+    );
+  };
+
+  const handleSelectReaction = (messageId, emoji) => {
+    setReactions((prev) => ({
+      ...prev,
+      [messageId]: prev[messageId] === emoji ? null : emoji,
+    }));
+    setReactionPickerFor(null);
+  };
+
+  const handleMoreMenu = (event, message) => {
+    event.preventDefault();
+    setContextMenu({
+      x: Math.min(event.clientX || window.innerWidth / 2 - 90, window.innerWidth - 190),
+      y: Math.min(event.clientY || window.innerHeight - 150, window.innerHeight - 110),
+      message,
+    });
+    setReactionPickerFor(null);
+  };
+
   const openContext = (event, message) => {
     event.preventDefault();
+    setReactionPickerFor(null);
     setContextMenu({
       x: Math.min(event.clientX, window.innerWidth - 190),
       y: Math.min(event.clientY, window.innerHeight - 110),
@@ -555,8 +703,8 @@ export default function ChatPage() {
           {message.mediaUrl ? (
             <div className="space-y-2">
               {message.mediaType === 'video' || isVideoUrl(message.mediaUrl)
-                ? <video src={message.mediaUrl} controls className="max-h-80 w-full rounded-2xl object-cover" />
-                : <img src={message.mediaUrl} alt="attachment" className="max-h-80 w-full rounded-2xl object-cover" />}
+                ? <video src={message.mediaUrl} controls className="max-h-80 w-full rounded-2xl object-cover outline-none border-0 [-webkit-tap-highlight-color:transparent]" />
+                : <img src={message.mediaUrl} alt="attachment" className="max-h-80 w-full rounded-2xl object-cover outline-none border-0 [-webkit-tap-highlight-color:transparent]" />}
               {message.text ? <p className="whitespace-pre-wrap break-words text-sm">{message.text}</p> : null}
             </div>
           ) : (
@@ -653,7 +801,7 @@ export default function ChatPage() {
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col bg-black">
+        <section className="flex min-w-0 flex-1 flex-col bg-black overflow-hidden">
           {!activeConversation ? (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
               <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/20">
@@ -673,7 +821,7 @@ export default function ChatPage() {
                 </div>
               </header>
 
-              <div ref={scrollerRef} onScroll={(e) => { if (e.currentTarget.scrollTop <= 60) handleLoadMore(); }} className="flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div ref={scrollerRef} onScroll={(e) => { if (e.currentTarget.scrollTop <= 60) handleLoadMore(); }} className="flex-1 min-h-0 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                 {isLoadingMessages && messages.length === 0 ? (
                   <div className="flex h-full items-center justify-center">
                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#262626] border-t-[#7C3AED]" />
@@ -695,11 +843,58 @@ export default function ChatPage() {
                       const showSeen = mine && message._id === latestSeenOwnMessageId;
 
                       return (
-                        <div key={message._id || `${message.createdAt}-${index}`} className={`mb-1 flex ${mine ? 'justify-end' : 'justify-start'} ${samePrev ? 'mt-1' : 'mt-3'}`} onContextMenu={(event) => openContext(event, message)} onTouchStart={() => startLongPress(message)} onTouchEnd={clearLongPress} onTouchMove={clearLongPress}>
-                          <div className={`flex max-w-full flex-col ${mine ? 'items-end' : 'items-start'}`}>
-                            <div className={`flex max-w-full items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
+                        <div
+                          key={message._id || `${message.createdAt}-${index}`}
+                          className={`mb-1 flex group/msg 
+                ${mine ? 'justify-end' : 'justify-start'} 
+                ${samePrev ? 'mt-1' : 'mt-3'}
+                outline-none select-none 
+                [-webkit-tap-highlight-color:transparent]`}
+                          onContextMenu={(event) => openContext(event, message)}
+                          onTouchStart={() => startLongPress(message)}
+                          onTouchEnd={clearLongPress}
+                          onTouchMove={clearLongPress}
+                          onMouseEnter={() => setHoveredMessageId(message._id)}
+                          onMouseLeave={() => {
+                            setHoveredMessageId(null);
+                          }}
+                        >
+                          <div className={`relative flex max-w-full flex-col 
+                   ${mine ? 'items-end' : 'items-start'}`}>
+                            <div className={`flex max-w-full items-end gap-1 
+                   ${mine ? 'flex-row-reverse' : ''}`}>
                               {!mine ? (showAvatar ? <Avatar user={otherUser} className="h-7 w-7" /> : <div className="w-7" />) : null}
-                              {renderBubble(message, mine)}
+                              
+                              <div className="relative">
+                                {reactionPickerFor === message._id && (
+                                  <ReactionPicker
+                                    mine={mine}
+                                    onSelect={(emoji) => handleSelectReaction(message._id, emoji)}
+                                  />
+                                )}
+                                {renderBubble(message, mine)}
+                                {reactions[message._id] && (
+                                  <div
+                                    className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'} 
+                      text-sm bg-[#1a1a1a] border border-white/10 
+                      rounded-full px-1.5 py-0.5 leading-none cursor-pointer
+                      hover:scale-110 transition-transform`}
+                                    onClick={() => handleSelectReaction(message._id, reactions[message._id])}
+                                  >
+                                    {reactions[message._id]}
+                                  </div>
+                                )}
+                              </div>
+
+                              {!message.isDeleted && (
+                                <MessageActions
+                                  message={message}
+                                  mine={mine}
+                                  onReply={() => handleReply(message)}
+                                  onReact={() => handleReact(message)}
+                                  onMore={(e) => handleMoreMenu(e, message)}
+                                />
+                              )}
                             </div>
                             {showSeen ? <span className="mt-1 px-2 text-[11px] font-medium text-gray-500">{formatSeenAgo(message.seenAt)}</span> : null}
                           </div>
@@ -725,8 +920,8 @@ export default function ChatPage() {
                 </div>
               ) : null}
 
-              <div className="border-t border-white/10 px-3 py-3">
-                <div className="flex items-center gap-2 rounded-full bg-[#111111] px-3 py-2">
+              <div className="border-t border-white/10 px-3 py-2 flex-shrink-0">
+                <div className="flex items-center gap-2 rounded-full bg-[#111111] px-3 py-2 min-h-[48px]">
                   <button className="rounded-full p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"><Smile size={18} /></button>
                   <input
                     value={input}
@@ -744,13 +939,18 @@ export default function ChatPage() {
                       }
                     }}
                     placeholder="Message..."
-                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-500"
+                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-500 min-w-0 leading-normal"
                   />
                   <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="rounded-full p-2 text-gray-400 transition hover:bg-white/5 hover:text-white disabled:opacity-50"><ImagePlus size={18} /></button>
                   <button className="rounded-full p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"><Sticker size={18} /></button>
                   <button className="rounded-full p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"><Mic size={18} /></button>
-                  {(input.trim() || uploading) ? (
-                    <button onClick={() => handleSend()} disabled={uploading} className="rounded-full p-2 text-[#7C3AED] transition hover:bg-white/5 hover:text-[#8b5cf6] disabled:opacity-50">
+                  {input.trim() && !sending ? (
+                    <button
+                      onClick={() => handleSend()}
+                      disabled={sending || uploading}
+                      className="rounded-full p-2 text-[#7C3AED] transition hover:bg-white/5 
+                 hover:text-[#8b5cf6] disabled:opacity-50"
+                    >
                       <SendHorizontal size={18} />
                     </button>
                   ) : null}
@@ -779,6 +979,21 @@ export default function ChatPage() {
           >
             Reply
           </button>
+          {contextMenu?.message?.text && !contextMenu?.message?.isDeleted ? (
+            <button
+              onClick={() => {
+                if (contextMenu?.message?.text) {
+                  navigator.clipboard.writeText(contextMenu.message.text)
+                    .catch(() => {});
+                }
+                setContextMenu(null);
+              }}
+              className="flex w-full rounded-xl px-3 py-2 text-left 
+               text-sm transition hover:bg-white/5"
+            >
+              Copy
+            </button>
+          ) : null}
           {String(contextMenu.message?.sender?._id || contextMenu.message?.sender) === String(currentUserId) ? (
             <button onClick={() => handleDelete(contextMenu.message)} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-red-400 transition hover:bg-red-500/10">
               Unsend

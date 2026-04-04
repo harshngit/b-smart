@@ -96,3 +96,24 @@
     --scrollbar-track: rgba(0, 0, 0, 0.06);
   }
 }
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0px);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #9ca3af;
+  animation: typingBounce 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
