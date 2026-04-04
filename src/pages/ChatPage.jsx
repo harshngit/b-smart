@@ -103,6 +103,16 @@ const messagePreview = (message, isMine, name) => {
   return 'Start chatting';
 };
 
+const hasReplyContent = (replyTo) => Boolean(
+  replyTo
+  && (
+    replyTo.messageId
+    || (typeof replyTo.text === 'string' && replyTo.text.trim())
+    || replyTo.senderId
+    || (typeof replyTo.senderName === 'string' && replyTo.senderName.trim())
+  )
+);
+
 const Avatar = ({ user, className = 'h-10 w-10' }) => {
   const avatar = getUserAvatar(user);
   if (avatar) {
@@ -691,7 +701,7 @@ export default function ChatPage() {
 
     return (
       <div className="max-w-[280px] sm:max-w-[340px]">
-        {message.replyTo ? (
+        {hasReplyContent(message.replyTo) ? (
           <div className={`mb-1 rounded-2xl border border-white/10 px-3 py-2 text-xs ${mine ? 'bg-[#672ec3]' : 'bg-[#1a1a1a]'}`}>
             <p className="mb-1 font-semibold text-white/80">
               {String(message.replyTo.senderId) === String(currentUserId) ? 'You replied' : `${message.replyTo.senderName || 'User'} replied`}
