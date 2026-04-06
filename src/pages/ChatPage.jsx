@@ -116,11 +116,11 @@ const hasReplyContent = (replyTo) => Boolean(
 const Avatar = ({ user, className = 'h-10 w-10' }) => {
   const avatar = getUserAvatar(user);
   if (avatar) {
-    return <img src={avatar} alt={getUserName(user)} className={`${className} rounded-full object-cover`} />;
+    return <img src={avatar} alt={getUserName(user)} className={`${className} rounded-full object-cover border border-gray-100 dark:border-white/10`} />;
   }
 
   return (
-    <div className={`${className} flex items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#3B82F6] text-sm font-bold text-white`}>
+    <div className={`${className} flex items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#3B82F6] text-sm font-bold text-white shadow-sm`}>
       {getInitial(user)}
     </div>
   );
@@ -130,12 +130,12 @@ const TypingIndicator = () => (
   <div className="mb-3 flex items-end gap-2">
     <div className="w-7 h-7 flex-shrink-0" />
     <div
-      className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-[#262626] px-4 py-3"
+      className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-gray-100 dark:bg-[#262626] px-4 py-3 border border-gray-200 dark:border-white/5"
       style={{ minWidth: '60px' }}
     >
-      <span className="typing-dot" style={{ animationDelay: '0ms' }} />
-      <span className="typing-dot" style={{ animationDelay: '200ms' }} />
-      <span className="typing-dot" style={{ animationDelay: '400ms' }} />
+      <span className="typing-dot bg-gray-400 dark:bg-gray-500" style={{ animationDelay: '0ms' }} />
+      <span className="typing-dot bg-gray-400 dark:bg-gray-500" style={{ animationDelay: '200ms' }} />
+      <span className="typing-dot bg-gray-400 dark:bg-gray-500" style={{ animationDelay: '400ms' }} />
     </div>
   </div>
 );
@@ -145,8 +145,8 @@ const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '😡', '👍'];
 const ReactionPicker = ({ onSelect, mine }) => (
   <div
     className={`absolute ${mine ? 'right-0' : 'left-0'} -top-10 z-50 
-                  flex gap-1 rounded-full bg-[#1a1a1a] border border-white/10 
-                  px-2 py-1.5 shadow-xl`}
+                  flex gap-1 rounded-full bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 
+                  px-2 py-1.5 shadow-xl animate-in fade-in zoom-in duration-200`}
     onClick={(e) => e.stopPropagation()}
   >
     {REACTION_EMOJIS.map((emoji) => (
@@ -171,8 +171,8 @@ const MessageActions = ({ message, mine, onReply, onReact, onMore }) => (
   >
     <button
       onClick={(e) => onMore(e, message)}
-      className="rounded-full p-1.5 text-gray-500 hover:text-white 
-                   hover:bg-white/10 transition-colors"
+      className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 dark:hover:text-white 
+                   hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
       title="More"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -183,8 +183,8 @@ const MessageActions = ({ message, mine, onReply, onReact, onMore }) => (
     </button>
     <button
       onClick={() => onReply(message)}
-      className="rounded-full p-1.5 text-gray-500 hover:text-white 
-                   hover:bg-white/10 transition-colors"
+      className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 dark:hover:text-white 
+                   hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
       title="Reply"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
@@ -196,8 +196,8 @@ const MessageActions = ({ message, mine, onReply, onReact, onMore }) => (
     </button>
     <button
       onClick={() => onReact(message)}
-      className="rounded-full p-1.5 text-gray-500 hover:text-white 
-                   hover:bg-white/10 transition-colors"
+      className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 dark:hover:text-white 
+                   hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
       title="React"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
@@ -696,29 +696,29 @@ export default function ChatPage() {
     }
 
     const bubbleClass = mine
-      ? 'bg-[#7C3AED] rounded-[22px] rounded-br-md'
-      : 'bg-[#262626] rounded-[22px] rounded-bl-md';
+      ? 'bg-[#7C3AED] rounded-[22px] rounded-br-md shadow-sm'
+      : 'bg-gray-100 dark:bg-[#262626] rounded-[22px] rounded-bl-md border border-gray-200 dark:border-white/5 shadow-sm';
 
     return (
       <div className="max-w-[280px] sm:max-w-[340px]">
         {hasReplyContent(message.replyTo) ? (
-          <div className={`mb-1 rounded-2xl border border-white/10 px-3 py-2 text-xs ${mine ? 'bg-[#672ec3]' : 'bg-[#1a1a1a]'}`}>
-            <p className="mb-1 font-semibold text-white/80">
+          <div className={`mb-1 rounded-2xl border px-3 py-2 text-xs ${mine ? 'bg-[#672ec3] border-white/10' : 'bg-gray-200/50 dark:bg-[#1a1a1a] border-gray-300 dark:border-white/10'}`}>
+            <p className={`mb-1 font-semibold ${mine ? 'text-white/80' : 'text-gray-900 dark:text-white/80'}`}>
               {String(message.replyTo.senderId) === String(currentUserId) ? 'You replied' : `${message.replyTo.senderName || 'User'} replied`}
             </p>
-            <p className="line-clamp-2 text-white/70">{message.replyTo.text || 'Attachment'}</p>
+            <p className={`line-clamp-2 ${mine ? 'text-white/70' : 'text-gray-600 dark:text-white/70'}`}>{message.replyTo.text || 'Attachment'}</p>
           </div>
         ) : null}
-        <div className={`${bubbleClass} overflow-hidden px-3 py-2.5 text-white`}>
+        <div className={`${bubbleClass} overflow-hidden px-3 py-2.5 ${mine ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
           {message.mediaUrl ? (
             <div className="space-y-2">
               {message.mediaType === 'video' || isVideoUrl(message.mediaUrl)
                 ? <video src={message.mediaUrl} controls className="max-h-80 w-full rounded-2xl object-cover outline-none border-0 [-webkit-tap-highlight-color:transparent]" />
                 : <img src={message.mediaUrl} alt="attachment" className="max-h-80 w-full rounded-2xl object-cover outline-none border-0 [-webkit-tap-highlight-color:transparent]" />}
-              {message.text ? <p className="whitespace-pre-wrap break-words text-sm">{message.text}</p> : null}
+              {message.text ? <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p> : null}
             </div>
           ) : (
-            <p className="whitespace-pre-wrap break-words text-sm">{message.text}</p>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p>
           )}
         </div>
       </div>
@@ -738,26 +738,26 @@ export default function ChatPage() {
   }, [currentUserId, messages, otherUserId]);
 
   return (
-    <div className="h-[100dvh] bg-black text-white md:h-screen">
+    <div className="h-[100dvh] bg-white dark:bg-black text-gray-900 dark:text-white md:h-screen">
       <div className="flex h-full">
-        <aside className="hidden h-full w-[380px] flex-shrink-0 border-r border-white/10 bg-[#0a0a0a] md:flex md:flex-col">
-          <div className="border-b border-white/10 px-5 py-5">
-            <div className="flex items-center gap-3 rounded-full bg-[#111111] px-4 py-3 text-sm text-gray-400">
-              <Search size={16} className="text-gray-500" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" className="w-full bg-transparent outline-none placeholder:text-gray-500" />
+        <aside className="hidden h-full w-[380px] flex-shrink-0 border-r border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-[#0a0a0a] md:flex md:flex-col">
+          <div className="border-b border-gray-100 dark:border-white/10 px-5 py-5">
+            <div className="flex items-center gap-3 rounded-full bg-white dark:bg-[#111111] px-4 py-3 text-sm text-gray-400 border border-gray-200 dark:border-transparent focus-within:border-gray-300 dark:focus-within:border-white/20 transition-all shadow-sm">
+              <Search size={16} className="text-gray-400 dark:text-gray-500" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" className="w-full bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-white" />
             </div>
 
             <div className="mt-5 flex gap-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {conversations.map((conversation) => {
                 const user = otherParticipant(conversation, currentUserId);
                 return (
-                  <button key={conversation._id} onClick={() => setConversationAsActive(conversation)} className="flex min-w-[64px] flex-col items-center gap-2">
-                    <div className="rounded-full bg-gradient-to-br from-[#7C3AED] to-[#3B82F6] p-[2px]">
-                      <div className="rounded-full bg-black p-[2px]">
+                  <button key={conversation._id} onClick={() => setConversationAsActive(conversation)} className="flex min-w-[64px] flex-col items-center gap-2 group transition-transform hover:scale-105 active:scale-95">
+                    <div className="rounded-full bg-gradient-to-br from-[#7C3AED] to-[#3B82F6] p-[2px] shadow-sm">
+                      <div className="rounded-full bg-white dark:bg-black p-[2px]">
                         <Avatar user={user} className="h-14 w-14" />
                       </div>
                     </div>
-                    <span className="max-w-[64px] truncate text-[11px] text-gray-300">{user?.username || getUserName(user)}</span>
+                    <span className="max-w-[64px] truncate text-[11px] font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{user?.username || getUserName(user)}</span>
                   </button>
                 );
               })}
@@ -765,8 +765,8 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center justify-between px-5 py-4">
-            <h1 className="text-xl font-semibold">Messages</h1>
-            <span className="text-sm text-gray-500">Requests</span>
+            <h1 className="text-xl font-bold tracking-tight">Messages</h1>
+            <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-white transition-colors">Requests</span>
           </div>
 
           <div className="flex-1 overflow-y-auto px-2 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -774,10 +774,10 @@ export default function ChatPage() {
               <div className="space-y-3 px-3 pt-2">
                 {Array.from({ length: 7 }).map((_, index) => (
                   <div key={index} className="flex animate-pulse items-center gap-3 rounded-2xl px-3 py-3">
-                    <div className="h-12 w-12 rounded-full bg-[#1f1f1f]" />
+                    <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-[#1f1f1f]" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3 w-1/3 rounded bg-[#1f1f1f]" />
-                      <div className="h-3 w-2/3 rounded bg-[#161616]" />
+                      <div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-[#1f1f1f]" />
+                      <div className="h-3 w-2/3 rounded bg-gray-100 dark:bg-[#161616]" />
                     </div>
                   </div>
                 ))}
@@ -791,19 +791,19 @@ export default function ChatPage() {
                 const isTyping = (typingUsers[conversation._id] || []).some((id) => String(id) !== String(currentUserId));
 
                 return (
-                  <button key={conversation._id} onClick={() => setConversationAsActive(conversation)} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors ${active ? 'bg-[#1a1a1a]' : 'hover:bg-[#141414]'}`}>
+                  <button key={conversation._id} onClick={() => setConversationAsActive(conversation)} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-all ${active ? 'bg-white dark:bg-[#1a1a1a] shadow-sm border border-gray-100 dark:border-white/5' : 'hover:bg-white dark:hover:bg-[#141414] border border-transparent'}`}>
                     <Avatar user={user} className="h-12 w-12" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold">{getUserName(user)}</p>
-                        <span className="text-xs text-gray-500">{formatAgo(conversation.lastMessageAt)}</span>
+                        <p className="truncate text-sm font-bold">{getUserName(user)}</p>
+                        <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">{formatAgo(conversation.lastMessageAt)}</span>
                       </div>
-                      <p className={`truncate text-sm ${isTyping ? 'font-medium text-[#3B82F6]' : 'text-gray-400'}`}>
+                      <p className={`truncate text-[13px] mt-0.5 ${isTyping ? 'font-semibold text-[#3B82F6]' : 'text-gray-500 dark:text-gray-400'}`}>
                         {isTyping ? 'Typing...' : messagePreview(conversation.lastMessage, mine, getUserName(user))}
                       </p>
-                      {unread > 0 ? <p className="mt-1 text-xs font-semibold text-[#3B82F6]">{unread} new message{unread > 1 ? 's' : ''}</p> : null}
+                      {unread > 0 ? <p className="mt-1 text-xs font-bold text-[#3B82F6] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" /> {unread} new message{unread > 1 ? 's' : ''}</p> : null}
                     </div>
-                    {unread > 0 ? <span className="h-2.5 w-2.5 rounded-full bg-[#3B82F6]" /> : null}
+                    {unread > 0 && !active ? <span className="h-2.5 w-2.5 rounded-full bg-[#3B82F6] shadow-lg shadow-blue-500/20" /> : null}
                   </button>
                 );
               })
@@ -811,36 +811,38 @@ export default function ChatPage() {
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col bg-black overflow-hidden">
+        <section className="flex min-w-0 flex-1 flex-col bg-white dark:bg-black overflow-hidden relative">
           {!activeConversation ? (
-            <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/20">
-                <MessageCircle size={42} />
+            <div className="flex flex-1 flex-col items-center justify-center px-6 text-center animate-in fade-in duration-500">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-[#0a0a0a] shadow-sm">
+                <MessageCircle size={42} className="text-gray-300 dark:text-gray-700" />
               </div>
-              <h2 className="mt-6 text-2xl font-semibold">Your messages</h2>
-              <p className="mt-2 text-sm text-gray-400">Send a message to start a chat.</p>
-              <button className="mt-6 rounded-full bg-[#7C3AED] px-5 py-2.5 text-sm font-semibold transition hover:bg-[#6d28d9]">Send message</button>
+              <h2 className="mt-6 text-2xl font-bold tracking-tight">Your messages</h2>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-xs leading-relaxed">Send private photos and messages to a friend or group.</p>
+              <button className="mt-6 rounded-full bg-[#7C3AED] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition hover:bg-[#6d28d9] hover:scale-105 active:scale-95">Send message</button>
             </div>
           ) : (
             <>
-              <header className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-                <Avatar user={otherUser} className="h-9 w-9" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{otherUser?.username || getUserName(otherUser)}</p>
-                  <p className="truncate text-xs text-gray-500">{getUserName(otherUser)}</p>
-                </div>
+              <header className="flex items-center gap-3 border-b border-gray-100 dark:border-white/10 px-4 py-3 bg-white/80 dark:bg-black/80 backdrop-blur-md z-10 sticky top-0">
+                <Link to={`/profile/${otherUserId}`} className="flex-shrink-0">
+                  <Avatar user={otherUser} className="h-9 w-9" />
+                </Link>
+                <Link to={`/profile/${otherUserId}`} className="min-w-0 flex-1 hover:opacity-70 transition-opacity">
+                  <p className="truncate text-sm font-bold tracking-tight">{otherUser?.username || getUserName(otherUser)}</p>
+                  <p className="truncate text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-widest">{getUserName(otherUser)}</p>
+                </Link>
               </header>
 
               <div ref={scrollerRef} onScroll={(e) => { if (e.currentTarget.scrollTop <= 60) handleLoadMore(); }} className="flex-1 min-h-0 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                 {isLoadingMessages && messages.length === 0 ? (
                   <div className="flex h-full items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#262626] border-t-[#7C3AED]" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-100 dark:border-[#262626] border-t-[#7C3AED]" />
                   </div>
                 ) : (
                   <div className="flex min-h-full flex-col justify-end">
                     {groupedMessages.map((item, index) => {
                       if (item.type === 'separator') {
-                        return <div key={item.id} className="my-4 flex justify-center"><span className="rounded-full bg-[#111111] px-3 py-1 text-[11px] text-gray-400">{item.label}</span></div>;
+                        return <div key={item.id} className="my-6 flex justify-center"><span className="rounded-full bg-gray-50 dark:bg-[#111111] border border-gray-100 dark:border-white/5 px-4 py-1 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">{item.label}</span></div>;
                       }
 
                       const message = item.message;
@@ -857,7 +859,7 @@ export default function ChatPage() {
                           key={message._id || `${message.createdAt}-${index}`}
                           className={`mb-1 flex group/msg 
                 ${mine ? 'justify-end' : 'justify-start'} 
-                ${samePrev ? 'mt-1' : 'mt-3'}
+                ${samePrev ? 'mt-1' : 'mt-4'}
                 outline-none select-none 
                 [-webkit-tap-highlight-color:transparent]`}
                           onContextMenu={(event) => openContext(event, message)}
@@ -869,11 +871,15 @@ export default function ChatPage() {
                             setHoveredMessageId(null);
                           }}
                         >
-                          <div className={`relative flex max-w-full flex-col 
+                          <div className={`relative flex max-w-[85%] sm:max-w-[75%] flex-col 
                    ${mine ? 'items-end' : 'items-start'}`}>
-                            <div className={`flex max-w-full items-end gap-1 
+                            <div className={`flex max-w-full items-end gap-2 
                    ${mine ? 'flex-row-reverse' : ''}`}>
-                              {!mine ? (showAvatar ? <Avatar user={otherUser} className="h-7 w-7" /> : <div className="w-7" />) : null}
+                              {!mine ? (showAvatar ? (
+                                <Link to={`/profile/${otherUserId}`} className="flex-shrink-0">
+                                  <Avatar user={otherUser} className="h-7 w-7 shadow-sm hover:opacity-80 transition-opacity" />
+                                </Link>
+                              ) : <div className="w-7" />) : null}
                               
                               <div className="relative">
                                 {reactionPickerFor === message._id && (
@@ -886,9 +892,9 @@ export default function ChatPage() {
                                 {reactions[message._id] && (
                                   <div
                                     className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'} 
-                      text-sm bg-[#1a1a1a] border border-white/10 
-                      rounded-full px-1.5 py-0.5 leading-none cursor-pointer
-                      hover:scale-110 transition-transform`}
+                      text-[13px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 
+                      rounded-full px-2 py-0.5 leading-none cursor-pointer shadow-sm
+                      hover:scale-110 transition-transform z-10`}
                                     onClick={() => handleSelectReaction(message._id, reactions[message._id])}
                                   >
                                     {reactions[message._id]}
@@ -906,7 +912,7 @@ export default function ChatPage() {
                                 />
                               )}
                             </div>
-                            {showSeen ? <span className="mt-1 px-2 text-[11px] font-medium text-gray-500">{formatSeenAgo(message.seenAt)}</span> : null}
+                            {showSeen ? <span className="mt-1.5 px-2 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">{formatSeenAgo(message.seenAt)}</span> : null}
                           </div>
                         </div>
                       );
@@ -917,22 +923,22 @@ export default function ChatPage() {
               </div>
 
               {replyTo ? (
-                <div className="border-t border-white/10 bg-[#050505] px-4 py-2">
-                  <div className="flex items-center justify-between rounded-2xl bg-[#121212] px-3 py-2">
+                <div className="border-t border-gray-100 dark:border-white/10 bg-white dark:bg-[#050505] px-4 py-3 animate-in slide-in-from-bottom-2 duration-200">
+                  <div className="flex items-center justify-between rounded-2xl bg-gray-50 dark:bg-[#121212] border border-gray-100 dark:border-white/5 px-4 py-2.5">
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-white/80">Replying to {replyTo.senderName}</p>
-                      <p className="truncate text-xs text-gray-400">{replyTo.text || 'Attachment'}</p>
+                      <p className="text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider">Replying to {replyTo.senderName}</p>
+                      <p className="truncate text-sm text-gray-500 dark:text-gray-400 mt-0.5">{replyTo.text || 'Attachment'}</p>
                     </div>
-                    <button onClick={() => setReplyTo(null)} className="rounded-full p-1 text-gray-500 transition hover:bg-white/5 hover:text-white">
-                      <X size={14} />
+                    <button onClick={() => setReplyTo(null)} className="rounded-full p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
               ) : null}
 
-              <div className="border-t border-white/10 px-3 py-2 flex-shrink-0">
-                <div className="flex items-center gap-2 rounded-full bg-[#111111] px-3 py-2 min-h-[48px]">
-                  <button className="rounded-full p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"><Smile size={18} /></button>
+              <div className="border-t border-gray-100 dark:border-white/10 px-4 py-4 flex-shrink-0 bg-white dark:bg-black">
+                <div className="flex items-center gap-2 rounded-[28px] bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/5 px-3 py-2 min-h-[52px] shadow-sm focus-within:shadow-md focus-within:border-gray-300 dark:focus-within:border-white/20 transition-all">
+                  <button className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"><Smile size={20} /></button>
                   <input
                     value={input}
                     onChange={(event) => {
@@ -949,19 +955,19 @@ export default function ChatPage() {
                       }
                     }}
                     placeholder="Message..."
-                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-500 min-w-0 leading-normal"
+                    className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-white min-w-0 px-1"
                   />
-                  <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="rounded-full p-2 text-gray-400 transition hover:bg-white/5 hover:text-white disabled:opacity-50"><ImagePlus size={18} /></button>
-                  <button className="rounded-full p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"><Sticker size={18} /></button>
-                  <button className="rounded-full p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"><Mic size={18} /></button>
+                  <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"><ImagePlus size={20} /></button>
+                  <button className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors hidden sm:block"><Sticker size={20} /></button>
+                  <button className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"><Mic size={20} /></button>
                   {input.trim() && !sending ? (
                     <button
                       onClick={() => handleSend()}
                       disabled={sending || uploading}
-                      className="rounded-full p-2 text-[#7C3AED] transition hover:bg-white/5 
+                      className="rounded-full p-2.5 text-[#7C3AED] transition hover:bg-purple-50 dark:hover:bg-purple-500/10 
                  hover:text-[#8b5cf6] disabled:opacity-50"
                     >
-                      <SendHorizontal size={18} />
+                      <SendHorizontal size={20} />
                     </button>
                   ) : null}
                 </div>
@@ -973,7 +979,7 @@ export default function ChatPage() {
       </div>
 
       {contextMenu ? (
-        <div ref={contextRef} className="fixed z-50 min-w-[180px] rounded-2xl border border-white/10 bg-[#111111] p-1 shadow-2xl" style={{ left: contextMenu.x, top: contextMenu.y }}>
+        <div ref={contextRef} className="fixed z-[100] min-w-[200px] rounded-2xl border border-gray-100 dark:border-white/10 bg-white dark:bg-[#111111] p-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-200" style={{ left: contextMenu.x, top: contextMenu.y }}>
           <button
             onClick={() => {
               const senderName = String(contextMenu.message?.sender?._id || contextMenu.message?.sender) === String(currentUserId) ? 'You' : getUserName(otherUser);
@@ -985,7 +991,7 @@ export default function ChatPage() {
               });
               setContextMenu(null);
             }}
-            className="flex w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-white/5"
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition hover:bg-gray-50 dark:hover:bg-white/5"
           >
             Reply
           </button>
@@ -998,14 +1004,14 @@ export default function ChatPage() {
                 }
                 setContextMenu(null);
               }}
-              className="flex w-full rounded-xl px-3 py-2 text-left 
-               text-sm transition hover:bg-white/5"
+              className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left 
+               text-sm font-semibold transition hover:bg-gray-50 dark:hover:bg-white/5"
             >
               Copy
             </button>
           ) : null}
           {String(contextMenu.message?.sender?._id || contextMenu.message?.sender) === String(currentUserId) ? (
-            <button onClick={() => handleDelete(contextMenu.message)} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-red-400 transition hover:bg-red-500/10">
+            <button onClick={() => handleDelete(contextMenu.message)} className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-bold text-red-500 transition hover:bg-red-50/80 dark:hover:bg-red-500/10">
               Unsend
             </button>
           ) : null}

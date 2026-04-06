@@ -364,7 +364,7 @@ const CommentsUI = ({ reel, onClose, userObject }) => {
     return (
       <div key={commentId} className={`flex gap-3 mb-4 ${isReply ? 'ml-10 pr-4' : 'px-4'}`}>
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden shrink-0">
+        <Link to={`/profile/${user?._id || user?.id || comment.user_id}`} className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden shrink-0">
           {user?.avatar_url ? (
             <img src={user.avatar_url} alt={user?.username} className="w-full h-full object-cover" />
           ) : (
@@ -372,13 +372,13 @@ const CommentsUI = ({ reel, onClose, userObject }) => {
               {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
             </div>
           )}
-        </div>
+        </Link>
 
         {/* Body */}
         <div className="flex-1 text-sm group">
           <div className="flex justify-between items-start gap-2">
             <div className="flex-1 min-w-0">
-              <span className="font-semibold mr-1.5 dark:text-white text-gray-900">{user?.username}</span>
+              <Link to={`/profile/${user?._id || user?.id || comment.user_id}`} className="font-semibold mr-1.5 dark:text-white text-gray-900 hover:underline">{user?.username}</Link>
               <span className="text-gray-800 dark:text-gray-200 break-words">{comment.text || comment.content}</span>
               <div className="text-gray-400 dark:text-gray-500 text-xs mt-1 flex gap-3 items-center flex-wrap">
                 <span>{formatTimeAgo(comment.createdAt || comment.created_at)}</span>
@@ -843,17 +843,17 @@ const Reels = () => {
                     {/* Bottom info */}
                     <div className="absolute lg:bottom-[0%] bottom-[0%] left-0 z-20 px-4 pb-6 pr-16" style={{ maxWidth: 'calc(100% - 56px)' }}>
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full border-2 border-white/50 overflow-hidden flex-shrink-0">
+                        <Link to={`/profile/${reel.user_id?._id || reel.user_id?.id || reel.user_id}`} className="w-8 h-8 rounded-full border-2 border-white/50 overflow-hidden flex-shrink-0">
                           {reel.user_id?.avatar_url
                             ? <img src={reel.user_id.avatar_url} className="w-full h-full object-cover" alt="user" />
                             : <div className="w-full h-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center">
                                 <span className="text-white text-[10px] font-bold">{(reel.user_id?.username || 'U')[0].toUpperCase()}</span>
                               </div>
                           }
-                        </div>
-                        <span className="font-bold text-white text-sm truncate cursor-pointer" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                        </Link>
+                        <Link to={`/profile/${reel.user_id?._id || reel.user_id?.id || reel.user_id}`} className="font-bold text-white text-sm truncate cursor-pointer hover:underline" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
                           {reel.user_id?.username || reel.user_id?.full_name || 'Unknown'}
-                        </span>
+                        </Link>
                         <FollowButton userId={reel.user_id?._id || reel.user_id?.id || reel.user_id} initialFollowing={reel.is_followed_by_me || false} />
                       </div>
                       <Caption text={reel.caption} />
