@@ -8,7 +8,10 @@ import {
   ChevronDown, ChevronUp, RefreshCw, ArrowDownLeft, ArrowUpRight,
   ChevronLeft, ChevronRight, Wallet, TrendingUp, TrendingDown,
   Activity, UserCheck, BarChart, PieChart as PieIcon, MapPinned,
-  Venus, Mars, Transgender
+  Venus, Mars, Transgender,
+  MousePointerClick, Target, Smartphone, Monitor, Calendar,
+  Megaphone, ShieldCheck, TestTube2, CalendarClock, Zap,
+  Link2, Phone, Mail, MessageSquare, Layers
 } from "lucide-react";
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -1578,7 +1581,7 @@ export default function AdDetails() {
             </button>
             <div>
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{ad.caption || "Ad Details"}</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{ad.ad_title || ad.caption || "Ad Details"}</h1>
                 <Badge status={status} />
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2 flex-wrap">
@@ -1671,38 +1674,180 @@ export default function AdDetails() {
                 </div>
 
                 {/* Ad Info */}
-                <Card title="Ad Information">
-                  <InfoRow icon={Hash}        label="Caption"      value={ad.caption}      />
-                  <InfoRow icon={Tag}         label="Category"     value={ad.category}     />
-                  <InfoRow icon={Film}        label="Content Type" value={ad.content_type} />
-                  <InfoRow icon={MapPin}      label="Location"     value={ad.location}     />
-                  <InfoRow icon={AlertCircle} label="Status"       value={<Badge status={ad.status} />} />
+                <Card title="Ad Information" icon={Megaphone}>
+                  {ad.ad_title && <InfoRow icon={Megaphone}    label="Ad Title"       value={ad.ad_title} />}
+                  {ad.ad_description && <InfoRow icon={Layers}  label="Description"    value={ad.ad_description} />}
+                  <InfoRow icon={Hash}        label="Caption"        value={ad.caption}      />
+                  <InfoRow icon={Tag}         label="Category"       value={ad.category}     />
+                  {ad.sub_category && <InfoRow icon={Tag}      label="Sub-Category"   value={ad.sub_category} />}
+                  <InfoRow icon={Film}        label="Content Type"   value={ad.content_type} />
+                  <InfoRow icon={Layers}      label="Ad Type"        value={(ad.ad_type || "—").replace("_", " ")} />
+                  <InfoRow icon={MapPin}      label="Location"       value={ad.location}     />
+                  <InfoRow icon={AlertCircle} label="Status"         value={<Badge status={ad.status} />} />
+                  {ad.compliance?.approval_status && (
+                    <InfoRow icon={ShieldCheck} label="Review Status"
+                      value={
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                          ad.compliance.approval_status === "approved"
+                            ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                            : ad.compliance.approval_status === "rejected"
+                            ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
+                            : "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800"
+                        }`}>
+                          {ad.compliance.approval_status}
+                        </span>
+                      }
+                    />
+                  )}
+                  {ad.compliance?.policy_agreed !== undefined && (
+                    <InfoRow icon={ShieldCheck} label="Policy Agreed"
+                      value={
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                          ad.compliance.policy_agreed
+                            ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+                        }`}>
+                          {ad.compliance.policy_agreed ? "✓ Agreed" : "Not agreed"}
+                        </span>
+                      }
+                    />
+                  )}
                   {ad.rejection_reason && <InfoRow icon={AlertCircle} label="Reject Reason" value={ad.rejection_reason} />}
                   <InfoRow icon={Clock} label="Created At" value={new Date(ad.createdAt).toLocaleString("en-IN")} />
                   <InfoRow icon={Clock} label="Updated At" value={new Date(ad.updatedAt).toLocaleString("en-IN")} />
+                  {/* Keywords */}
+                  {(ad.keywords || []).length > 0 && (
+                    <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+                      <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5" /> Keywords
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {ad.keywords.map((k, i) => (
+                          <span key={i} className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-400 font-medium">{k}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </Card>
 
                 {/* Targeting */}
-                <Card title="Targeting Settings">
-                  <div className="space-y-6">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
-                          <Globe className="w-3.5 h-3.5" /> Target Languages
+                <Card title="Targeting Settings" icon={Target}>
+                  <div className="space-y-5">
+
+                    {/* New structured targeting */}
+                    {ad.targeting && Object.keys(ad.targeting).length > 0 && (
+                      <>
+                        {/* Age + Gender row */}
+                        {(ad.targeting.age_min || ad.targeting.age_max || ad.targeting.gender) && (
+                          <div className="grid grid-cols-2 gap-3">
+                            {(ad.targeting.age_min || ad.targeting.age_max) && (
+                              <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900">
+                                <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Age Range</div>
+                                <div className="text-sm font-bold text-indigo-700 dark:text-indigo-300">
+                                  {ad.targeting.age_min || 13} – {ad.targeting.age_max || 65} yrs
+                                </div>
+                              </div>
+                            )}
+                            {ad.targeting.gender && ad.targeting.gender !== "all" && (
+                              <div className="p-3 rounded-xl bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-900">
+                                <div className="text-[10px] font-bold text-pink-400 uppercase tracking-wider mb-1">Gender</div>
+                                <div className="text-sm font-bold text-pink-700 dark:text-pink-300 capitalize">{ad.targeting.gender}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Countries */}
+                        {(ad.targeting.countries || []).length > 0 && (
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                                <Globe className="w-3.5 h-3.5" /> Countries
+                              </div>
+                              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{ad.targeting.countries.length}</span>
+                            </div>
+                            <TagList items={ad.targeting.countries} color="blue" />
+                          </div>
+                        )}
+
+                        {/* States */}
+                        {(ad.targeting.states || []).length > 0 && (
+                          <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                                <MapPin className="w-3.5 h-3.5" /> States / Regions
+                              </div>
+                              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{ad.targeting.states.length}</span>
+                            </div>
+                            <TagList items={ad.targeting.states} color="purple" />
+                          </div>
+                        )}
+
+                        {/* Cities */}
+                        {(ad.targeting.cities || []).length > 0 && (
+                          <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                                <MapPin className="w-3.5 h-3.5" /> Cities
+                              </div>
+                              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{ad.targeting.cities.length}</span>
+                            </div>
+                            <TagList items={ad.targeting.cities} color="green" />
+                          </div>
+                        )}
+
+                        {/* Interests */}
+                        {(ad.targeting.interests || []).length > 0 && (
+                          <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                              <Zap className="w-3.5 h-3.5" /> Interests
+                            </div>
+                            <TagList items={ad.targeting.interests} color="purple" />
+                          </div>
+                        )}
+
+                        {/* Device Types */}
+                        {(ad.targeting.device_types || []).length > 0 && (
+                          <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                              <Smartphone className="w-3.5 h-3.5" /> Device Types
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {ad.targeting.device_types.map((d, i) => (
+                                <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                  {d === "mobile" || d === "ios" || d === "android" ? <Smartphone className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
+                                  {d}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Legacy flat targeting fields */}
+                    {(ad.target_language || []).length > 0 && (
+                      <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                            <Globe className="w-3.5 h-3.5" /> Target Languages
+                          </div>
+                          <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{(ad.target_language || []).length}</span>
                         </div>
-                        <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{(ad.target_language || []).length}</span>
+                        <TagList items={ad.target_language} color="blue" />
                       </div>
-                      <TagList items={ad.target_language} color="blue" />
-                    </div>
-                    <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
-                          <MapPin className="w-3.5 h-3.5" /> Target Locations
+                    )}
+                    {(ad.target_location || []).length > 0 && (
+                      <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                            <MapPin className="w-3.5 h-3.5" /> Target Locations
+                          </div>
+                          <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{(ad.target_location || []).length}</span>
                         </div>
-                        <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full font-semibold">{(ad.target_location || []).length}</span>
+                        <TagList items={ad.target_location} color="purple" />
                       </div>
-                      <TagList items={ad.target_location} color="purple" />
-                    </div>
+                    )}
                     {(ad.target_preferences || []).length > 0 && (
                       <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
                         <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
@@ -1719,6 +1864,14 @@ export default function AdDetails() {
                         <TagList items={ad.hashtags} color="green" />
                       </div>
                     )}
+
+                    {/* Empty state */}
+                    {!ad.targeting?.countries?.length && !ad.target_language?.length && !ad.target_location?.length && (
+                      <div className="text-center py-6 text-gray-400">
+                        <Target className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">No targeting configured — showing to all audiences</p>
+                      </div>
+                    )}
                   </div>
                 </Card>
 
@@ -1726,15 +1879,19 @@ export default function AdDetails() {
                 <Card title="Engagement Controls">
                   <div className="space-y-3">
                     {[
-                      { label: "Hide Likes Count", value: ad.engagement_controls?.hide_likes_count },
-                      { label: "Disable Comments", value: ad.engagement_controls?.disable_comments  },
+                      { label: "Hide Likes Count",   value: ad.engagement_controls?.hide_likes_count   },
+                      { label: "Disable Comments",   value: ad.engagement_controls?.disable_comments   },
+                      { label: "Disable Share",      value: ad.engagement_controls?.disable_share      },
+                      { label: "Disable Save",       value: ad.engagement_controls?.disable_save       },
+                      { label: "Disable Report",     value: ad.engagement_controls?.disable_report     },
+                      { label: "Moderation Enabled", value: ad.engagement_controls?.moderation_enabled },
                     ].map((ctrl, i) => (
                       <div key={i} className="flex items-center justify-between p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/50">
                         <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{ctrl.label}</span>
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${ctrl.value
                           ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
                           : "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"}`}>
-                          {ctrl.value ? "Enabled" : "Disabled"}
+                          {ctrl.value ? "On" : "Off"}
                         </span>
                       </div>
                     ))}
@@ -1833,6 +1990,25 @@ export default function AdDetails() {
                       <div className="h-2 rounded-full bg-gradient-to-r from-orange-500 to-pink-500 transition-all" style={{ width: `${spendPct}%` }} />
                     </div>
                   </div>
+                  {/* Extended budget fields */}
+                  {ad.budget?.daily_budget_coins > 0 && (
+                    <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 py-2.5 border-t border-gray-100 dark:border-gray-800">
+                      <span className="flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" /> Daily Limit</span>
+                      <span className="font-semibold text-gray-800 dark:text-white">{ad.budget.daily_budget_coins.toLocaleString()} 🪙</span>
+                    </div>
+                  )}
+                  {ad.budget?.start_date && (
+                    <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 py-2.5 border-t border-gray-100 dark:border-gray-800">
+                      <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Start Date</span>
+                      <span className="font-semibold text-gray-800 dark:text-white">{new Date(ad.budget.start_date).toLocaleDateString("en-IN")}</span>
+                    </div>
+                  )}
+                  {ad.budget?.end_date && (
+                    <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 py-2.5 border-t border-gray-100 dark:border-gray-800">
+                      <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> End Date</span>
+                      <span className="font-semibold text-gray-800 dark:text-white">{new Date(ad.budget.end_date).toLocaleDateString("en-IN")}</span>
+                    </div>
+                  )}
                   <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
                     <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
                       <span>Coins Reward</span>
@@ -1862,6 +2038,117 @@ export default function AdDetails() {
                     </div>
                   )}
                 </Card>
+
+                {/* CTA Card */}
+                {ad.cta && ad.cta.type && (
+                  <Card title="Call-To-Action" icon={MousePointerClick}>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900">
+                        <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">CTA Type</span>
+                        <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300 capitalize">{(ad.cta.type || "").replace("_", " ")}</span>
+                      </div>
+                      {ad.cta.url && (
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                            <Link2 className="w-3.5 h-3.5" /> URL
+                          </div>
+                          <a href={ad.cta.url} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline max-w-[160px] truncate">
+                            {ad.cta.url}
+                          </a>
+                        </div>
+                      )}
+                      {ad.cta.deep_link && (
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                            <Smartphone className="w-3.5 h-3.5" /> Deep Link
+                          </div>
+                          <span className="text-xs text-gray-700 dark:text-gray-300 font-mono max-w-[160px] truncate">{ad.cta.deep_link}</span>
+                        </div>
+                      )}
+                      {ad.cta.phone_number && (
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                            <Phone className="w-3.5 h-3.5" /> Phone
+                          </div>
+                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{ad.cta.phone_number}</span>
+                        </div>
+                      )}
+                      {ad.cta.whatsapp_number && (
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900">
+                          <div className="flex items-center gap-2 text-xs font-bold text-green-600 uppercase tracking-wide">
+                            <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+                          </div>
+                          <span className="text-xs font-semibold text-green-700 dark:text-green-400">{ad.cta.whatsapp_number}</span>
+                        </div>
+                      )}
+                      {ad.cta.email && (
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                            <Mail className="w-3.5 h-3.5" /> Email
+                          </div>
+                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{ad.cta.email}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Tracking / UTM */}
+                {ad.tracking && (ad.tracking.utm_source || ad.tracking.utm_campaign || ad.tracking.conversion_pixel_id) && (
+                  <Card title="Tracking & UTM" icon={Target}>
+                    <div className="space-y-2">
+                      {[
+                        { label: "Source",    value: ad.tracking.utm_source    },
+                        { label: "Medium",    value: ad.tracking.utm_medium    },
+                        { label: "Campaign",  value: ad.tracking.utm_campaign  },
+                        { label: "Term",      value: ad.tracking.utm_term      },
+                        { label: "Content",   value: ad.tracking.utm_content   },
+                        { label: "Pixel ID",  value: ad.tracking.conversion_pixel_id },
+                      ].filter(r => r.value).map((row, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">UTM {row.label}</span>
+                          <span className="text-xs font-mono font-semibold text-gray-700 dark:text-gray-300 max-w-[160px] truncate">{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* A/B Testing */}
+                {ad.ab_testing?.enabled && (ad.ab_testing.variants || []).length > 0 && (
+                  <Card title="A/B Testing" icon={TestTube2}>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">A/B Test Active — {ad.ab_testing.variants.length} variants</span>
+                      </div>
+                      {ad.ab_testing.variants.map((v, i) => (
+                        <div key={i} className="p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                          <div className="text-xs font-bold text-gray-500 mb-1.5">Variant {i + 1}: {v.variant_id}</div>
+                          {v.ad_title && <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{v.ad_title}</div>}
+                          {v.ad_description && <div className="text-xs text-gray-400 mt-0.5 truncate">{v.ad_description}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Scheduling */}
+                {(ad.scheduling?.delivery_time_slots || []).length > 0 && (
+                  <Card title="Delivery Schedule" icon={CalendarClock}>
+                    <div className="space-y-2">
+                      {ad.scheduling.delivery_time_slots.map((slot, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300 capitalize">{slot.day_of_week}</span>
+                          <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400 font-semibold">
+                            {slot.start_time} – {slot.end_time}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
                 {/* Views Breakdown */}
                 <Card title="Views Breakdown">

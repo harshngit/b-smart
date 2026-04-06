@@ -207,6 +207,9 @@ export default function ReportsAnalytics() {
   const [reportError, setReportError] = useState("");
   const [exportMsg, setExportMsg] = useState("");
 
+  const [tablePage, setTablePage] = useState(1);
+  const TABLE_PAGE_SIZE = 7;
+
   const currentReport = REPORTS.find((r) => r.id === selectedReport);
   const params = useMemo(() => {
     const range = getRange(datePreset, startDate, endDate);
@@ -221,6 +224,9 @@ export default function ReportsAnalytics() {
   }, [datePreset, startDate, endDate, selectedAd, country, language, gender]);
 
   const adOptions = useMemo(() => [{ value: "all", label: "All Ads" }, ...ads.map((ad) => ({ value: ad._id, label: ad.caption || ad.title || "Untitled Ad" }))], [ads]);
+
+  // Reset table page whenever report type or data changes
+  React.useEffect(() => { setTablePage(1); }, [selectedReport, rows.length]);
 
   const fetchAds = useCallback(async () => {
     if (!userObject?._id) return;
@@ -755,7 +761,7 @@ export default function ReportsAnalytics() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                    {rows.map((row, idx) => (
+                    {rows.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE).map((row, idx) => (
                       <tr key={`${selectedReport}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
                         {(COLUMNS[selectedReport] || []).map((col) => <td key={col[0]} className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{fmt(row[col[0]], col[2])}</td>)}
                       </tr>
@@ -765,17 +771,87 @@ export default function ReportsAnalytics() {
               </div>
             )}
 
-            {!reportLoading && rows.length > 0 ? (
-              <div className="flex items-center justify-between border-t border-gray-50 bg-gray-50/50 px-5 py-3.5 dark:border-gray-800 dark:bg-gray-800/30">
-                <p className="text-xs text-gray-400">
-                  {rows.length} rows · {PRESETS.find((p) => p.value === datePreset)?.label ?? "Custom range"}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button onClick={exportCsv} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"><FileDown size={12} /> Export CSV</button>
-                  <button onClick={exportPdf} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 px-3.5 py-2 text-xs font-bold text-white"><Download size={12} /> Download PDF</button>
-                </div>
-              </div>
-            ) : null}
+            {!reportLoading && rows.length > 0 ? (() => {
+              const totalPages = Math.ceil(rows.length / TABLE_PAGE_SIZE);
+              const showPagination = rows.length > TABLE_PAGE_SIZE;
+              return (
+                <>
+                  {showPagination && (
+                    <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 px-5 py-3 dark:border-gray-800 dark:bg-gray-800/30">
+                      <div className="flex items-center gap-1">
+                        {/* First */}
+                        <button
+                          onClick={() => setTablePage(1)}
+                          disabled={tablePage === 1}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs font-bold text-gray-500 transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >«</button>
+                        {/* Prev */}
+                        <button
+                          onClick={() => setTablePage(p => Math.max(1, p - 1))}
+                          disabled={tablePage === 1}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs font-bold text-gray-500 transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >‹</button>
+
+                        {/* Page numbers with ellipsis */}
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                          .filter(p => p === 1 || p === totalPages || Math.abs(p - tablePage) <= 1)
+                          .reduce((acc, p, i, arr) => {
+                            if (i > 0 && p - arr[i - 1] > 1) acc.push('…');
+                            acc.push(p);
+                            return acc;
+                          }, [])
+                          .map((item, i) =>
+                            typeof item === 'string' ? (
+                              <span key={`e${i}`} className="flex h-8 w-6 items-center justify-center text-xs text-gray-400">…</span>
+                            ) : (
+                              <button
+                                key={item}
+                                onClick={() => setTablePage(item)}
+                                className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-all ${
+                                  tablePage === item
+                                    ? 'bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-sm'
+                                    : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800'
+                                }`}
+                              >{item}</button>
+                            )
+                          )
+                        }
+
+                        {/* Next */}
+                        <button
+                          onClick={() => setTablePage(p => Math.min(totalPages, p + 1))}
+                          disabled={tablePage === totalPages}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs font-bold text-gray-500 transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >›</button>
+                        {/* Last */}
+                        <button
+                          onClick={() => setTablePage(totalPages)}
+                          disabled={tablePage === totalPages}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs font-bold text-gray-500 transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >»</button>
+                      </div>
+                      <span className="text-xs text-gray-400 tabular-nums">
+                        Page {tablePage} / {totalPages} · {rows.length} total rows
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Footer row */}
+                  <div className="flex items-center justify-between border-t border-gray-50 bg-gray-50/50 px-5 py-3.5 dark:border-gray-800 dark:bg-gray-800/30">
+                    <p className="text-xs text-gray-400">
+                      {showPagination
+                        ? `Showing ${(tablePage - 1) * TABLE_PAGE_SIZE + 1}–${Math.min(tablePage * TABLE_PAGE_SIZE, rows.length)} of ${rows.length} rows · ${PRESETS.find((p) => p.value === datePreset)?.label ?? "Custom range"}`
+                        : `${rows.length} rows · ${PRESETS.find((p) => p.value === datePreset)?.label ?? "Custom range"}`
+                      }
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button onClick={exportCsv} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"><FileDown size={12} /> Export CSV</button>
+                      <button onClick={exportPdf} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 px-3.5 py-2 text-xs font-bold text-white"><Download size={12} /> Download PDF</button>
+                    </div>
+                  </div>
+                </>
+              );
+            })() : null}
           </div>
         </div>
       </div>

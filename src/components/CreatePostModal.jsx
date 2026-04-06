@@ -2,7 +2,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone } from 'lucide-react';
+import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone,
+  MousePointerClick, Target, Smartphone, Monitor, Calendar, Link2, Phone, Mail, MessageSquare,
+  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins
+} from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
 // Filter Definitions
@@ -333,6 +336,63 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [selectedCountries, setSelectedCountries] = useState([]);
   const [selectedStates, setSelectedStates] = useState([]);
   const [totalBudgetCoins, setTotalBudgetCoins] = useState('');
+
+  // ── NEW ad fields ──────────────────────────────────────────────────────────
+  const [adTitle, setAdTitle] = useState('');
+  const [adDescription, setAdDescription] = useState('');
+  const [adType, setAdType] = useState('sponsored_post');
+  const [subCategory, setSubCategory] = useState('');
+  const [keywords, setKeywords] = useState([]);
+  const [keywordInput, setKeywordInput] = useState('');
+
+  // CTA
+  const [ctaType, setCtaType] = useState('view_site');
+  const [ctaUrl, setCtaUrl] = useState('');
+  const [ctaDeepLink, setCtaDeepLink] = useState('');
+  const [ctaPhone, setCtaPhone] = useState('');
+  const [ctaEmail, setCtaEmail] = useState('');
+  const [ctaWhatsapp, setCtaWhatsapp] = useState('');
+
+  // Budget extended
+  const [dailyBudgetCoins, setDailyBudgetCoins] = useState('');
+  const [budgetStartDate, setBudgetStartDate] = useState('');
+  const [budgetEndDate, setBudgetEndDate] = useState('');
+
+  // Targeting new fields
+  const [selectedCities, setSelectedCities] = useState([]);
+  const [cityInput, setCityInput] = useState('');
+  const [ageMin, setAgeMin] = useState('');
+  const [ageMax, setAgeMax] = useState('');
+  const [genderTarget, setGenderTarget] = useState('all');
+  const [selectedInterests, setSelectedInterests] = useState([]);
+  const [interestInput, setInterestInput] = useState('');
+  const [selectedDeviceTypes, setSelectedDeviceTypes] = useState([]);
+
+  // Tracking / UTM
+  const [utmSource, setUtmSource] = useState('');
+  const [utmMedium, setUtmMedium] = useState('');
+  const [utmCampaign, setUtmCampaign] = useState('');
+  const [utmTerm, setUtmTerm] = useState('');
+  const [utmContent, setUtmContent] = useState('');
+  const [conversionPixelId, setConversionPixelId] = useState('');
+
+  // Engagement controls (new)
+  const [disableShare, setDisableShare] = useState(false);
+  const [disableSave, setDisableSave] = useState(false);
+  const [disableReport, setDisableReport] = useState(false);
+  const [moderationEnabled, setModerationEnabled] = useState(false);
+
+  // Compliance
+  const [policyAgreed, setPolicyAgreed] = useState(false);
+
+  // A/B testing
+  const [abTestingEnabled, setAbTestingEnabled] = useState(false);
+
+  // Scheduling
+  const [scheduleSlots, setScheduleSlots] = useState([]);
+
+  // Accordion state — extended
+  // 'category' | 'country' | 'state' | 'language' | 'budget' | 'cta' | 'adtype' | 'targeting_advanced' | 'tracking' | 'engagement' | 'compliance' | null
 
   // API-driven country/state/language data
   const [allCountries, setAllCountries] = useState([]);
@@ -999,8 +1059,15 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
           const adPayload = {
             type: 'ads',
+            // Core
+            ad_title: adTitle,
+            ad_description: adDescription,
             caption,
             location,
+            ad_type: adType,
+            content_type: media.some(m => m.type === 'video') ? 'reel' : 'post',
+            status: submitMode === 'draft' ? 'draft' : 'pending',
+            // Media
             media: mediaForApi,
             hashtags,
             tagged_users: tags.map(t => ({
@@ -1009,18 +1076,65 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               position_x: t.x,
               position_y: t.y
             })),
-            engagement_controls: {
-              hide_likes_count: hideLikes,
-              disable_comments: turnOffCommenting
+            // CTA
+            cta: {
+              type: ctaType,
+              url: ctaUrl,
+              deep_link: ctaDeepLink,
+              phone_number: ctaPhone,
+              email: ctaEmail,
+              whatsapp_number: ctaWhatsapp,
             },
-            content_type: media.some(m => m.type === 'video') ? 'reel' : 'post',
+            // Budget
+            total_budget_coins: parseFloat(totalBudgetCoins) || 0,
+            budget: {
+              daily_budget_coins: parseFloat(dailyBudgetCoins) || 0,
+              start_date: budgetStartDate || undefined,
+              end_date: budgetEndDate || undefined,
+              auto_stop_on_budget_exhausted: false,
+            },
+            // Categorization
             category: selectedCategory || '',
+            sub_category: subCategory,
             tags: hashtags,
+            keywords,
+            // Legacy targeting
             target_language: selectedLanguages,
             target_location: selectedCountries,
             target_states: selectedStates,
-            total_budget_coins: parseFloat(totalBudgetCoins) || 0,
-            status: submitMode === 'draft' ? 'draft' : 'pending'
+            // New structured targeting
+            targeting: {
+              countries: selectedCountries,
+              states: selectedStates,
+              cities: selectedCities,
+              age_min: parseInt(ageMin) || 13,
+              age_max: parseInt(ageMax) || 65,
+              gender: genderTarget,
+              interests: selectedInterests,
+              device_types: selectedDeviceTypes,
+            },
+            // Engagement
+            engagement_controls: {
+              hide_likes_count: hideLikes,
+              disable_comments: turnOffCommenting,
+              disable_share: disableShare,
+              disable_save: disableSave,
+              disable_report: disableReport,
+              moderation_enabled: moderationEnabled,
+            },
+            // Tracking
+            tracking: {
+              utm_source: utmSource,
+              utm_medium: utmMedium,
+              utm_campaign: utmCampaign,
+              utm_term: utmTerm,
+              utm_content: utmContent,
+              conversion_pixel_id: conversionPixelId,
+            },
+            // Compliance
+            compliance: {
+              policy_agreed: policyAgreed,
+            },
           };
 
           await api.post('https://api.bebsmart.in/api/ads', adPayload);
@@ -1227,18 +1341,32 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       const natW = v.videoWidth  || 640;
       const natH = v.videoHeight || 360;
       const aspect = natW / natH;
-      const height = 120;
-      const width  = Math.round(height * aspect);
-      canvas.width  = width;
-      canvas.height = height;
-      const frames = [];
+      // Strip canvas — small/compact for the filmstrip timeline UI
+      const stripH = 120;
+      const stripW = Math.round(stripH * aspect);
+      const stripCanvas = document.createElement('canvas');
+      stripCanvas.width = stripW; stripCanvas.height = stripH;
+      const stripCtx = stripCanvas.getContext('2d');
+
+      // Cover canvas — full native resolution (max 720p) for crisp cover photo
+      const coverH = Math.min(natH, 720);
+      const coverW = Math.round(coverH * aspect);
+      const coverCanvas = document.createElement('canvas');
+      coverCanvas.width = coverW; coverCanvas.height = coverH;
+      const coverCtx = coverCanvas.getContext('2d');
+
+      const stripFrames = [];
+      const coverFrames = [];
       for (let i = 0; i < count; i++) {
         const t = duration > 0 ? Math.min(duration - 0.01, i) : 0;
         await new Promise(res => { v.currentTime = t; v.onseeked = res; });
-        ctx.drawImage(v, 0, 0, width, height);
-        frames.push(canvas.toDataURL('image/jpeg', 0.92));
+        stripCtx.drawImage(v, 0, 0, stripW, stripH);
+        stripFrames.push(stripCanvas.toDataURL('image/jpeg', 0.80));
+        coverCtx.drawImage(v, 0, 0, coverW, coverH);
+        coverFrames.push(coverCanvas.toDataURL('image/jpeg', 0.95));
       }
-      updateCurrentMedia({ thumbnails: frames, coverUrl: frames[0] });
+      // Use stripFrames for timeline strip (compact), coverFrames[0] for crisp cover
+      updateCurrentMedia({ thumbnails: stripFrames, coverUrl: coverFrames[0], coverFrames });
     };
     run();
   }, [step, currentMedia, updateCurrentMedia]);
@@ -1298,14 +1426,14 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 </button>
               </div>
               <h2 className="font-semibold text-base text-center dark:text-white flex-1">
-                {step === 'crop' ? 'Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Edit' : step === 'details' ? 'Ad Details' : 'Share'}
+                {step === 'crop' ? 'Step 1 · Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Step 2 · Edit' : step === 'share' && postType === 'ad' ? 'Step 3–6 · Ad Setup' : 'Share'}
               </h2>
               <div className="w-auto min-w-[140px] flex justify-end items-center gap-2">
                 {step === 'share' && postType === 'ad' && (
                   <button
                     onClick={() => handleNextStep('draft')}
                     className="px-3 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40"
-                    disabled={!totalBudgetCoins || isSubmitting}
+                    disabled={!totalBudgetCoins || !policyAgreed || isSubmitting}
                   >
                     Save Draft
                   </button>
@@ -1313,7 +1441,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 <button
                   onClick={() => handleNextStep('publish')}
                   className="text-[#0095f6] hover:text-[#00376b] dark:hover:text-blue-400 font-semibold text-sm transition-colors disabled:opacity-40"
-                  disabled={step === 'share' && postType === 'ad' && (!totalBudgetCoins)}
+                  disabled={step === 'share' && postType === 'ad' && (!totalBudgetCoins || !policyAgreed)}
                 >
                   {step === 'share' ? 'Share' : 'Next'}
                 </button>
@@ -1914,33 +2042,172 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 />
               </div>
 
+              {/* Ad Step Progress Bar */}
+              {postType === 'ad' && (
+                <div className="sticky top-0 z-30 bg-white dark:bg-[#262626] border-b border-gray-100 dark:border-gray-800 px-4 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Ad Setup Progress</span>
+                    <span className="text-[10px] font-bold text-purple-500">6 steps</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {[
+                      { n: 1, label: 'Media',     done: true },
+                      { n: 2, label: 'Content',   done: !!adTitle },
+                      { n: 3, label: 'CTA',       done: !!ctaUrl || !!ctaPhone || !!ctaWhatsapp },
+                      { n: 4, label: 'Targeting', done: !!selectedCategory },
+                      { n: 5, label: 'Budget',    done: !!totalBudgetCoins },
+                      { n: 6, label: 'Policy',    done: policyAgreed },
+                    ].map((s) => (
+                      <div key={s.n} className="flex-1 flex flex-col items-center gap-1.5">
+                        <div className={`w-full h-1.5 rounded-full transition-all duration-500 ${s.done ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                        <div className="flex items-center gap-1">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black flex-shrink-0 ${s.done ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-400'}`}>{s.done ? '✓' : s.n}</span>
+                          <span className={`text-[9px] font-bold hidden sm:block ${s.done ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400'}`}>{s.label}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Ad-specific fields */}
               {postType === 'ad' && (
-                <div className="px-4 pb-4 border-b border-gray-100 dark:border-gray-800 space-y-4 pt-4">
-                  
-                  {/* 1. Category Accordion — single select (radio) */}
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                <div className="px-4 pb-4 border-b border-gray-100 dark:border-gray-800 space-y-3 pt-4">
+
+                  {/* ── Visual Step Progress Bar ── */}
+                  <div className="flex items-center gap-0 mb-2 -mx-1">
+                    {[
+                      { n: 1, label: 'Media' },
+                      { n: 2, label: 'Content' },
+                      { n: 3, label: 'CTA' },
+                      { n: 4, label: 'Audience' },
+                      { n: 5, label: 'Budget' },
+                      { n: 6, label: 'Review' },
+                    ].map((s, i, arr) => (
+                      <React.Fragment key={s.n}>
+                        <div className="flex flex-col items-center flex-1">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black mb-0.5 ${
+                            s.n <= 2
+                              ? 'bg-green-500 text-white'
+                              : 'bg-purple-600 text-white'
+                          }`}>{s.n <= 2 ? '✓' : s.n}</div>
+                          <span className="text-[9px] font-semibold text-gray-400 text-center leading-none">{s.label}</span>
+                        </div>
+                        {i < arr.length - 1 && (
+                          <div className={`h-[2px] flex-1 mb-3 ${s.n < 2 ? 'bg-green-400' : 'bg-purple-200 dark:bg-purple-900/40'}`} />
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 text-center -mt-1 mb-2">Steps 1 &amp; 2 (media + edit) are already done ✓ — complete steps 3–6 below</p>
+
+                  {/* ── STEP 2: Title + Description ── */}
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 pb-1">Step 2 · Ad Content</div>
+
+                  <input
+                    type="text"
+                    placeholder="Ad Title *"
+                    value={adTitle}
+                    onChange={(e) => setAdTitle(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                  />
+                  <textarea
+                    placeholder="Ad Description"
+                    value={adDescription}
+                    onChange={(e) => setAdDescription(e.target.value)}
+                    rows={2}
+                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-purple-500 transition-all resize-none"
+                  />
+
+                  {/* Ad Type */}
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1.5"><Megaphone size={13} /> Ad Type</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'sponsored_post', label: 'Sponsored Post' },
+                        { value: 'banner',         label: 'Banner' },
+                        { value: 'video',          label: 'Video' },
+                        { value: 'carousel',       label: 'Carousel' },
+                      ].map(t => (
+                        <button key={t.value} onClick={() => setAdType(t.value)}
+                          className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
+                            adType === t.value
+                              ? 'bg-purple-600 text-white border-purple-600'
+                              : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-purple-400'
+                          }`}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── STEP 3: CTA ── */}
+                  <div className="pt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 pb-1">Step 3 · Call-To-Action</div>
+
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                     <button
-                      onClick={() => setOpenAccordion(openAccordion === 'category' ? null : 'category')}
+                      onClick={() => setOpenAccordion(openAccordion === 'cta' ? null : 'cta')}
                       className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
                     >
-                      <span>Category {selectedCategory && `(${selectedCategory})`}</span>
+                      <span className="flex items-center gap-2">
+                        <MousePointerClick size={14} className="text-indigo-500" />
+                        CTA {ctaType ? `· ${ctaType.replace('_', ' ')}` : ''}
+                      </span>
+                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'cta' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openAccordion === 'cta' && (
+                      <div className="p-3 bg-white dark:bg-black space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { value: 'view_site',    label: 'View Site' },
+                            { value: 'contact_info', label: 'Contact' },
+                            { value: 'install_app',  label: 'Install App' },
+                            { value: 'book_now',     label: 'Book Now' },
+                            { value: 'learn_more',   label: 'Learn More' },
+                            { value: 'call_now',     label: 'Call Now' },
+                          ].map(c => (
+                            <button key={c.value} onClick={() => setCtaType(c.value)}
+                              className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
+                                ctaType === c.value
+                                  ? 'bg-indigo-600 text-white border-indigo-600'
+                                  : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+                              }`}>
+                              {c.label}
+                            </button>
+                          ))}
+                        </div>
+                        <input type="url" placeholder="Destination URL" value={ctaUrl} onChange={e => setCtaUrl(e.target.value)}
+                          className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <input type="text" placeholder="Deep Link (e.g. myapp://product/123)" value={ctaDeepLink} onChange={e => setCtaDeepLink(e.target.value)}
+                          className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <input type="tel" placeholder="Phone Number (for Call Now)" value={ctaPhone} onChange={e => setCtaPhone(e.target.value)}
+                          className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <input type="text" placeholder="WhatsApp Number (e.g. 919876543210)" value={ctaWhatsapp} onChange={e => setCtaWhatsapp(e.target.value)}
+                          className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <input type="email" placeholder="Contact Email" value={ctaEmail} onChange={e => setCtaEmail(e.target.value)}
+                          className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── STEP 4: Audience Targeting ── */}
+                  <div className="pt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 pb-1">Step 4 · Audience Targeting</div>
+
+                  {/* Category */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                    <button onClick={() => setOpenAccordion(openAccordion === 'category' ? null : 'category')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
+                      <span className="flex items-center gap-2"><Tag size={14} className="text-orange-500" />Category {selectedCategory && `· ${selectedCategory}`}</span>
                       <ChevronDown size={16} className={`transition-transform ${openAccordion === 'category' ? 'rotate-180' : ''}`} />
                     </button>
                     {openAccordion === 'category' && (
-                      <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
+                      <div className="max-h-52 overflow-y-auto p-2 bg-white dark:bg-black space-y-1">
                         {isLoadingCategories ? (
                           <div className="p-2 text-xs text-gray-500">Loading...</div>
                         ) : (
                           categories.map(cat => (
-                            <label key={cat} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
-                              <input
-                                type="radio"
-                                name="ad_category"
-                                checked={selectedCategory === cat}
-                                onChange={() => setSelectedCategory(cat)}
-                                className="accent-blue-600"
-                              />
+                            <label key={cat} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded-lg">
+                              <input type="radio" name="ad_category" checked={selectedCategory === cat} onChange={() => setSelectedCategory(cat)} className="accent-purple-600" />
                               <span className="text-sm dark:text-gray-200">{cat}</span>
                             </label>
                           ))
@@ -1949,85 +2216,81 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     )}
                   </div>
 
-                  {/* 2. Country Accordion — multiple select (checkbox) */}
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => setOpenAccordion(openAccordion === 'country' ? null : 'country')}
-                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
-                    >
-                      <span>Target Country {selectedCountries.length > 0 && `(${selectedCountries.length} selected)`}</span>
-                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'country' ? 'rotate-180' : ''}`} />
-                    </button>
-                    {openAccordion === 'country' && (
-                      <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
-                        {isLoadingCountries ? (
-                          <div className="p-2 text-xs text-gray-500">Loading countries...</div>
-                        ) : allCountries.length === 0 ? (
-                          <div className="p-2 text-xs text-gray-400">No countries available</div>
-                        ) : (
-                          allCountries.map(c => {
-                            const name = typeof c === 'string' ? c : (c.name || c.country);
-                            return (
-                              <label key={name} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCountries.includes(name)}
-                                  onChange={() => {
-                                    if (selectedCountries.includes(name)) {
-                                      setSelectedCountries(selectedCountries.filter(x => x !== name));
-                                    } else {
-                                      setSelectedCountries([...selectedCountries, name]);
-                                    }
-                                  }}
-                                  className="accent-blue-600"
-                                />
-                                <span className="text-sm dark:text-gray-200">{name}</span>
-                              </label>
-                            );
-                          })
-                        )}
+                  {/* Sub-category + Keywords */}
+                  <input type="text" placeholder="Sub-category (optional, e.g. Women's Clothing)" value={subCategory} onChange={e => setSubCategory(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-purple-500" />
+
+                  <div>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder="Add keyword & press Enter" value={keywordInput} onChange={e => setKeywordInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && keywordInput.trim()) { setKeywords(prev => [...prev, keywordInput.trim()]); setKeywordInput(''); e.preventDefault(); }}}
+                        className="flex-1 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-purple-500" />
+                      <button onClick={() => { if (keywordInput.trim()) { setKeywords(prev => [...prev, keywordInput.trim()]); setKeywordInput(''); }}}
+                        className="px-3 py-2 rounded-xl bg-purple-600 text-white text-sm font-bold hover:bg-purple-700 transition-colors">+</button>
+                    </div>
+                    {keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {keywords.map((k, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold">
+                            {k} <button onClick={() => setKeywords(prev => prev.filter((_, j) => j !== i))} className="hover:text-red-500 transition-colors">×</button>
+                          </span>
+                        ))}
                       </div>
                     )}
                   </div>
 
-                  {/* 3. State Accordion — multiple select, shown only when countries selected */}
+                  {/* Country */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                    <button onClick={() => setOpenAccordion(openAccordion === 'country' ? null : 'country')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
+                      <span className="flex items-center gap-2"><Globe size={14} className="text-blue-500" />Countries {selectedCountries.length > 0 && `(${selectedCountries.length})`}</span>
+                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'country' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openAccordion === 'country' && (
+                      <div className="max-h-52 overflow-y-auto p-2 bg-white dark:bg-black">
+                        {isLoadingCountries ? (
+                          <div className="p-2 text-xs text-gray-500">Loading countries...</div>
+                        ) : allCountries.length === 0 ? (
+                          <div className="p-2 text-xs text-gray-400">No countries available</div>
+                        ) : allCountries.map(c => {
+                          const name = typeof c === 'string' ? c : (c.name || c.country);
+                          return (
+                            <label key={name} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded-lg">
+                              <input type="checkbox" checked={selectedCountries.includes(name)}
+                                onChange={() => setSelectedCountries(prev => prev.includes(name) ? prev.filter(x => x !== name) : [...prev, name])}
+                                className="accent-blue-600" />
+                              <span className="text-sm dark:text-gray-200">{name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* State */}
                   {selectedCountries.length > 0 && (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => setOpenAccordion(openAccordion === 'state' ? null : 'state')}
-                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
-                      >
-                        <span>Target State {selectedStates.length > 0 && `(${selectedStates.length} selected)`}</span>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                      <button onClick={() => setOpenAccordion(openAccordion === 'state' ? null : 'state')}
+                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
+                        <span className="flex items-center gap-2"><MapPin size={14} className="text-blue-400" />States / Regions {selectedStates.length > 0 && `(${selectedStates.length})`}</span>
                         <ChevronDown size={16} className={`transition-transform ${openAccordion === 'state' ? 'rotate-180' : ''}`} />
                       </button>
                       {openAccordion === 'state' && (
-                        <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
-                          {isLoadingStates ? (
-                            <div className="p-2 text-xs text-gray-500">Loading states...</div>
-                          ) : (
+                        <div className="max-h-52 overflow-y-auto p-2 bg-white dark:bg-black">
+                          {isLoadingStates ? <div className="p-2 text-xs text-gray-500">Loading states...</div> : (
                             selectedCountries.map(country => {
                               const states = statesByCountry[country] || [];
-                              if (states.length === 0) return null;
+                              if (!states.length) return null;
                               return (
                                 <div key={country}>
                                   <div className="px-2 pt-2 pb-1 text-xs font-bold text-gray-400 uppercase tracking-wide">{country}</div>
                                   {states.map(st => {
-                                    // Each st is { state, languages, cities }
                                     const stateName = st.state || (typeof st === 'string' ? st : st.name);
                                     return (
-                                      <label key={stateName} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedStates.includes(stateName)}
-                                          onChange={() => {
-                                            if (selectedStates.includes(stateName)) {
-                                              setSelectedStates(selectedStates.filter(x => x !== stateName));
-                                            } else {
-                                              setSelectedStates([...selectedStates, stateName]);
-                                            }
-                                          }}
-                                          className="accent-blue-600"
-                                        />
+                                      <label key={stateName} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded-lg">
+                                        <input type="checkbox" checked={selectedStates.includes(stateName)}
+                                          onChange={() => setSelectedStates(prev => prev.includes(stateName) ? prev.filter(x => x !== stateName) : [...prev, stateName])}
+                                          className="accent-blue-600" />
                                         <span className="text-sm dark:text-gray-200">{stateName}</span>
                                       </label>
                                     );
@@ -2041,79 +2304,261 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     </div>
                   )}
 
-                  {/* 4. Language Accordion — multiple select, shown only when states selected */}
+                  {/* Cities */}
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1.5"><MapPin size={13} className="text-green-500" />Cities (optional)</div>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder="Add city & press Enter" value={cityInput} onChange={e => setCityInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && cityInput.trim()) { setSelectedCities(prev => [...prev, cityInput.trim()]); setCityInput(''); e.preventDefault(); }}}
+                        className="flex-1 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-green-500" />
+                      <button onClick={() => { if (cityInput.trim()) { setSelectedCities(prev => [...prev, cityInput.trim()]); setCityInput(''); }}}
+                        className="px-3 py-2 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-colors">+</button>
+                    </div>
+                    {selectedCities.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {selectedCities.map((c, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-semibold">
+                            {c} <button onClick={() => setSelectedCities(prev => prev.filter((_, j) => j !== i))} className="hover:text-red-500">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Age + Gender */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Age Range</div>
+                      <div className="flex gap-2">
+                        <input type="number" placeholder="Min" value={ageMin} onChange={e => setAgeMin(e.target.value)} min={13} max={99}
+                          className="w-full p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <input type="number" placeholder="Max" value={ageMax} onChange={e => setAgeMax(e.target.value)} min={13} max={100}
+                          className="w-full p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Gender</div>
+                      <div className="flex flex-col gap-1.5">
+                        {['all', 'male', 'female', 'other'].map(g => (
+                          <label key={g} className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="gender_target" value={g} checked={genderTarget === g} onChange={() => setGenderTarget(g)} className="accent-pink-600" />
+                            <span className="text-xs dark:text-gray-300 capitalize">{g}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Interests */}
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1.5"><Zap size={13} className="text-yellow-500" />Interests</div>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder="Add interest & press Enter" value={interestInput} onChange={e => setInterestInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && interestInput.trim()) { setSelectedInterests(prev => [...prev, interestInput.trim()]); setInterestInput(''); e.preventDefault(); }}}
+                        className="flex-1 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-yellow-500" />
+                      <button onClick={() => { if (interestInput.trim()) { setSelectedInterests(prev => [...prev, interestInput.trim()]); setInterestInput(''); }}}
+                        className="px-3 py-2 rounded-xl bg-yellow-500 text-white text-sm font-bold hover:bg-yellow-600 transition-colors">+</button>
+                    </div>
+                    {selectedInterests.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {selectedInterests.map((item, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-xs font-semibold">
+                            {item} <button onClick={() => setSelectedInterests(prev => prev.filter((_, j) => j !== i))} className="hover:text-red-500">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Device Types */}
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1.5"><Smartphone size={13} className="text-indigo-500" />Device Types</div>
+                    <div className="flex flex-wrap gap-2">
+                      {['mobile', 'ios', 'android', 'desktop'].map(d => (
+                        <button key={d} onClick={() => setSelectedDeviceTypes(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                            selectedDeviceTypes.includes(d)
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+                          }`}>
+                          {d === 'desktop' ? <Monitor size={12} /> : <Smartphone size={12} />}
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Language */}
                   {selectedStates.length > 0 && (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => setOpenAccordion(openAccordion === 'language' ? null : 'language')}
-                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
-                      >
-                        <span>Target Language {selectedLanguages.length > 0 && `(${selectedLanguages.length} selected)`}</span>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                      <button onClick={() => setOpenAccordion(openAccordion === 'language' ? null : 'language')}
+                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
+                        <span className="flex items-center gap-2"><Globe size={14} className="text-purple-500" />Languages {selectedLanguages.length > 0 && `(${selectedLanguages.length})`}</span>
                         <ChevronDown size={16} className={`transition-transform ${openAccordion === 'language' ? 'rotate-180' : ''}`} />
                       </button>
                       {openAccordion === 'language' && (
-                        <div className="max-h-60 overflow-y-auto p-2 bg-white dark:bg-black">
-                          {isLoadingLanguages ? (
-                            <div className="p-2 text-xs text-gray-500">Loading languages...</div>
-                          ) : Object.keys(languagesByState).length === 0 ? (
-                            <div className="p-2 text-xs text-gray-400">No languages found for selected states</div>
-                          ) : (
-                            selectedCountries.map(country => {
+                        <div className="max-h-52 overflow-y-auto p-2 bg-white dark:bg-black">
+                          {isLoadingLanguages ? <div className="p-2 text-xs text-gray-500">Loading languages...</div>
+                          : Object.keys(languagesByState).length === 0 ? <div className="p-2 text-xs text-gray-400">No languages found for selected states</div>
+                          : selectedCountries.map(country => {
                               const langs = languagesByState[country] || [];
-                              if (langs.length === 0) return null;
+                              if (!langs.length) return null;
                               return (
                                 <div key={country}>
                                   <div className="px-2 pt-2 pb-1 text-xs font-bold text-gray-400 uppercase tracking-wide">{country}</div>
-                                  {langs.map(langName => {
-                                    return (
-                                      <label key={langName} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded">
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedLanguages.includes(langName)}
-                                          onChange={() => {
-                                            if (selectedLanguages.includes(langName)) {
-                                              setSelectedLanguages(selectedLanguages.filter(x => x !== langName));
-                                            } else {
-                                              setSelectedLanguages([...selectedLanguages, langName]);
-                                            }
-                                          }}
-                                          className="accent-blue-600"
-                                        />
-                                        <span className="text-sm dark:text-gray-200">{langName}</span>
-                                      </label>
-                                    );
-                                  })}
+                                  {langs.map(langName => (
+                                    <label key={langName} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer rounded-lg">
+                                      <input type="checkbox" checked={selectedLanguages.includes(langName)}
+                                        onChange={() => setSelectedLanguages(prev => prev.includes(langName) ? prev.filter(x => x !== langName) : [...prev, langName])}
+                                        className="accent-purple-600" />
+                                      <span className="text-sm dark:text-gray-200">{langName}</span>
+                                    </label>
+                                  ))}
                                 </div>
                               );
                             })
-                          )}
+                          }
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* 5. Budget */}
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => setOpenAccordion(openAccordion === 'budget' ? null : 'budget')}
-                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white"
-                    >
-                      <span>Total Budget (Coins) {totalBudgetCoins && `(${totalBudgetCoins})`}</span>
+                  {/* ── STEP 5: Budget & Duration ── */}
+                  <div className="pt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 pb-1">Step 5 · Budget & Duration</div>
+
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                    <button onClick={() => setOpenAccordion(openAccordion === 'budget' ? null : 'budget')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
+                      <span className="flex items-center gap-2"><Coins size={14} className="text-amber-500" />Budget {totalBudgetCoins && `· ${totalBudgetCoins} 🪙`}</span>
                       <ChevronDown size={16} className={`transition-transform ${openAccordion === 'budget' ? 'rotate-180' : ''}`} />
                     </button>
                     {openAccordion === 'budget' && (
-                      <div className="p-3 bg-white dark:bg-black">
-                        <input
-                          type="number"
-                          value={totalBudgetCoins}
-                          onChange={(e) => setTotalBudgetCoins(e.target.value)}
-                          placeholder="e.g. 1000"
-                          className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">Minimum 100 coins required</p>
+                      <div className="p-3 bg-white dark:bg-black space-y-3">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Total Budget (Coins) *</label>
+                          <input type="number" value={totalBudgetCoins} onChange={e => setTotalBudgetCoins(e.target.value)} placeholder="e.g. 5000 (min 100)"
+                            className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Daily Budget Limit (Coins)</label>
+                          <input type="number" value={dailyBudgetCoins} onChange={e => setDailyBudgetCoins(e.target.value)} placeholder="e.g. 500 (0 = no limit)"
+                            className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Start Date</label>
+                            <input type="date" value={budgetStartDate} onChange={e => setBudgetStartDate(e.target.value)}
+                              className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">End Date</label>
+                            <input type="date" value={budgetEndDate} onChange={e => setBudgetEndDate(e.target.value)}
+                              className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500" />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-400">Minimum 100 coins required. Budget is deducted from your wallet on creation.</p>
                       </div>
                     )}
                   </div>
+
+                  {/* Tracking / UTM */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                    <button onClick={() => setOpenAccordion(openAccordion === 'tracking' ? null : 'tracking')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
+                      <span className="flex items-center gap-2"><Target size={14} className="text-teal-500" />Tracking & UTM (optional)</span>
+                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'tracking' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openAccordion === 'tracking' && (
+                      <div className="p-3 bg-white dark:bg-black space-y-2.5">
+                        {[
+                          { label: 'UTM Source', value: utmSource, setter: setUtmSource, placeholder: 'e.g. myapp' },
+                          { label: 'UTM Medium', value: utmMedium, setter: setUtmMedium, placeholder: 'e.g. paid_ad' },
+                          { label: 'UTM Campaign', value: utmCampaign, setter: setUtmCampaign, placeholder: 'e.g. summer_sale_2025' },
+                          { label: 'UTM Term', value: utmTerm, setter: setUtmTerm, placeholder: 'e.g. fashion' },
+                          { label: 'UTM Content', value: utmContent, setter: setUtmContent, placeholder: 'e.g. banner_v1' },
+                          { label: 'Conversion Pixel ID', value: conversionPixelId, setter: setConversionPixelId, placeholder: 'e.g. px_abc123' },
+                        ].map(field => (
+                          <div key={field.label}>
+                            <label className="text-xs font-semibold text-gray-400 mb-1 block">{field.label}</label>
+                            <input type="text" value={field.value} onChange={e => field.setter(e.target.value)} placeholder={field.placeholder}
+                              className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── STEP 6: Review & Submit ── */}
+                  <div className="pt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 pb-1">Step 6 · Review & Submit</div>
+
+                  {/* Engagement Controls */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                    <button onClick={() => setOpenAccordion(openAccordion === 'engagement' ? null : 'engagement')}
+                      className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
+                      <span>Engagement Controls</span>
+                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'engagement' ? 'rotate-180' : ''}`} />
+                    </button>
+                    {openAccordion === 'engagement' && (
+                      <div className="p-3 bg-white dark:bg-black space-y-3">
+                        {[
+                          { label: 'Hide likes count',   value: hideLikes,          setter: setHideLikes },
+                          { label: 'Disable comments',   value: turnOffCommenting,  setter: setTurnOffCommenting },
+                          { label: 'Disable share',      value: disableShare,       setter: setDisableShare },
+                          { label: 'Disable save',       value: disableSave,        setter: setDisableSave },
+                          { label: 'Disable report',     value: disableReport,      setter: setDisableReport },
+                          { label: 'Moderation mode',    value: moderationEnabled,  setter: setModerationEnabled },
+                        ].map(ctrl => (
+                          <div key={ctrl.label} className="flex items-center justify-between">
+                            <span className="text-sm text-gray-700 dark:text-gray-300">{ctrl.label}</span>
+                            <div className="relative inline-flex items-center cursor-pointer" onClick={() => ctrl.setter(!ctrl.value)}>
+                              <input type="checkbox" className="sr-only peer" checked={ctrl.value} readOnly />
+                              <div className="w-10 h-5 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Policy Agreement — REQUIRED */}
+                  <div className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-colors cursor-pointer ${
+                    policyAgreed
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-700'
+                      : 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900/50'
+                  }`} onClick={() => setPolicyAgreed(!policyAgreed)}>
+                    <div className={`w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all mt-0.5 ${
+                      policyAgreed ? 'bg-green-500 border-green-500' : 'border-gray-400 dark:border-gray-600'
+                    }`}>
+                      {policyAgreed && <span className="text-white text-xs font-bold">✓</span>}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        I agree to the Ad Content Policy <span className="text-red-500">*</span>
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                        By submitting this ad I confirm the content complies with platform guidelines and applicable laws. <strong>Required to publish.</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Review Summary */}
+                  {(adTitle || selectedCategory || totalBudgetCoins) && (
+                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 space-y-2">
+                      <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Review Summary</div>
+                      {adTitle && <div className="flex justify-between text-sm"><span className="text-gray-500">Title</span><span className="font-semibold dark:text-white truncate max-w-[180px]">{adTitle}</span></div>}
+                      {selectedCategory && <div className="flex justify-between text-sm"><span className="text-gray-500">Category</span><span className="font-semibold dark:text-white">{selectedCategory}</span></div>}
+                      {ctaType && <div className="flex justify-between text-sm"><span className="text-gray-500">CTA</span><span className="font-semibold dark:text-white capitalize">{ctaType.replace('_', ' ')}</span></div>}
+                      {totalBudgetCoins && <div className="flex justify-between text-sm"><span className="text-gray-500">Total Budget</span><span className="font-bold text-amber-600">{totalBudgetCoins} 🪙</span></div>}
+                      {dailyBudgetCoins && <div className="flex justify-between text-sm"><span className="text-gray-500">Daily Budget</span><span className="font-bold text-amber-500">{dailyBudgetCoins} 🪙/day</span></div>}
+                      {selectedCountries.length > 0 && <div className="flex justify-between text-sm"><span className="text-gray-500">Countries</span><span className="font-semibold dark:text-white">{selectedCountries.length} selected</span></div>}
+                      {(ageMin || ageMax) && <div className="flex justify-between text-sm"><span className="text-gray-500">Age</span><span className="font-semibold dark:text-white">{ageMin || 13}–{ageMax || 65}</span></div>}
+                      {genderTarget !== 'all' && <div className="flex justify-between text-sm"><span className="text-gray-500">Gender</span><span className="font-semibold dark:text-white capitalize">{genderTarget}</span></div>}
+                      <div className="flex justify-between text-sm pt-1 border-t border-gray-200 dark:border-gray-700">
+                        <span className="text-gray-500">Policy Agreed</span>
+                        <span className={`font-bold ${policyAgreed ? 'text-green-600' : 'text-red-500'}`}>{policyAgreed ? '✓ Yes' : '✗ Required'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
