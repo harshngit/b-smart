@@ -6,8 +6,16 @@ import { supabase } from '../lib/supabase';
 import api from '../lib/api';
 import PostDetailModal from '../components/PostDetailModal';
 import AvatarCropModal from '../components/AvatarCropModal';
+import FollowersModal from '../components/FollowersModal';
+import FollowingModal from '../components/FollowingModal';
 import { setUser } from '../store/authSlice';
 import { createOrGetConversation } from '../services/chatService';
+import {
+    checkFollowStatus,
+    followUser,
+    getFollowCounts,
+    unfollowUser,
+} from '../services/followService';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n = 0) => {
@@ -45,6 +53,8 @@ const Profile = () => {
     const [vendorInfo, setVendorInfo] = useState(null);
     const [rewardToast, setRewardToast] = useState(null);
     const [favoriteProfile, setFavoriteProfile] = useState(false);
+    const [followersModalOpen, setFollowersModalOpen] = useState(false);
+    const [followingModalOpen, setFollowingModalOpen] = useState(false);
 
     const profileRewardMsRef = useRef(0);
     const profileRewardTickRef = useRef(null);
@@ -56,6 +66,7 @@ const Profile = () => {
         activeTab === 'reels' ? onlyReels :
         activeTab === 'posts' ? onlyPosts :
         userPosts;
+    const profileTargetUserId = profileUser?._id || profileUser?.id || userId || '';
 
     // ── Fetch profile user ──────────────────────────────────────────────────
     useEffect(() => {
@@ -166,15 +177,58 @@ const Profile = () => {
         };
         fetchVendorInfo();
     }, [profileUser?._id, profileUser?.id, profileUser?.role]); // eslint-disable-line
+    useEffect(() => {
+        if (!profileTargetUserId || isOwnProfile) {
+            setFollowed(false);
+            return;
+        }
+
+        const loadFollowStatus = async () => {
+            try {
+                const status = await checkFollowStatus(profileTargetUserId);
+                setFollowed(Boolean(status?.isFollowing));
+            } catch (error) {
+                console.error('Error checking follow status:', error);
+                setFollowed(false);
+            }
+        };
+
+        loadFollowStatus();
+    }, [isOwnProfile, profileTargetUserId]);
+
+    const refreshProfileFollowCounts = useCallback(async () => {
+        if (!profileTargetUserId) return;
+        try {
+            const counts = await getFollowCounts(profileTargetUserId);
+            setProfileUser((prev) => (
+                prev
+                    ? {
+                        ...prev,
+                        followers_count: Number(counts?.followers_count ?? prev.followers_count ?? 0),
+                        following_count: Number(counts?.following_count ?? prev.following_count ?? 0),
+                    }
+                    : prev
+            ));
+        } catch (error) {
+            console.error('Error refreshing follow counts:', error);
+        }
+    }, [profileTargetUserId]);
+
     const handleFollow = async () => {
         if (followLoading) return;
+        if (!profileTargetUserId || isOwnProfile) return;
         setFollowLoading(true);
         const was = followed;
-        setFollowed(!was);
         try {
-            const endpoint = was ? '/unfollow' : '/follow';
-            await api.post(endpoint, { followedUserId: profileUser?._id || profileUser?.id });
-        } catch {
+            if (was) {
+                await unfollowUser(profileTargetUserId);
+            } else {
+                await followUser(profileTargetUserId);
+            }
+            setFollowed(!was);
+            await refreshProfileFollowCounts();
+        } catch (error) {
+            console.error('Error updating follow status:', error);
             setFollowed(was);
         } finally {
             setFollowLoading(false);
@@ -619,12 +673,31 @@ const Profile = () => {
                                     { val: profileUser.posts_count ?? userPosts.length, label: 'Posts' },
                                     { val: profileUser.followers_count || 0, label: 'Followers' },
                                     { val: profileUser.following_count || 0, label: 'Following' },
-                                ].map(({ val, label }) => (
-                                    <div key={label} className="flex flex-col items-center">
-                                        <span className="font-bold text-lg text-gray-900 dark:text-white leading-tight">{fmt(val)}</span>
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
-                                    </div>
-                                ))}
+                                ].map(({ val, label }) => {
+                                    const isFollowers = label === 'Followers';
+                                    const isFollowingStat = label === 'Following';
+                                    const handleClick = isFollowers
+                                        ? () => setFollowersModalOpen(true)
+                                        : isFollowingStat
+                                            ? () => setFollowingModalOpen(true)
+                                            : undefined;
+
+                                    if (!handleClick) {
+                                        return (
+                                            <div key={label} className="flex flex-col items-center">
+                                                <span className="font-bold text-lg text-gray-900 dark:text-white leading-tight">{fmt(val)}</span>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <button key={label} type="button" onClick={handleClick} className="flex flex-col items-center transition hover:opacity-80">
+                                            <span className="font-bold text-lg text-gray-900 dark:text-white leading-tight">{fmt(val)}</span>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -843,11 +916,29 @@ const Profile = () => {
                                     { val: profileUser.posts_count ?? userPosts.length, label: 'posts' },
                                     { val: profileUser.followers_count || 0, label: 'followers' },
                                     { val: profileUser.following_count || 0, label: 'following' },
-                                ].map(({ val, label }) => (
-                                    <span key={label} className="text-[16px] text-gray-700 dark:text-gray-300">
-                                        <span className="font-bold text-gray-900 dark:text-white">{fmt(val)}</span> {label}
-                                    </span>
-                                ))}
+                                ].map(({ val, label }) => {
+                                    const isFollowers = label === 'followers';
+                                    const isFollowingStat = label === 'following';
+                                    const handleClick = isFollowers
+                                        ? () => setFollowersModalOpen(true)
+                                        : isFollowingStat
+                                            ? () => setFollowingModalOpen(true)
+                                            : undefined;
+
+                                    if (!handleClick) {
+                                        return (
+                                            <span key={label} className="text-[16px] text-gray-700 dark:text-gray-300">
+                                                <span className="font-bold text-gray-900 dark:text-white">{fmt(val)}</span> {label}
+                                            </span>
+                                        );
+                                    }
+
+                                    return (
+                                        <button key={label} type="button" onClick={handleClick} className="text-[16px] text-gray-700 transition hover:opacity-80 dark:text-gray-300">
+                                            <span className="font-bold text-gray-900 dark:text-white">{fmt(val)}</span> {label}
+                                        </button>
+                                    );
+                                })}
                             </div>
 
                             {/* Row 5: Name + Bio */}
@@ -913,6 +1004,18 @@ const Profile = () => {
                 onSuccess={handleAvatarSuccess}
                 currentAvatar={profileUser.avatar_url}
                 userName={profileUser.full_name || profileUser.username}
+            />
+            <FollowersModal
+                isOpen={followersModalOpen}
+                onClose={() => setFollowersModalOpen(false)}
+                userId={profileTargetUserId}
+                isOwnProfile={isOwnProfile}
+            />
+            <FollowingModal
+                isOpen={followingModalOpen}
+                onClose={() => setFollowingModalOpen(false)}
+                userId={profileTargetUserId}
+                isOwnProfile={isOwnProfile}
             />
         </div>
     );
