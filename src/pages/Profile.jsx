@@ -724,32 +724,15 @@ const Profile = () => {
                                     <Link to="/edit-profile" className="flex-1 bg-gradient-to-r from-orange-400 via-orange-500 to-pink-600 text-white text-sm font-bold py-3 rounded-xl text-center shadow-md shadow-orange-500/20 hover:opacity-95 transition-opacity">
                                         Edit Profile
                                     </Link>
-                                    <button
-                                        type="button"
-                                        onClick={handleShareProfile}
-                                        className="w-12 h-12 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm"
-                                        aria-label="Share profile"
-                                    >
+                                    <button type="button" onClick={handleShareProfile} className="w-12 h-12 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
                                         <Share2 size={20} />
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFavoriteProfile((prev) => !prev)}
-                                        className={`w-12 h-12 flex items-center justify-center rounded-xl border shadow-sm transition-all ${
-                                            favoriteProfile
-                                                ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400'
-                                                : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'
-                                        }`}
-                                        aria-label="Favourite profile"
-                                    >
+                                    <button type="button" onClick={() => setFavoriteProfile((prev) => !prev)}
+                                        className={`w-12 h-12 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
+                                        aria-label="Favourite profile">
                                         <Star size={20} fill={favoriteProfile ? 'currentColor' : 'none'} />
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleOpenMessages}
-                                        className="w-12 h-12 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm"
-                                        aria-label="Chat"
-                                    >
+                                    <button type="button" onClick={handleOpenMessages} className="w-12 h-12 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
                                         <MessageCircle size={20} />
                                     </button>
                                 </>
@@ -760,14 +743,21 @@ const Profile = () => {
                                         {followLoading && <Loader2 size={14} className="animate-spin" />}
                                         {followed ? 'Following' : 'Follow'}
                                     </button>
-                                    <button
-                                        onClick={handleOpenMessages}
-                                        disabled={messageLoading}
-                                        className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-bold py-3 rounded-xl disabled:opacity-60"
-                                    >
+                                    <button onClick={handleOpenMessages} disabled={messageLoading}
+                                        className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-bold py-3 rounded-xl disabled:opacity-60">
                                         {messageLoading ? 'Opening...' : 'Message'}
                                     </button>
-                                    <button className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-xl shadow-sm"><MoreHorizontal size={20} /></button>
+                                    <button type="button" onClick={handleShareProfile} className="w-12 h-12 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
+                                        <Share2 size={20} />
+                                    </button>
+                                    <button type="button" onClick={() => setFavoriteProfile((prev) => !prev)}
+                                        className={`w-12 h-12 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
+                                        aria-label="Favourite">
+                                        <Star size={20} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                    </button>
+                                    <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="w-12 h-12 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
+                                        <MessageCircle size={20} />
+                                    </button>
                                 </>
                             )}
                         </div>
@@ -896,7 +886,7 @@ const Profile = () => {
                                 )}
                             </div>
 
-                            {/* Row 3: Settings icon */}
+                            {/* Row 3: Settings icon (own) / Vendor badge (other vendor) / empty spacer for layout parity */}
                             <div className="mb-6">
                                 {isOwnProfile ? (
                                     <Link to="/settings" className="inline-flex p-1 text-gray-900 dark:text-white hover:opacity-70 transition-opacity">
@@ -907,7 +897,9 @@ const Profile = () => {
                                         <span className="text-xs font-bold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-3 py-1 rounded-full uppercase tracking-wider">Vendor</span>
                                         <ValidationStatusBadge validated={vendorValidated} />
                                     </div>
-                                ) : null}
+                                ) : (
+                                    <div className="h-[36px]" /> /* spacer to keep stats row at same vertical position */
+                                )}
                             </div>
 
                             {/* Row 4: Stats */}
