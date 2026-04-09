@@ -685,7 +685,10 @@ const Ads = ({ feedMode = 'user' }) => {
   const handleSearchResultClick = (item) => {
     handleSearchClose();
     if (item._type === 'user') {
-      navigate(`/profile/${item._id || item.id}`);
+      const profilePath = item.role === 'vendor' 
+        ? `/vendor/${item._id || item.id}/public` 
+        : `/profile/${item._id || item.id}`;
+      navigate(profilePath);
       return;
     }
     if (item._type === 'ad') {
@@ -1784,7 +1787,7 @@ const Ads = ({ feedMode = 'user' }) => {
                             onClick={() => {
                               trackAdClick(a._id);
                               const uid = a.user_id?._id || a.user_id?.id || a.vendor_id?._id;
-                              if (uid) navigate(`/profile/${uid}`);
+                              if (uid) navigate(`/vendor/${uid}/public`);
                             }}
                             className="flex items-center gap-2 active:opacity-70 transition-opacity min-w-0 flex-1"
                           >

@@ -29,6 +29,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Search from './pages/Search';
 import ChatPage from './pages/ChatPage';
 
+import VendorPublicProfile from './pages/VendorPublicProfile';
 import VendorLayout from './components/VendorLayout';
 import VendorDashboard from './pages/vendor-pages/Dashboard';
 import VendorProfile from './pages/vendor-pages/VendorProfile';
@@ -110,6 +111,8 @@ function App() {
           <Route path="/search"           element={<Search />} />
           <Route path="/messages"         element={<ChatPage />} />
           <Route path="/messages/:conversationId" element={<ChatPage />} />
+          <Route path="/vendor/:userId/public" element={<VendorPublicProfile />} />
+
         </Route>
 
         <Route path="/vendor" element={
