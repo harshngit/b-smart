@@ -8,6 +8,7 @@ import {
   Sticker,
   X,
 } from 'lucide-react';
+import EmojiPicker from 'emoji-picker-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -94,6 +95,23 @@ const previousNonDeleted = (messages) => {
 
 const hasUserSeenMessage = (message, userId) =>
   (message?.seenBy || []).some((entry) => String(entry?._id || entry) === String(userId));
+
+const getOwnReaction = (message, userId) =>
+  (message?.reactions || []).find((reaction) => String(reaction?.userId?._id || reaction?.userId) === String(userId)) || null;
+
+const getReactionBadge = (message, userId) => {
+  const reactions = message?.reactions || [];
+  if (!reactions.length) return null;
+
+  const ownReaction = getOwnReaction(message, userId);
+  const primaryEmoji = ownReaction?.emoji || reactions[0]?.emoji || '';
+  const count = reactions.length;
+
+  return {
+    label: count > 1 ? `${primaryEmoji} ${count}` : primaryEmoji,
+    removable: Boolean(ownReaction),
+  };
+};
 
 const messagePreview = (message, isMine, name) => {
   if (!message) return 'Start chatting';
@@ -217,15 +235,18 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const { conversationId: conversationIdFromUrl } = useParams();
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
   const scrollerRef = useRef(null);
   const stopTypingRef = useRef(null);
   const roomRef = useRef(null);
   const contextRef = useRef(null);
+  const emojiPickerRef = useRef(null);
   const longPressRef = useRef(null);
   const activeConversationIdRef = useRef(null);
   const chatPageCallbacksRef = useRef(null);
   const onNewMessageRef = useRef(null);
   const onMessageRemovedRef = useRef(null);
+  const onMessageReactionUpdateRef = useRef(null);
   const messagesRef = useRef([]);
   const unreadCountsRef = useRef({});
   const currentUserIdRef = useRef('');
@@ -236,7 +257,7 @@ export default function ChatPage() {
   const [contextMenu, setContextMenu] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [reactions, setReactions] = useState({});
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState(null);
   const [hoveredMessageId, setHoveredMessageId] = useState(null);
 
@@ -252,6 +273,7 @@ export default function ChatPage() {
     unreadCounts,
   } = useSelector((state) => state.chat);
   const { userObject } = useSelector((state) => state.auth);
+  const { mode } = useSelector((state) => state.theme);
 
   const currentUserId = getUserId(userObject);
   const token = localStorage.getItem('token');
@@ -444,6 +466,23 @@ export default function ChatPage() {
     onMessageRemovedRef.current = onMessageRemoved;
   }, [onMessageRemoved]);
 
+  const onMessageReactionUpdate = useCallback(({ messageId, reactions: nextReactions }) => {
+    if (!messageId || !messagesRef.current.some((message) => message._id === messageId)) return;
+
+    const nextMessages = messagesRef.current.map((message) => (
+      message._id === messageId
+        ? { ...message, reactions: Array.isArray(nextReactions) ? nextReactions : [] }
+        : message
+    ));
+
+    messagesRef.current = nextMessages;
+    dispatch(setMessages(nextMessages));
+  }, [dispatch]);
+
+  useEffect(() => {
+    onMessageReactionUpdateRef.current = onMessageReactionUpdate;
+  }, [onMessageReactionUpdate]);
+
   useEffect(() => {
     if (!token) return undefined;
 
@@ -467,6 +506,7 @@ export default function ChatPage() {
         messagesRef.current = nextMessages;
         dispatch(setMessages(nextMessages));
       },
+      onMessageReactionUpdate: (...args) => onMessageReactionUpdateRef.current?.(...args),
       onMessageRemoved: (...args) => onMessageRemovedRef.current?.(...args),
     };
 
@@ -540,6 +580,29 @@ export default function ChatPage() {
     window.addEventListener('click', handler);
     return () => window.removeEventListener('click', handler);
   }, [reactionPickerFor]);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (emojiPickerRef.current?.contains(event.target)) return;
+      setShowEmojiPicker(false);
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setShowEmojiPicker(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [showEmojiPicker]);
 
   const stopTyping = useCallback(() => {
     if (activeConversation?._id && currentUserId) emitStopTyping(activeConversation._id, currentUserId);
@@ -648,17 +711,65 @@ export default function ChatPage() {
   };
 
   const handleReact = (message) => {
+    if (message?.isDeleted) return;
     setReactionPickerFor((prev) =>
       prev === message._id ? null : message._id
     );
   };
 
-  const handleSelectReaction = (messageId, emoji) => {
-    setReactions((prev) => ({
-      ...prev,
-      [messageId]: prev[messageId] === emoji ? null : emoji,
-    }));
-    setReactionPickerFor(null);
+  const handleInputChange = (value) => {
+    setInput(value);
+    if (activeConversation?._id && currentUserId) {
+      emitTyping(activeConversation._id, currentUserId);
+      scheduleStopTyping();
+    }
+  };
+
+  const handleEmojiSelect = (emojiData) => {
+    setInput((prev) => `${prev}${emojiData.emoji}`);
+    if (activeConversation?._id && currentUserId) {
+      emitTyping(activeConversation._id, currentUserId);
+      scheduleStopTyping();
+    }
+    inputRef.current?.focus();
+  };
+
+  const handleSelectReaction = async (message, emoji) => {
+    if (!message?._id) return;
+
+    try {
+      const ownReaction = getOwnReaction(message, currentUserId);
+      const updatedMessage = ownReaction?.emoji === emoji
+        ? await chatService.removeMessageReaction(message._id)
+        : await chatService.addMessageReaction(message._id, emoji);
+
+      const nextMessages = messagesRef.current.map((item) => (
+        item._id === message._id ? { ...item, ...updatedMessage } : item
+      ));
+
+      messagesRef.current = nextMessages;
+      dispatch(setMessages(nextMessages));
+    } catch (error) {
+      console.error('Failed to update reaction:', error);
+    } finally {
+      setReactionPickerFor(null);
+    }
+  };
+
+  const handleRemoveOwnReaction = async (message) => {
+    if (!message?._id || !getOwnReaction(message, currentUserId)) return;
+
+    try {
+      const updatedMessage = await chatService.removeMessageReaction(message._id);
+      const nextMessages = messagesRef.current.map((item) => (
+        item._id === message._id ? { ...item, ...updatedMessage } : item
+      ));
+
+      messagesRef.current = nextMessages;
+      dispatch(setMessages(nextMessages));
+    } catch (error) {
+      console.error('Failed to remove reaction:', error);
+    }
   };
 
   const handleMoreMenu = (event, message) => {
@@ -698,6 +809,9 @@ export default function ChatPage() {
     const bubbleClass = mine
       ? 'bg-[#7C3AED] rounded-[22px] rounded-br-md shadow-sm'
       : 'bg-gray-100 dark:bg-[#262626] rounded-[22px] rounded-bl-md border border-gray-200 dark:border-white/5 shadow-sm';
+    const mediaFrameClass = mine
+      ? 'overflow-hidden rounded-[22px] rounded-br-md shadow-sm bg-transparent'
+      : 'overflow-hidden rounded-[22px] rounded-bl-md shadow-sm bg-transparent';
 
     return (
       <div className="max-w-[280px] sm:max-w-[340px]">
@@ -709,18 +823,24 @@ export default function ChatPage() {
             <p className={`line-clamp-2 ${mine ? 'text-white/70' : 'text-gray-600 dark:text-white/70'}`}>{message.replyTo.text || 'Attachment'}</p>
           </div>
         ) : null}
-        <div className={`${bubbleClass} overflow-hidden px-3 py-2.5 ${mine ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-          {message.mediaUrl ? (
-            <div className="space-y-2">
+        {message.mediaUrl ? (
+          <div className="space-y-2">
+            <div className={mediaFrameClass}>
               {message.mediaType === 'video' || isVideoUrl(message.mediaUrl)
-                ? <video src={message.mediaUrl} controls className="max-h-80 w-full rounded-2xl object-cover outline-none border-0 [-webkit-tap-highlight-color:transparent]" />
-                : <img src={message.mediaUrl} alt="attachment" className="max-h-80 w-full rounded-2xl object-cover outline-none border-0 [-webkit-tap-highlight-color:transparent]" />}
-              {message.text ? <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p> : null}
+                ? <video src={message.mediaUrl} controls className="block max-h-80 w-full object-cover outline-none border-0 ring-0 shadow-none [-webkit-tap-highlight-color:transparent]" />
+                : <img src={message.mediaUrl} alt="attachment" className="block max-h-80 w-full object-cover outline-none border-0 ring-0 shadow-none [-webkit-tap-highlight-color:transparent]" />}
             </div>
-          ) : (
+            {message.text ? (
+              <div className={`${bubbleClass} overflow-hidden px-3 py-2.5 ${mine ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className={`${bubbleClass} overflow-hidden px-3 py-2.5 ${mine ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -853,6 +973,7 @@ export default function ChatPage() {
                       const sameNext = next && String(next?.sender?._id || next?.sender) === String(message?.sender?._id || message?.sender);
                       const showAvatar = !mine && !sameNext;
                       const showSeen = mine && message._id === latestSeenOwnMessageId;
+                      const reactionBadge = getReactionBadge(message, currentUserId);
 
                       return (
                         <div
@@ -885,21 +1006,22 @@ export default function ChatPage() {
                                 {reactionPickerFor === message._id && (
                                   <ReactionPicker
                                     mine={mine}
-                                    onSelect={(emoji) => handleSelectReaction(message._id, emoji)}
+                                    onSelect={(emoji) => handleSelectReaction(message, emoji)}
                                   />
                                 )}
                                 {renderBubble(message, mine)}
-                                {reactions[message._id] && (
+                                {reactionBadge ? (
                                   <div
                                     className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'} 
                       text-[13px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 
                       rounded-full px-2 py-0.5 leading-none cursor-pointer shadow-sm
                       hover:scale-110 transition-transform z-10`}
-                                    onClick={() => handleSelectReaction(message._id, reactions[message._id])}
+                                    onClick={() => handleRemoveOwnReaction(message)}
+                                    title={reactionBadge.removable ? 'Remove your reaction' : undefined}
                                   >
-                                    {reactions[message._id]}
+                                    {reactionBadge.label}
                                   </div>
-                                )}
+                                ) : null}
                               </div>
 
                               {!message.isDeleted && (
@@ -937,18 +1059,41 @@ export default function ChatPage() {
               ) : null}
 
               <div className="border-t border-gray-100 dark:border-white/10 px-4 py-4 flex-shrink-0 bg-white dark:bg-black">
-                <div className="flex items-center gap-2 rounded-[28px] bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/5 px-3 py-2 min-h-[52px] shadow-sm focus-within:shadow-md focus-within:border-gray-300 dark:focus-within:border-white/20 transition-all">
-                  <button className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"><Smile size={20} /></button>
+                <div ref={emojiPickerRef} className="relative">
+                  {showEmojiPicker ? (
+                    <div
+                      className="absolute bottom-full left-0 mb-3 z-[120] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 shadow-2xl"
+                    >
+                      <EmojiPicker
+                        theme={mode === 'dark' ? 'dark' : 'light'}
+                        onEmojiClick={handleEmojiSelect}
+                        lazyLoadEmojis
+                        skinTonesDisabled
+                        searchDisabled={false}
+                        previewConfig={{ showPreview: false }}
+                        width="min(352px, calc(100vw - 2rem))"
+                        height={400}
+                      />
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-2 rounded-[28px] bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/5 px-3 py-2 min-h-[52px] shadow-sm focus-within:shadow-md focus-within:border-gray-300 dark:focus-within:border-white/20 transition-all">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker((prev) => !prev)}
+                      className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                      aria-label="Toggle emoji picker"
+                    >
+                      <Smile size={20} />
+                    </button>
                   <input
+                    ref={inputRef}
                     value={input}
-                    onChange={(event) => {
-                      setInput(event.target.value);
-                      if (activeConversation?._id && currentUserId) {
-                        emitTyping(activeConversation._id, currentUserId);
-                        scheduleStopTyping();
-                      }
-                    }}
+                    onChange={(event) => handleInputChange(event.target.value)}
                     onKeyDown={(event) => {
+                      if (event.key === 'Escape' && showEmojiPicker) {
+                        setShowEmojiPicker(false);
+                        return;
+                      }
                       if (event.key === 'Enter' && !event.shiftKey) {
                         event.preventDefault();
                         handleSend();
@@ -970,6 +1115,7 @@ export default function ChatPage() {
                       <SendHorizontal size={20} />
                     </button>
                   ) : null}
+                  </div>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFile} className="hidden" />
               </div>

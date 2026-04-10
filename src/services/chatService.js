@@ -27,6 +27,16 @@ export const markMessageSeen = async (messageId) => {
   return response.data;
 };
 
+export const addMessageReaction = async (messageId, emoji) => {
+  const response = await api.post(`/chat/messages/${messageId}/reaction`, { emoji });
+  return response.data;
+};
+
+export const removeMessageReaction = async (messageId) => {
+  const response = await api.delete(`/chat/messages/${messageId}/reaction`);
+  return response.data;
+};
+
 export const deleteMessage = async (messageId) => {
   const response = await api.delete(`/chat/messages/${messageId}`);
   return response.data;
