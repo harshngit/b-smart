@@ -80,7 +80,7 @@ const Caption = ({ text }) => {
         <>
           {text}
           {expanded && isLong && (
-            <button onClick={() => setExpanded(false)} className="text-white/60 ml-1.5 hover:text-white transition-colors text-xs font-semibold">less</button>
+            <button onClick={() => setExpanded(false)} className="text-white/60 ml-1.5 hover:text-white transition-colors text-sm font-semibold">less</button>
           )}
         </>
       ) : (
@@ -208,13 +208,13 @@ const Avatar = ({ src, username, size = 'md' }) => {
     size === 'sm' ? 'w-8 h-8 text-xs' :
     'w-9 h-9 text-sm';
   return (
-    <div className={`${dim} rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] flex-shrink-0`}>
-      <div className="w-full h-full rounded-full bg-white dark:bg-[#1c1c1e] flex items-center justify-center overflow-hidden">
-        {src
-          ? <img src={src} alt={username || 'user'} className="w-full h-full object-cover" />
-          : <span className="text-gray-800 dark:text-white font-bold">{(username || 'U')[0].toUpperCase()}</span>
-        }
-      </div>
+    <div className={`${dim} rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 flex items-center justify-center`}>
+      {src
+        ? <img src={src} alt={username || 'user'} className="w-full h-full object-cover" />
+        : <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700 font-bold text-gray-500">
+            {(username || 'U')[0].toUpperCase()}
+          </div>
+      }
     </div>
   );
 };

@@ -1022,7 +1022,7 @@ const Profile = () => {
                 {/* Floating Wallet */}
                 <div className="fixed bottom-8 right-8 z-50 hover:scale-105 transition-transform cursor-pointer">
                     <Link to="/wallet" className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-full shadow-xl border border-gray-100 dark:border-gray-800 p-1 pr-4">
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center text-white shadow">
+                        <div className="w-11 h-11 rounded-full bg-orange-500 flex items-center justify-center text-white shadow">
                             <Wallet size={20} />
                         </div>
                         <div className="flex flex-col">

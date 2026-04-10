@@ -42,13 +42,13 @@ const formatTimeAgo = (dateString) => {
 const Avatar = ({ src, username, size = 'md' }) => {
   const dim = size === 'xs' ? 'w-7 h-7 text-[10px]' : size === 'sm' ? 'w-8 h-8 text-xs' : 'w-9 h-9 text-sm';
   return (
-    <div className={`${dim} rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] flex-shrink-0`}>
-      <div className="w-full h-full rounded-full bg-white dark:bg-[#1c1c1e] flex items-center justify-center overflow-hidden">
-        {src
-          ? <img src={src} alt={username || 'user'} className="w-full h-full object-cover" />
-          : <span className="text-gray-800 dark:text-white font-bold">{(username || 'U')[0].toUpperCase()}</span>
-        }
-      </div>
+    <div className={`${dim} rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 flex items-center justify-center`}>
+      {src
+        ? <img src={src} alt={username || 'user'} className="w-full h-full object-cover" />
+        : <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700 font-bold text-gray-500">
+            {(username || 'U')[0].toUpperCase()}
+          </div>
+      }
     </div>
   );
 };
@@ -515,7 +515,7 @@ const Caption = ({ text }) => {
         <>
           {text}
           {expanded && isLong && (
-            <button onClick={() => setExpanded(false)} className="text-white/60 ml-1.5 hover:text-white transition-colors text-xs font-semibold">
+            <button onClick={() => setExpanded(false)} className="text-white/60 ml-1.5 hover:text-white transition-colors text-sm font-semibold">
               less
             </button>
           )}
@@ -1383,13 +1383,11 @@ const Ads = ({ feedMode = 'user' }) => {
                           onMouseLeave={() => setHoveredUserId((current) => (current === previewUserId ? null : current))}
                           className="relative w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
                         >
-                          <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] shrink-0">
-                            <div className="w-full h-full rounded-full bg-white dark:bg-[#1c1c1e] overflow-hidden flex items-center justify-center">
-                              {u.avatar_url
-                                ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
-                                : <span className="text-xs font-bold text-gray-700 dark:text-white">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
-                              }
-                            </div>
+                          <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0 flex items-center justify-center">
+                            {u.avatar_url
+                              ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                              : <span className="text-xs font-bold text-gray-500">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
+                            }
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</div>
@@ -1533,7 +1531,7 @@ const Ads = ({ feedMode = 'user' }) => {
               </button>
               {/* Compact wallet pill */}
               <Link to="/wallet" className="flex items-center gap-1 bg-black/40 backdrop-blur-md border border-white/20 rounded-full px-2 py-1">
-                <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center shrink-0">
+                <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center shrink-0">
                   <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
                   </svg>
@@ -1583,13 +1581,11 @@ const Ads = ({ feedMode = 'user' }) => {
                     if (item._type === 'user') return (
                       <button key={item._id || item.id} onClick={() => handleSearchResultClick(item)}
                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 transition-colors text-left">
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-500 p-[1.5px] shrink-0">
-                          <div className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center">
-                            {item.avatar_url
-                              ? <img src={item.avatar_url} alt="" className="w-full h-full object-cover" />
-                              : <span className="text-[10px] font-bold text-white">{(item.username || '?')[0].toUpperCase()}</span>
-                            }
-                          </div>
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 shrink-0 flex items-center justify-center">
+                          {item.avatar_url
+                            ? <img src={item.avatar_url} alt="" className="w-full h-full object-cover" />
+                            : <span className="text-[10px] font-bold text-white/70">{(item.username || '?')[0].toUpperCase()}</span>
+                          }
                         </div>
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-white truncate">{item.full_name || item.username}</div>
