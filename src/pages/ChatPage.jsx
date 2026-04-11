@@ -1,4 +1,5 @@
 import {
+  ChevronLeft,
   ImagePlus,
   MessageCircle,
   Mic,
@@ -860,8 +861,15 @@ export default function ChatPage() {
   return (
     <div className="h-[100dvh] bg-white dark:bg-black text-gray-900 dark:text-white md:h-screen">
       <div className="flex h-full">
-        <aside className="hidden h-full w-[380px] flex-shrink-0 border-r border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-[#0a0a0a] md:flex md:flex-col">
+        <aside className={`${activeId ? 'hidden' : 'flex'} h-full w-full flex-shrink-0 border-r border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-[#0a0a0a] md:w-[380px] md:flex md:flex-col`}>
           <div className="border-b border-gray-100 dark:border-white/10 px-5 py-5">
+            {/* Mobile Back to Home */}
+            <div className="md:hidden flex items-center gap-3 mb-4">
+              <button onClick={() => navigate('/')} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10">
+                <ChevronLeft size={24} />
+              </button>
+              <h1 className="text-xl font-bold tracking-tight">Messages</h1>
+            </div>
             <div className="flex items-center gap-3 rounded-full bg-white dark:bg-[#111111] px-4 py-3 text-sm text-gray-400 border border-gray-200 dark:border-transparent focus-within:border-gray-300 dark:focus-within:border-white/20 transition-all shadow-sm">
               <Search size={16} className="text-gray-400 dark:text-gray-500" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" className="w-full bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-white" />
@@ -931,7 +939,7 @@ export default function ChatPage() {
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col bg-white dark:bg-black overflow-hidden relative">
+        <section className={`${!activeId ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col bg-white dark:bg-black overflow-hidden relative md:flex`}>
           {!activeConversation ? (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center animate-in fade-in duration-500">
               <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-[#0a0a0a] shadow-sm">
@@ -944,6 +952,15 @@ export default function ChatPage() {
           ) : (
             <>
               <header className="flex items-center gap-3 border-b border-gray-100 dark:border-white/10 px-4 py-3 bg-white/80 dark:bg-black/80 backdrop-blur-md z-10 sticky top-0">
+                <button
+                  onClick={() => {
+                    dispatch(setActiveConversation(null));
+                    navigate('/messages');
+                  }}
+                  className="md:hidden p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+                >
+                  <ChevronLeft size={24} />
+                </button>
                 <Link to={`/profile/${otherUserId}`} className="flex-shrink-0">
                   <Avatar user={otherUser} className="h-9 w-9" />
                 </Link>
