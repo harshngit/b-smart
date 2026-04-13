@@ -6,6 +6,7 @@ import api from '../lib/api';
 const getUserId = (user) => user?._id || user?.id || '';
 const getUserName = (user) => user?.username || user?.full_name || user?.name || 'User';
 const getUserAvatar = (user) => user?.avatar_url || user?.profilePicture || user?.profile_picture || '';
+const isHighlightOwner = (highlight, currentUserId) => String(highlight?.user_id || '') === String(currentUserId || '');
 const getMedia = (item) => (Array.isArray(item?.media) ? item.media[0] : item?.media) || null;
 const formatAgo = (dateValue) => {
   if (!dateValue) return '';
@@ -372,6 +373,7 @@ const HighlightViewer = ({ highlight, items, loading, currentIndex, setCurrentIn
 export default function HighlightsRail({ users = [], variant = 'chat', allowCreate = true }) {
   const { userObject } = useSelector((state) => state.auth);
   const currentUserId = getUserId(userObject);
+  const isProfileVariant = variant === 'profile';
   const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(false);
   const [viewerHighlight, setViewerHighlight] = useState(null);
@@ -393,7 +395,7 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
 
   const relevantUsers = useMemo(() => {
     const map = new Map();
-    if (userObject && currentUserId) {
+    if (!isProfileVariant && userObject && currentUserId) {
       map.set(String(currentUserId), { userId: currentUserId, username: getUserName(userObject), avatarUrl: getUserAvatar(userObject), isOwner: true });
     }
     users.forEach((user) => {
@@ -402,7 +404,7 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
       map.set(String(userId), { userId, username: getUserName(user), avatarUrl: getUserAvatar(user), isOwner: String(userId) === String(currentUserId) });
     });
     return Array.from(map.values());
-  }, [currentUserId, userObject, users]);
+  }, [currentUserId, isProfileVariant, userObject, users]);
 
   const fetchHighlights = useCallback(async () => {
     if (!relevantUsers.length) {
@@ -415,7 +417,12 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
         try {
           const response = await api.get(`/highlights/user/${user.userId}`);
           const list = Array.isArray(response.data) ? response.data : [];
-          return list.map((highlight) => ({ ...highlight, username: user.username, avatarUrl: user.avatarUrl, isOwner: user.isOwner }));
+          return list.map((highlight) => ({
+            ...highlight,
+            username: user.username,
+            avatarUrl: user.avatarUrl,
+            isOwner: isHighlightOwner(highlight, currentUserId),
+          }));
         } catch {
           return [];
         }
@@ -424,7 +431,7 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
     } finally {
       setLoading(false);
     }
-  }, [relevantUsers]);
+  }, [currentUserId, relevantUsers]);
 
   useEffect(() => { fetchHighlights(); }, [fetchHighlights]);
 
@@ -512,6 +519,9 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
     setSubmittingCreate(true);
     try {
       if (editingHighlight?._id) {
+        if (!isHighlightOwner(editingHighlight, currentUserId)) {
+          throw new Error('You can only edit your own highlight.');
+        }
         await api.post(`/highlights/${editingHighlight._id}/items`, { title: draftTitle.trim(), story_item_ids: selectedIds });
         if (coverId) {
           const coverItem = availableItems.find((item) => item._id === coverId);
@@ -539,12 +549,15 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
         setViewerHighlight((prev) => (prev ? { ...prev, title: draftTitle.trim() } : prev));
         await refreshViewerItems(editingHighlight._id);
       }
+    } catch (error) {
+      window.alert(error?.response?.data?.message || error?.message || 'Unable to save highlight.');
     } finally {
       setSubmittingCreate(false);
     }
   };
 
   const openAddStoriesFlow = async (highlight) => {
+    if (!isHighlightOwner(highlight, currentUserId)) return;
     setEditingHighlight(highlight);
     setDraftTitle(highlight?.title || '');
     setSelectedIds([]);
@@ -554,6 +567,7 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
   };
 
   const openRenameModal = (highlight) => {
+    if (!isHighlightOwner(highlight, currentUserId)) return;
     setEditingHighlight(highlight);
     setRenameTitle(highlight?.title || '');
     setRenameOpen(true);
@@ -563,12 +577,17 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
     if (!editingHighlight?._id || !renameTitle.trim()) return;
     setRenameSaving(true);
     try {
+      if (!isHighlightOwner(editingHighlight, currentUserId)) {
+        throw new Error('You can only edit your own highlight.');
+      }
       await api.patch(`/highlights/${editingHighlight._id}`, { title: renameTitle.trim() });
       setRenameOpen(false);
       setHighlights((prev) => prev.map((item) => (
         item._id === editingHighlight._id ? { ...item, title: renameTitle.trim() } : item
       )));
       setViewerHighlight((prev) => (prev && prev._id === editingHighlight._id ? { ...prev, title: renameTitle.trim() } : prev));
+    } catch (error) {
+      window.alert(error?.response?.data?.message || error?.message || 'Unable to update highlight.');
     } finally {
       setRenameSaving(false);
     }
@@ -589,18 +608,32 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
 
   const deleteHighlight = async () => {
     if (!viewerHighlight?._id || !window.confirm('Delete this highlight?')) return;
-    await api.delete(`/highlights/${viewerHighlight._id}`);
-    setViewerHighlight(null);
-    setViewerItems([]);
-    await fetchHighlights();
+    try {
+      if (!isHighlightOwner(viewerHighlight, currentUserId)) {
+        throw new Error('You can only delete your own highlight.');
+      }
+      await api.delete(`/highlights/${viewerHighlight._id}`);
+      setViewerHighlight(null);
+      setViewerItems([]);
+      await fetchHighlights();
+    } catch (error) {
+      window.alert(error?.response?.data?.message || error?.message || 'Unable to delete highlight.');
+    }
   };
 
   const deleteHighlightItem = async (itemId) => {
     if (!viewerHighlight?._id || !itemId || !window.confirm('Remove this story from the highlight?')) return;
-    await api.delete(`/highlights/${viewerHighlight._id}/items/${itemId}`);
-    const items = await refreshViewerItems(viewerHighlight._id);
-    await fetchHighlights();
-    if (items.length === 0) setViewerHighlight(null);
+    try {
+      if (!isHighlightOwner(viewerHighlight, currentUserId)) {
+        throw new Error('You can only edit your own highlight.');
+      }
+      await api.delete(`/highlights/${viewerHighlight._id}/items/${itemId}`);
+      const items = await refreshViewerItems(viewerHighlight._id);
+      await fetchHighlights();
+      if (items.length === 0) setViewerHighlight(null);
+    } catch (error) {
+      window.alert(error?.response?.data?.message || error?.message || 'Unable to remove item from highlight.');
+    }
   };
 
   useEffect(() => {
@@ -611,8 +644,6 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
 
   const ownHighlights = highlights.filter((item) => item.isOwner);
   const otherHighlights = highlights.filter((item) => !item.isOwner);
-
-  const isProfileVariant = variant === 'profile';
 
   return (
     <>
