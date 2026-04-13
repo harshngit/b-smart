@@ -8,6 +8,7 @@ import PostDetailModal from '../components/PostDetailModal';
 import AvatarCropModal from '../components/AvatarCropModal';
 import FollowersModal from '../components/FollowersModal';
 import FollowingModal from '../components/FollowingModal';
+import HighlightsRail from '../components/HighlightsRail';
 import { setUser } from '../store/authSlice';
 import { createOrGetConversation } from '../services/chatService';
 import {
@@ -816,6 +817,14 @@ const Profile = () => {
                             </div>
                         </div>
 
+                        <div className="pb-4">
+                            <HighlightsRail
+                                users={profileUser ? [profileUser] : []}
+                                variant="profile"
+                                allowCreate={isOwnProfile}
+                            />
+                        </div>
+
                         {/* Vendor Business Info (mobile) */}
                         {isVendor && vendorInfo && (
                             <div className="pb-2">
@@ -1048,6 +1057,14 @@ const Profile = () => {
                                 )}
                             </div>
                         </div>
+                    </div>
+
+                    <div className="px-4 pb-8">
+                        <HighlightsRail
+                            users={profileUser ? [profileUser] : []}
+                            variant="profile"
+                            allowCreate={isOwnProfile}
+                        />
                     </div>
 
                     {/* Vendor Business Info */}

@@ -42,9 +42,12 @@ export const deleteMessage = async (messageId) => {
   return response.data;
 };
 
-export const uploadChatMedia = async (conversationId, file) => {
+export const uploadChatMedia = async (conversationId, files) => {
   const formData = new FormData();
-  formData.append('media', file);
+  const fileList = Array.isArray(files) ? files : [files];
+  fileList.filter(Boolean).forEach((file) => {
+    formData.append('media', file);
+  });
 
   const response = await api.post(`/chat/conversations/${conversationId}/media`, formData, {
     headers: {
