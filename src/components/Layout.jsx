@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Outlet, useLocation, Link } from 'react-router-dom';
+import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import BottomNav from './BottomNav';
 import TopBar from './TopBar';
@@ -8,6 +8,122 @@ import CreatePostModal from './CreatePostModal';
 import api from '../lib/api';
 import { fetchMe, setUser } from '../store/authSlice';
 import { fetchWallet } from '../store/walletSlice';
+
+const BASE_URL = 'https://api.bebsmart.in';
+
+const adAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+};
+
+const normalizeArr = (v) => {
+  if (Array.isArray(v)) return v;
+  if (!v || typeof v !== 'object') return [];
+  const keys = ['data','users','suggestions','results','items'];
+  for (const k of keys) { if (Array.isArray(v[k])) return v[k]; if (v.data && Array.isArray(v.data[k])) return v.data[k]; }
+  return [];
+};
+
+// ── Right Sidebar — desktop only ──────────────────────────────────────────────
+const RightSidebar = ({ userObject }) => {
+  const navigate = useNavigate();
+  const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetch(`${BASE_URL}/api/suggestions/users`, { headers: adAuthHeaders() })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => { if (active) { setSuggestedUsers(normalizeArr(d).slice(0, 5)); setLoading(false); } })
+      .catch(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const username = userObject?.username || 'User';
+  const avatar = userObject?.avatar_url || userObject?.profile_picture || null;
+  const fullName = userObject?.full_name || userObject?.name || '';
+
+  return (
+    <div className="hidden lg:flex flex-col w-[320px] flex-shrink-0 pt-0 pl-8 sticky top-0 h-screen overflow-y-auto">
+      {/* Current user */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center cursor-pointer ring-1 ring-offset-2 ring-pink-400/40"
+            onClick={() => navigate(`/profile/${username}`)}
+          >
+            {avatar
+              ? <img src={avatar} alt={username} className="w-full h-full object-cover" />
+              : <span className="text-white font-bold text-sm">{username.slice(0,1).toUpperCase()}</span>
+            }
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900 dark:text-white truncate cursor-pointer hover:underline" onClick={() => navigate(`/profile/${username}`)}>{username}</p>
+            {fullName && <p className="text-xs text-gray-400 truncate">{fullName}</p>}
+          </div>
+        </div>
+        <button className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors">Switch</button>
+      </div>
+
+      {/* Suggested for you */}
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-bold text-gray-500 dark:text-gray-400">Suggested for you</span>
+        <button className="text-xs font-bold text-gray-900 dark:text-white hover:text-gray-600 transition-colors">See all</button>
+      </div>
+
+      {loading ? (
+        <div className="flex flex-col gap-3">
+          {[1,2,3,4,5].map(i => (
+            <div key={i} className="flex items-center gap-3 animate-pulse">
+              <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-800 flex-shrink-0" />
+              <div className="flex-1 flex flex-col gap-1.5">
+                <div className="w-28 h-2.5 rounded-full bg-gray-200 dark:bg-gray-800" />
+                <div className="w-20 h-2 rounded-full bg-gray-100 dark:bg-gray-800" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : suggestedUsers.length === 0 ? null : (
+        <div className="flex flex-col gap-3">
+          {suggestedUsers.map((user, i) => {
+            const u = user.user || user;
+            const uname = u.username || u.name || 'User';
+            const uavatar = u.avatar_url || u.avatar || u.profile_picture || null;
+            const reason = u.mutual_friends_count
+              ? `${u.mutual_friends_count} mutual`
+              : u.followed_by ? `Followed by ${u.followed_by}` : 'Suggested for you';
+            return (
+              <div key={u._id || u.id || i} className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center cursor-pointer"
+                  onClick={() => navigate(`/profile/${uname}`)}
+                >
+                  {uavatar
+                    ? <img src={uavatar} alt={uname} className="w-full h-full object-cover" />
+                    : <span className="text-white text-xs font-bold">{uname.slice(0,1).toUpperCase()}</span>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate cursor-pointer hover:underline" onClick={() => navigate(`/profile/${uname}`)}>{uname}</p>
+                  <p className="text-xs text-gray-400 truncate">{reason}</p>
+                </div>
+                <button className="text-xs font-bold text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0">Follow</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Footer links */}
+      <div className="mt-6 text-[10px] text-gray-400 leading-relaxed">
+        About · Help · Press · API · Jobs · Privacy · Terms · Locations · Language
+        <br /><br />
+        © 2026 B-SMART
+      </div>
+    </div>
+  );
+};
 
 const Layout = () => {
   const location = useLocation();
@@ -207,16 +323,25 @@ const Layout = () => {
       <div className="md:pl-20 min-h-screen transition-all duration-300">
         {showTopBar && <TopBar />}
 
-
-
         <div className={`
-          ${showTopBar ? 'pt-16 md:pt-4' : 'pt-0 md:pt-0'}
-          w-full
-          ${isMessagesPage ? 'md:max-w-none lg:max-w-none' : 'md:max-w-[calc(100%-80px)] lg:max-w-4xl'}
-          mx-auto
-          ${isMessagesPage ? 'px-0 md:px-0' : 'px-0 md:px-8'}
+          ${showTopBar ? 'pt-16 md:pt-0' : 'pt-0 md:pt-0'}
+          w-full flex justify-center
+          ${isMessagesPage ? 'md:max-w-none lg:max-w-none' : 'lg:max-w-[850px] mx-auto'}
+          ${isMessagesPage ? 'px-0 md:px-0' : 'px-0 md:px-0'}
         `}>
-          <Outlet />
+          {/* Main content */}
+          <div className={`
+            flex-1 min-w-0
+            ${!isExcludedPage && !isFullScreenPage ? 'max-w-[470px]' : ''}
+            ${isMessagesPage ? 'w-full' : ''}
+          `}>
+            <Outlet />
+          </div>
+
+          {/* Right sidebar — only on home/feed pages */}
+          {!isExcludedPage && !isFullScreenPage && !isMessagesPage && (
+            <RightSidebar userObject={userObject} />
+          )}
         </div>
       </div>
 
