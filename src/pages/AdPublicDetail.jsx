@@ -6,7 +6,7 @@ import {
   ArrowLeft, Heart, MessageCircle, Share2, Bookmark,
   Globe, Phone, Mail, MessageSquare, ExternalLink,
   MapPin, Tag, Play, Volume2, VolumeX, BadgeCheck,
-  ShoppingBag, Eye, ChevronRight,
+  ShoppingBag, Eye, ChevronRight, ChevronLeft, X, Film,
 } from 'lucide-react';
 
 const BASE_URL = 'https://api.bebsmart.in';
@@ -16,6 +16,211 @@ const fmt = (n = 0) => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
   return String(n);
+};
+
+// ─── Gallery helpers ──────────────────────────────────────────────────────────
+const getMediaType = (fname = '', url = '') => {
+  const src = fname || url;
+  const ext = src.split('.').pop().split('?')[0].toLowerCase();
+  if (['mp4', 'webm', 'mov', 'm4v'].includes(ext)) return 'video';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'].includes(ext)) return 'image';
+  if (url.includes('.mp4') || url.includes('.webm')) return 'video';
+  return 'image';
+};
+
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+const GalleryLightbox = ({ items, startIdx, onClose }) => {
+  const [idx, setIdx] = useState(startIdx);
+  const item  = items[idx];
+  const url   = item?.link || item?.fileUrl || item?.url || '';
+  const fname = item?.filename || item?.filname || item?.fileName || '';
+  const mtype = getMediaType(fname, url);
+  const total = items.length;
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft')  setIdx(i => (i - 1 + total) % total);
+      if (e.key === 'ArrowRight') setIdx(i => (i + 1) % total);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [total, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] bg-black/92 backdrop-blur-md flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Close */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Counter */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 text-white text-xs font-bold">
+        {idx + 1} / {total}
+      </div>
+
+      {/* Prev */}
+      {total > 1 && (
+        <button
+          onClick={e => { e.stopPropagation(); setIdx(i => (i - 1 + total) % total); }}
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Media */}
+      <div
+        className="max-w-3xl w-full max-h-[85vh] flex items-center justify-center"
+        onClick={e => e.stopPropagation()}
+      >
+        {mtype === 'video' ? (
+          <video
+            src={url}
+            controls
+            autoPlay
+            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl"
+          />
+        ) : (
+          <img
+            src={url}
+            alt={fname}
+            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
+          />
+        )}
+      </div>
+
+      {/* Next */}
+      {total > 1 && (
+        <button
+          onClick={e => { e.stopPropagation(); setIdx(i => (i + 1) % total); }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Filename */}
+      {fname && (
+        <p className="absolute bottom-16 left-1/2 -translate-x-1/2 text-xs text-white/50 font-mono">{fname}</p>
+      )}
+
+      {/* Thumbnail strip */}
+      {total > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 px-3 py-2 bg-black/50 rounded-2xl">
+          {items.map((it, i) => {
+            const turl  = it.link || it.fileUrl || it.url || '';
+            const tfn   = it.filename || it.filname || it.fileName || '';
+            const ttype = getMediaType(tfn, turl);
+            return (
+              <button
+                key={i}
+                onClick={e => { e.stopPropagation(); setIdx(i); }}
+                className={`w-10 h-10 rounded-lg overflow-hidden border-2 transition-all ${i === idx ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-90'}`}
+              >
+                {ttype === 'video' ? (
+                  <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                    <Play className="w-3 h-3 text-white fill-white" />
+                  </div>
+                ) : (
+                  <img src={turl} alt="" className="w-full h-full object-cover" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Public Gallery Section ───────────────────────────────────────────────────
+// Matches the "More from [Vendor]" reference style: horizontal card grid,
+// clicking opens lightbox for images or plays video inline.
+const AdGallerySection = ({ items, vendorName }) => {
+  const [lightboxIdx, setLightboxIdx] = useState(null);
+  if (!items || items.length === 0) return null;
+
+  return (
+    <>
+      <div className="mt-8">
+        {/* Header — mirrors the "More from Expert Shoes / See all" reference */}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-bold text-gray-900 dark:text-white">
+            More from {vendorName}
+          </p>
+          <button className="flex items-center gap-1 text-xs font-bold text-pink-600 dark:text-pink-400 hover:underline">
+            See all <ChevronRight size={13} />
+          </button>
+        </div>
+
+        {/* Grid — portrait cards matching the reference screenshot */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+          {items.map((item, idx) => {
+            const url   = item.link || item.fileUrl || item.url || '';
+            const fname = item.filename || item.filname || item.fileName || '';
+            const mtype = getMediaType(fname, url);
+
+            return (
+              <button
+                key={item._id || item.id || idx}
+                onClick={() => setLightboxIdx(idx)}
+                className="group relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-pink-400 hover:shadow-md transition-all focus:outline-none"
+                style={{ aspectRatio: '9/16' }}
+              >
+                {mtype === 'video' ? (
+                  <>
+                    <video
+                      src={url}
+                      className="w-full h-full object-cover"
+                      muted
+                      preload="metadata"
+                    />
+                    {/* Play icon overlay */}
+                    <div className="absolute inset-0 bg-black/25 group-hover:bg-black/35 transition-colors flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center group-hover:scale-110 transition-transform shadow">
+                        <Play className="w-3.5 h-3.5 text-gray-800 fill-gray-800 ml-0.5" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <img
+                      src={url}
+                      alt={fname}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={e => { e.currentTarget.style.display = 'none'; }}
+                    />
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow">
+                        <Eye className="w-3.5 h-3.5 text-gray-700" />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Lightbox */}
+      {lightboxIdx !== null && (
+        <GalleryLightbox
+          items={items}
+          startIdx={lightboxIdx}
+          onClose={() => setLightboxIdx(null)}
+        />
+      )}
+    </>
+  );
 };
 
 // ─── HLS Video Player ─────────────────────────────────────────────────────────
@@ -44,9 +249,8 @@ const VideoPlayer = ({ src, thumb, muted, onToggleMute }) => {
     };
 
     if (src.includes('.m3u8')) {
-      if (window.Hls) {
-        setupHls();
-      } else {
+      if (window.Hls) { setupHls(); }
+      else {
         const s = document.createElement('script');
         s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js';
         s.onload = setupHls;
@@ -60,10 +264,7 @@ const VideoPlayer = ({ src, thumb, muted, onToggleMute }) => {
     return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } };
   }, [src]);
 
-  // Sync muted
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.muted = muted;
-  }, [muted]);
+  useEffect(() => { if (videoRef.current) videoRef.current.muted = muted; }, [muted]);
 
   const toggle = () => {
     const v = videoRef.current;
@@ -74,11 +275,9 @@ const VideoPlayer = ({ src, thumb, muted, onToggleMute }) => {
 
   return (
     <div className="relative w-full bg-black rounded-2xl overflow-hidden" style={{ aspectRatio: '9/16' }}>
-      {/* Thumbnail shown before play */}
       {thumb && !playing && (
         <img src={thumb} alt="thumbnail" className="absolute inset-0 w-full h-full object-cover" />
       )}
-
       <video
         ref={videoRef}
         muted={muted}
@@ -89,22 +288,14 @@ const VideoPlayer = ({ src, thumb, muted, onToggleMute }) => {
         onPause={() => setPlaying(false)}
         onCanPlay={() => setReady(true)}
       />
-
-      {/* Play overlay */}
       {!playing && (
-        <div
-          onClick={toggle}
-          className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/20"
-        >
+        <div onClick={toggle} className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/20">
           <div className="w-16 h-16 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:scale-110 transition-transform shadow-2xl">
             <Play size={26} className="text-white fill-white ml-1" />
           </div>
         </div>
       )}
-
       {playing && <div className="absolute inset-0 cursor-pointer" onClick={toggle} />}
-
-      {/* Mute toggle */}
       <button
         onClick={onToggleMute}
         className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors z-10"
@@ -121,12 +312,12 @@ const CtaButton = ({ cta, adId }) => {
   const trackClick = () => { try { api.post(`/ads/${adId}/click`); } catch {} };
 
   const map = {
-    view_site:    { label: 'Visit Website', icon: <Globe size={15} />,       color: 'from-orange-500 to-pink-600', href: cta.url?.trim() || cta.deep_link?.trim() },
-    call_now:     { label: 'Call Now',      icon: <Phone size={15} />,       color: 'from-green-500 to-emerald-600', href: `tel:${cta.phone_number}` },
-    install_app:  { label: 'Install App',   icon: <ExternalLink size={15} />,color: 'from-blue-500 to-indigo-600', href: cta.url?.trim() },
-    book_now:     { label: 'Book Now',      icon: <ExternalLink size={15} />,color: 'from-purple-500 to-pink-600', href: cta.url?.trim() },
-    contact_info: { label: 'Contact Us',    icon: <Mail size={15} />,        color: 'from-teal-500 to-cyan-600',   href: `mailto:${cta.email}` },
-    learn_more:   { label: 'Learn More',    icon: <ExternalLink size={15} />,color: 'from-gray-700 to-gray-900',   href: cta.url?.trim() },
+    view_site:    { label: 'Visit Website', icon: <Globe size={15} />,        color: 'from-orange-500 to-pink-600',    href: cta.url?.trim() || cta.deep_link?.trim() },
+    call_now:     { label: 'Call Now',      icon: <Phone size={15} />,        color: 'from-green-500 to-emerald-600',  href: `tel:${cta.phone_number}` },
+    install_app:  { label: 'Install App',   icon: <ExternalLink size={15} />, color: 'from-blue-500 to-indigo-600',   href: cta.url?.trim() },
+    book_now:     { label: 'Book Now',      icon: <ExternalLink size={15} />, color: 'from-purple-500 to-pink-600',   href: cta.url?.trim() },
+    contact_info: { label: 'Contact Us',    icon: <Mail size={15} />,         color: 'from-teal-500 to-cyan-600',     href: `mailto:${cta.email}` },
+    learn_more:   { label: 'Learn More',    icon: <ExternalLink size={15} />, color: 'from-gray-700 to-gray-900',     href: cta.url?.trim() },
   };
 
   const cfg = map[cta.type] || map.learn_more;
@@ -170,7 +361,6 @@ const MiniAdCard = ({ ad, onClick }) => {
           <Play size={8} className="text-white fill-white ml-0.5" />
         </div>
       )}
-      {/* Hover stats */}
       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
         <span className="flex items-center gap-1 text-white text-xs font-bold">
           <Heart size={11} className="fill-white" />{fmt(ad.likes_count || 0)}
@@ -194,16 +384,13 @@ export default function AdPublicDetail() {
   const [error, setError]     = useState('');
   const [isMuted, setIsMuted] = useState(true);
 
-  // Engagement
   const [liked, setLiked]             = useState(false);
   const [likesCount, setLikesCount]   = useState(0);
   const [likeLoading, setLikeLoading] = useState(false);
 
-  // Vendor ads
-  const [vendorAds, setVendorAds]           = useState([]);
+  const [vendorAds, setVendorAds]               = useState([]);
   const [vendorAdsLoading, setVendorAdsLoading] = useState(false);
 
-  // Load ad
   useEffect(() => {
     if (!adId) return;
     setLoading(true);
@@ -218,7 +405,6 @@ export default function AdPublicDetail() {
       .finally(() => setLoading(false));
   }, [adId]);
 
-  // Load vendor's other ads once we know vendor userId
   useEffect(() => {
     if (!ad) return;
     const uid = ad.user_id?._id || ad.vendor_id?._id;
@@ -260,23 +446,29 @@ export default function AdPublicDetail() {
     </div>
   );
 
-  const media       = ad.media?.[0];
-  const videoSrc    = media?.fileUrl || null;
-  const thumbSrc    = media?.thumbnails?.[0]?.fileUrl || null;
-  const isVideo     = media?.media_type === 'video';
-  const imageSrc    = !isVideo && media?.fileUrl ? media.fileUrl : null;
-  const vendorName  = ad.vendor_id?.business_name || ad.user_id?.full_name || 'Vendor';
+  const media        = ad.media?.[0];
+  const videoSrc     = media?.fileUrl || null;
+  const thumbSrc     = media?.thumbnails?.[0]?.fileUrl || null;
+  const isVideo      = media?.media_type === 'video';
+  const imageSrc     = !isVideo && media?.fileUrl ? media.fileUrl : null;
+  const vendorName   = ad.vendor_id?.business_name || ad.user_id?.full_name || 'Vendor';
   const vendorAvatar = ad.user_id?.avatar_url || '';
-  const vendorId    = ad.user_id?._id || ad.vendor_id?._id;
-  const isVerified  = ad.vendor_id?.validated === true;
+  const vendorId     = ad.user_id?._id || ad.vendor_id?._id;
+  const isVerified   = ad.vendor_id?.validated === true;
 
-  // Top highlights — key facts about the ad
+  // Gallery items — API uses 'gallery' field (fallback: 'detail')
+  const galleryItems = Array.isArray(ad.gallery) && ad.gallery.length > 0
+    ? ad.gallery
+    : Array.isArray(ad.detail) && ad.detail.length > 0
+      ? ad.detail
+      : [];
+
   const highlights = [
-    ad.category      && { label: 'Category',  value: ad.category,      icon: <Tag size={13} className="text-violet-500" />,  bg: 'bg-violet-50 dark:bg-violet-950/30 border-violet-100 dark:border-violet-900/20' },
-    ad.location      && { label: 'Location',  value: ad.location,      icon: <MapPin size={13} className="text-rose-500" />,  bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/20' },
-    ad.ad_type       && { label: 'Type',      value: ad.ad_type.replace('_',' '), icon: <Play size={13} className="text-amber-500" />, bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/20' },
+    ad.category      && { label: 'Category', value: ad.category,                icon: <Tag size={13} className="text-violet-500" />,     bg: 'bg-violet-50 dark:bg-violet-950/30 border-violet-100 dark:border-violet-900/20' },
+    ad.location      && { label: 'Location', value: ad.location,                icon: <MapPin size={13} className="text-rose-500" />,     bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/20' },
+    ad.ad_type       && { label: 'Type',     value: ad.ad_type.replace('_',' '),icon: <Play size={13} className="text-amber-500" />,      bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/20' },
     ad.target_language?.length > 0 && { label: 'Language', value: ad.target_language.slice(0,2).join(', '), icon: <Globe size={13} className="text-blue-500" />, bg: 'bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/20' },
-    ad.status        && { label: 'Status',    value: ad.status,         icon: <BadgeCheck size={13} className="text-emerald-500" />, bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/20' },
+    ad.status        && { label: 'Status',   value: ad.status,                  icon: <BadgeCheck size={13} className="text-emerald-500" />, bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/20' },
   ].filter(Boolean);
 
   return (
@@ -306,19 +498,14 @@ export default function AdPublicDetail() {
         }`}>{ad.status}</span>
       </div>
 
-      {/* ── Main two-column layout ── */}
+      {/* ── Main layout ── */}
       <div className="max-w-5xl mx-auto px-4 py-5 pb-16">
         <div className="flex flex-col md:flex-row gap-5">
 
           {/* ── LEFT: Video / Image ── */}
           <div className="flex-shrink-0 w-full md:w-[280px] lg:w-[300px]">
             {isVideo ? (
-              <VideoPlayer
-                src={videoSrc}
-                thumb={thumbSrc}
-                muted={isMuted}
-                onToggleMute={() => setIsMuted(m => !m)}
-              />
+              <VideoPlayer src={videoSrc} thumb={thumbSrc} muted={isMuted} onToggleMute={() => setIsMuted(m => !m)} />
             ) : imageSrc ? (
               <div className="rounded-2xl overflow-hidden bg-black shadow-xl" style={{ aspectRatio: '9/16' }}>
                 <img src={imageSrc} alt={ad.ad_title} className="w-full h-full object-cover" />
@@ -329,7 +516,7 @@ export default function AdPublicDetail() {
               </div>
             )}
 
-            {/* Engagement under video */}
+            {/* Engagement */}
             <div className="flex items-center gap-4 mt-3 px-1">
               <button
                 onClick={toggleLike}
@@ -339,12 +526,10 @@ export default function AdPublicDetail() {
                 {fmt(likesCount)}
               </button>
               <div className="flex items-center gap-1.5 text-sm font-bold text-gray-500 dark:text-gray-400">
-                <MessageCircle size={18} />
-                {fmt(ad.comments_count || 0)}
+                <MessageCircle size={18} />{fmt(ad.comments_count || 0)}
               </div>
               <div className="flex items-center gap-1.5 text-sm font-bold text-gray-500 dark:text-gray-400">
-                <Eye size={18} />
-                {fmt(ad.views_count || 0)}
+                <Eye size={18} />{fmt(ad.views_count || 0)}
               </div>
             </div>
           </div>
@@ -385,15 +570,13 @@ export default function AdPublicDetail() {
 
             {/* Ad description */}
             {ad.ad_description && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                {ad.ad_description}
-              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{ad.ad_description}</p>
             )}
 
-            {/* CTA Button */}
+            {/* CTA */}
             {ad.cta?.type && <CtaButton cta={ad.cta} adId={adId} />}
 
-            {/* Extra contact options */}
+            {/* Contact buttons */}
             {(ad.cta?.whatsapp_number || ad.cta?.phone_number || ad.cta?.email) && (
               <div className="flex gap-2 flex-wrap">
                 {ad.cta?.whatsapp_number && (
@@ -417,7 +600,7 @@ export default function AdPublicDetail() {
               </div>
             )}
 
-            {/* Top Highlights grid */}
+            {/* Highlights */}
             {highlights.length > 0 && (
               <div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Top Highlights</p>
@@ -456,20 +639,22 @@ export default function AdPublicDetail() {
           </div>
         </div>
 
-        {/* ── More from this vendor ── */}
-        {(vendorAds.length > 0 || vendorAdsLoading) && (
+        {/* ── Gallery section (from ad.detail) ────────────────────────────── */}
+        {galleryItems.length > 0 && (
+          <AdGallerySection items={galleryItems} vendorName={vendorName} />
+        )}
+
+        {/* ── More from vendor ads grid ── */}
+        {(vendorAds.length > 0 || vendorAdsLoading) && galleryItems.length === 0 && (
           <div className="mt-8">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-gray-900 dark:text-white">
-                More from {vendorName}
-              </p>
+              <p className="text-sm font-bold text-gray-900 dark:text-white">More from {vendorName}</p>
               {vendorId && (
                 <Link to={`/vendor/${vendorId}/public`} className="flex items-center gap-1 text-xs font-bold text-pink-600 dark:text-pink-400 hover:underline">
                   See all <ChevronRight size={13} />
                 </Link>
               )}
             </div>
-
             {vendorAdsLoading ? (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                 {[...Array(6)].map((_, i) => (
@@ -479,11 +664,7 @@ export default function AdPublicDetail() {
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                 {vendorAds.map(va => (
-                  <MiniAdCard
-                    key={va._id}
-                    ad={va}
-                    onClick={(id) => navigate(`/ads/${id}/details`)}
-                  />
+                  <MiniAdCard key={va._id} ad={va} onClick={(id) => navigate(`/ads/${id}/details`)} />
                 ))}
               </div>
             )}

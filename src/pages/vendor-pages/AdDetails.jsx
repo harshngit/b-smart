@@ -11,11 +11,223 @@ import {
   Venus, Mars, Transgender,
   MousePointerClick, Target, Smartphone, Monitor, Calendar,
   Megaphone, ShieldCheck, TestTube2, CalendarClock, Zap,
-  Link2, Phone, Mail, MessageSquare, Layers
+  Link2, Phone, Mail, MessageSquare, Layers, X, Play
 } from "lucide-react";
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
+
+// ─── Gallery helpers ──────────────────────────────────────────────────────────
+const getMediaType = (fname = '', url = '') => {
+  const src = fname || url;
+  const ext = src.split('.').pop().split('?')[0].toLowerCase();
+  if (['mp4','webm','mov','m4v'].includes(ext)) return 'video';
+  if (['jpg','jpeg','png','gif','webp','avif','svg'].includes(ext)) return 'image';
+  // fallback: sniff from URL
+  if (url.includes('.mp4') || url.includes('.webm')) return 'video';
+  return 'image';
+};
+
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+const GalleryLightbox = ({ items, startIdx, onClose }) => {
+  const [idx, setIdx] = useState(startIdx);
+  const item   = items[idx];
+  const url    = item?.link || item?.fileUrl || item?.url || '';
+  const fname  = item?.filename || item?.filname || item?.fileName || '';
+  const mtype  = getMediaType(fname, url);
+  const total  = items.length;
+
+  // close on Escape, navigate on arrow keys
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft')  setIdx(i => (i - 1 + total) % total);
+      if (e.key === 'ArrowRight') setIdx(i => (i + 1) % total);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [total, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Close */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Counter */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 text-white text-xs font-bold">
+        {idx + 1} / {total}
+      </div>
+
+      {/* Prev */}
+      {total > 1 && (
+        <button
+          onClick={e => { e.stopPropagation(); setIdx(i => (i - 1 + total) % total); }}
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Media */}
+      <div
+        className="max-w-3xl w-full max-h-[85vh] flex items-center justify-center"
+        onClick={e => e.stopPropagation()}
+      >
+        {mtype === 'video' ? (
+          <video
+            src={url}
+            controls
+            autoPlay
+            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl"
+            style={{ maxHeight: '85vh' }}
+          />
+        ) : (
+          <img
+            src={url}
+            alt={fname}
+            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
+          />
+        )}
+      </div>
+
+      {/* Next */}
+      {total > 1 && (
+        <button
+          onClick={e => { e.stopPropagation(); setIdx(i => (i + 1) % total); }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Filename */}
+      {fname && (
+        <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/50 font-mono">{fname}</p>
+      )}
+
+      {/* Thumbnail strip */}
+      {total > 1 && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-1.5 px-3 py-2 bg-black/50 rounded-2xl">
+          {items.map((it, i) => {
+            const turl  = it.link || it.fileUrl || it.url || '';
+            const tfn   = it.filename || it.filname || it.fileName || '';
+            const ttype = getMediaType(tfn, turl);
+            return (
+              <button
+                key={i}
+                onClick={e => { e.stopPropagation(); setIdx(i); }}
+                className={`w-10 h-10 rounded-lg overflow-hidden border-2 transition-all ${i === idx ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-90'}`}
+              >
+                {ttype === 'video' ? (
+                  <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                    <Play className="w-3 h-3 text-white fill-white" />
+                  </div>
+                ) : (
+                  <img src={turl} alt="" className="w-full h-full object-cover" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Gallery Card ─────────────────────────────────────────────────────────────
+const AdDetailGallery = ({ items }) => {
+  const [lightboxIdx, setLightboxIdx] = useState(null);
+  if (!items || items.length === 0) return null;
+
+  return (
+    <>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Film className="w-4 h-4 text-pink-500" />
+            Gallery
+          </h3>
+          <span className="text-xs font-semibold text-gray-400 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full">
+            {items.length} {items.length === 1 ? 'item' : 'items'}
+          </span>
+        </div>
+
+        {/* Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {items.map((item, idx) => {
+            const url   = item.link || item.fileUrl || item.url || '';
+            const fname = item.filename || item.filname || item.fileName || `Item ${idx + 1}`;
+            const mtype = getMediaType(fname, url);
+
+            return (
+              <button
+                key={item._id || item.id || idx}
+                onClick={() => setLightboxIdx(idx)}
+                className="group relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-pink-400 dark:hover:border-pink-500 transition-all hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                style={{ aspectRatio: '1/1' }}
+              >
+                {mtype === 'video' ? (
+                  <>
+                    <video
+                      src={url}
+                      className="w-full h-full object-cover"
+                      muted
+                      preload="metadata"
+                    />
+                    {/* Video play badge */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <Play className="w-4 h-4 text-gray-800 fill-gray-800 ml-0.5" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <img
+                      src={url}
+                      alt={fname}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={e => { e.currentTarget.style.display = 'none'; }}
+                    />
+                    {/* Hover zoom icon */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow">
+                        <Eye className="w-4 h-4 text-gray-700" />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Type badge */}
+                <div className={`absolute top-2 left-2 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide ${mtype === 'video' ? 'bg-purple-600 text-white' : 'bg-black/50 text-white'}`}>
+                  {mtype === 'video' ? 'VIDEO' : 'IMG'}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Lightbox portal */}
+      {lightboxIdx !== null && (
+        <GalleryLightbox
+          items={items}
+          startIdx={lightboxIdx}
+          onClose={() => setLightboxIdx(null)}
+        />
+      )}
+    </>
+  );
+};
 
 // ─── Age Breakdown Pie Charts (Chart.js) ──────────────────────────────────────
 
@@ -1681,7 +1893,14 @@ export default function AdDetails() {
                   <InfoRow icon={Tag}         label="Category"       value={ad.category}     />
                   {ad.sub_category && <InfoRow icon={Tag}      label="Sub-Category"   value={ad.sub_category} />}
                   <InfoRow icon={Film}        label="Content Type"   value={ad.content_type} />
-                  <InfoRow icon={Layers}      label="Ad Type"        value={(ad.ad_type || "—").replace("_", " ")} />
+                  <InfoRow icon={Layers}      label="Ad Type"        value={(ad.ad_type || "—").replace(/_/g, " ")} />
+                  {ad.ads_type && (
+                    <InfoRow icon={Megaphone} label="Ads Type" value={
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800">
+                        {String(ad.ads_type).replace(/_/g, " ")}
+                      </span>
+                    } />
+                  )}
                   <InfoRow icon={MapPin}      label="Location"       value={ad.location}     />
                   <InfoRow icon={AlertCircle} label="Status"         value={<Badge status={ad.status} />} />
                   {ad.compliance?.approval_status && (
@@ -1729,6 +1948,17 @@ export default function AdDetails() {
                     </div>
                   )}
                 </Card>
+
+                {/* ── Detail Gallery ───────────────────────────────────────── */}
+                {/* gallery field (API) with fallback to detail */}
+                {(() => {
+                  const gItems = Array.isArray(ad.gallery) && ad.gallery.length > 0
+                    ? ad.gallery
+                    : Array.isArray(ad.detail) && ad.detail.length > 0
+                      ? ad.detail
+                      : [];
+                  return gItems.length > 0 ? <AdDetailGallery items={gItems} /> : null;
+                })()}
 
                 {/* Targeting */}
                 <Card title="Targeting Settings" icon={Target}>
