@@ -6,7 +6,7 @@ import {
   ArrowLeft, Heart, MessageCircle, Share2, Bookmark,
   Globe, Phone, Mail, MessageSquare, ExternalLink,
   MapPin, Tag, Play, Volume2, VolumeX, BadgeCheck,
-  ShoppingBag, Eye, ChevronRight, ChevronLeft, X, Film,
+  ShoppingBag, Eye, ChevronRight, ChevronLeft, X, Film, MoreHorizontal,
 } from 'lucide-react';
 
 const BASE_URL = 'https://api.bebsmart.in';
@@ -16,6 +16,28 @@ const fmt = (n = 0) => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
   return String(n);
+};
+
+const toAbsoluteUploadUrl = (value) => {
+  if (!value) return null;
+  if (/^http:\/\/api\.bebsmart\.in/i.test(String(value))) {
+    return String(value).replace(/^http:\/\//i, 'https://');
+  }
+  if (String(value).startsWith('http')) return value;
+  const normalized = String(value).replace(/^\/+/, '');
+  if (normalized.startsWith('uploads/')) return `${BASE_URL}/${normalized}`;
+  return `${BASE_URL}/uploads/${normalized}`;
+};
+
+const getPreviewMedia = (item) => {
+  const media = item?.media?.[0];
+  const isVideo = media?.media_type === 'video' || media?.type === 'video' || item?.type === 'reel';
+  const thumb = isVideo
+    ? toAbsoluteUploadUrl(media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url)
+    : toAbsoluteUploadUrl(media?.fileUrl || media?.fileName);
+  const src = toAbsoluteUploadUrl(media?.fileUrl || media?.fileName);
+
+  return { media, isVideo, thumb, src };
 };
 
 // ─── Gallery helpers ──────────────────────────────────────────────────────────
@@ -143,7 +165,7 @@ const GalleryLightbox = ({ items, startIdx, onClose }) => {
 // ─── Public Gallery Section ───────────────────────────────────────────────────
 // Matches the "More from [Vendor]" reference style: horizontal card grid,
 // clicking opens lightbox for images or plays video inline.
-const AdGallerySection = ({ items, vendorName }) => {
+const AdGallerySection = ({ items }) => {
   const [lightboxIdx, setLightboxIdx] = useState(null);
   if (!items || items.length === 0) return null;
 
@@ -151,19 +173,15 @@ const AdGallerySection = ({ items, vendorName }) => {
     <>
       <div className="mt-8">
         {/* Header — mirrors the "More from Expert Shoes / See all" reference */}
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-bold text-gray-900 dark:text-white">
-            More from {vendorName}
-          </p>
-          <button className="flex items-center gap-1 text-xs font-bold text-pink-600 dark:text-pink-400 hover:underline">
-            See all <ChevronRight size={13} />
-          </button>
+        <div className="flex items-center gap-2 mb-3">
+          <Film size={15} className="text-pink-500" />
+          <p className="text-sm font-bold text-gray-900 dark:text-white">Gallery</p>
         </div>
 
         {/* Grid — portrait cards matching the reference screenshot */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
           {items.map((item, idx) => {
-            const url   = item.link || item.fileUrl || item.url || '';
+            const url   = toAbsoluteUploadUrl(item.link || item.fileUrl || item.url || item.fileName || item.filename || item.filname || '');
             const fname = item.filename || item.filname || item.fileName || '';
             const mtype = getMediaType(fname, url);
 
@@ -227,12 +245,42 @@ const AdGallerySection = ({ items, vendorName }) => {
 const VideoPlayer = ({ src, thumb, muted, onToggleMute }) => {
   const videoRef = useRef(null);
   const hlsRef   = useRef(null);
+  const pendingPlayRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady]     = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  const attemptPlay = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const playPromise = video.play();
+    if (playPromise?.catch) {
+      playPromise
+        .then(() => {
+          pendingPlayRef.current = false;
+          setPlaying(true);
+        })
+        .catch(() => {
+          pendingPlayRef.current = true;
+        });
+      return;
+    }
+    pendingPlayRef.current = false;
+    setPlaying(true);
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !src) return;
+    setReady(false);
+    setPlaying(false);
+    setLoadError(false);
+    pendingPlayRef.current = false;
+
+    const markReady = () => {
+      setReady(true);
+      if (pendingPlayRef.current) attemptPlay();
+    };
 
     const setupHls = () => {
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
@@ -241,10 +289,15 @@ const VideoPlayer = ({ src, thumb, muted, onToggleMute }) => {
         hlsRef.current = hls;
         hls.loadSource(src);
         hls.attachMedia(video);
-        hls.on(window.Hls.Events.MANIFEST_PARSED, () => setReady(true));
+        hls.on(window.Hls.Events.MANIFEST_PARSED, markReady);
+        hls.on(window.Hls.Events.ERROR, (_, data) => {
+          if (data?.fatal) setLoadError(true);
+        });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = src;
-        setReady(true);
+        markReady();
+      } else {
+        setLoadError(true);
       }
     };
 
@@ -258,23 +311,29 @@ const VideoPlayer = ({ src, thumb, muted, onToggleMute }) => {
       }
     } else {
       video.src = src;
-      setReady(true);
+      markReady();
     }
 
     return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } };
-  }, [src]);
+  }, [attemptPlay, src]);
 
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted; }, [muted]);
 
   const toggle = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) { v.play().catch(() => {}); setPlaying(true); }
+    if (v.paused) {
+      if (!ready) {
+        pendingPlayRef.current = true;
+        return;
+      }
+      attemptPlay();
+    }
     else { v.pause(); setPlaying(false); }
   };
 
   return (
-    <div className="relative w-full bg-black rounded-2xl overflow-hidden" style={{ aspectRatio: '9/16' }}>
+    <div className="relative w-full bg-black rounded-2xl overflow-hidden cursor-pointer" style={{ aspectRatio: '9/16' }} onClick={toggle}>
       {thumb && !playing && (
         <img src={thumb} alt="thumbnail" className="absolute inset-0 w-full h-full object-cover" />
       )}
@@ -283,21 +342,33 @@ const VideoPlayer = ({ src, thumb, muted, onToggleMute }) => {
         muted={muted}
         playsInline
         loop
+        preload="metadata"
         className="w-full h-full object-cover"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onCanPlay={() => setReady(true)}
+        onCanPlay={() => {
+          setReady(true);
+          if (pendingPlayRef.current) attemptPlay();
+        }}
+        onError={() => setLoadError(true)}
       />
-      {!playing && (
-        <div onClick={toggle} className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/20">
+      {loadError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/55 px-6 text-center">
+          <p className="text-xs font-semibold text-white/85">Video could not be loaded.</p>
+        </div>
+      )}
+      {!playing && !loadError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
           <div className="w-16 h-16 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:scale-110 transition-transform shadow-2xl">
             <Play size={26} className="text-white fill-white ml-1" />
           </div>
         </div>
       )}
-      {playing && <div className="absolute inset-0 cursor-pointer" onClick={toggle} />}
       <button
-        onClick={onToggleMute}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleMute();
+        }}
         className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors z-10"
       >
         {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
@@ -338,10 +409,11 @@ const CtaButton = ({ cta, adId }) => {
 
 // ─── Mini Ad Card for vendor ads grid ────────────────────────────────────────
 const MiniAdCard = ({ ad, onClick }) => {
-  const thumb = ad.media?.[0]?.thumbnails?.[0]?.fileUrl
-    || (ad.media?.[0]?.media_type !== 'video' && ad.media?.[0]?.fileUrl)
-    || null;
-  const isVid = ad.media?.[0]?.media_type === 'video';
+  const media = ad.media?.[0];
+  const thumb = media?.media_type === 'video'
+    ? toAbsoluteUploadUrl(media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url)
+    : toAbsoluteUploadUrl(media?.fileUrl || media?.fileName);
+  const isVid = media?.media_type === 'video';
 
   return (
     <button
@@ -374,6 +446,145 @@ const MiniAdCard = ({ ad, onClick }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
+const MobileSuggestedAdsSection = ({ ads, loading, onOpenAd }) => {
+  if (!loading && ads.length === 0) return null;
+
+  return (
+    <div className="md:hidden mt-8 -mx-4 px-4 py-5 border-y border-gray-100 dark:border-gray-800 bg-white/50 dark:bg-white/[0.02]">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-lg font-bold text-gray-900 dark:text-white">Suggested ads</p>
+          <p className="text-xs text-gray-400">More ads you may want to explore</p>
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Mobile</span>
+      </div>
+
+      {loading ? (
+        <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {[...Array(3)].map((_, idx) => (
+            <div key={idx} className="w-[42vw] max-w-[190px] min-w-[150px] rounded-[28px] bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ aspectRatio: '9/16' }} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {ads.map((item) => {
+            const media = item.media?.[0];
+            const thumb = media?.media_type === 'video'
+              ? toAbsoluteUploadUrl(media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url)
+              : toAbsoluteUploadUrl(media?.fileUrl || media?.fileName);
+
+            return (
+              <button
+                key={item._id}
+                onClick={() => onOpenAd(item._id)}
+                className="group snap-start w-[42vw] max-w-[190px] min-w-[150px] text-left"
+              >
+                <div className="relative overflow-hidden rounded-[28px] bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm" style={{ aspectRatio: '9/16' }}>
+                  {thumb ? (
+                    <img src={thumb} alt={item.ad_title || item.caption || 'Suggested ad'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-orange-100 to-pink-100 dark:from-orange-900/30 dark:to-pink-900/30 flex items-center justify-center">
+                      <ShoppingBag size={22} className="text-orange-300" />
+                    </div>
+                  )}
+
+                  {media?.media_type === 'video' && (
+                    <div className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+                      <Play size={10} className="text-white fill-white ml-0.5" />
+                    </div>
+                  )}
+
+                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/45 to-transparent">
+                    <p className="text-[11px] font-bold text-white line-clamp-2">{item.ad_title || item.caption || 'Suggested ad'}</p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MobileSuggestedReelsSection = ({ reels, loading, onOpenReel }) => {
+  if (!loading && reels.length === 0) return null;
+
+  return (
+    <div className="md:hidden mt-8 -mx-4 px-4 py-5 border-y border-gray-100 dark:border-gray-800 bg-[#0d0d0f]">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-lg font-bold text-white">Suggested reels</p>
+        <button type="button" className="p-1.5 rounded-full text-white/80">
+          <MoreHorizontal size={18} />
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {[...Array(3)].map((_, idx) => (
+            <div key={idx} className="w-[42vw] max-w-[190px] min-w-[150px] rounded-[24px] bg-white/5 animate-pulse" style={{ aspectRatio: '9/16' }} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {reels.map((reel) => {
+            const { isVideo, thumb, src } = getPreviewMedia(reel);
+            const title = reel.caption || reel.title || reel.user_id?.username || 'Suggested reel';
+
+            return (
+              <button
+                key={reel._id}
+                onClick={() => onOpenReel(reel._id)}
+                className="group snap-start w-[42vw] max-w-[190px] min-w-[150px] text-left"
+              >
+                <div className="relative overflow-hidden rounded-[24px] bg-black border border-white/10 shadow-[0_12px_30px_rgba(0,0,0,0.35)]" style={{ aspectRatio: '9/16' }}>
+                  {isVideo && src ? (
+                    <>
+                      {thumb && <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:opacity-0 transition-opacity duration-300" />}
+                      <video
+                        src={src}
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        className="w-full h-full object-cover"
+                      />
+                    </>
+                  ) : thumb ? (
+                    <img src={thumb} alt={title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-950" />
+                  )}
+
+                  <div className="absolute inset-x-0 top-0 p-2.5 flex items-center justify-end">
+                    <div className="w-7 h-7 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center text-white">
+                      <MoreHorizontal size={14} />
+                    </div>
+                  </div>
+
+                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black via-black/45 to-transparent">
+                    <div className="flex items-center gap-2 mb-2">
+                      {reel.user_id?.avatar_url ? (
+                        <img src={toAbsoluteUploadUrl(reel.user_id.avatar_url)} alt={reel.user_id?.username || 'User'} className="w-7 h-7 rounded-full object-cover border border-white/20" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-white/15 border border-white/15" />
+                      )}
+                      <span className="text-[11px] font-semibold text-white truncate">
+                        {reel.user_id?.username || reel.user_id?.full_name || 'reel'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-4 text-white/95 line-clamp-2">{title}</p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AdPublicDetail() {
   const { adId }   = useParams();
   const navigate   = useNavigate();
@@ -390,6 +601,8 @@ export default function AdPublicDetail() {
 
   const [vendorAds, setVendorAds]               = useState([]);
   const [vendorAdsLoading, setVendorAdsLoading] = useState(false);
+  const [suggestedReels, setSuggestedReels] = useState([]);
+  const [suggestedReelsLoading, setSuggestedReelsLoading] = useState(false);
 
   useEffect(() => {
     if (!adId) return;
@@ -419,6 +632,21 @@ export default function AdPublicDetail() {
       .finally(() => setVendorAdsLoading(false));
   }, [ad, adId]);
 
+  useEffect(() => {
+    setSuggestedReelsLoading(true);
+    api.get('/suggestions/reels', { params: { limit: 10 } })
+      .then((res) => {
+        const list = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data?.data) ? res.data.data
+          : Array.isArray(res.data?.reels) ? res.data.reels
+          : [];
+        setSuggestedReels(list.filter((item) => item?._id && item._id !== adId).slice(0, 10));
+      })
+      .catch(() => setSuggestedReels([]))
+      .finally(() => setSuggestedReelsLoading(false));
+  }, [adId]);
+
   const toggleLike = async () => {
     if (!userObject || likeLoading) return;
     const wasLiked = liked;
@@ -447,10 +675,10 @@ export default function AdPublicDetail() {
   );
 
   const media        = ad.media?.[0];
-  const videoSrc     = media?.fileUrl || null;
-  const thumbSrc     = media?.thumbnails?.[0]?.fileUrl || null;
+  const videoSrc     = toAbsoluteUploadUrl(media?.fileUrl || media?.fileName);
+  const thumbSrc     = toAbsoluteUploadUrl(media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url);
   const isVideo      = media?.media_type === 'video';
-  const imageSrc     = !isVideo && media?.fileUrl ? media.fileUrl : null;
+  const imageSrc     = !isVideo ? toAbsoluteUploadUrl(media?.fileUrl || media?.fileName) : null;
   const vendorName   = ad.vendor_id?.business_name || ad.user_id?.full_name || 'Vendor';
   const vendorAvatar = ad.user_id?.avatar_url || '';
   const vendorId     = ad.user_id?._id || ad.vendor_id?._id;
@@ -640,13 +868,19 @@ export default function AdPublicDetail() {
         </div>
 
         {/* ── Gallery section (from ad.detail) ────────────────────────────── */}
+        <MobileSuggestedReelsSection
+          reels={suggestedReels}
+          loading={suggestedReelsLoading}
+          onOpenReel={(id) => navigate(`/reels?id=${id}`)}
+        />
+
         {galleryItems.length > 0 && (
-          <AdGallerySection items={galleryItems} vendorName={vendorName} />
+          <AdGallerySection items={galleryItems} />
         )}
 
         {/* ── More from vendor ads grid ── */}
-        {(vendorAds.length > 0 || vendorAdsLoading) && galleryItems.length === 0 && (
-          <div className="mt-8">
+        {(vendorAds.length > 0 || vendorAdsLoading) && (
+          <div className="hidden md:block mt-8">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-bold text-gray-900 dark:text-white">More from {vendorName}</p>
               {vendorId && (

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { ChevronDown, MapPin, UserPlus, Play, X } from 'lucide-react';
+import { ChevronDown, MapPin, UserPlus, Play, X, MoreHorizontal } from 'lucide-react';
 import StoryRail from '../components/StoryRail';
 import PostCard from '../components/PostCard';
 import PostDetailModal from '../components/PostDetailModal';
@@ -29,21 +29,63 @@ const adAuthHeaders = () => {
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 };
 
+const normalizeAssetUrl = (value) => {
+  if (!value) return null;
+  if (/^http:\/\/api\.bebsmart\.in/i.test(String(value))) return String(value).replace(/^http:\/\//i, 'https://');
+  if (String(value).startsWith('http')) return value;
+  const normalized = String(value).replace(/^\/+/, '');
+  if (normalized.startsWith('uploads/')) return `${BASE_URL}/${normalized}`;
+  return `${BASE_URL}/uploads/${normalized}`;
+};
+
+const DesktopFollowButton = ({ targetUserId }) => {
+  const { userObject } = useSelector(s => s.auth);
+  const [following, setFollowing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    if (!userObject || !targetUserId || loading) return;
+    const wasFollowing = following;
+    setFollowing(!wasFollowing);
+    setLoading(true);
+    try {
+      await api.post(wasFollowing ? '/unfollow' : '/follow', { followedUserId: targetUserId });
+    } catch {
+      setFollowing(wasFollowing);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      className="min-w-[56px] text-right text-xs font-semibold text-[#60a5fa] hover:text-white transition-colors disabled:opacity-50"
+    >
+      {loading ? '...' : following ? 'Following' : 'Follow'}
+    </button>
+  );
+};
+
 // ── Location Bar ──────────────────────────────────────────────────────────────
 const LocationBar = () => (
-  <div className="hidden md:block sticky top-0 z-10 bg-white dark:bg-black mb-2 border-b border-gray-200 dark:border-gray-800">
-    <div className="flex items-center justify-between px-4 py-3 gap-4">
-      <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange" style={{ fontFamily: 'cursive' }}>
-        B-Smart
-      </h1>
-      <div className="flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg cursor-pointer group hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors w-auto min-w-[300px]">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="p-1.5 bg-white dark:bg-black rounded-full shadow-sm shrink-0">
-            <MapPin size={14} className="text-red-500" />
+  <div className="hidden md:block sticky top-0 z-10 bg-white dark:bg-black mb-4">
+    <div className="max-w-[1120px] mx-auto xl:px-6">
+      <div className="flex items-center justify-between px-4 py-3 gap-4">
+        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange" style={{ fontFamily: 'cursive' }}>
+          B-Smart
+        </h1>
+        <div className="flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg cursor-pointer group hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors w-auto min-w-[300px]">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="p-1.5 bg-white dark:bg-black rounded-full shadow-sm shrink-0">
+              <MapPin size={14} className="text-red-500" />
+            </div>
+            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">Plat No.20, 2nd Floor, Shivaram Nivas, Sri...</span>
           </div>
-          <span className="text-sm font-bold text-gray-900 dark:text-white truncate">Plat No.20, 2nd Floor, Shivaram Nivas, Sri...</span>
+          <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
         </div>
-        <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
       </div>
     </div>
   </div>
@@ -129,10 +171,164 @@ const MobileSuggestedUsersCard = ({ users, onDismiss }) => {
   );
 };
 
+const MobileSuggestedReelsCard = ({ reels }) => {
+  const navigate = useNavigate();
+  if (!reels || reels.length === 0) return null;
+
+  return (
+    <div className="bg-[#0d0d0f] border-b border-t border-gray-800 py-3 mb-0 lg:hidden">
+      <div className="flex items-center justify-between px-4 mb-3">
+        <span className="text-sm font-bold text-white">Suggested reels</span>
+        <button type="button" className="p-1 rounded-full text-white/80">
+          <MoreHorizontal size={18} />
+        </button>
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {reels.map((reel, i) => {
+          const media = reel.media?.[0];
+          const thumb = normalizeAssetUrl(media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url || media?.fileUrl || media?.fileName);
+          const username = reel.user_id?.username || reel.user_id?.full_name || 'reel';
+          const avatar = normalizeAssetUrl(reel.user_id?.avatar_url);
+          const caption = reel.caption || username;
+
+          return (
+            <button
+              key={reel._id || reel.id || i}
+              onClick={() => navigate(`/reels?id=${reel._id || reel.id}`)}
+              className="group relative flex-shrink-0 w-[160px] overflow-hidden rounded-3xl border border-white/10 bg-black text-left shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+              style={{ aspectRatio: '9/16' }}
+            >
+              {thumb ? (
+                <img src={thumb} alt={caption} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-950" />
+              )}
+
+              <div className="absolute inset-x-0 top-0 flex justify-end p-2.5">
+                <div className="w-7 h-7 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center text-white">
+                  <MoreHorizontal size={14} />
+                </div>
+              </div>
+
+              <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black via-black/45 to-transparent">
+                <div className="flex items-center gap-2 mb-2">
+                  {avatar ? (
+                    <img src={avatar} alt={username} className="w-7 h-7 rounded-full object-cover border border-white/20" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-white/15 border border-white/15" />
+                  )}
+                  <span className="text-[11px] font-semibold text-white truncate">{username}</span>
+                </div>
+                <p className="text-[11px] leading-4 text-white/95 line-clamp-2">{caption}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
+  const navigate = useNavigate();
+  const currentUserId = currentUser?._id || currentUser?.id;
+  const visibleUsers = (suggestedUsers || []).filter((user) => {
+    const candidate = user.user || user;
+    const candidateId = candidate?._id || candidate?.id;
+    return candidateId && String(candidateId) !== String(currentUserId);
+  }).slice(0, 5);
+
+  if (!currentUser || visibleUsers.length === 0) return null;
+
+  const currentAvatar = normalizeAssetUrl(currentUser.avatar_url || currentUser.avatar);
+  const currentName = currentUser.full_name || currentUser.username || 'User';
+
+  return (
+    <aside className="hidden xl:block w-[319px] shrink-0">
+      <div className="sticky top-6">
+        <div className="flex items-center justify-between mb-6">
+          <button
+            type="button"
+            onClick={() => navigate(`/profile/${currentUserId}`)}
+            className="flex items-center gap-3 min-w-0 text-left"
+          >
+            {currentAvatar ? (
+              <img src={currentAvatar} alt={currentName} className="w-11 h-11 rounded-full object-cover" />
+            ) : (
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center text-white font-bold">
+                {currentName[0]?.toUpperCase() || 'U'}
+              </div>
+            )}
+            <div className="min-w-0 leading-tight">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{currentUser.username || currentName}</p>
+              <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400 truncate">{currentName}</p>
+            </div>
+          </button>
+          <Link to="/settings" className="text-xs font-semibold text-[#60a5fa] hover:text-white transition-colors">
+            Switch
+          </Link>
+        </div>
+
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Suggested for you</p>
+          <button type="button" className="text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity">
+            See all
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {visibleUsers.map((entry, idx) => {
+            const user = entry.user || entry;
+            const userId = user._id || user.id;
+            const username = user.username || user.full_name || `user-${idx}`;
+            const fullName = user.full_name || user.name || username;
+            const avatar = normalizeAssetUrl(user.avatar_url || user.avatar || user.profile_picture);
+            const reason = user.mutual_friends_count
+              ? `${user.mutual_friends_count} mutual connections`
+              : user.followed_by
+                ? `Followed by ${user.followed_by}`
+                : 'Suggested for you';
+
+            return (
+              <div key={userId || idx} className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/profile/${userId}`)}
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                >
+                  {avatar ? (
+                    <img src={avatar} alt={username} className="w-11 h-11 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold">
+                      {username[0]?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                  <div className="min-w-0 leading-tight">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{username}</p>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate">{reason}</p>
+                  </div>
+                </button>
+                <DesktopFollowButton targetUserId={String(userId)} />
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-9 pr-6 text-[11px] leading-[1.45] text-gray-500 dark:text-gray-500">
+          <p>About · Help · Press · API · Jobs · Privacy · Terms</p>
+          <p>Locations · Language · Meta Verified</p>
+          <p className="mt-4 uppercase">© 2026 B-Smart from Meta</p>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
 // ── Build feed with ads + mobile suggestions ──────────────────────────────────
 const AD_INTERVAL = 4;
 
-const buildFeed = (posts, ads, suggestedUsers) => {
+const buildFeed = (posts, ads, suggestedUsers, suggestedReels) => {
   const safePosts = normalizeApiArray(posts);
   const safeAds   = normalizeApiArray(ads);
 
@@ -142,6 +338,7 @@ const buildFeed = (posts, ads, suggestedUsers) => {
   const feed = [];
   let adIdx = 0;
   let suggInserted = false;
+  let reelsInserted = false;
 
   safePosts.forEach((post, i) => {
     feed.push(post);
@@ -149,6 +346,10 @@ const buildFeed = (posts, ads, suggestedUsers) => {
     if (safeAds.length > 0 && (i + 1) % AD_INTERVAL === 0 && adIdx < safeAds.length) {
       feed.push({ ...safeAds[adIdx % safeAds.length], item_type: 'ad' });
       adIdx++;
+      if (!reelsInserted && suggestedReels.length > 0) {
+        feed.push({ item_type: 'mobile_reels_suggestion', reels: suggestedReels });
+        reelsInserted = true;
+      }
     }
     // Insert suggestion block (mobile only — hidden on lg via CSS)
     if (!suggInserted && i === suggPos && suggestedUsers.length > 0) {
@@ -156,6 +357,10 @@ const buildFeed = (posts, ads, suggestedUsers) => {
       suggInserted = true;
     }
   });
+
+  if (!reelsInserted && suggestedReels.length > 0) {
+    feed.splice(Math.min(feed.length, 2), 0, { item_type: 'mobile_reels_suggestion', reels: suggestedReels });
+  }
   return feed;
 };
 
@@ -167,6 +372,7 @@ const Home = () => {
   const [posts,          setPosts]          = useState([]);
   const [ads,            setAds]            = useState([]);
   const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [suggestedReels, setSuggestedReels] = useState([]);
   const [feed,           setFeed]           = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [selectedItem,   setSelectedItem]   = useState(null);
@@ -192,20 +398,29 @@ const Home = () => {
     } catch (e) { return []; }
   }, []);
 
+  const fetchSuggestedReels = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/suggestions/reels?limit=10`, { headers: adAuthHeaders() });
+      if (!res.ok) return [];
+      return normalizeApiArray(await res.json());
+    } catch (e) { return []; }
+  }, []);
+
   const loadFeed = useCallback(async () => {
     setLoading(true);
-    const [fetchedPosts, fetchedAds, fetchedUsers] = await Promise.all([
-      fetchPosts(), fetchAds(), fetchSuggestedUsers(),
+    const [fetchedPosts, fetchedAds, fetchedUsers, fetchedReels] = await Promise.all([
+      fetchPosts(), fetchAds(), fetchSuggestedUsers(), fetchSuggestedReels(),
     ]);
     setPosts(fetchedPosts);
     setAds(fetchedAds);
     setSuggestedUsers(fetchedUsers);
-    setFeed(buildFeed(fetchedPosts, fetchedAds, fetchedUsers));
+    setSuggestedReels(fetchedReels);
+    setFeed(buildFeed(fetchedPosts, fetchedAds, fetchedUsers, fetchedReels));
     setLoading(false);
-  }, [fetchPosts, fetchAds, fetchSuggestedUsers]);
+  }, [fetchPosts, fetchAds, fetchSuggestedUsers, fetchSuggestedReels]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
-  useEffect(() => { setFeed(buildFeed(posts, ads, suggestedUsers)); }, [posts, ads, suggestedUsers]);
+  useEffect(() => { setFeed(buildFeed(posts, ads, suggestedUsers, suggestedReels)); }, [posts, ads, suggestedUsers, suggestedReels]);
 
   useEffect(() => {
     if (userObject?.role === 'vendor') navigate('/vendor/dashboard');
@@ -227,31 +442,41 @@ const Home = () => {
   return (
     <div>
       <LocationBar />
-      <StoryRail />
-      <div className="pb-4">
-        {loading ? (
-          <FeedSkeleton />
-        ) : feed.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-            <p className="text-lg font-semibold mb-1">Your feed is empty</p>
-            <p className="text-sm">Follow people to see their posts here.</p>
+      <div className="max-w-[1120px] mx-auto xl:px-6">
+        <div className="xl:flex xl:items-start xl:justify-between xl:gap-16">
+          <div className="w-full max-w-[630px]">
+            <StoryRail />
+            <div className="w-full max-w-[470px] mx-auto xl:mx-0 pb-4">
+            {loading ? (
+              <FeedSkeleton />
+            ) : feed.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <p className="text-lg font-semibold mb-1">Your feed is empty</p>
+                <p className="text-sm">Follow people to see their posts here.</p>
+              </div>
+            ) : (
+              feed.map((item, idx) => {
+                if (item.item_type === 'mobile_suggestion') {
+                  return <MobileSuggestedUsersCard key={`sugg-${idx}`} users={item.users} />;
+                }
+                if (item.item_type === 'mobile_reels_suggestion') {
+                  return <MobileSuggestedReelsCard key={`reels-${idx}`} reels={item.reels} />;
+                }
+                return (
+                  <PostCard
+                    key={item._id || item.id || `item-${idx}`}
+                    post={item}
+                    onCommentClick={handleCommentClick}
+                    onDelete={handlePostDeleted}
+                  />
+                );
+              })
+            )}
+            </div>
           </div>
-        ) : (
-          feed.map((item, idx) => {
-            // Mobile suggestion block
-            if (item.item_type === 'mobile_suggestion') {
-              return <MobileSuggestedUsersCard key={`sugg-${idx}`} users={item.users} />;
-            }
-            return (
-              <PostCard
-                key={item._id || item.id || `item-${idx}`}
-                post={item}
-                onCommentClick={handleCommentClick}
-                onDelete={handlePostDeleted}
-              />
-            );
-          })
-        )}
+
+          <DesktopSuggestionsRail currentUser={userObject} suggestedUsers={suggestedUsers} />
+        </div>
       </div>
       <PostDetailModal
         isOpen={!!selectedItem}

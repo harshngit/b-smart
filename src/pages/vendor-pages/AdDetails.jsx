@@ -17,6 +17,8 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 
+const API_UPLOADS_BASE = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+
 // ─── Gallery helpers ──────────────────────────────────────────────────────────
 const getMediaType = (fname = '', url = '') => {
   const src = fname || url;
@@ -50,7 +52,7 @@ const GalleryLightbox = ({ items, startIdx, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center !mt-0 p-4"
       onClick={onClose}
     >
       {/* Close */}
@@ -226,6 +228,129 @@ const AdDetailGallery = ({ items }) => {
         />
       )}
     </>
+  );
+};
+
+void AdDetailGallery;
+
+const fmtCompact = (n) => (
+  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
+  : n >= 1000 ? `${(n / 1000).toFixed(1)}K`
+  : String(n || 0)
+);
+
+const toUploadUrl = (value) => {
+  if (!value) return null;
+  if (/^http:\/\/api\.bebsmart\.in/i.test(value)) {
+    return value.replace(/^http:\/\//i, "https://");
+  }
+  if (value.startsWith("http")) return value;
+  return `${API_UPLOADS_BASE}/uploads/${value}`;
+};
+
+const getVendorAdThumbnail = (ad) => {
+  const media = ad?.media?.[0];
+  if (!media) return null;
+
+  if (media.media_type === "video") {
+    const thumb = media.thumbnails?.[0];
+    return (
+      toUploadUrl(thumb?.fileUrl) ||
+      toUploadUrl(thumb?.fileName) ||
+      toUploadUrl(media.thumbnail_url)
+    );
+  }
+
+  return toUploadUrl(media.fileUrl) || toUploadUrl(media.fileName);
+};
+
+const VendorAdCard = ({ ad, onClick }) => {
+  const media = ad.media?.[0];
+  const thumb = getVendorAdThumbnail(ad);
+  const isVideo = media?.media_type === "video";
+  const title = ad.ad_title || ad.caption || "Untitled Ad";
+
+  return (
+    <button
+      onClick={() => onClick(ad._id || ad.id)}
+      className="group relative overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-pink-400 dark:hover:border-pink-500 transition-all"
+      style={{ aspectRatio: "9/16" }}
+    >
+      {thumb ? (
+        <img
+          src={thumb}
+          alt={title}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-orange-100 to-pink-100 dark:from-orange-900/30 dark:to-pink-900/30 flex flex-col items-center justify-center gap-2 px-4 text-center">
+          <Building2 className="w-6 h-6 text-orange-400" />
+          <span className="text-xs font-bold text-gray-700 dark:text-gray-200 line-clamp-2">{title}</span>
+        </div>
+      )}
+
+      {isVideo && (
+        <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center">
+          <Play className="w-3 h-3 text-white fill-white ml-0.5" />
+        </div>
+      )}
+
+      <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+        <p className="text-[11px] font-bold text-white line-clamp-2 text-left">{title}</p>
+        <div className="mt-1.5 flex items-center gap-3 text-[10px] font-semibold text-white/85">
+          <span className="flex items-center gap-1">
+            <Heart className="w-3 h-3" />
+            {fmtCompact(ad.likes_count || 0)}
+          </span>
+          <span className="flex items-center gap-1">
+            <Eye className="w-3 h-3" />
+            {fmtCompact(ad.views_count || 0)}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+};
+
+const MoreFromVendorSection = ({ vendorName, vendorAds, loading, onOpenAll, onOpenAd }) => {
+  if (!loading && vendorAds.length === 0) return null;
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+          More from {vendorName}
+        </h3>
+        <button
+          onClick={onOpenAll}
+          className="flex items-center gap-1 text-sm font-bold text-pink-600 dark:text-pink-400 hover:underline"
+        >
+          See all <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {[...Array(5)].map((_, idx) => (
+            <div
+              key={idx}
+              className="rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse"
+              style={{ aspectRatio: "9/16" }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {vendorAds.map((vendorAd) => (
+            <VendorAdCard
+              key={vendorAd._id || vendorAd.id}
+              ad={vendorAd}
+              onClick={onOpenAd}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -1678,6 +1803,8 @@ export default function AdDetails() {
   const [showAllLikes, setShowAllLikes] = useState(false);
 
   const [activeTab, setActiveTab] = useState("overview");
+  const [vendorAds, setVendorAds] = useState([]);
+  const [vendorAdsLoading, setVendorAdsLoading] = useState(false);
 
   const [walletHistory, setWalletHistory] = useState(null);
   const [walletLoading, setWalletLoading] = useState(false);
@@ -1732,6 +1859,36 @@ export default function AdDetails() {
     fetchWalletHistory();
   }, [adId, walletPage]);
 
+  useEffect(() => {
+    const vendorUserId = ad?.user_id?._id || ad?.vendor_id?._id;
+    if (!vendorUserId || !adId) return;
+
+    const fetchVendorAds = async () => {
+      setVendorAdsLoading(true);
+      try {
+        const res = await api.get(`/ads/user/${vendorUserId}`);
+        const list = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data?.ads) ? res.data.ads
+          : Array.isArray(res.data?.data) ? res.data.data
+          : [];
+
+        setVendorAds(
+          list
+            .filter((item) => (item._id || item.id) !== adId)
+            .slice(0, 10)
+        );
+      } catch (err) {
+        console.error("Vendor ads fetch failed", err);
+        setVendorAds([]);
+      } finally {
+        setVendorAdsLoading(false);
+      }
+    };
+
+    fetchVendorAds();
+  }, [ad, adId]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
@@ -1767,6 +1924,7 @@ export default function AdDetails() {
   const coinsSpent     = ad.total_coins_spent  || 0;
   const coinsRemaining = totalBudget - coinsSpent;
   const spendPct       = totalBudget > 0 ? Math.round((coinsSpent / totalBudget) * 100) : 0;
+  const vendorName     = ad.vendor_id?.business_name || ad.user_id?.full_name || "Vendor";
 
   const likesList    = Array.isArray(ad.likes)    ? ad.likes    : [];
   const dislikesList = Array.isArray(ad.dislikes) ? ad.dislikes : [];
@@ -1950,15 +2108,14 @@ export default function AdDetails() {
                 </Card>
 
                 {/* ── Detail Gallery ───────────────────────────────────────── */}
-                {/* gallery field (API) with fallback to detail */}
-                {(() => {
-                  const gItems = Array.isArray(ad.gallery) && ad.gallery.length > 0
-                    ? ad.gallery
-                    : Array.isArray(ad.detail) && ad.detail.length > 0
-                      ? ad.detail
-                      : [];
-                  return gItems.length > 0 ? <AdDetailGallery items={gItems} /> : null;
-                })()}
+                {/* More ads from this vendor */}
+                <MoreFromVendorSection
+                  vendorName={vendorName}
+                  vendorAds={vendorAds}
+                  loading={vendorAdsLoading}
+                  onOpenAll={() => navigate("/vendor/ads-management")}
+                  onOpenAd={(id) => navigate(`/vendor/ads-management/${id}`)}
+                />
 
                 {/* Targeting */}
                 <Card title="Targeting Settings" icon={Target}>
