@@ -577,6 +577,12 @@ const Sidebar = ({ onOpenCreateModal }) => {
                             <Image size={18} /> Create Post
                           </button>
                           <button
+                            onClick={() => { onOpenCreateModal('tweet'); setIsCreateDropdownOpen(false); }}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
+                          >
+                            <MessageCircle size={18} /> Create Tweet
+                          </button>
+                          <button
                             onClick={() => { onOpenCreateModal('reel'); setIsCreateDropdownOpen(false); }}
                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                           >

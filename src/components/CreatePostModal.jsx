@@ -647,7 +647,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
   const handleFiles = async (files) => {
     const validFiles = files.filter(file => {
-      if (postType === 'post') return file.type.startsWith('image/');
+      if (postType === 'post' || postType === 'tweet') return file.type.startsWith('image/');
       if (postType === 'reel') return file.type.startsWith('video/');
       if (postType === 'ad') return file.type.startsWith('image/') || file.type.startsWith('video/');
       return file.type.startsWith('image/') || file.type.startsWith('video/');
@@ -925,7 +925,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           const formData = new FormData();
           formData.append('file', file);
 
-          const uploadResponse = await api.post('https://api.bebsmart.in/api/upload', formData, {
+          const uploadResponse = await api.post(postType === 'tweet' ? '/tweets/upload' : 'https://api.bebsmart.in/api/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress: (evt) => {
               if (evt.total) {
@@ -937,8 +937,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             }
           });
 
-          const { fileName: serverFileName, url: serverUrl, fileUrl: serverFileUrl } = uploadResponse.data;
-          const finalUrl = serverUrl || serverFileUrl;
+          const { fileName: serverFileName, url: serverUrl, fileUrl: serverFileUrl, media: uploadedTweetMedia } = uploadResponse.data;
+          const finalUrl = uploadedTweetMedia?.url || serverUrl || serverFileUrl;
 
           // Generate Filter CSS
           const filterDef = FILTERS.find(f => f.name === item.filter);
@@ -982,14 +982,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           const trimEnd = (item.trimEnd && item.trimEnd > 0) ? item.trimEnd : dur;
 
           // Build the media object per the API schema
-          const mediaObj = {
-            fileName: serverFileName || fileName,
-            fileUrl: finalUrl,
-            url: finalUrl,
-            media_type: item.type === 'video' ? 'video' : 'image',
-          };
+          const mediaObj = postType === 'tweet'
+            ? {
+                url: finalUrl,
+                type: 'image',
+              }
+            : {
+                fileName: serverFileName || fileName,
+                fileUrl: finalUrl,
+                url: finalUrl,
+                media_type: item.type === 'video' ? 'video' : 'image',
+              };
 
-          if (item.type === 'video') {
+          if (postType !== 'tweet' && item.type === 'video') {
             mediaObj.video_meta = {
               original_length_seconds: dur,
               selected_start: trimStart,
@@ -1004,7 +1009,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             if (uploadedThumbs) {
               mediaObj.thumbnails = uploadedThumbs;
             }
-          } else {
+          } else if (postType !== 'tweet') {
             // Image editing data
             mediaObj.image_editing = {
               filter: { name: item.filter || 'Original', css: filterCss },
@@ -1020,13 +1025,15 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           }
 
           // Crop settings (for both image and video)
-          mediaObj.crop_settings = {
-            mode: 'original',
-            aspect_ratio: getAspectRatioLabel(item.aspect || item.originalAspect || 1),
-            zoom: item.zoom || 1,
-            x: item.crop?.x || 0,
-            y: item.crop?.y || 0
-          };
+          if (postType !== 'tweet') {
+            mediaObj.crop_settings = {
+              mode: 'original',
+              aspect_ratio: getAspectRatioLabel(item.aspect || item.originalAspect || 1),
+              zoom: item.zoom || 1,
+              x: item.crop?.x || 0,
+              y: item.crop?.y || 0
+            };
+          }
 
           
 
@@ -1039,7 +1046,20 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
         const hashtags = caption.match(/#[a-zA-Z0-9_]+/g) || [];
 
-        if (postType === 'reel') {
+        if (postType === 'tweet') {
+          if (!caption.trim()) {
+            throw new Error('Please add text for your tweet.');
+          }
+          const payload = {
+            content: caption.trim(),
+            media: processedMedia.filter((m) => m.url).map((m) => ({
+              url: m.url,
+              type: 'image',
+            })),
+            audience: 'everyone',
+          };
+          await api.post('/tweets', payload);
+        } else if (postType === 'reel') {
           // Reel — existing endpoint unchanged
           const payload = {
             caption,
@@ -1462,7 +1482,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           {step === 'select' ? (
             <>
               <div className="w-10"></div>
-              <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'reel' ? 'reel' : postType === 'ad' ? 'ad' : 'post'}</h2>
+              <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'tweet' ? 'tweet' : postType === 'reel' ? 'reel' : postType === 'ad' ? 'ad' : 'post'}</h2>
               <button onClick={handleClose} className="text-black dark:text-white md:hidden"><X size={24} /></button>
               <div className="w-10 md:block hidden"></div>
             </>
@@ -1529,6 +1549,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     >
                       <Image size={18} className="text-purple-400" />
                       <span className="text-xs font-semibold">Post</span>
+                    </button>
+                    <button
+                      onClick={() => setPostType('tweet')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'tweet' ? 'bg-white/20' : 'hover:bg-white/10'}`}
+                    >
+                      <Image size={18} /> Tweet
                     </button>
                     <button
                       onClick={() => setPostType('reel')}
@@ -2765,7 +2791,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
       <input
         type="file" ref={fileInputRef} className="hidden" multiple
-        accept={postType === 'post' ? 'image/*' : postType === 'reel' ? 'video/*' : 'image/*,video/*'}
+        accept={postType === 'post' || postType === 'tweet' ? 'image/*' : postType === 'reel' ? 'video/*' : 'image/*,video/*'}
         onChange={handleFileSelect}
       />
 
@@ -2916,7 +2942,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               </div>
               <div className="flex flex-col items-center gap-1.5 text-center">
                 <h3 className="text-xl font-bold text-white">
-                  {postType === 'reel'
+                  {postType === 'tweet'
+                    ? 'Tweet Shared! 🎉'
+                    : postType === 'reel'
                     ? 'Reel Published! 🎉'
                     : postType === 'ad'
                     ? adSubmitMode === 'draft'
@@ -2925,7 +2953,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     : 'Post Shared! 🎉'}
                 </h3>
                 <p className="text-sm text-white/50">
-                  {postType === 'reel'
+                  {postType === 'tweet'
+                    ? 'Your tweet is now live'
+                    : postType === 'reel'
                     ? 'Your reel is now live'
                     : postType === 'ad'
                     ? adSubmitMode === 'draft'

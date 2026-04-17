@@ -22,6 +22,10 @@ const fmt = (n = 0) => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const isAdItem = (item) => item?.item_type === 'ad' || (item?.vendor_id && !item?.user_id?.username?.includes);
+const isTweetItem = (item) => item?.item_type === 'tweet';
+const getContentText = (item) => item?.content || item?.caption || '';
+const getCommentsCount = (item) => item?.commentsCount ?? item?.comments_count ?? 0;
+const getLikeCount = (item) => item?.likesCount ?? item?.likes_count ?? (Array.isArray(item?.likes) ? item.likes.length : 0);
 
 const adAuthHeaders = () => {
   const token = localStorage.getItem('token');
@@ -446,20 +450,23 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
 const PostCard = ({ post, onCommentClick, onDelete }) => {
   const { userObject } = useSelector(s => s.auth);
   const isAd = isAdItem(post);
+  const isTweet = isTweetItem(post);
 
   // ── Derived: normalize post & ad shapes to one interface ──────────────────
-  const user       = post.user_id || post.users || post.user || {};
+  const user       = post.author || post.user_id || post.users || post.user || {};
   const vendor     = post.vendor_id || {};
   const username   = user.username || vendor.business_name || post.username || 'User';
   const fullName   = vendor.business_name && vendor.business_name !== username
     ? vendor.business_name
-    : (user.full_name || '');
-  const avatar     = user.avatar_url || post.userAvatar || '';
+    : (user.full_name || user.name || '');
+  const avatar     = user.avatar_url || user.profilePicture || post.userAvatar || '';
   const userId     = user._id || user.id || (typeof post.user_id === 'string' ? post.user_id : null);
   const postId     = post._id || post.id;
   const peopleTags = post.people_tags || [];
   const viewerId   = userObject?._id || userObject?.id || null;
   const isOwner    = !!(viewerId && userId && String(viewerId) === String(userId));
+  const contentText = getContentText(post);
+  const commentsCount = getCommentsCount(post);
 
   const mediaItems = post.media?.length > 0
     ? post.media
@@ -501,19 +508,22 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
     const t = setTimeout(() => {
       if (typeof post.is_liked_by_me !== 'undefined') {
         setIsLiked(post.is_liked_by_me);
-        setLikeCount(post.likes_count || 0);
+        setLikeCount(getLikeCount(post));
+      } else if (typeof post.isLiked !== 'undefined') {
+        setIsLiked(post.isLiked);
+        setLikeCount(getLikeCount(post));
       } else if (Array.isArray(post.likes)) {
         const myId = userObject?._id || userObject?.id;
         const liked = myId ? post.likes.some(l =>
           typeof l === 'string' ? String(l) === String(myId) : String(l.user_id || l._id || l.id) === String(myId)
         ) : false;
         setIsLiked(liked);
-        setLikeCount(post.likes.length);
+        setLikeCount(getLikeCount(post));
       }
       setIsSaved(post.is_saved_by_me || false);
 
       // Latest comment preview (posts only)
-      if (!isAd) {
+      if (!isAd && !isTweet) {
         if (post.latest_comments?.length > 0) {
           const c = post.latest_comments[0];
           setLatestComment({ username: c.username || c.user?.username, text: c.text || c.content });
@@ -532,7 +542,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
       }
     }, 0);
     return () => clearTimeout(t);
-  }, [post, userObject, isAd]);
+  }, [post, userObject, isAd, isTweet]);
 
   // ── Like handler ──────────────────────────────────────────────────────────
   const handleLike = async () => {
@@ -551,6 +561,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
           body: JSON.stringify({ user: { id: String(userObject._id || userObject.id || '') } }),
         });
         if (!res.ok) throw new Error();
+      } else if (isTweet) {
+        await api.post(`/tweets/${postId}/${wasLiked ? 'unlike' : 'like'}`);
       } else if (post._id) {
         await api.post(`/posts/${postId}/${wasLiked ? 'unlike' : 'like'}`);
       } else {
@@ -572,7 +584,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   // ── Save handler ──────────────────────────────────────────────────────────
   const handleSave = async (e) => {
     e.stopPropagation();
-    if (!userObject || !postId || isAd) return;
+    if (!userObject || !postId || isAd || isTweet) return;
     const was = isSaved;
     setIsSaved(!was);
     try {
@@ -584,20 +596,22 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
-      await api.delete(isAd ? `/ads/${postId}` : `/posts/${postId}`);
+      await api.delete(isAd ? `/ads/${postId}` : isTweet ? `/tweets/${postId}` : `/posts/${postId}`);
       await new Promise(r => setTimeout(r, 900));
       onDelete?.(postId);
     } catch (err) {
-      alert(err.response?.data?.message || `Failed to delete ${isAd ? 'ad' : 'post'}`);
+      alert(err.response?.data?.message || `Failed to delete ${isAd ? 'ad' : isTweet ? 'tweet' : 'post'}`);
       setIsDeleting(false);
       setShowDeleteModal(false);
     }
   };
 
   const offer = isAd ? (post.product_offer?.[0] || null) : null;
-  const reportContentType = isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post');
+  const reportContentType = isAd ? 'ad' : isTweet ? 'tweet' : (post.type === 'reel' ? 'reel' : 'post');
   const reportContentUrl = isAd
     ? `${window.location.origin}/ads`
+    : isTweet
+      ? `${window.location.origin}/post/${postId}?type=tweet`
     : post.type === 'reel'
       ? `${window.location.origin}/reels/${postId}`
       : `${window.location.origin}/posts/${postId}`;
@@ -629,7 +643,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
             <div className="flex items-center gap-1.5">
               {fullName && <span className="text-[11px] text-gray-400 truncate">{fullName}</span>}
               {isAd && <span className="text-[10px] text-gray-400 font-medium">· Sponsored</span>}
-              {!isAd && post.location && <span className="text-[11px] text-gray-400 truncate">{post.location}</span>}
+              {!isAd && !isTweet && post.location && <span className="text-[11px] text-gray-400 truncate">{post.location}</span>}
+              {isTweet && <span className="text-[11px] text-gray-400 truncate">Tweet</span>}
             </div>
           </div>
         </div>
@@ -647,10 +662,14 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
           <button
             onClick={() => {
               if (isOwner) {
-                setShowOptions(true);
+                if (isTweet) {
+                  setShowDeleteModal(true);
+                } else {
+                  setShowOptions(true);
+                }
                 return;
               }
-              setShowReportModal(true);
+              if (!isTweet) setShowReportModal(true);
             }}
             className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
           >
@@ -661,37 +680,41 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
       </div>
 
       <DeleteModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleConfirmDelete} isDeleting={isDeleting} />
-      <OwnerContentOptionsModal
-        isOpen={showOptions && isOwner}
-        onClose={() => setShowOptions(false)}
-        item={post}
-        contentType={isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post')}
-        contentUrl={reportContentUrl}
-        onEdit={() => {
-          setShowOptions(false);
-          setShowEditModal(true);
-        }}
-        onDelete={() => {
-          setShowOptions(false);
-          setShowDeleteModal(true);
-        }}
-        onUpdated={() => window.location.reload()}
-      />
-      <EditContentModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        item={post}
-        contentType={isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post')}
-        onSaved={() => window.location.reload()}
-      />
-      <ContentReportModal
-        isOpen={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        contentType={reportContentType}
-        contentId={postId}
-        ownerUsername={username}
-        contentUrl={reportContentUrl}
-      />
+      {!isTweet && (
+        <>
+          <OwnerContentOptionsModal
+            isOpen={showOptions && isOwner}
+            onClose={() => setShowOptions(false)}
+            item={post}
+            contentType={isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post')}
+            contentUrl={reportContentUrl}
+            onEdit={() => {
+              setShowOptions(false);
+              setShowEditModal(true);
+            }}
+            onDelete={() => {
+              setShowOptions(false);
+              setShowDeleteModal(true);
+            }}
+            onUpdated={() => window.location.reload()}
+          />
+          <EditContentModal
+            isOpen={showEditModal}
+            onClose={() => setShowEditModal(false)}
+            item={post}
+            contentType={isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post')}
+            onSaved={() => window.location.reload()}
+          />
+          <ContentReportModal
+            isOpen={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            contentType={reportContentType}
+            contentId={postId}
+            ownerUsername={username}
+            contentUrl={reportContentUrl}
+          />
+        </>
+      )}
 
       {/* ── Media ─────────────────────────────────────────────────────────── */}
       <MediaRenderer mediaItems={mediaItems} isAdType={isAd} peopleTags={peopleTags} />
@@ -722,10 +745,12 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
               <FollowButton targetUserId={String(userId)} />
             )}
             {/* Save */}
-            <button onClick={isAd ? (e) => { e.stopPropagation(); setIsSaved(s => !s); } : handleSave}
-              className="active:scale-90 transition-transform" aria-label={isSaved ? 'Unsave' : 'Save'}>
-              <Bookmark size={24} className={`transition-all duration-200 ${isSaved ? 'fill-black text-black dark:fill-white dark:text-white' : 'text-black dark:text-white'}`} />
-            </button>
+            {!isTweet && (
+              <button onClick={isAd ? (e) => { e.stopPropagation(); setIsSaved(s => !s); } : handleSave}
+                className="active:scale-90 transition-transform" aria-label={isSaved ? 'Unsave' : 'Save'}>
+                <Bookmark size={24} className={`transition-all duration-200 ${isSaved ? 'fill-black text-black dark:fill-white dark:text-white' : 'text-black dark:text-white'}`} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -746,7 +771,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
         )}
 
         {/* Caption */}
-        <ExpandCaption username={username} userId={userId} text={post.caption} isAd={isAd} />
+        <ExpandCaption username={username} userId={userId} text={contentText} isAd={isAd} />
 
         {/* Hashtags */}
         {post.hashtags?.length > 0 && (
@@ -758,7 +783,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
         )}
 
         {/* People tag mentions — posts only */}
-        {!isAd && peopleTags.length > 0 && (
+        {!isAd && !isTweet && peopleTags.length > 0 && (
           <div className="flex flex-wrap gap-x-2 gap-y-0.5 mb-1">
             {peopleTags.map((tag, i) => {
               const profilePath = tag.role === 'vendor' 
@@ -784,15 +809,15 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
         )}
 
         {/* Comments link */}
-        {(post.comments_count || 0) > 1 && (
+        {commentsCount > 0 && (
           <button onClick={() => onCommentClick?.(post)}
             className="block text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 mb-1 mt-0.5 transition-colors">
-            View all {fmt(post.comments_count)} comments
+            View all {fmt(commentsCount)} comments
           </button>
         )}
 
         {/* Latest comment preview — posts only */}
-        {!isAd && latestComment && (
+        {!isAd && !isTweet && latestComment && (
           <p className="text-sm dark:text-white mb-1 leading-snug">
             <span className="font-semibold mr-1 dark:text-white">{latestComment.username}</span>
             <span className="text-gray-700 dark:text-gray-300">{latestComment.text}</span>
@@ -802,6 +827,9 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
         {/* Ad: views */}
         {isAd && post.views_count > 0 && (
           <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{fmt(post.views_count)} views</p>
+        )}
+        {isTweet && (post.viewsCount || 0) > 0 && (
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{fmt(post.viewsCount)} views</p>
         )}
 
         <p className="text-gray-400 dark:text-gray-500 text-[11px] uppercase tracking-wider mt-1">{formattedDate}</p>
