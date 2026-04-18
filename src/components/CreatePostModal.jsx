@@ -2494,23 +2494,22 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
               <div className="md:hidden flex gap-4 min-h-full">
                 <div className="flex flex-col items-center shrink-0 pt-2">
-                  <div className="w-[62px] h-[62px] rounded-full bg-[#262626] overflow-hidden flex items-center justify-center">
+                  <div className="w-[42px] h-[42px] rounded-full bg-[#262626] overflow-hidden flex items-center justify-center">
                     {userObject?.avatar_url ? (
                       <img src={userObject.avatar_url} className="w-full h-full object-cover" alt={userObject.username} />
                     ) : (
                       <span className="text-lg font-semibold text-white">{(userObject?.username || 'U').slice(0, 1).toUpperCase()}</span>
                     )}
                   </div>
-                  <div className="w-px flex-1 bg-white/10 my-3 min-h-[120px]" />
-                  <div className="w-9 h-9 rounded-full bg-[#242424] border border-white/10 flex items-center justify-center text-white/55 text-lg">+</div>
+                  
                 </div>
 
                 <div className="flex-1 min-w-0 pt-1">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-bold text-[18px] truncate">{userObject?.username || 'User'}</span>
-                      <ChevronRight size={20} className="text-white/35 shrink-0" />
-                      <span className="text-white/35 text-[18px] truncate">Community or topic</span>
+                      <span className="font-bold text-[14px] truncate">{userObject?.username || 'User'}</span>
+                      <ChevronRight size={16} className="text-white/35 shrink-0" />
+                      <span className="text-white/35 text-[14px] truncate">Community or topic</span>
                     </div>
                     {(caption.trim() || media.length > 0) && (
                       <button
@@ -2528,7 +2527,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
 
                   <textarea
-                    className="mt-1 w-full min-h-[160px] resize-none bg-transparent outline-none text-[24px] leading-[1.35] tracking-[-0.02em] text-white placeholder:text-white/35"
+                    className="mt-1 w-full min-h-[60px] resize-none bg-transparent outline-none text-[16px] leading-[1.35] tracking-[-0.02em] text-white placeholder:text-white/35"
                     placeholder="What's new?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
@@ -2589,10 +2588,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
 
                   <div className="mt-9 flex items-center gap-4 text-white/35">
-                    <div className="w-10 h-10 rounded-full bg-[#242424] border border-white/10 flex items-center justify-center">
-                      <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-sm">+</div>
-                    </div>
-                    <span className="text-[18px]">Add to thread</span>
+                      <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-sm">+</div>
+                    <span className="text-[14px]">Add to thread</span>
                   </div>
                 </div>
               </div>
@@ -2609,69 +2606,21 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               </button>
             </div>
 
-            <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-[linear-gradient(180deg,rgba(15,15,16,0),rgba(15,15,16,0.84)_18%,rgba(15,15,16,0.98)_36%)] backdrop-blur-xl px-4 pt-5 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <div className="rounded-[26px] border border-white/10 bg-[#161617]/95 shadow-[0_24px_60px_rgba(0,0,0,0.45)] p-3">
-                <div className="flex items-center justify-around gap-2 rounded-[22px] border border-white/8 bg-[#121213] px-2 py-2 text-white">
-                  {userObject?.role !== 'vendor' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setPostType('post');
-                          setStep('select');
-                        }}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-2xl transition-all ${postType === 'post' ? 'bg-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]' : 'hover:bg-white/6'}`}
-                      >
-                        <Image size={18} className="text-purple-400" />
-                        <span className="text-sm font-semibold">Post</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPostType('tweet');
-                          setStep('share');
-                        }}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-2xl transition-all ${postType === 'tweet' ? 'bg-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]' : 'hover:bg-white/6'}`}
-                      >
-                        <Image size={18} />
-                        <span className="text-sm font-semibold">Tweet</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPostType('reel');
-                          setStep('select');
-                        }}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-2xl transition-all ${postType === 'reel' ? 'bg-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]' : 'hover:bg-white/6'}`}
-                      >
-                        <Video size={18} className="text-pink-400" />
-                        <span className="text-sm font-semibold">Reel</span>
-                      </button>
-                    </>
-                  )}
-                </div>
+            <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-[#111111] px-8 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <div className="flex items-center justify-end gap-4">
+                
 
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <button type="button" className="flex items-center gap-2 text-white/60 px-2">
-                    <Copy size={22} />
-                    <span className="text-[17px] font-medium">Options</span>
-                  </button>
-
-                  <div className="flex items-center justify-center w-[102px] h-[54px] rounded-full bg-white/10 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-                    <div className="w-[46px] h-[46px] rounded-full bg-[#1e1e1e] border border-white/10 flex items-center justify-center shadow-[0_8px_18px_rgba(0,0,0,0.35)]">
-                      <Smile size={24} className="text-white/55" />
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleNextStep('publish')}
-                    disabled={isSubmitting || (!caption.trim() && media.length === 0)}
-                    className={`h-[54px] min-w-[116px] rounded-full text-[18px] font-semibold transition-all ${
-                      isSubmitting || (!caption.trim() && media.length === 0)
-                        ? 'bg-white/10 text-white/35'
-                        : 'bg-white text-black shadow-[0_18px_36px_rgba(255,255,255,0.12)]'
-                    }`}
-                  >
-                    Post
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleNextStep('publish')}
+                  disabled={isSubmitting || (!caption.trim() && media.length === 0)}
+                  className={`h-[40px] min-w-[80px] rounded-full text-[14px] font-semibold transition-all ${
+                    isSubmitting || (!caption.trim() && media.length === 0)
+                      ? 'bg-white/10 text-black/45'
+                      : 'bg-white text-black'
+                  }`}
+                >
+                  Post
+                </button>
               </div>
             </div>
           </div>
