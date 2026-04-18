@@ -5,7 +5,7 @@ import api from '../lib/api';
 import EmojiPicker from 'emoji-picker-react';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone,
   MousePointerClick, Target, Smartphone, Monitor, Calendar, Link2, Phone, Mail, MessageSquare,
-  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins
+  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, FileText, Ellipsis
 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
@@ -1514,7 +1514,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         }`}>
 
         {/* Header */}
-        <div className="h-[45px] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 bg-white dark:bg-[#262626] sticky top-0 z-40">
+        <div className={`h-[45px] border-b border-gray-200 dark:border-gray-800 items-center justify-between px-4 bg-white dark:bg-[#262626] sticky top-0 z-40 ${
+          postType === 'tweet' && step === 'share' ? 'hidden md:flex' : 'flex'
+        }`}>
           {step === 'select' ? (
             <>
               <div className="w-10"></div>
@@ -1599,7 +1601,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                       <span className="text-xs font-semibold">Post</span>
                     </button>
                     <button
-                      onClick={() => setPostType('tweet')}
+                      onClick={() => {
+                        setPostType('tweet');
+                        setStep('share');
+                      }}
                       className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'tweet' ? 'bg-white/20' : 'hover:bg-white/10'}`}
                     >
                       <Image size={18} /> Tweet
@@ -2387,8 +2392,23 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           </div>
         ) : postType === 'tweet' ? (
           <div className="flex-1 bg-[#111111] text-white flex flex-col">
-            <div className="flex-1 overflow-y-auto px-5 py-5">
-              <div className="flex gap-4">
+            <div className="md:hidden flex items-center justify-between px-5 pt-4 pb-5 border-b border-white/10">
+              <button onClick={handleClose} className="text-white">
+                <X size={34} strokeWidth={2.2} />
+              </button>
+              <h2 className="text-[20px] font-bold tracking-[-0.02em]">New thread</h2>
+              <div className="flex items-center gap-4">
+                <button type="button" className="text-white/95">
+                  <FileText size={32} strokeWidth={2.1} />
+                </button>
+                <button type="button" className="text-white/95">
+                  <Ellipsis size={32} strokeWidth={2.1} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-5 pb-[13.5rem] md:pb-5">
+              <div className="hidden md:flex gap-4">
                 <div className="flex flex-col items-center shrink-0">
                   <div className="w-11 h-11 rounded-full bg-[#222] overflow-hidden flex items-center justify-center">
                     {userObject?.avatar_url ? (
@@ -2471,9 +2491,114 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
                 </div>
               </div>
+
+              <div className="md:hidden flex gap-4 min-h-full">
+                <div className="flex flex-col items-center shrink-0 pt-2">
+                  <div className="w-[62px] h-[62px] rounded-full bg-[#262626] overflow-hidden flex items-center justify-center">
+                    {userObject?.avatar_url ? (
+                      <img src={userObject.avatar_url} className="w-full h-full object-cover" alt={userObject.username} />
+                    ) : (
+                      <span className="text-lg font-semibold text-white">{(userObject?.username || 'U').slice(0, 1).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="w-px flex-1 bg-white/10 my-3 min-h-[120px]" />
+                  <div className="w-9 h-9 rounded-full bg-[#242424] border border-white/10 flex items-center justify-center text-white/55 text-lg">+</div>
+                </div>
+
+                <div className="flex-1 min-w-0 pt-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-bold text-[18px] truncate">{userObject?.username || 'User'}</span>
+                      <ChevronRight size={20} className="text-white/35 shrink-0" />
+                      <span className="text-white/35 text-[18px] truncate">Community or topic</span>
+                    </div>
+                    {(caption.trim() || media.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCaption('');
+                          setMedia([]);
+                          setCurrentIndex(0);
+                        }}
+                        className="text-white/35 shrink-0"
+                      >
+                        <X size={24} />
+                      </button>
+                    )}
+                  </div>
+
+                  <textarea
+                    className="mt-1 w-full min-h-[160px] resize-none bg-transparent outline-none text-[24px] leading-[1.35] tracking-[-0.02em] text-white placeholder:text-white/35"
+                    placeholder="What's new?"
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    maxLength={500}
+                  />
+
+                  {currentMedia && (
+                    <div className="relative mt-4 w-full max-w-[360px] overflow-hidden rounded-[22px] border border-white/10 bg-black">
+                      <img
+                        src={currentMedia.croppedUrl || currentMedia.url}
+                        alt="Tweet media"
+                        className="w-full h-auto object-cover"
+                      />
+                      <button
+                        onClick={(e) => handleRemoveMedia(currentIndex, e)}
+                        className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 flex items-center justify-center text-white"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex items-center gap-5 text-white/50">
+                    <button onClick={handleButtonClick} className="hover:text-white transition-colors">
+                      <Image size={28} strokeWidth={1.8} />
+                    </button>
+                    <div ref={emojiPickerRef} className="relative">
+                      {showEmojiPicker && (
+                        <div className="absolute bottom-full left-0 mb-3 z-[80]">
+                          <EmojiPicker
+                            theme="dark"
+                            onEmojiClick={handleEmojiClick}
+                            lazyLoadEmojis
+                            skinTonesDisabled
+                            searchDisabled={false}
+                            previewConfig={{ showPreview: false }}
+                          />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker((prev) => !prev)}
+                        className="hover:text-white transition-colors"
+                        aria-label="Toggle emoji picker"
+                      >
+                        <Smile size={28} strokeWidth={1.8} />
+                      </button>
+                    </div>
+                    <button type="button" className="opacity-50 cursor-default">
+                      <Copy size={28} strokeWidth={1.8} />
+                    </button>
+                    <button type="button" className="opacity-50 cursor-default">
+                      <MessageSquare size={28} strokeWidth={1.8} />
+                    </button>
+                    <button type="button" className="opacity-50 cursor-default">
+                      <Ellipsis size={28} strokeWidth={1.8} />
+                    </button>
+                  </div>
+
+                  <div className="mt-9 flex items-center gap-4 text-white/35">
+                    <div className="w-10 h-10 rounded-full bg-[#242424] border border-white/10 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-sm">+</div>
+                    </div>
+                    <span className="text-[18px]">Add to thread</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="border-t border-white/10 px-5 py-4 flex items-center justify-between">
+            <div className="hidden md:flex border-t border-white/10 px-5 py-4 items-center justify-between">
               <span className="text-sm text-white/45">Reply options</span>
               <button
                 onClick={() => handleNextStep('publish')}
@@ -2482,6 +2607,72 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               >
                 Post
               </button>
+            </div>
+
+            <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-[linear-gradient(180deg,rgba(15,15,16,0),rgba(15,15,16,0.84)_18%,rgba(15,15,16,0.98)_36%)] backdrop-blur-xl px-4 pt-5 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <div className="rounded-[26px] border border-white/10 bg-[#161617]/95 shadow-[0_24px_60px_rgba(0,0,0,0.45)] p-3">
+                <div className="flex items-center justify-around gap-2 rounded-[22px] border border-white/8 bg-[#121213] px-2 py-2 text-white">
+                  {userObject?.role !== 'vendor' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setPostType('post');
+                          setStep('select');
+                        }}
+                        className={`flex items-center gap-2 px-4 py-3 rounded-2xl transition-all ${postType === 'post' ? 'bg-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]' : 'hover:bg-white/6'}`}
+                      >
+                        <Image size={18} className="text-purple-400" />
+                        <span className="text-sm font-semibold">Post</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPostType('tweet');
+                          setStep('share');
+                        }}
+                        className={`flex items-center gap-2 px-4 py-3 rounded-2xl transition-all ${postType === 'tweet' ? 'bg-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]' : 'hover:bg-white/6'}`}
+                      >
+                        <Image size={18} />
+                        <span className="text-sm font-semibold">Tweet</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPostType('reel');
+                          setStep('select');
+                        }}
+                        className={`flex items-center gap-2 px-4 py-3 rounded-2xl transition-all ${postType === 'reel' ? 'bg-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]' : 'hover:bg-white/6'}`}
+                      >
+                        <Video size={18} className="text-pink-400" />
+                        <span className="text-sm font-semibold">Reel</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <button type="button" className="flex items-center gap-2 text-white/60 px-2">
+                    <Copy size={22} />
+                    <span className="text-[17px] font-medium">Options</span>
+                  </button>
+
+                  <div className="flex items-center justify-center w-[102px] h-[54px] rounded-full bg-white/10 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                    <div className="w-[46px] h-[46px] rounded-full bg-[#1e1e1e] border border-white/10 flex items-center justify-center shadow-[0_8px_18px_rgba(0,0,0,0.35)]">
+                      <Smile size={24} className="text-white/55" />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleNextStep('publish')}
+                    disabled={isSubmitting || (!caption.trim() && media.length === 0)}
+                    className={`h-[54px] min-w-[116px] rounded-full text-[18px] font-semibold transition-all ${
+                      isSubmitting || (!caption.trim() && media.length === 0)
+                        ? 'bg-white/10 text-white/35'
+                        : 'bg-white text-black shadow-[0_18px_36px_rgba(255,255,255,0.12)]'
+                    }`}
+                  >
+                    Post
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
