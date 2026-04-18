@@ -406,7 +406,7 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
       ) : (
         <div className="relative w-full">
           <img
-            src={currentItem.fileUrl || currentItem.image}
+            src={currentItem.fileUrl || currentItem.url || currentItem.image}
             alt="Post"
             className="w-full h-auto max-h-[600px] object-contain"
             style={currentItem.image_editing?.filter?.css ? { filter: currentItem.image_editing.filter.css } : {}}
@@ -618,6 +618,110 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
 
   const profilePath = isAd ? `/vendor/${userId}/public` : `/profile/${userId}`;
 
+  if (isTweet) {
+    return (
+      <div className="max-w-[640px] mx-auto bg-white dark:bg-black border-b border-gray-200 dark:border-white/10 px-4 py-3">
+        <div className="flex gap-3">
+          <div className="flex flex-col items-center shrink-0">
+            <Link to={profilePath} className="w-10 h-10 rounded-full overflow-hidden block bg-gray-100 dark:bg-gray-800">
+              {avatar ? (
+                <img src={avatar} alt={username} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300">
+                  {username.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </Link>
+            
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Link to={profilePath} className="text-[15px] font-semibold text-gray-900 dark:text-white hover:underline truncate">
+                    {username}
+                  </Link>
+                  {fullName && fullName !== username && (
+                    <span className="text-xs text-gray-400 truncate">{fullName}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-xs text-gray-400">{formattedDate}</span>
+                <button
+                  onClick={() => {
+                    if (isOwner) {
+                      setShowDeleteModal(true);
+                      return;
+                    }
+                    setShowReportModal(true);
+                  }}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+              </div>
+            </div>
+
+            {contentText && (
+              <p className="mt-0.5 text-[15px] leading-6 text-gray-900 dark:text-white whitespace-pre-wrap break-words">
+                {contentText}
+              </p>
+            )}
+
+            {mediaItems.length > 0 && (
+              <div className="mt-3 overflow-hidden rounded-[18px] border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111] shadow-[0_2px_10px_rgba(0,0,0,0.04)] dark:shadow-none">
+                <div className="overflow-hidden bg-[#f5f5f5] dark:bg-black">
+                  <MediaRenderer mediaItems={mediaItems} isAdType={false} peopleTags={[]} />
+                </div>
+                <div className="border-t border-gray-200 dark:border-white/10 px-3 py-2.5">
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{username}</p>
+                  <p className="mt-0.5 text-[14px] leading-5 text-gray-700 dark:text-gray-200 line-clamp-2">
+                    {contentText || 'Image post'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-3 flex items-center gap-4 text-gray-900 dark:text-white">
+              <button onClick={handleLike} className="active:scale-90 transition-transform opacity-85 hover:opacity-100" aria-label="Like">
+                <Heart size={20} className={isLiked ? 'fill-red-500 text-red-500' : ''} />
+              </button>
+              <button onClick={() => onCommentClick?.(post)} className="active:scale-90 transition-transform opacity-85 hover:opacity-100" aria-label="Reply">
+                <MessageCircle size={20} />
+              </button>
+              
+              <button className="active:scale-90 transition-transform opacity-85 hover:opacity-100" aria-label="Share">
+                <Send size={20} />
+              </button>
+            </div>
+
+            <div className="mt-2 flex items-center gap-3 text-[14px] text-gray-500 dark:text-gray-400">
+              {commentsCount > 0 && (
+                <button onClick={() => onCommentClick?.(post)} className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                  {fmt(commentsCount)} {commentsCount === 1 ? 'reply' : 'replies'}
+                </button>
+              )}
+              {likeCount > 0 && (
+                <span>{fmt(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <DeleteModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleConfirmDelete} isDeleting={isDeleting} />
+        <ContentReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          contentType={reportContentType}
+          contentId={postId}
+          contentUrl={reportContentUrl}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="relative overflow-hidden bg-white dark:bg-black mb-4 border-b border-gray-200 dark:border-gray-800 pb-4 md:rounded-lg md:border max-w-[470px] mx-auto">
 
@@ -669,7 +773,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                 }
                 return;
               }
-              if (!isTweet) setShowReportModal(true);
+              setShowReportModal(true);
             }}
             className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
           >
@@ -717,6 +821,15 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
       )}
 
       {/* ── Media ─────────────────────────────────────────────────────────── */}
+      {isTweet && (
+        <ContentReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          contentType={reportContentType}
+          contentId={postId}
+          contentUrl={reportContentUrl}
+        />
+      )}
       <MediaRenderer mediaItems={mediaItems} isAdType={isAd} peopleTags={peopleTags} />
 
       {/* ── Action Bar ────────────────────────────────────────────────────── */}

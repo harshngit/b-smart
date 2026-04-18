@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import EmojiPicker from 'emoji-picker-react';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone,
   MousePointerClick, Target, Smartphone, Monitor, Calendar, Link2, Phone, Mail, MessageSquare,
   TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins
@@ -238,6 +239,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   useEffect(() => {
     if (isOpen) {
       setPostType(initialType);
+      setStep(initialType === 'tweet' ? 'share' : 'select');
     }
   }, [isOpen, initialType]);
 
@@ -295,6 +297,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [isAdvancedSettingsOpen, setIsAdvancedSettingsOpen] = useState(false);
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef(null);
   const [tags, setTags] = useState([]);
   const [showTagSearch, setShowTagSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -710,7 +713,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       }
     }));
 
-    if (step === 'select') {
+    if (postType === 'tweet') {
+      setMedia(newMedia);
+      setCurrentIndex(0);
+      setStep('share');
+    } else if (step === 'select') {
       setMedia(newMedia);
       setCurrentIndex(0);
       setTimeout(() => setStep('crop'), 0);
@@ -745,6 +752,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const handleButtonClick = () => fileInputRef.current?.click();
 
   const handleBack = () => {
+    if (postType === 'tweet' && step === 'share') {
+      handleClose();
+      return;
+    }
     if (step === 'share') {
       setStep(postType === 'ad' ? 'adDetails' : 'edit');
     } else if (step === 'adDetails') {
@@ -1047,8 +1058,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         const hashtags = caption.match(/#[a-zA-Z0-9_]+/g) || [];
 
         if (postType === 'tweet') {
-          if (!caption.trim()) {
-            throw new Error('Please add text for your tweet.');
+          if (!caption.trim() && processedMedia.length === 0) {
+            throw new Error('Add text or an image to post your tweet.');
           }
           const payload = {
             content: caption.trim(),
@@ -1234,7 +1245,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     }
   };
 
-  const handleEmojiClick = (emoji) => {
+  const handleEmojiClick = (emojiData) => {
+    const emoji = typeof emojiData === 'string' ? emojiData : emojiData?.emoji || '';
+    if (!emoji) return;
     setCaption(prev => prev + emoji);
     setShowEmojiPicker(false);
   };
@@ -1308,6 +1321,27 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       return () => clearTimeout(timer);
     }
   }, [searchQuery, showTagSearch]);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (emojiPickerRef.current?.contains(event.target)) return;
+      setShowEmojiPicker(false);
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setShowEmojiPicker(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showEmojiPicker]);
 
   const handleClose = () => {
     setStep('select');
@@ -1470,7 +1504,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         <X size={32} />
       </button>
 
-      <div className={`bg-white dark:bg-[#262626] md:max-h-[85vh] md:rounded-xl overflow-hidden flex flex-col transition-all duration-300 shadow-2xl ${step === 'select'
+      <div className={`bg-white dark:bg-[#262626] md:max-h-[85vh] md:rounded-xl overflow-hidden flex flex-col transition-all duration-300 shadow-2xl ${postType === 'tweet' && step === 'share'
+        ? 'w-full h-full md:w-[720px] md:h-auto'
+        : step === 'select'
         ? 'w-full h-full md:w-[500px] md:h-[550px]'
         : step === 'crop'
           ? 'w-full h-full md:w-[750px] md:h-[800px]'
@@ -1485,6 +1521,18 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'tweet' ? 'tweet' : postType === 'reel' ? 'reel' : postType === 'ad' ? 'ad' : 'post'}</h2>
               <button onClick={handleClose} className="text-black dark:text-white md:hidden"><X size={24} /></button>
               <div className="w-10 md:block hidden"></div>
+            </>
+          ) : postType === 'tweet' && step === 'share' ? (
+            <>
+              <button onClick={handleClose} className="text-sm font-medium text-gray-700 dark:text-gray-200">Cancel</button>
+              <h2 className="font-semibold text-base text-center dark:text-white flex-1">New tweet</h2>
+              <button
+                onClick={() => handleNextStep('publish')}
+                disabled={isSubmitting || (!caption.trim() && media.length === 0)}
+                className="px-4 py-1.5 rounded-full bg-white text-black dark:bg-white dark:text-black text-sm font-semibold disabled:opacity-40"
+              >
+                Post
+              </button>
             </>
           ) : (
             <>
@@ -2335,6 +2383,105 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
                 <div className="pb-2" />
               </div>
+            </div>
+          </div>
+        ) : postType === 'tweet' ? (
+          <div className="flex-1 bg-[#111111] text-white flex flex-col">
+            <div className="flex-1 overflow-y-auto px-5 py-5">
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center shrink-0">
+                  <div className="w-11 h-11 rounded-full bg-[#222] overflow-hidden flex items-center justify-center">
+                    {userObject?.avatar_url ? (
+                      <img src={userObject.avatar_url} className="w-full h-full object-cover" alt={userObject.username} />
+                    ) : (
+                      <span className="text-sm font-semibold text-white">{(userObject?.username || 'U').slice(0, 1).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="w-px flex-1 bg-white/10 my-3" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 text-sm mb-2">
+                    <span className="font-semibold text-white">{userObject?.username || 'User'}</span>
+                    <span className="text-white/35">›</span>
+                    <span className="text-white/35">Add a topic</span>
+                  </div>
+
+                  <textarea
+                    className="w-full min-h-[140px] resize-none bg-transparent outline-none text-[17px] leading-7 text-white placeholder:text-white/35"
+                    placeholder="What's new?"
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    maxLength={500}
+                  />
+
+                  {currentMedia && (
+                    <div className="relative mt-4 w-full max-w-[320px] overflow-hidden rounded-2xl border border-white/10 bg-black">
+                      <img
+                        src={currentMedia.croppedUrl || currentMedia.url}
+                        alt="Tweet media"
+                        className="w-full h-auto object-cover"
+                      />
+                      <button
+                        onClick={(e) => handleRemoveMedia(currentIndex, e)}
+                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/70 flex items-center justify-center text-white"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex items-center gap-4 text-white/55">
+                    <button onClick={handleButtonClick} className="hover:text-white transition-colors">
+                      <Image size={20} />
+                    </button>
+                    <div ref={emojiPickerRef} className="relative">
+                      {showEmojiPicker && (
+                        <div className="absolute bottom-full left-0 mb-3 z-[80]">
+                          <EmojiPicker
+                            theme="dark"
+                            onEmojiClick={handleEmojiClick}
+                            lazyLoadEmojis
+                            skinTonesDisabled
+                            searchDisabled={false}
+                            previewConfig={{ showPreview: false }}
+                          />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker((prev) => !prev)}
+                        className="hover:text-white transition-colors"
+                        aria-label="Toggle emoji picker"
+                      >
+                        <Smile size={20} />
+                      </button>
+                    </div>
+                    <button type="button" className="opacity-50 cursor-default">
+                      <Copy size={20} />
+                    </button>
+                    <button type="button" className="opacity-50 cursor-default">
+                      <MapPin size={20} />
+                    </button>
+                  </div>
+
+                  <div className="mt-6 flex items-center gap-3 text-white/30">
+                    <div className="w-7 h-7 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[10px]">+</div>
+                    <span className="text-sm">Add to thread</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 px-5 py-4 flex items-center justify-between">
+              <span className="text-sm text-white/45">Reply options</span>
+              <button
+                onClick={() => handleNextStep('publish')}
+                disabled={isSubmitting || (!caption.trim() && media.length === 0)}
+                className="px-5 py-2 rounded-full bg-white text-black text-sm font-semibold disabled:opacity-30"
+              >
+                Post
+              </button>
             </div>
           </div>
         ) : (

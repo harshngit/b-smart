@@ -753,7 +753,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                     }
                     return;
                   }
-                  if (!isTweet) setShowReportModal(true);
+                  setShowReportModal(true);
                 }}
                 className="text-gray-900 dark:text-white hover:opacity-50 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
@@ -797,6 +797,15 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                 contentUrl={reportContentUrl}
               />
             </>
+          )}
+          {isTweet && (
+            <ContentReportModal
+              isOpen={showReportModal}
+              onClose={() => setShowReportModal(false)}
+              contentType={reportContentType}
+              contentId={postId}
+              contentUrl={reportContentUrl}
+            />
           )}
 
           {/* Scrollable: post info + comments */}

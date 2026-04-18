@@ -551,7 +551,7 @@ const MobilePostDetail = () => {
                                 }
                                 return;
                             }
-                            if (!isTweet) setShowReportModal(true);
+                            setShowReportModal(true);
                         }}
                         className="text-gray-900 dark:text-white p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                     >
