@@ -119,15 +119,20 @@ const TweetComponent = ({ tweet }) => {
     if (!id) return;
     setLoadingComments(true);
     try {
-      const { data } = await tweetCommentService.getComments(id);
-      setComments(data);
+      const commentsData = await tweetCommentService.getComments(id);
+      const normalizedComments = Array.isArray(commentsData)
+        ? commentsData
+        : (commentsData?.data || []);
+      setComments(normalizedComments);
       // Pre-load replies for all comments
       const newReplies = {};
       const newExpandedComments = {};
-      for (const comment of data) {
+      for (const comment of normalizedComments) {
         if (comment.reply_count > 0) {
-          const { data: replyData } = await tweetCommentService.getReplies(comment._id || comment.id);
-          newReplies[comment._id || comment.id] = replyData;
+          const repliesData = await tweetCommentService.getReplies(comment._id || comment.id);
+          newReplies[comment._id || comment.id] = Array.isArray(repliesData)
+            ? repliesData
+            : (repliesData?.data || []);
           newExpandedComments[comment._id || comment.id] = false; // Keep replies collapsed initially
         }
       }
@@ -142,8 +147,11 @@ const TweetComponent = ({ tweet }) => {
 
   const loadReplies = useCallback(async (commentId) => {
     try {
-      const { data } = await tweetCommentService.getReplies(commentId);
-      setReplies(prev => ({ ...prev, [commentId]: data }));
+      const repliesData = await tweetCommentService.getReplies(commentId);
+      const normalizedReplies = Array.isArray(repliesData)
+        ? repliesData
+        : (repliesData?.data || []);
+      setReplies(prev => ({ ...prev, [commentId]: normalizedReplies }));
     } catch (error) {
       console.error('Error loading replies:', error);
     }
