@@ -305,17 +305,27 @@ const ModalMediaPanel = ({ post, isAd }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef(null);
+  const toAbsoluteUrl = (value) => {
+    if (!value) return '';
+    const str = String(value);
+    if (str.startsWith('http')) return str;
+    const normalized = str.replace(/^\/+/, '');
+    return `${BASE_URL}/${normalized.startsWith('uploads/') ? normalized : `uploads/${normalized}`}`;
+  };
 
   useEffect(() => { if (videoRef.current) videoRef.current.muted = isMuted; }, [isMuted]);
 
   const currentItem = mediaItems[currentIndex] || {};
-  const isVideo = currentItem.type === 'video' || currentItem.media_type === 'video';
+  const mediaSrc = toAbsoluteUrl(currentItem.fileUrl || currentItem.url || currentItem.fileName);
+  const isVideo = currentItem.type === 'video'
+    || currentItem.media_type === 'video'
+    || /\.(mp4|mov|webm|ogg|mkv|m4v|m3u8)(\?.*)?$/i.test(String(mediaSrc));
 
   const getThumbnailUrl = (item) => {
     if (!item) return null;
-    if (Array.isArray(item.thumbnails) && item.thumbnails[0]?.fileUrl) return item.thumbnails[0].fileUrl;
-    if (Array.isArray(item.thumbnail) && item.thumbnail[0]?.fileUrl) return item.thumbnail[0].fileUrl;
-    if (typeof item.thumbnail === 'string') return item.thumbnail;
+    if (Array.isArray(item.thumbnails) && item.thumbnails[0]?.fileUrl) return toAbsoluteUrl(item.thumbnails[0].fileUrl);
+    if (Array.isArray(item.thumbnail) && item.thumbnail[0]?.fileUrl) return toAbsoluteUrl(item.thumbnail[0].fileUrl);
+    if (typeof item.thumbnail === 'string') return toAbsoluteUrl(item.thumbnail);
     return null;
   };
 
@@ -369,7 +379,7 @@ const ModalMediaPanel = ({ post, isAd }) => {
           )}
           <video
             ref={videoRef}
-            src={currentItem.fileUrl || currentItem.url}
+            src={mediaSrc}
             className="w-full h-full object-contain"
             autoPlay muted={isMuted} playsInline
             data-start={trimStart} data-end={trimEnd}
@@ -407,7 +417,7 @@ const ModalMediaPanel = ({ post, isAd }) => {
       ) : (
         <div className="relative w-full h-full flex items-center justify-center">
           <img
-            src={currentItem.fileUrl || currentItem.url || currentItem.image}
+            src={mediaSrc || currentItem.image}
             alt="Content"
             className="w-full h-full object-contain"
             style={currentItem.image_editing?.filter?.css ? { filter: currentItem.image_editing.filter.css } : {}}

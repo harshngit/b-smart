@@ -240,8 +240,19 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
   const containerRef  = useRef(null);
   const isVisibleRef  = useRef(false);
 
+  const toAbsoluteUrl = (value) => {
+    if (!value) return '';
+    const str = String(value);
+    if (str.startsWith('http')) return str;
+    const normalized = str.replace(/^\/+/, '');
+    return `${BASE_URL}/${normalized.startsWith('uploads/') ? normalized : `uploads/${normalized}`}`;
+  };
+
   const currentItem = mediaItems[currentIndex] || {};
-  const isVideo = currentItem.type === 'video' || currentItem.media_type === 'video';
+  const mediaSrc = toAbsoluteUrl(currentItem.fileUrl || currentItem.url || currentItem.fileName);
+  const isVideo = currentItem.type === 'video'
+    || currentItem.media_type === 'video'
+    || /\.(mp4|mov|webm|ogg|mkv|m4v|m3u8)(\?.*)?$/i.test(String(mediaSrc));
 
   const getThumbnailUrl = (item) => {
     if (!item) return null;
@@ -358,8 +369,8 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
           )}
           <video
             ref={videoRef}
-            key={`${currentItem.fileUrl || currentItem.url}-${currentIndex}`}
-            src={currentItem.fileUrl || currentItem.url}
+            key={`${mediaSrc}-${currentIndex}`}
+            src={mediaSrc}
             className="w-full h-auto max-h-[600px] object-contain"
             style={{ display: videoReady ? 'block' : 'none' }}
             muted={isMuted}
@@ -414,7 +425,7 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
       ) : (
         <div className="relative w-full">
           <img
-            src={currentItem.fileUrl || currentItem.url || currentItem.image}
+            src={mediaSrc || currentItem.image}
             alt="Post"
             className="w-full h-auto max-h-[600px] object-contain"
             style={currentItem.image_editing?.filter?.css ? { filter: currentItem.image_editing.filter.css } : {}}
@@ -708,7 +719,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
             <div className="mt-2 flex items-center gap-3 text-[14px] text-gray-500 dark:text-gray-400">
               {commentsCount > 0 && (
                 <button onClick={() => onCommentClick?.(post)} className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
-                  {fmt(commentsCount)} {commentsCount === 1 ? 'reply' : 'replies'}
+                  {fmt(commentsCount)} {commentsCount === 1 ? 'comment' : 'comments'}
                 </button>
               )}
               {likeCount > 0 && (
