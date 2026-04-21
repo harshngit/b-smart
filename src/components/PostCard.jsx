@@ -24,7 +24,15 @@ const fmt = (n = 0) => {
 const isAdItem = (item) => item?.item_type === 'ad' || (item?.vendor_id && !item?.user_id?.username?.includes);
 const isTweetItem = (item) => item?.item_type === 'tweet';
 const getContentText = (item) => item?.content || item?.caption || '';
-const getCommentsCount = (item) => item?.commentsCount ?? item?.comments_count ?? 0;
+const getCommentsCount = (item) => {
+  const explicit =
+    item?.commentsCount
+    ?? item?.comments_count
+    ?? item?.commentCount
+    ?? item?.comment_count;
+  if (Number.isFinite(Number(explicit))) return Number(explicit);
+  return Array.isArray(item?.comments) ? item.comments.length : 0;
+};
 const getLikeCount = (item) => item?.likesCount ?? item?.likes_count ?? (Array.isArray(item?.likes) ? item.likes.length : 0);
 
 const adAuthHeaders = () => {

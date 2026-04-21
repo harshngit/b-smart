@@ -55,6 +55,16 @@ const formatCount = (count) => {
   return count.toString();
 };
 
+const resolveCommentsCount = (item) => {
+  const explicit =
+    item?.commentsCount
+    ?? item?.comments_count
+    ?? item?.commentCount
+    ?? item?.comment_count;
+  if (Number.isFinite(Number(explicit))) return Number(explicit);
+  return Array.isArray(item?.comments) ? item.comments.length : 0;
+};
+
 const formatTimeAgo = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -138,7 +148,7 @@ const FollowButton = ({ userId, initialFollowing = false }) => {
 const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSave, onMore }) => {
   const reelId = reel?._id || reel?.post_id;
   const likesCount = reel?.likes_count ?? 0;
-  const commentsCount = reel?.comments_count ?? reel?.comments?.length ?? 0;
+  const commentsCount = resolveCommentsCount(reel);
   const isLiked = !!reel?.is_liked_by_me;
   const isSaved = !!reel?.is_saved_by_me;
   const avatarUrl = reel?.user_id?.avatar_url;
@@ -760,7 +770,7 @@ const Reels = () => {
 
   const currentReel = reels[currentIndex];
   const currentReelId = currentReel?._id || currentReel?.post_id;
-  const commentCount = currentReel?.comments_count ?? currentReel?.comments?.length ?? 0;
+  const commentCount = resolveCommentsCount(currentReel);
 
   return (
     <>
