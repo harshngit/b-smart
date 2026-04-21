@@ -1,5 +1,7 @@
 import api from '../lib/api';
 
+// ── Existing follow APIs ───────────────────────────────────────────────────────
+
 export const checkFollowStatus = async (userId) => {
   const response = await api.get(`/follows/check/${userId}`);
   return response.data;
@@ -35,7 +37,7 @@ export const unfollowUser = async (userId) => {
 };
 
 export const removeFollower = async (followerId) => {
-  const response = await api.delete(`/follows/remove/${followerId}`);
+  const response = await api.delete(`/follow/followers/${followerId}/remove`);
   return response.data;
 };
 
@@ -51,6 +53,73 @@ export const getFollowCounts = async (userId) => {
   return response.data;
 };
 
+// ── Account Privacy APIs ───────────────────────────────────────────────────────
+
+/**
+ * Toggle account between public and private.
+ * Private → Public: all pending follow requests are auto-accepted.
+ * Public → Private: future followers must send a request first.
+ */
+export const toggleAccountPrivacy = async () => {
+  const response = await api.patch('/follow/privacy/toggle');
+  return response.data; // { success, isPrivate, message }
+};
+
+/**
+ * Set account privacy explicitly.
+ * @param {boolean} isPrivate - true = private, false = public
+ */
+export const setAccountPrivacy = async (isPrivate) => {
+  const response = await api.patch('/follow/privacy/set', { isPrivate });
+  return response.data; // { success, isPrivate, message }
+};
+
+/**
+ * Get current privacy status.
+ * Returns whether account is private and how many follow requests are pending.
+ */
+export const getPrivacyStatus = async () => {
+  const response = await api.get('/follow/privacy/status');
+  return response.data; // { isPrivate, pendingRequestsCount }
+};
+
+// ── Follow Request APIs ────────────────────────────────────────────────────────
+
+/**
+ * Get all incoming follow requests (for private accounts).
+ */
+export const getFollowRequests = async () => {
+  const response = await api.get('/follow/requests');
+  return response.data; // { count, requests: [...] }
+};
+
+/**
+ * Accept a follow request from a specific user.
+ * @param {string} requesterId - ID of the user who sent the request
+ */
+export const acceptFollowRequest = async (requesterId) => {
+  const response = await api.post(`/follow/requests/${requesterId}/accept`);
+  return response.data; // { success, message }
+};
+
+/**
+ * Decline a follow request from a specific user.
+ * @param {string} requesterId - ID of the user whose request to decline
+ */
+export const declineFollowRequest = async (requesterId) => {
+  const response = await api.post(`/follow/requests/${requesterId}/decline`);
+  return response.data; // { success, message }
+};
+
+/**
+ * Cancel a follow request you previously sent.
+ * @param {string} userId - ID of the user you sent the request to
+ */
+export const cancelFollowRequest = async (userId) => {
+  const response = await api.delete(`/follow/request/${userId}/cancel`);
+  return response.data; // { success, message }
+};
+
 export default {
   checkFollowStatus,
   bulkCheckFollowStatus,
@@ -61,4 +130,13 @@ export default {
   removeFollower,
   getSuggestions,
   getFollowCounts,
+  // Privacy
+  toggleAccountPrivacy,
+  setAccountPrivacy,
+  getPrivacyStatus,
+  // Follow Requests
+  getFollowRequests,
+  acceptFollowRequest,
+  declineFollowRequest,
+  cancelFollowRequest,
 };
