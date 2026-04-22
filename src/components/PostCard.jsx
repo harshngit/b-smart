@@ -79,23 +79,14 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, isDeleting }) => {
 // ─── People Tag Overlay ────────────────────────────────────────────────────────
 const PeopleTagsOverlay = ({ tags, visible }) => {
   const [showTags, setShowTags] = useState(false);
+
   useEffect(() => {
-    if (visible && tags?.length > 0) {
-      const showT = setTimeout(() => setShowTags(true), 0);
-      const hideT = setTimeout(() => setShowTags(false), 2600);
-      return () => { clearTimeout(showT); clearTimeout(hideT); };
-    }
-  }, [visible, tags]);
+    if (!visible) setShowTags(false);
+  }, [visible]);
+
   if (!tags?.length) return null;
   return (
     <>
-      <style>{`
-        @keyframes igTagPop {
-          0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.5); }
-          70%  { transform: translate(-50%,-50%) scale(1.08); }
-          100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-        }
-      `}</style>
       <button
         className="absolute bottom-3 left-3 z-10 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 active:scale-90 transition-all"
         onClick={(e) => { e.stopPropagation(); setShowTags(s => !s); }}
@@ -104,30 +95,57 @@ const PeopleTagsOverlay = ({ tags, visible }) => {
           <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
         </svg>
       </button>
-      {showTags && tags.map((tag, idx) => {
-        const x = Math.min(88, Math.max(12, tag.x));
-        const y = Math.min(88, Math.max(12, tag.y));
-        const inBottom = y > 55;
-        
-        // Tags might be members or vendors
-        const profilePath = tag.role === 'vendor' 
-          ? `/vendor/${tag.user_id || ''}/public` 
-          : `/profile/${tag.user_id || ''}`;
+      {showTags ? (
+        <>
+          <div className="absolute inset-0 z-20 bg-black/35" onClick={(e) => { e.stopPropagation(); setShowTags(false); }} />
+          <div
+            className="absolute left-1/2 top-4 z-30 w-[calc(100%-24px)] max-w-[620px] -translate-x-1/2 overflow-hidden rounded-[22px] border border-white/10 bg-[#1f222b]/95 text-white shadow-2xl backdrop-blur-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative border-b border-white/10 px-5 py-3 text-center">
+              <p className="text-lg font-semibold">Tagged</p>
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-3xl leading-none text-white/90 hover:text-white"
+                onClick={() => setShowTags(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="max-h-[48vh] overflow-y-auto">
+              {tags.map((tag, idx) => {
+                const profilePath = tag.role === 'vendor'
+                  ? `/vendor/${tag.user_id || ''}/public`
+                  : `/profile/${tag.user_id || ''}`;
+                const username = tag.username || 'user';
+                const fullName = tag.full_name || username;
+                const avatar = tag.avatar_url || tag.profile_picture || tag.avatar || '';
 
-        return (
-          <div key={tag._id || idx} className="absolute z-30 pointer-events-auto"
-            style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%,-50%)', animation: `igTagPop 0.28s ${idx * 0.07}s cubic-bezier(0.34,1.56,0.64,1) both` }}>
-            <div className="flex flex-col items-center">
-              {!inBottom && <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-white/90 -mb-[1px]" />}
-              <Link to={profilePath} onClick={e => e.stopPropagation()}
-                className="block bg-white/90 backdrop-blur-sm text-black text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap shadow-xl hover:bg-white">
-                @{tag.username}
-              </Link>
-              {inBottom && <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white/90 -mt-[1px]" />}
+                return (
+                  <Link
+                    key={tag._id || tag.user_id || idx}
+                    to={profilePath}
+                    onClick={() => setShowTags(false)}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-white/5"
+                  >
+                    {avatar ? (
+                      <img src={avatar} alt={username} className="h-11 w-11 rounded-full object-cover" />
+                    ) : (
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-sm font-bold">
+                        {(username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold leading-tight">{username}</p>
+                      <p className="truncate text-sm text-white/70 leading-tight">{fullName}</p>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
-        );
-      })}
+        </>
+      ) : null}
     </>
   );
 };

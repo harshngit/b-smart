@@ -2,6 +2,7 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  Info,
   ImagePlus,
   MessageCircle,
   Search,
@@ -193,6 +194,16 @@ const mobileListPreview = (message, isMine, name) => {
   return 'Start chatting';
 };
 
+const isGroupSystemNotice = (message) => {
+  const text = String(message?.text || '').trim().toLowerCase();
+  if (!text) return false;
+  return (
+    text.includes('created the group')
+    || text.includes('created this group')
+    || /\badded\b/.test(text)
+  );
+};
+
 const hasReplyContent = (replyTo) => Boolean(
   replyTo && (
     replyTo.messageId
@@ -244,6 +255,34 @@ const Avatar = ({ user, className = 'h-10 w-10', src = '', alt = '' }) => {
   return (
     <div className={`${className} flex items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#3B82F6] text-sm font-bold text-white shadow-sm`}>
       {getInitial(user)}
+    </div>
+  );
+};
+
+const MergedGroupAvatar = ({ conversation, currentUserId, className = 'h-10 w-10' }) => {
+  const members = (conversation?.participants || [])
+    .filter((item) => String(getUserId(item)) !== String(currentUserId))
+    .slice(0, 2);
+
+  if (members.length <= 1) {
+    return (
+      <Avatar
+        user={members[0] || { full_name: conversation?.groupName || 'Group' }}
+        src={getUserAvatar(members[0]) || conversation?.groupAvatar}
+        alt={conversation?.groupName || 'Group'}
+        className={className}
+      />
+    );
+  }
+
+  return (
+    <div className={`${className} relative`}>
+      <div className="absolute left-0 top-0 h-[72%] w-[72%] overflow-hidden rounded-full ring-2 ring-black md:ring-white dark:md:ring-[#0a0a0a]">
+        <Avatar user={members[0]} src={getUserAvatar(members[0])} className="h-full w-full" />
+      </div>
+      <div className="absolute bottom-0 right-0 h-[72%] w-[72%] overflow-hidden rounded-full ring-2 ring-black md:ring-white dark:md:ring-[#0a0a0a]">
+        <Avatar user={members[1]} src={getUserAvatar(members[1])} className="h-full w-full" />
+      </div>
     </div>
   );
 };
@@ -465,17 +504,25 @@ const GroupManageModal = ({
   onSave,
   onAddMember,
   onRemoveMember,
+  onLeaveChat,
+  onDeleteChat,
   loading = false,
 }) => {
   const [groupName, setGroupName] = useState('');
   const [groupAvatar, setGroupAvatar] = useState('');
   const [search, setSearch] = useState('');
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setGroupName(conversation?.groupName || '');
     setGroupAvatar(conversation?.groupAvatar || '');
     setSearch('');
+    setShowRenameModal(false);
+    setRenameDraft(conversation?.groupName || '');
+    setShowDeleteConfirm(false);
   }, [conversation, isOpen]);
 
   const participantIds = useMemo(
@@ -499,7 +546,7 @@ const GroupManageModal = ({
   return (
     <div className="fixed inset-0 z-[135] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white text-gray-900 shadow-2xl dark:bg-[#111111] dark:text-white"
+        className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white text-gray-900 shadow-2xl dark:bg-[#111111] dark:text-white"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-white/10">
@@ -514,31 +561,21 @@ const GroupManageModal = ({
 
         <div className="grid gap-5 overflow-y-auto p-5 md:grid-cols-[1.1fr,0.9fr]">
           <div className="space-y-4">
-            <div className="space-y-3">
-              <input
-                value={groupName}
-                onChange={(event) => setGroupName(event.target.value)}
-                disabled={!isAdmin || loading}
-                placeholder="Group name"
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none transition disabled:opacity-60 dark:border-white/10 dark:bg-[#181818]"
-              />
-              <input
-                value={groupAvatar}
-                onChange={(event) => setGroupAvatar(event.target.value)}
-                disabled={!isAdmin || loading}
-                placeholder="Group avatar URL"
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none transition disabled:opacity-60 dark:border-white/10 dark:bg-[#181818]"
-              />
-              {isAdmin ? (
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-[#181818]">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-base font-medium">Change group name</p>
                 <button
                   type="button"
-                  disabled={loading || !groupName.trim()}
-                  onClick={() => onSave({ groupName: groupName.trim(), groupAvatar: groupAvatar.trim() })}
-                  className="rounded-full bg-[#7C3AED] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6d28d9] disabled:opacity-50"
+                  disabled={!isAdmin || loading}
+                  onClick={() => {
+                    setRenameDraft(groupName || conversation?.groupName || '');
+                    setShowRenameModal(true);
+                  }}
+                  className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-bold text-gray-900 transition hover:bg-gray-300 disabled:opacity-50 dark:bg-[#2b2f39] dark:text-white dark:hover:bg-[#353a45]"
                 >
-                  Save changes
+                  Change
                 </button>
-              ) : null}
+              </div>
             </div>
 
             <div>
@@ -560,7 +597,13 @@ const GroupManageModal = ({
                         <button
                           type="button"
                           disabled={loading || String(userId) === groupAdminId && !isAdmin}
-                          onClick={() => onRemoveMember(String(userId))}
+                          onClick={() => {
+                            if (String(userId) === String(currentUserId)) {
+                              onLeaveChat?.();
+                            } else {
+                              onRemoveMember(String(userId));
+                            }
+                          }}
                           className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
                         >
                           {String(userId) === String(currentUserId) ? 'Leave' : 'Remove'}
@@ -614,6 +657,115 @@ const GroupManageModal = ({
             </div>
           </div>
         </div>
+
+        <div className="border-t border-gray-100 px-5 py-5 dark:border-white/10">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onLeaveChat}
+            className="text-left text-[16px] font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-50"
+          >
+            Leave Chat
+          </button>
+          <p className="mt-3 max-w-3xl text-[14px] leading-8 text-gray-500 dark:text-gray-400">
+            You won't be able to send or receive messages unless someone adds you back to the chat. No one will be notified that you left the chat.
+          </p>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => setShowDeleteConfirm(true)}
+            className="mt-6 text-left text-[16px] font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-50"
+          >
+            Delete Chat
+          </button>
+        </div>
+
+        {showRenameModal ? (
+          <div className="absolute inset-0 z-[10] flex items-center justify-center bg-black/70 px-4" onClick={() => setShowRenameModal(false)}>
+            <div
+              className="w-full max-w-[620px] overflow-hidden rounded-[24px] border border-white/10 bg-[#1f222b] text-white shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="relative border-b border-white/10 px-5 py-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowRenameModal(false)}
+                  className="absolute left-5 top-1/2 -translate-y-1/2 text-white/90 hover:text-white"
+                  aria-label="Close"
+                >
+                  <X size={30} strokeWidth={2} />
+                </button>
+                <p className="text-[30px] font-semibold">Change group name</p>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="mb-4 text-xl text-white/90">
+                  Changing the name of a group chat changes it for everyone.
+                </p>
+                <div className="rounded-xl border border-white/20 bg-transparent px-3 py-2.5">
+                  <p className="text-xs text-white/60">Group name</p>
+                  <input
+                    value={renameDraft}
+                    onChange={(event) => setRenameDraft(event.target.value)}
+                    disabled={!isAdmin || loading}
+                    className="mt-1 w-full bg-transparent text-3xl font-medium outline-none disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 px-5 py-4">
+                <button
+                  type="button"
+                  disabled={!isAdmin || loading || !renameDraft.trim()}
+                  onClick={() => {
+                    const nextGroupName = renameDraft.trim();
+                    setGroupName(nextGroupName);
+                    onSave({ groupName: nextGroupName, groupAvatar: groupAvatar.trim() });
+                    setShowRenameModal(false);
+                  }}
+                  className="w-full rounded-2xl bg-[#2429a8] px-5 py-3.5 text-2xl font-bold text-white transition hover:bg-[#2b31bf] disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {showDeleteConfirm ? (
+          <div className="absolute inset-0 z-[11] flex items-center justify-center bg-black/70 px-4" onClick={() => setShowDeleteConfirm(false)}>
+            <div
+              className="w-full max-w-[620px] overflow-hidden rounded-[24px] border border-white/10 bg-[#1f222b] text-white shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="border-b border-white/10 px-6 py-5 text-center">
+                <p className="text-4xl font-semibold leading-tight">Delete chat from inbox?</p>
+                <p className="mx-auto mt-3 max-w-[560px] text-[17px] leading-7 text-white/60">
+                  This will remove the chat from your inbox and erase the chat history. To stop receiving new messages from this chat, first leave the chat then delete it.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  onDeleteChat?.();
+                }}
+                className="w-full border-b border-white/10 px-6 py-4 text-2xl font-semibold text-red-400 transition hover:bg-white/5 disabled:opacity-50"
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setShowDeleteConfirm(false)}
+                className="w-full px-6 py-4 text-2xl font-medium text-white/85 transition hover:bg-white/5 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -716,6 +868,22 @@ export default function ChatPage() {
     });
     return result;
   }, [messages]);
+
+  const showGroupProfileIntro = useMemo(() => {
+    if (!activeConversation?.isGroup) return false;
+    return !messages.some((message) => {
+      if (message?.isDeleted) return false;
+      if (message?.mediaUrl || message?.mediaType === 'audio') return true;
+      const text = String(message?.text || '').trim().toLowerCase();
+      if (!text) return false;
+      const isSystemMessage = (
+        text.includes('created the group')
+        || text.includes('created this group')
+        || /\badded\b/.test(text)
+      );
+      return !isSystemMessage;
+    });
+  }, [activeConversation?.isGroup, messages]);
 
   const setConversationAsActive = useCallback(async (conversation, options = {}) => {
     if (!conversation?._id || !currentUserId) return;
@@ -1249,8 +1417,33 @@ export default function ChatPage() {
     setGroupActionLoading(true);
     try {
       const updatedConversation = await chatService.addGroupMember(activeConversation._id, userId);
-      await fetchConversations();
       dispatch(setActiveConversation(updatedConversation));
+
+      const addedUser =
+        (updatedConversation?.participants || []).find((item) => String(getUserId(item)) === String(userId))
+        || groupMembers.find((item) => String(getUserId(item)) === String(userId))
+        || null;
+
+      const addedUserLabel = addedUser?.username || getUserName(addedUser);
+      const adderLabel = userObject?.username || getUserName(userObject);
+
+      if (addedUserLabel && adderLabel) {
+        const created = await chatService.sendMessage(activeConversation._id, {
+          text: `${adderLabel} added ${addedUserLabel}`,
+          mediaUrl: '',
+          mediaType: 'none',
+          replyTo: null,
+        });
+
+        if (created?._id) {
+          dispatch(appendMessage(created));
+          refreshConversationOrdering(activeConversation._id, created, created.createdAt);
+          syncConversationPreview(updatedConversation, created);
+          dispatch(markConversationRead(activeConversation._id));
+        }
+      }
+
+      await fetchConversations();
     } catch (error) {
       console.error('Failed to add group member:', error);
     } finally {
@@ -1283,13 +1476,33 @@ export default function ChatPage() {
     if (!activeConversation?._id || groupActionLoading) return;
     setGroupActionLoading(true);
     try {
-      await chatService.removeGroupMember(activeConversation._id, currentUserId);
+      await chatService.leaveGroupConversation(activeConversation._id);
       await fetchConversations();
       dispatch(setActiveConversation(null));
       dispatch(setMessages([]));
+      setShowManageGroupModal(false);
       navigate('/messages');
     } catch (error) {
       console.error('Failed to leave group:', error);
+    } finally {
+      setGroupActionLoading(false);
+    }
+  };
+
+  const handleDeleteGroupChat = async () => {
+    if (!activeConversation?._id || groupActionLoading) return;
+    setGroupActionLoading(true);
+    try {
+      await chatService.deleteGroupConversationForUser(activeConversation._id);
+      await fetchConversations();
+      dispatch(setActiveConversation(null));
+      dispatch(setMessages([]));
+      setShowManageGroupModal(false);
+      navigate('/messages');
+    } catch (error) {
+      console.error('Failed to delete group chat:', error);
+      const serverMessage = error?.response?.data?.message;
+      if (serverMessage) window.alert(serverMessage);
     } finally {
       setGroupActionLoading(false);
     }
@@ -1539,12 +1752,20 @@ export default function ChatPage() {
                   {/* Avatar with gradient ring */}
                   <div className={`rounded-full p-[2px] ${unread > 0 ? 'bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]' : 'bg-[#333]'}`}>
                     <div className="relative rounded-full bg-black p-[2px]">
-                      <Avatar
-                        user={conversation?.isGroup ? { full_name: title } : user}
-                        src={avatar}
-                        alt={title}
-                        className="h-[56px] w-[56px]"
-                      />
+                      {conversation?.isGroup ? (
+                        <MergedGroupAvatar
+                          conversation={conversation}
+                          currentUserId={currentUserId}
+                          className="h-[56px] w-[56px]"
+                        />
+                      ) : (
+                        <Avatar
+                          user={user}
+                          src={avatar}
+                          alt={title}
+                          className="h-[56px] w-[56px]"
+                        />
+                      )}
                       {!conversation?.isGroup && onlineUserIds.includes(String(getUserId(user))) ? (
                         <span className="absolute bottom-[2px] right-[2px] h-3.5 w-3.5 rounded-full border-2 border-black bg-[#38d430]" />
                       ) : null}
@@ -1574,12 +1795,20 @@ export default function ChatPage() {
                 >
                   <div className="rounded-full bg-gradient-to-br from-[#7C3AED] to-[#3B82F6] p-[2px]">
                     <div className="rounded-full bg-white dark:bg-black p-[2px]">
-                      <Avatar
-                        user={conversation?.isGroup ? { full_name: title } : user}
-                        src={avatar}
-                        alt={title}
-                        className="h-14 w-14"
-                      />
+                      {conversation?.isGroup ? (
+                        <MergedGroupAvatar
+                          conversation={conversation}
+                          currentUserId={currentUserId}
+                          className="h-14 w-14"
+                        />
+                      ) : (
+                        <Avatar
+                          user={user}
+                          src={avatar}
+                          alt={title}
+                          className="h-14 w-14"
+                        />
+                      )}
                     </div>
                   </div>
                   <span className="max-w-[64px] truncate text-[11px] font-medium text-gray-600 dark:text-gray-300">
@@ -1708,12 +1937,20 @@ export default function ChatPage() {
                   >
                     {/* Avatar */}
                     <div className="relative shrink-0">
-                      <Avatar
-                        user={conversation?.isGroup ? { full_name: title } : user}
-                        src={avatar}
-                        alt={title}
-                        className="h-[54px] w-[54px] md:h-12 md:w-12"
-                      />
+                      {conversation?.isGroup ? (
+                        <MergedGroupAvatar
+                          conversation={conversation}
+                          currentUserId={currentUserId}
+                          className="h-[54px] w-[54px] md:h-12 md:w-12"
+                        />
+                      ) : (
+                        <Avatar
+                          user={user}
+                          src={avatar}
+                          alt={title}
+                          className="h-[54px] w-[54px] md:h-12 md:w-12"
+                        />
+                      )}
                       {!conversation?.isGroup && onlineUserIds.includes(String(getUserId(user))) ? (
                         <span className="absolute bottom-1 right-1 h-3.5 w-3.5 rounded-full border-2 border-black bg-[#38d430] md:border-white dark:md:border-[#0a0a0a]" />
                       ) : null}
@@ -1828,41 +2065,37 @@ export default function ChatPage() {
                   <ChevronLeft size={24} />
                 </button>
                 {activeConversation?.isGroup ? (
-                  <div className="flex-shrink-0">
-                    <Avatar
-                      user={{ full_name: activeConversationTitle }}
-                      src={getConversationAvatar(activeConversation, currentUserId)}
-                      alt={activeConversationTitle}
-                      className="h-9 w-9"
-                    />
-                  </div>
+                  <>
+                    <div className="flex-shrink-0">
+                      <MergedGroupAvatar
+                        conversation={activeConversation}
+                        currentUserId={currentUserId}
+                        className="h-9 w-9"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold tracking-tight">{activeConversationTitle}</p>
+                      <p className="truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                        {getGroupMemberLabel(activeConversation, currentUserId, 4)}
+                      </p>
+                    </div>
+                  </>
                 ) : (
-                  <Link to={`/profile/${otherUserId}`} className="flex-shrink-0">
-                    <Avatar user={otherUser} className="h-9 w-9" />
+                  <Link
+                    to={`/profile/${otherUserId}`}
+                    className="flex min-w-0 flex-1 items-center gap-3 transition hover:opacity-90"
+                  >
+                    <Avatar user={otherUser} className="h-9 w-9 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold tracking-tight">{activeConversationTitle}</p>
+                      <p className="truncate text-[11px] font-medium uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                        {activeConversationSubtitle}
+                      </p>
+                    </div>
                   </Link>
                 )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold tracking-tight">{activeConversationTitle}</p>
-                  <p className={`truncate text-[11px] font-medium text-gray-500 dark:text-gray-400 ${
-                    activeConversation?.isGroup ? '' : 'uppercase tracking-widest'
-                  }`}>
-                    {activeConversation?.isGroup
-                      ? getGroupMemberLabel(activeConversation, currentUserId, 4)
-                      : activeConversationSubtitle}
-                  </p>
-                </div>
                 {activeConversation?.isGroup ? (
                   <div className="flex items-center gap-2">
-                    {activeConversationIsGroupAdmin ? (
-                      <button
-                        type="button"
-                        onClick={() => { loadFollowingForGroup(); setShowManageGroupModal(true); }}
-                        disabled={groupActionLoading}
-                        className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
-                      >
-                        Manage
-                      </button>
-                    ) : null}
                     <button
                       type="button"
                       onClick={handleLeaveGroup}
@@ -1873,6 +2106,16 @@ export default function ChatPage() {
                         <UserMinus size={13} />
                         Leave
                       </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { loadFollowingForGroup(); setShowManageGroupModal(true); }}
+                      disabled={groupActionLoading}
+                      className="rounded-full border border-gray-200 p-2 text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
+                      aria-label="Group details"
+                      title="Group details"
+                    >
+                      <Info size={16} />
                     </button>
                   </div>
                 ) : null}
@@ -1936,8 +2179,28 @@ export default function ChatPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex min-h-full flex-col justify-end">
-                    {groupedMessages.map((item, index) => {
+                  <div className="flex min-h-full flex-col">
+                    {showGroupProfileIntro ? (
+                      <div className="flex flex-1 items-start justify-center px-6 py-10">
+                        <div className="flex w-full max-w-md flex-col items-center text-center">
+                          <MergedGroupAvatar
+                            conversation={activeConversation}
+                            currentUserId={currentUserId}
+                            className="h-24 w-24 md:h-28 md:w-28"
+                          />
+                          <h2 className="mt-6 w-full text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">
+                            {activeConversationTitle}
+                          </h2>
+                          <p className="mt-2 w-full text-sm text-gray-500 dark:text-gray-400">
+                            {activeConversationIsGroupAdmin
+                              ? 'You created this group'
+                              : getGroupMemberLabel(activeConversation, currentUserId, 3)}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className="mt-auto">
+                      {groupedMessages.map((item, index) => {
                       if (item.type === 'separator') {
                         return (
                           <div key={item.id} className="my-6 flex justify-center">
@@ -1950,6 +2213,31 @@ export default function ChatPage() {
 
                       const message = item.message;
                       const mine = String(message?.sender?._id || message?.sender) === String(currentUserId);
+                      const senderUser = getMessageSender(activeConversation, message, currentUserId);
+                      const senderName = senderUser?.username || getUserName(senderUser);
+                      const isSystemNotice = activeConversation?.isGroup && isGroupSystemNotice(message);
+                      if (isSystemNotice) {
+                        const rawText = String(message?.text || '').trim();
+                        const lowerText = rawText.toLowerCase();
+                        let displayText = rawText;
+
+                        if (
+                          senderName
+                          && (lowerText.includes('created the group') || lowerText.includes('created this group'))
+                        ) {
+                          const createdStart = lowerText.indexOf('created');
+                          const suffix = createdStart >= 0 ? rawText.slice(createdStart) : 'created the group chat.';
+                          displayText = `${senderName} ${suffix}`.replace(/\s+/g, ' ').trim();
+                        }
+
+                        return (
+                          <div key={message._id || `sys-${index}`} className="my-3 flex justify-center">
+                            <span className="px-2 text-sm text-gray-400 dark:text-gray-500">
+                              {displayText}
+                            </span>
+                          </div>
+                        );
+                      }
                       const previous = groupedMessages[index - 1]?.message;
                       const next = groupedMessages[index + 1]?.message;
                       const samePrev = previous && String(previous?.sender?._id || previous?.sender) === String(message?.sender?._id || message?.sender);
@@ -1957,70 +2245,70 @@ export default function ChatPage() {
                       const showAvatar = !mine && !sameNext;
                       const showSeen = mine && message._id === latestSeenOwnMessageId;
                       const reactionBadge = getReactionBadge(message, currentUserId);
-                      const senderUser = getMessageSender(activeConversation, message, currentUserId);
                       const senderUserId = getUserId(senderUser);
 
-                      return (
-                        <div
-                          key={message._id || `${message.createdAt}-${index}`}
-                          className={`mb-1 flex group/msg 
+                        return (
+                          <div
+                            key={message._id || `${message.createdAt}-${index}`}
+                            className={`mb-1 flex group/msg 
                             ${mine ? 'justify-end' : 'justify-start'} 
                             ${samePrev ? 'mt-1' : 'mt-4'}
                             outline-none select-none [-webkit-tap-highlight-color:transparent]`}
-                          onContextMenu={(event) => openContext(event, message)}
-                          onTouchStart={() => startLongPress(message)}
-                          onTouchEnd={clearLongPress}
-                          onTouchMove={clearLongPress}
-                          onMouseEnter={() => setHoveredMessageId(message._id)}
-                          onMouseLeave={() => setHoveredMessageId(null)}
-                        >
-                          <div className={`relative flex max-w-[85%] sm:max-w-[75%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
-                            <div className={`flex max-w-full items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-                              {!mine ? (showAvatar ? (
-                                <Link to={`/profile/${senderUserId || otherUserId}`} className="flex-shrink-0">
-                                  <Avatar user={senderUser || otherUser} className="h-7 w-7 shadow-sm hover:opacity-80 transition-opacity" />
-                                </Link>
-                              ) : <div className="w-7" />) : null}
+                            onContextMenu={(event) => openContext(event, message)}
+                            onTouchStart={() => startLongPress(message)}
+                            onTouchEnd={clearLongPress}
+                            onTouchMove={clearLongPress}
+                            onMouseEnter={() => setHoveredMessageId(message._id)}
+                            onMouseLeave={() => setHoveredMessageId(null)}
+                          >
+                            <div className={`relative flex max-w-[85%] sm:max-w-[75%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                              <div className={`flex max-w-full items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
+                                {!mine ? (showAvatar ? (
+                                  <Link to={`/profile/${senderUserId || otherUserId}`} className="flex-shrink-0">
+                                    <Avatar user={senderUser || otherUser} className="h-7 w-7 shadow-sm hover:opacity-80 transition-opacity" />
+                                  </Link>
+                                ) : <div className="w-7" />) : null}
 
-                              <div className="relative">
-                                {reactionPickerFor === message._id && (
-                                  <ReactionPicker mine={mine} onSelect={(emoji) => handleSelectReaction(message, emoji)} />
-                                )}
-                                {renderBubble(message, mine)}
-                                {reactionBadge ? (
-                                  <div
-                                    className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'} 
+                                <div className="relative">
+                                  {reactionPickerFor === message._id && (
+                                    <ReactionPicker mine={mine} onSelect={(emoji) => handleSelectReaction(message, emoji)} />
+                                  )}
+                                  {renderBubble(message, mine)}
+                                  {reactionBadge ? (
+                                    <div
+                                      className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'} 
                                       text-[13px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 
                                       rounded-full px-2 py-0.5 leading-none cursor-pointer shadow-sm
                                       hover:scale-110 transition-transform z-10`}
-                                    onClick={() => handleRemoveOwnReaction(message)}
-                                    title={reactionBadge.removable ? 'Remove your reaction' : undefined}
-                                  >
-                                    {reactionBadge.label}
-                                  </div>
-                                ) : null}
-                              </div>
+                                      onClick={() => handleRemoveOwnReaction(message)}
+                                      title={reactionBadge.removable ? 'Remove your reaction' : undefined}
+                                    >
+                                      {reactionBadge.label}
+                                    </div>
+                                  ) : null}
+                                </div>
 
-                              {!message.isDeleted && (
-                                <MessageActions
-                                  message={message}
-                                  mine={mine}
-                                  onReply={() => handleReply(message)}
-                                  onReact={() => handleReact(message)}
-                                  onMore={(e) => handleMoreMenu(e, message)}
-                                />
+                                {!message.isDeleted && (
+                                  <MessageActions
+                                    message={message}
+                                    mine={mine}
+                                    onReply={() => handleReply(message)}
+                                    onReact={() => handleReact(message)}
+                                    onMore={(e) => handleMoreMenu(e, message)}
+                                  />
+                                )}
+                              </div>
+                              {showSeen && (
+                                <span className="mt-1.5 px-2 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                                  {formatSeenAgo(message.seenAt)}
+                                </span>
                               )}
                             </div>
-                            {showSeen && (
-                              <span className="mt-1.5 px-2 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                                {formatSeenAgo(message.seenAt)}
-                              </span>
-                            )}
                           </div>
-                        </div>
-                      );
-                    })}
-                    {activeTyping.length > 0 && <TypingIndicator />}
+                        );
+                      })}
+                      {activeTyping.length > 0 && <TypingIndicator />}
+                    </div>
                   </div>
                 )}
               </div>
@@ -2167,6 +2455,8 @@ export default function ChatPage() {
         onSave={handleSaveGroup}
         onAddMember={handleAddGroupMember}
         onRemoveMember={handleRemoveGroupMember}
+        onLeaveChat={handleLeaveGroup}
+        onDeleteChat={handleDeleteGroupChat}
         loading={groupActionLoading || loadingGroupMembers}
       />
     </div>

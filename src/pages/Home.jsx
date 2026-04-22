@@ -409,7 +409,7 @@ const Home = () => {
     setLoading(true);
     const [fetchedPosts, fetchedUsers, fetchedReels] = await Promise.all([
       fetchPosts(),
-      activeTab === 'tweets' ? Promise.resolve([]) : fetchSuggestedUsers(),
+      fetchSuggestedUsers(),
       activeTab === 'tweets' ? Promise.resolve([]) : fetchSuggestedReels(),
     ]);
     setPosts(fetchedPosts);

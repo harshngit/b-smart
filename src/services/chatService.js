@@ -40,6 +40,16 @@ export const removeGroupMember = async (conversationId, userId) => {
   return response.data;
 };
 
+export const leaveGroupConversation = async (conversationId) => {
+  const response = await api.post(`/chat/groups/${conversationId}/leave`);
+  return response.data;
+};
+
+export const deleteGroupConversationForUser = async (conversationId) => {
+  const response = await api.delete(`/chat/groups/${conversationId}/delete`);
+  return response.data;
+};
+
 export const acceptMessageRequest = async (conversationId) => {
   const response = await api.put(`/chat/conversations/${conversationId}/accept`);
   return response.data;
