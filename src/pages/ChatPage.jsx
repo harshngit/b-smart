@@ -1777,6 +1777,14 @@ export default function ChatPage() {
       event.stopPropagation();
       const openSharedContent = async () => {
         const id = String(sharedContentId || '').trim();
+        const isMobileViewport = typeof window !== 'undefined' && window.innerWidth < 768;
+
+        // Match profile behavior on mobile: open dedicated mobile post/tweet screen.
+        if (id && isMobileViewport && (sharedContentType === 'post' || sharedContentType === 'tweet')) {
+          const suffix = sharedContentType === 'tweet' ? '?type=tweet' : '';
+          navigate(`/post/${encodeURIComponent(id)}${suffix}`);
+          return;
+        }
 
         if (id && ['post', 'reel', 'ad', 'tweet'].includes(sharedContentType)) {
           try {
