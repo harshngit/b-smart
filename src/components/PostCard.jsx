@@ -705,8 +705,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   };
 
   const offer = isAd ? (post.product_offer?.[0] || null) : null;
-  const shareContentType = isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post');
-  const canShareInChat = Boolean(postId && !isTweet && ['post', 'reel', 'ad'].includes(shareContentType));
+  const shareContentType = isTweet ? 'tweet' : isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post');
+  const canShareInChat = Boolean(postId && ['post', 'reel', 'ad', 'tweet'].includes(shareContentType));
   const reportContentType = isAd ? 'ad' : isTweet ? 'tweet' : (post.type === 'reel' ? 'reel' : 'post');
   const reportContentUrl = isAd
     ? `${window.location.origin}/ads`
@@ -720,7 +720,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
 
   if (isTweet) {
     return (
-      <div className="max-w-[640px] mx-auto bg-white dark:bg-black border-b border-gray-200 dark:border-white/10 px-4 py-3">
+      <div className="max-w-[640px] mx-auto bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-2xl px-4 py-3 mb-3">
         <div className="flex gap-3">
           <div className="flex flex-col items-center shrink-0">
             <Link to={profilePath} className="w-10 h-10 rounded-full overflow-hidden block bg-gray-100 dark:bg-gray-800">
@@ -792,7 +792,11 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                 <MessageCircle size={20} />
               </button>
               
-              <button className="active:scale-90 transition-transform opacity-85 hover:opacity-100" aria-label="Share">
+              <button
+                onClick={() => { if (canShareInChat) setShowShareModal(true); }}
+                className="active:scale-90 transition-transform opacity-85 hover:opacity-100"
+                aria-label="Share"
+              >
                 <Send size={20} />
               </button>
             </div>
@@ -817,6 +821,12 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
           contentType={reportContentType}
           contentId={postId}
           contentUrl={reportContentUrl}
+        />
+        <ShareContentModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          contentType={shareContentType}
+          contentId={postId}
         />
       </div>
     );

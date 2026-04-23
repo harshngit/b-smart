@@ -9,6 +9,7 @@ import TweetDetailModal from '../components/TweetDetailModal';
 import api from '../lib/api';
 import {
   checkFollowStatus,
+  bulkCheckFollowStatus,
   followUser,
   unfollowUser,
   cancelFollowRequest,
@@ -44,6 +45,46 @@ const normalizeAssetUrl = (value) => {
   const normalized = String(value).replace(/^\/+/, '');
   if (normalized.startsWith('uploads/')) return `${BASE_URL}/${normalized}`;
   return `${BASE_URL}/uploads/${normalized}`;
+};
+
+const getAuthorFromItem = (item) => item?.user_id || item?.user || null;
+const getAuthorId = (author) => author?._id || author?.id || author?.userId || null;
+
+const filterPrivateItemsForViewer = async (items, viewerId) => {
+  const safeItems = normalizeApiArray(items);
+  if (!viewerId || safeItems.length === 0) return safeItems;
+
+  const privateAuthorIds = Array.from(new Set(
+    safeItems
+      .map((item) => getAuthorFromItem(item))
+      .filter((author) => Boolean(author?.isPrivate))
+      .map((author) => String(getAuthorId(author) || ''))
+      .filter((authorId) => authorId && authorId !== String(viewerId))
+  ));
+
+  if (privateAuthorIds.length === 0) return safeItems;
+
+  let followingSet = new Set();
+  try {
+    const statuses = await bulkCheckFollowStatus(privateAuthorIds);
+    followingSet = new Set(
+      normalizeApiArray(statuses)
+        .filter((status) => Boolean(status?.isFollowing))
+        .map((status) => String(status?.userId || ''))
+    );
+  } catch {
+    followingSet = new Set();
+  }
+
+  return safeItems.filter((item) => {
+    const author = getAuthorFromItem(item);
+    const authorId = String(getAuthorId(author) || '');
+    if (!author?.isPrivate) return true;
+    if (!authorId) return false;
+    if (authorId === String(viewerId)) return true;
+    if (item?.is_author_followed_by_me || item?.can_view_by_me) return true;
+    return followingSet.has(authorId);
+  });
 };
 
 const DesktopFollowButton = ({ targetUserId }) => {
@@ -467,12 +508,17 @@ const Home = () => {
       fetchSuggestedUsers(),
       activeTab === 'tweets' ? Promise.resolve([]) : fetchSuggestedReels(),
     ]);
-    setPosts(fetchedPosts);
+    const viewerId = userObject?._id || userObject?.id;
+    const [visiblePosts, visibleReels] = await Promise.all([
+      filterPrivateItemsForViewer(fetchedPosts, viewerId),
+      filterPrivateItemsForViewer(fetchedReels, viewerId),
+    ]);
+    setPosts(visiblePosts);
     setSuggestedUsers(fetchedUsers);
-    setSuggestedReels(fetchedReels);
-    setFeed(activeTab === 'tweets' ? fetchedPosts : buildFeed(fetchedPosts, [], fetchedUsers, fetchedReels));
+    setSuggestedReels(visibleReels);
+    setFeed(activeTab === 'tweets' ? visiblePosts : buildFeed(visiblePosts, [], fetchedUsers, visibleReels));
     setLoading(false);
-  }, [activeTab, fetchPosts, fetchSuggestedUsers, fetchSuggestedReels]);
+  }, [activeTab, fetchPosts, fetchSuggestedUsers, fetchSuggestedReels, userObject]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
   useEffect(() => {
