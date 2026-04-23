@@ -7,6 +7,13 @@ import PostCard from '../components/PostCard';
 import PostDetailModal from '../components/PostDetailModal';
 import TweetDetailModal from '../components/TweetDetailModal';
 import api from '../lib/api';
+import {
+  checkFollowStatus,
+  followUser,
+  unfollowUser,
+  cancelFollowRequest,
+  FOLLOW_STATUS_CHANGED_EVENT,
+} from '../services/followService';
 
 const BASE_URL = 'https://api.bebsmart.in';
 
@@ -41,18 +48,68 @@ const normalizeAssetUrl = (value) => {
 
 const DesktopFollowButton = ({ targetUserId }) => {
   const { userObject } = useSelector(s => s.auth);
-  const [following, setFollowing] = useState(false);
+  const [followState, setFollowState] = useState('not_following');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadStatus = async () => {
+      const currentUserId = userObject?._id || userObject?.id;
+      if (!currentUserId || !targetUserId || String(currentUserId) === String(targetUserId)) {
+        if (isMounted) setFollowState('not_following');
+        return;
+      }
+      try {
+        const status = await checkFollowStatus(targetUserId);
+        if (!isMounted) return;
+        if (status?.isFollowing || status?.status === 'following') {
+          setFollowState('following');
+        } else if (status?.isPending || status?.requestPending || status?.requested || status?.status === 'pending') {
+          setFollowState('requested');
+        } else {
+          setFollowState('not_following');
+        }
+      } catch {
+        if (isMounted) setFollowState('not_following');
+      }
+    };
+    loadStatus();
+    return () => { isMounted = false; };
+  }, [targetUserId, userObject]);
+
+  useEffect(() => {
+    const onFollowStatusChanged = (event) => {
+      const detail = event?.detail || {};
+      if (String(detail.userId || '') !== String(targetUserId || '')) return;
+      if (detail.state === 'following' || detail.state === 'requested' || detail.state === 'not_following') {
+        setFollowState(detail.state);
+      }
+    };
+    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, onFollowStatusChanged);
+    return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, onFollowStatusChanged);
+  }, [targetUserId]);
 
   const handleClick = async () => {
     if (!userObject || !targetUserId || loading) return;
-    const wasFollowing = following;
-    setFollowing(!wasFollowing);
+    const prev = followState;
     setLoading(true);
     try {
-      await api.post(wasFollowing ? '/unfollow' : '/follow', { followedUserId: targetUserId });
+      if (followState === 'following') {
+        await unfollowUser(targetUserId);
+        setFollowState('not_following');
+      } else if (followState === 'requested') {
+        await cancelFollowRequest(targetUserId);
+        setFollowState('not_following');
+      } else {
+        const result = await followUser(targetUserId);
+        if (result?.status === 'pending' || result?.pending || result?.requested || result?.requestPending || result?.isPending) {
+          setFollowState('requested');
+        } else {
+          setFollowState('following');
+        }
+      }
     } catch {
-      setFollowing(wasFollowing);
+      setFollowState(prev);
     } finally {
       setLoading(false);
     }
@@ -65,7 +122,7 @@ const DesktopFollowButton = ({ targetUserId }) => {
       disabled={loading}
       className="min-w-[56px] text-right text-xs font-semibold text-[#60a5fa] hover:text-white transition-colors disabled:opacity-50"
     >
-      {loading ? '...' : following ? 'Following' : 'Follow'}
+      {loading ? '...' : followState === 'following' ? 'Following' : followState === 'requested' ? 'Requested' : 'Follow'}
     </button>
   );
 };
@@ -161,9 +218,7 @@ const MobileSuggestedUsersCard = ({ users, onDismiss }) => {
               <p className="text-xs font-bold text-gray-900 dark:text-white text-center truncate w-full cursor-pointer"
                 onClick={() => navigate(`/profile/${username}`)}>{username}</p>
               <p className="text-[10px] text-gray-400 text-center truncate w-full">{reason}</p>
-              <button className="mt-1 w-full py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1">
-                <UserPlus size={11} /> Follow
-              </button>
+              <DesktopFollowButton targetUserId={String(u._id || u.id || '')} />
             </div>
           );
         })}

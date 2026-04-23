@@ -8,9 +8,17 @@ import { supabase } from '../lib/supabase';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
+import {
+  checkFollowStatus,
+  followUser,
+  unfollowUser,
+  cancelFollowRequest,
+  FOLLOW_STATUS_CHANGED_EVENT,
+} from '../services/followService';
 import ContentReportModal from './ContentReportModal';
 import EditContentModal from './EditContentModal';
 import OwnerContentOptionsModal from './OwnerContentOptionsModal';
+import ShareContentModal from './ShareContentModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 
@@ -153,33 +161,85 @@ const PeopleTagsOverlay = ({ tags, visible }) => {
 // ─── Follow Button ─────────────────────────────────────────────────────────────
 const FollowButton = ({ targetUserId }) => {
   const { userObject } = useSelector(s => s.auth);
-  const [following, setFollowing] = useState(false);
+  const [followState, setFollowState] = useState('not_following');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadStatus = async () => {
+      if (!userObject || !targetUserId || String(userObject._id || userObject.id) === String(targetUserId)) {
+        if (isMounted) setFollowState('not_following');
+        return;
+      }
+      try {
+        const status = await checkFollowStatus(targetUserId);
+        if (!isMounted) return;
+        if (status?.isFollowing || status?.status === 'following') {
+          setFollowState('following');
+        } else if (status?.isPending || status?.requestPending || status?.requested || status?.status === 'pending') {
+          setFollowState('requested');
+        } else {
+          setFollowState('not_following');
+        }
+      } catch {
+        if (isMounted) setFollowState('not_following');
+      }
+    };
+    loadStatus();
+    return () => { isMounted = false; };
+  }, [targetUserId, userObject]);
+
+  useEffect(() => {
+    const onFollowStatusChanged = (event) => {
+      const detail = event?.detail || {};
+      if (String(detail.userId || '') !== String(targetUserId || '')) return;
+      if (detail.state === 'following' || detail.state === 'requested' || detail.state === 'not_following') {
+        setFollowState(detail.state);
+      }
+    };
+    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, onFollowStatusChanged);
+    return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, onFollowStatusChanged);
+  }, [targetUserId]);
 
   const handleClick = useCallback(async (e) => {
     e.stopPropagation();
     if (!userObject || loading) return;
-    const was = following;
-    setFollowing(!was);
+    const prev = followState;
     setLoading(true);
     try {
-      await api.post(was ? '/unfollow' : '/follow', { followedUserId: targetUserId });
+      if (followState === 'following') {
+        await unfollowUser(targetUserId);
+        setFollowState('not_following');
+      } else if (followState === 'requested') {
+        await cancelFollowRequest(targetUserId);
+        setFollowState('not_following');
+      } else {
+        const res = await followUser(targetUserId);
+        if (res?.status === 'pending' || res?.pending || res?.requested || res?.requestPending || res?.isPending) {
+          setFollowState('requested');
+        } else {
+          setFollowState('following');
+        }
+      }
     } catch {
-      setFollowing(was);
+      setFollowState(prev);
     } finally {
       setLoading(false);
     }
-  }, [userObject, loading, following, targetUserId]);
+  }, [userObject, loading, followState, targetUserId]);
+
+  const isFollowing = followState === 'following';
+  const isRequested = followState === 'requested';
 
   return (
     <button onClick={handleClick} disabled={loading}
       className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border-2 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''} ${
-        following
+        isFollowing || isRequested
           ? 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-400'
           : 'border-white text-black dark:text-white bg-white dark:bg-transparent dark:border-white hover:bg-gray-100 dark:hover:bg-white/10'
       }`}>
-      {loading ? <Loader2 size={11} className="animate-spin" /> : following ? <UserCheck size={11} /> : <UserPlus size={11} />}
-      <span>{following ? 'Following' : 'Follow'}</span>
+      {loading ? <Loader2 size={11} className="animate-spin" /> : isFollowing ? <UserCheck size={11} /> : <UserPlus size={11} />}
+      <span>{isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}</span>
     </button>
   );
 };
@@ -520,6 +580,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // ── Time formatting ────────────────────────────────────────────────────────
   const [nowTs, setNowTs] = useState(0);
@@ -644,6 +705,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   };
 
   const offer = isAd ? (post.product_offer?.[0] || null) : null;
+  const shareContentType = isAd ? 'ad' : (post.type === 'reel' ? 'reel' : 'post');
+  const canShareInChat = Boolean(postId && !isTweet && ['post', 'reel', 'ad'].includes(shareContentType));
   const reportContentType = isAd ? 'ad' : isTweet ? 'tweet' : (post.type === 'reel' ? 'reel' : 'post');
   const reportContentUrl = isAd
     ? `${window.location.origin}/ads`
@@ -884,7 +947,11 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
             </button>
 
             {/* Share */}
-            <button className="hover:opacity-60 transition-opacity" aria-label="Share">
+            <button
+              onClick={() => { if (canShareInChat) setShowShareModal(true); }}
+              className="hover:opacity-60 transition-opacity"
+              aria-label="Share"
+            >
               <Send size={24} className="text-black dark:text-white" />
             </button>
           </div>
@@ -984,6 +1051,13 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
 
         <p className="text-gray-400 dark:text-gray-500 text-[11px] uppercase tracking-wider mt-1">{formattedDate}</p>
       </div>
+
+      <ShareContentModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        contentType={shareContentType}
+        contentId={postId}
+      />
     </div>
   );
 };

@@ -21,6 +21,7 @@ import VoiceMessageBubble from '../components/VoiceMessageBubble';
 import VoiceRecorder from '../components/VoiceRecorder';
 import * as chatService from '../services/chatService';
 import { getFollowing } from '../services/followService';
+import api from '../lib/api';
 import {
   emitStopTyping,
   emitTyping,
@@ -59,7 +60,13 @@ const getConversationAvatar = (conversation, currentUserId) => (
 const getConversationTitle = (conversation, currentUserId) => {
   if (!conversation) return 'Conversation';
   if (conversation.isGroup) {
-    return conversation.groupName || `Group (${conversation.participants?.length || 0})`;
+    const explicitName = typeof conversation.groupName === 'string' ? conversation.groupName.trim() : '';
+    if (explicitName) return explicitName;
+
+    const participantNames = getGroupParticipantNames(conversation, currentUserId);
+    if (!participantNames.length) return 'Group';
+    if (participantNames.length <= 2) return participantNames.join(', ');
+    return `${participantNames.slice(0, 2).join(', ')} +${participantNames.length - 2}`;
   }
   return getUserName(otherParticipant(conversation, currentUserId));
 };
@@ -170,10 +177,22 @@ const getReactionBadge = (message, userId) => {
     removable: Boolean(ownReaction),
   };
 };
+const extractSharedReelId = (sharedContent) => {
+  if (!sharedContent || typeof sharedContent !== 'object') return '';
+  const directId = sharedContent?.contentId?._id || sharedContent?.contentId;
+  if (directId) return String(directId);
+  const shareUrl = String(sharedContent?.shareUrl || '');
+  const match = shareUrl.match(/\/reels\/([^/?#]+)/i);
+  return match?.[1] ? String(match[1]) : '';
+};
 
 const messagePreview = (message, isMine, name) => {
   if (!message) return 'Start chatting';
   if (message.isDeleted) return 'Message unsent';
+  if (message.sharedContent?.contentType) {
+    const label = message.sharedContent.contentType;
+    return isMine ? `You shared a ${label}` : `${name} shared a ${label}`;
+  }
   if (message.text) return isMine ? `You: ${message.text}` : message.text;
   if (message.mediaType === 'audio') return isMine ? 'You sent a voice message 🎤' : `${name} sent a voice message 🎤`;
   if (message.mediaUrl) return isMine ? 'You sent an attachment.' : `${name} sent an attachment.`;
@@ -188,6 +207,10 @@ const mobileBubblePreview = (message, isMine, name) => {
 const mobileListPreview = (message, isMine, name) => {
   if (!message) return 'Start chatting';
   if (message.isDeleted) return 'Message unsent';
+  if (message.sharedContent?.contentType) {
+    const label = message.sharedContent.contentType;
+    return isMine ? `You shared a ${label}` : `${name} shared a ${label}`;
+  }
   if (message.mediaType === 'audio') return isMine ? 'You sent a voice message 🎤' : `${name} sent a voice message 🎤`;
   if (message.mediaUrl) return isMine ? 'You sent an attachment.' : `${name} sent an attachment.`;
   if (message.text) return isMine ? `You: ${message.text}` : message.text;
@@ -483,7 +506,7 @@ const GroupCreateModal = ({
         <div className="border-t border-white/10 px-5 py-4">
           <button
             type="button"
-            disabled={loading || selectedIds.length === 0 || (isGroup && !groupName.trim())}
+            disabled={loading || selectedIds.length === 0}
             onClick={() => onSubmit({ groupName: groupName.trim(), participantIds: selectedIds })}
             className="w-full rounded-2xl bg-[#2a2f9f] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#3137b5] disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -794,6 +817,7 @@ export default function ChatPage() {
   const currentUserIdRef = useRef('');
   const fetchConversationsPromiseRef = useRef(null);
   const activatingConversationRef = useRef({ conversationId: '', promise: null });
+  const fetchedSharedReelIdsRef = useRef(new Set());
 
   const [search, setSearch] = useState('');
   const [input, setInput] = useState('');
@@ -813,6 +837,7 @@ export default function ChatPage() {
   const [loadingGroupMembers, setLoadingGroupMembers] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupActionLoading, setGroupActionLoading] = useState(false);
+  const [sharedReelMetaMap, setSharedReelMetaMap] = useState({});
 
   const {
     conversations, activeConversation, messages, page, hasMore,
@@ -1214,6 +1239,57 @@ export default function ChatPage() {
     };
   }, [showEmojiPicker]);
 
+  useEffect(() => {
+    const missingReelIds = [];
+    for (const message of messages) {
+      const shared = message?.sharedContent;
+      if (!shared) continue;
+      const reelId = extractSharedReelId(shared);
+      if (!reelId) continue;
+      if (shared?.previewUrl) continue;
+      if (fetchedSharedReelIdsRef.current.has(reelId)) continue;
+      missingReelIds.push(reelId);
+      fetchedSharedReelIdsRef.current.add(reelId);
+    }
+
+    if (!missingReelIds.length) return;
+    let cancelled = false;
+
+    (async () => {
+      for (const reelId of missingReelIds) {
+        try {
+          const { data } = await api.get(`/posts/reels/${reelId}`);
+          const reel = data?.data || data?.reel || data;
+          const media0 = reel?.media?.[0] || {};
+          const previewUrl =
+            media0?.thumbnail?.fileUrl
+            || media0?.thumbnails?.[0]?.fileUrl
+            || media0?.fileUrl
+            || '';
+          const creatorUsername = reel?.user_id?.username || '';
+          const creatorAvatarUrl = reel?.user_id?.avatar_url || '';
+
+          if (!cancelled) {
+            setSharedReelMetaMap((prev) => ({
+              ...prev,
+              [reelId]: {
+                previewUrl,
+                creatorUsername,
+                creatorAvatarUrl,
+              },
+            }));
+          }
+        } catch {
+          // Keep silent; fallback UI still renders.
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messages]);
+
   const stopTyping = useCallback(() => {
     if (activeConversation?._id && currentUserId) emitStopTyping(activeConversation._id, currentUserId);
   }, [activeConversation, currentUserId]);
@@ -1577,6 +1653,27 @@ export default function ChatPage() {
   const renderBubble = (message, mine) => {
     if (message.isDeleted) return <p className="text-sm italic text-gray-500">Message unsent</p>;
     const sender = getMessageSender(activeConversation, message, currentUserId);
+    const sharedContent = message?.sharedContent || null;
+    const hasSharedContent = Boolean(sharedContent?.contentType);
+    const sharedReelId = extractSharedReelId(sharedContent);
+    const sharedReelMeta = sharedReelId ? sharedReelMetaMap[sharedReelId] : null;
+    const isReelShare = Boolean(
+      sharedContent
+      && (
+        String(sharedContent?.contentType || '').toLowerCase() === 'reel'
+        || Boolean(sharedReelId)
+      )
+    );
+    const resolvedSharedPreview = sharedContent?.previewUrl || sharedReelMeta?.previewUrl || '';
+    const resolvedSharedCreatorName = sharedContent?.creatorUsername || sharedReelMeta?.creatorUsername || 'reel';
+    const resolvedSharedCreatorAvatar = sharedContent?.creatorAvatarUrl || sharedReelMeta?.creatorAvatarUrl || '';
+
+    const messageText = typeof message?.text === 'string' ? message.text.trim() : '';
+    const cleanedMessageText = hasSharedContent
+      ? messageText.replace(/https?:\/\/\S+/gi, '').trim()
+      : messageText;
+    const hasMessageText = isReelShare ? false : Boolean(cleanedMessageText);
+
     const bubbleClass = mine
       ? 'bg-[#7C3AED] rounded-[22px] rounded-br-md shadow-sm'
       : 'bg-gray-100 dark:bg-[#262626] rounded-[22px] rounded-bl-md border border-gray-200 dark:border-white/5 shadow-sm';
@@ -1599,6 +1696,130 @@ export default function ChatPage() {
             <p className={`line-clamp-2 ${mine ? 'text-white/70' : 'text-gray-600 dark:text-white/70'}`}>{message.replyTo.text || 'Attachment'}</p>
           </div>
         ) : null}
+
+        {hasSharedContent ? (
+          isReelShare ? (
+            <button
+              type="button"
+              onClick={() => {
+                const reelId = String(sharedReelId || '').trim();
+                if (!reelId) return;
+                navigate(`/reels?reel=${reelId}`);
+              }}
+              className="mb-2 block w-[250px] overflow-hidden rounded-[22px] border border-white/10 bg-[#16181f] text-left shadow-sm transition hover:opacity-95 sm:w-[280px]"
+            >
+              <div className="relative">
+                {resolvedSharedPreview ? (
+                  <img
+                    src={resolvedSharedPreview}
+                    alt={sharedContent?.title || 'Shared reel'}
+                    className="block h-[360px] w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-[360px] w-full items-center justify-center bg-black/30 text-sm text-white/70">
+                    Open shared reel
+                  </div>
+                )}
+
+                <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/65 to-transparent px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 overflow-hidden rounded-full bg-white/15">
+                      {resolvedSharedCreatorAvatar ? (
+                        <img
+                          src={resolvedSharedCreatorAvatar}
+                          alt={resolvedSharedCreatorName || 'creator'}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[11px] font-bold text-white">
+                          {String(resolvedSharedCreatorName || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <p className="truncate text-[22px] font-semibold leading-none text-white">
+                      {resolvedSharedCreatorName}
+                    </p>
+                    {sharedContent?.creatorVerified ? (
+                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#0095f6] text-[10px] font-bold text-white">
+                        ?
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <span className="absolute bottom-3 left-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
+              </div>
+            </button>
+          ) : (
+            <a
+              href={sharedContent?.shareUrl || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`mb-2 block overflow-hidden rounded-[20px] border ${
+                mine ? 'border-white/20 bg-[#4f46e5]/40' : 'border-white/10 bg-[#1d1f27]'
+              } shadow-sm transition hover:opacity-95`}
+            >
+              <div className={`flex items-center gap-2 px-3 py-2 ${mine ? 'bg-black/10' : 'bg-black/20'}`}>
+                <div className="h-7 w-7 overflow-hidden rounded-full bg-white/10">
+                  {sharedContent?.creatorAvatarUrl ? (
+                    <img
+                      src={sharedContent.creatorAvatarUrl}
+                      alt={sharedContent?.creatorUsername || 'creator'}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[11px] font-bold text-white">
+                      {String(sharedContent?.creatorUsername || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <p className="truncate text-sm font-semibold text-white">
+                  {sharedContent?.creatorUsername || sharedContent?.title || 'Shared'}
+                </p>
+                {sharedContent?.creatorVerified ? (
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#0095f6] text-[10px] font-bold text-white">
+                    ?
+                  </span>
+                ) : null}
+              </div>
+              <div className="relative">
+                {sharedContent?.previewUrl ? (
+                  <img
+                    src={sharedContent.previewUrl}
+                    alt={sharedContent?.title || 'Shared content'}
+                    className="block h-[280px] w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-[220px] w-full items-center justify-center bg-black/30 text-sm text-white/70">
+                    Open shared content
+                  </div>
+                )}
+                {sharedContent?.previewType === 'video' ? (
+                  <span className="absolute bottom-3 left-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                ) : null}
+              </div>
+              <div className={`px-3 py-2 text-sm ${mine ? 'text-white/95' : 'text-white/90'}`}>
+                <p className="line-clamp-2">
+                  <span className="font-semibold">
+                    {sharedContent?.creatorUsername || 'shared'}
+                  </span>
+                  {sharedContent?.caption || sharedContent?.title
+                    ? ` ${sharedContent.caption || sharedContent.title}`
+                    : ''}
+                </p>
+              </div>
+            </a>
+          )
+        ) : null}
+
         {message.mediaUrl ? (
           <div className="space-y-2">
             {message.mediaType === 'audio' ? (
@@ -1610,17 +1831,21 @@ export default function ChatPage() {
                   : <img src={message.mediaUrl} alt="attachment" className="block max-h-80 w-full object-cover outline-none border-0 ring-0 shadow-none" />}
               </div>
             )}
-            {message.text ? (
+            {hasMessageText ? (
               <div className={`${bubbleClass} overflow-hidden px-3 py-2.5 ${mine ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p>
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{cleanedMessageText}</p>
               </div>
             ) : null}
           </div>
-        ) : (
+        ) : hasMessageText ? (
+          <div className={`${bubbleClass} overflow-hidden px-3 py-2.5 ${mine ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{cleanedMessageText}</p>
+          </div>
+        ) : !hasSharedContent ? (
           <div className={`${bubbleClass} overflow-hidden px-3 py-2.5 ${mine ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p>
           </div>
-        )}
+        ) : null}
       </div>
     );
   };
@@ -2462,3 +2687,7 @@ export default function ChatPage() {
     </div>
   );
 }
+
+
+
+

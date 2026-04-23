@@ -25,6 +25,11 @@ export const createGroupConversation = async (payload) => {
   return response.data;
 };
 
+export const shareContentToUsers = async (payload) => {
+  const response = await api.post('/chat/share', payload);
+  return response.data;
+};
+
 export const updateGroupConversation = async (conversationId, payload) => {
   const response = await api.patch(`/chat/groups/${conversationId}`, payload);
   return response.data;

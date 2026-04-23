@@ -1,6 +1,21 @@
 import api from '../lib/api';
 
-// ── Existing follow APIs ───────────────────────────────────────────────────────
+export const FOLLOW_STATUS_CHANGED_EVENT = 'bsmart:follow-status-changed';
+
+export const normalizeFollowStateFromStatus = (status) => {
+  if (status?.isFollowing || status?.status === 'following') return 'following';
+  if (status?.isPending || status?.requestPending || status?.requested || status?.status === 'pending') return 'requested';
+  return 'not_following';
+};
+
+export const emitFollowStatusChanged = ({ userId, state }) => {
+  if (!userId || typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(FOLLOW_STATUS_CHANGED_EVENT, {
+    detail: { userId: String(userId), state },
+  }));
+};
+
+// Existing follow APIs
 
 export const checkFollowStatus = async (userId) => {
   const response = await api.get(`/follows/check/${userId}`);
@@ -28,11 +43,16 @@ export const getFollowing = async (userId, { search = '', page = 1, limit = 20 }
 
 export const followUser = async (userId) => {
   const response = await api.post('/follow', { followedUserId: userId });
+  emitFollowStatusChanged({
+    userId,
+    state: normalizeFollowStateFromStatus(response.data),
+  });
   return response.data;
 };
 
 export const unfollowUser = async (userId) => {
   const response = await api.post('/unfollow', { followedUserId: userId });
+  emitFollowStatusChanged({ userId, state: 'not_following' });
   return response.data;
 };
 
@@ -53,12 +73,12 @@ export const getFollowCounts = async (userId) => {
   return response.data;
 };
 
-// ── Account Privacy APIs ───────────────────────────────────────────────────────
+// Account Privacy APIs
 
 /**
  * Toggle account between public and private.
- * Private → Public: all pending follow requests are auto-accepted.
- * Public → Private: future followers must send a request first.
+ * Private -> Public: all pending follow requests are auto-accepted.
+ * Public -> Private: future followers must send a request first.
  */
 export const toggleAccountPrivacy = async () => {
   const response = await api.patch('/follow/privacy/toggle');
@@ -83,7 +103,7 @@ export const getPrivacyStatus = async () => {
   return response.data; // { isPrivate, pendingRequestsCount }
 };
 
-// ── Follow Request APIs ────────────────────────────────────────────────────────
+// Follow Request APIs
 
 /**
  * Get all incoming follow requests (for private accounts).
@@ -117,6 +137,7 @@ export const declineFollowRequest = async (requesterId) => {
  */
 export const cancelFollowRequest = async (userId) => {
   const response = await api.delete(`/follow/request/${userId}/cancel`);
+  emitFollowStatusChanged({ userId, state: 'not_following' });
   return response.data; // { success, message }
 };
 

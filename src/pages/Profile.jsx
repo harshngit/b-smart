@@ -17,6 +17,7 @@ import {
     getFollowCounts,
     unfollowUser,
     cancelFollowRequest,
+    FOLLOW_STATUS_CHANGED_EVENT,
 } from '../services/followService';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -248,9 +249,14 @@ const Profile = () => {
         const loadFollowStatus = async () => {
             try {
                 const status = await checkFollowStatus(profileTargetUserId);
-                if (status?.isFollowing) {
+                if (status?.isFollowing || status?.status === 'following') {
                     setFollowState('following');
-                } else if (status?.isPending || status?.requestPending) {
+                } else if (
+                    status?.isPending
+                    || status?.requestPending
+                    || status?.requested
+                    || status?.status === 'pending'
+                ) {
                     setFollowState('requested');
                 } else {
                     setFollowState('not_following');
@@ -262,6 +268,19 @@ const Profile = () => {
         };
 
         loadFollowStatus();
+    }, [isOwnProfile, profileTargetUserId]);
+
+    useEffect(() => {
+        if (!profileTargetUserId || isOwnProfile) return undefined;
+        const onFollowStatusChanged = (event) => {
+            const detail = event?.detail || {};
+            if (String(detail.userId || '') !== String(profileTargetUserId)) return;
+            if (detail.state === 'following' || detail.state === 'requested' || detail.state === 'not_following') {
+                setFollowState(detail.state);
+            }
+        };
+        window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, onFollowStatusChanged);
+        return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, onFollowStatusChanged);
     }, [isOwnProfile, profileTargetUserId]);
 
     const refreshProfileFollowCounts = useCallback(async () => {
@@ -300,7 +319,13 @@ const Profile = () => {
             } else {
                 // Send follow (may return pending if account is private)
                 const result = await followUser(profileTargetUserId);
-                if (result?.status === 'pending' || result?.pending) {
+                if (
+                    result?.status === 'pending'
+                    || result?.pending
+                    || result?.requested
+                    || result?.requestPending
+                    || result?.isPending
+                ) {
                     setFollowState('requested');
                 } else {
                     setFollowState('following');
