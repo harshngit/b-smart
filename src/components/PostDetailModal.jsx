@@ -14,6 +14,7 @@ import tweetCommentService from '../services/tweetCommentService';
 import ContentReportModal from './ContentReportModal';
 import EditContentModal from './EditContentModal';
 import OwnerContentOptionsModal from './OwnerContentOptionsModal';
+import ShareContentModal from './ShareContentModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 
@@ -510,6 +511,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // ── Init on open ────────────────────────────────────────────────────────────
 
@@ -712,6 +714,8 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
 
   const offer = isAd ? (post.product_offer?.[0] || null) : null;
   const reportContentType = isAd ? 'ad' : isTweet ? 'tweet' : (post.type === 'reel' ? 'reel' : 'post');
+  const shareContentType = isAd ? 'ad' : isTweet ? 'tweet' : (post.type === 'reel' ? 'reel' : 'post');
+  const canShareInChat = Boolean(postId && ['post', 'reel', 'ad', 'tweet'].includes(shareContentType));
   const reportContentUrl = isAd
     ? `${window.location.origin}/ads`
     : isTweet
@@ -932,7 +936,11 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                   <button className="hover:opacity-50 transition-opacity">
                     <MessageCircle size={24} className="text-gray-900 dark:text-white" />
                   </button>
-                  <button className="hover:opacity-50 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => { if (canShareInChat) setShowShareModal(true); }}
+                    className="hover:opacity-50 transition-opacity"
+                  >
                     <Send size={24} className="text-gray-900 dark:text-white" />
                   </button>
                 </div>
@@ -984,6 +992,12 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
           </div>
         </div>
       </div>
+      <ShareContentModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        contentType={shareContentType}
+        contentId={postId}
+      />
     </div>
   );
 };

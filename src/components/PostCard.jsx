@@ -775,12 +775,6 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
                 <div className="overflow-hidden bg-[#f5f5f5] dark:bg-black">
                   <MediaRenderer mediaItems={mediaItems} isAdType={false} peopleTags={[]} />
                 </div>
-                <div className="border-t border-gray-200 dark:border-white/10 px-3 py-2.5">
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{username}</p>
-                  <p className="mt-0.5 text-[14px] leading-5 text-gray-700 dark:text-gray-200 line-clamp-2">
-                    {contentText || 'Image post'}
-                  </p>
-                </div>
               </div>
             )}
 

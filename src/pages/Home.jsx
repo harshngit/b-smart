@@ -161,7 +161,7 @@ const DesktopFollowButton = ({ targetUserId }) => {
       type="button"
       onClick={handleClick}
       disabled={loading}
-      className="min-w-[56px] text-right text-xs font-semibold text-[#60a5fa] hover:text-white transition-colors disabled:opacity-50"
+      className="min-w-[56px] text-right text-xs font-semibold text-[#3b82f6] hover:text-[#1d4ed8] dark:text-[#60a5fa] dark:hover:text-white transition-colors disabled:opacity-50"
     >
       {loading ? '...' : followState === 'following' ? 'Following' : followState === 'requested' ? 'Requested' : 'Follow'}
     </button>
@@ -344,7 +344,7 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
   return (
     <aside className="hidden xl:block w-[319px] shrink-0 z-0">
       <div className="sticky top-20">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6">
           <button
             type="button"
             onClick={() => navigate(`/profile/${currentUserId}`)}
@@ -362,9 +362,6 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
               <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400 truncate">{currentName}</p>
             </div>
           </button>
-          <Link to="/settings" className="text-xs font-semibold text-[#60a5fa] hover:text-white transition-colors">
-            Switch
-          </Link>
         </div>
 
         <div className="flex items-center justify-between mb-4">

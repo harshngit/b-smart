@@ -153,6 +153,20 @@ const getMessageSender = (conversation, message, currentUserId) => {
 
 const sortConversations = (conversations) =>
   [...conversations].sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+const mergeUniqueConversations = (...lists) => {
+  const map = new Map();
+  lists.flat().forEach((conversation) => {
+    const id = String(conversation?._id || conversation?.id || '');
+    if (!id || map.has(id)) return;
+    map.set(id, conversation);
+  });
+  return Array.from(map.values());
+};
+const isOutgoingPendingRequest = (conversation, currentUserId) => (
+  Boolean(conversation?.isRequest)
+  && conversation?.requestStatus === 'pending'
+  && String(conversation?.requestedBy?._id || conversation?.requestedBy) === String(currentUserId)
+);
 
 const previousNonDeleted = (messages) => {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -196,17 +210,34 @@ const getSharedCreatorId = (sharedContent) => String(
   || sharedContent?.creatorId
   || ''
 ).trim();
+const getConversationSenderName = (conversation, message, currentUserId) => {
+  const senderId = String(message?.sender?._id || message?.sender || '');
+  if (!senderId) return 'User';
+  if (String(senderId) === String(currentUserId)) return 'You';
+
+  if (conversation?.isGroup) {
+    const participants = Array.isArray(conversation?.participants) ? conversation.participants : [];
+    const sender = participants.find((item) => String(getUserId(item)) === senderId);
+    return getUserName(sender || message?.sender || {});
+  }
+
+  return getUserName(otherParticipant(conversation, currentUserId));
+};
+const isAttachmentLikeMessage = (message) => Boolean(
+  message?.sharedContent?.contentType
+  || message?.mediaUrl
+  || message?.mediaType === 'audio'
+);
 
 const messagePreview = (message, isMine, name) => {
   if (!message) return 'Start chatting';
   if (message.isDeleted) return 'Message unsent';
   if (message.sharedContent?.contentType) {
-    const label = message.sharedContent.contentType;
-    return isMine ? `You shared a ${label}` : `${name} shared a ${label}`;
+    return isMine ? 'You sent an attachment.' : `${name} has send a attachedment`;
   }
   if (message.text) return isMine ? `You: ${message.text}` : message.text;
   if (message.mediaType === 'audio') return isMine ? 'You sent a voice message 🎤' : `${name} sent a voice message 🎤`;
-  if (message.mediaUrl) return isMine ? 'You sent an attachment.' : `${name} sent an attachment.`;
+  if (message.mediaUrl) return isMine ? 'You sent an attachment.' : `${name} has send a attachedment`;
   return 'Start chatting';
 };
 
@@ -219,11 +250,10 @@ const mobileListPreview = (message, isMine, name) => {
   if (!message) return 'Start chatting';
   if (message.isDeleted) return 'Message unsent';
   if (message.sharedContent?.contentType) {
-    const label = message.sharedContent.contentType;
-    return isMine ? `You shared a ${label}` : `${name} shared a ${label}`;
+    return isMine ? 'You sent an attachment.' : `${name} has send a attachedment`;
   }
   if (message.mediaType === 'audio') return isMine ? 'You sent a voice message 🎤' : `${name} sent a voice message 🎤`;
-  if (message.mediaUrl) return isMine ? 'You sent an attachment.' : `${name} sent an attachment.`;
+  if (message.mediaUrl) return isMine ? 'You sent an attachment.' : `${name} has send a attachedment`;
   if (message.text) return isMine ? `You: ${message.text}` : message.text;
   return 'Start chatting';
 };
@@ -249,7 +279,22 @@ const hasReplyContent = (replyTo) => Boolean(
 
 const getConversationListMeta = (conversation, currentUserId, unread, isTyping, subtitle) => {
   if (isTyping) return 'Typing...';
-  if (unread > 0) return `${unread}+ new message${unread > 1 ? 's' : ''}`;
+  if (unread >= 4) return '4+ new messages';
+  if (unread >= 2) return `${unread} new messages`;
+  if (unread === 1) {
+    const lastMessage = conversation?.lastMessage || null;
+    if (!lastMessage) return '1 new message';
+
+    const mine = String(lastMessage?.sender?._id || lastMessage?.sender) === String(currentUserId);
+    const senderName = getConversationSenderName(conversation, lastMessage, currentUserId);
+    const otherUser = otherParticipant(conversation, currentUserId);
+    const messagePreviewText = mobileListPreview(lastMessage, mine, getUserName(otherUser));
+
+    if (!isAttachmentLikeMessage(lastMessage) && messagePreviewText && messagePreviewText !== 'Start chatting') {
+      return messagePreviewText;
+    }
+    return mine ? 'You sent an attachment' : `${senderName} has send a attachedment`;
+  }
 
   const otherUser = otherParticipant(conversation, currentUserId);
   const mine = String(conversation?.lastMessage?.sender?._id || conversation?.lastMessage?.sender) === String(currentUserId);
@@ -778,8 +823,8 @@ const GroupManageModal = ({
               onClick={(event) => event.stopPropagation()}
             >
               <div className="border-b border-white/10 px-6 py-5 text-center">
-                <p className="text-4xl font-semibold leading-tight">Leave chat?</p>
-                <p className="mx-auto mt-3 max-w-[560px] text-[17px] leading-7 text-white/60">
+                <p className="text-3xl font-semibold leading-tight">Leave chat?</p>
+                <p className="mx-auto mt-3 max-w-[560px] text-[14px] leading-7 text-white/60">
                   You won't be able to send or receive messages unless someone adds you back to the chat. No one will be notified that you left the chat.
                 </p>
               </div>
@@ -790,7 +835,7 @@ const GroupManageModal = ({
                   setShowLeaveConfirm(false);
                   onLeaveChat?.();
                 }}
-                className="w-full border-b border-white/10 px-6 py-4 text-2xl font-semibold text-red-400 transition hover:bg-white/5 disabled:opacity-50"
+                className="w-full border-b border-white/10 px-6 py-4 text-xl font-semibold text-red-400 transition hover:bg-white/5 disabled:opacity-50"
               >
                 Leave
               </button>
@@ -798,7 +843,7 @@ const GroupManageModal = ({
                 type="button"
                 disabled={loading}
                 onClick={() => setShowLeaveConfirm(false)}
-                className="w-full px-6 py-4 text-2xl font-medium text-white/85 transition hover:bg-white/5 disabled:opacity-50"
+                className="w-full px-6 py-4 text-xl font-medium text-white/85 transition hover:bg-white/5 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -813,8 +858,8 @@ const GroupManageModal = ({
               onClick={(event) => event.stopPropagation()}
             >
               <div className="border-b border-white/10 px-6 py-5 text-center">
-                <p className="text-4xl font-semibold leading-tight">Delete chat from inbox?</p>
-                <p className="mx-auto mt-3 max-w-[560px] text-[17px] leading-7 text-white/60">
+                <p className="text-3xl font-semibold leading-tight">Delete chat from inbox?</p>
+                <p className="mx-auto mt-3 max-w-[560px] text-[14px] leading-7 text-white/60">
                   This will remove the chat from your inbox and erase the chat history.
                 </p>
               </div>
@@ -825,7 +870,7 @@ const GroupManageModal = ({
                   setShowDeleteConfirm(false);
                   onDeleteChat?.();
                 }}
-                className="w-full border-b border-white/10 px-6 py-4 text-2xl font-semibold text-red-400 transition hover:bg-white/5 disabled:opacity-50"
+                className="w-full border-b border-white/10 px-6 py-4 text-xl font-semibold text-red-400 transition hover:bg-white/5 disabled:opacity-50"
               >
                 Delete
               </button>
@@ -833,7 +878,7 @@ const GroupManageModal = ({
                 type="button"
                 disabled={loading}
                 onClick={() => setShowDeleteConfirm(false)}
-                className="w-full px-6 py-4 text-2xl font-medium text-white/85 transition hover:bg-white/5 disabled:opacity-50"
+                className="w-full px-6 py-4 text-xl font-medium text-white/85 transition hover:bg-white/5 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -891,6 +936,12 @@ export default function ChatPage() {
   const [sharedReelMetaMap, setSharedReelMetaMap] = useState({});
   const [sharedDetailItem, setSharedDetailItem] = useState(null);
   const [showTopbarLeaveConfirm, setShowTopbarLeaveConfirm] = useState(false);
+
+  const closeActiveChat = useCallback(() => {
+    dispatch(setActiveConversation(null));
+    dispatch(setMessages([]));
+    navigate('/messages');
+  }, [dispatch, navigate]);
 
   const {
     conversations, activeConversation, messages, page, hasMore,
@@ -1057,8 +1108,20 @@ export default function ChatPage() {
     const request = (async () => {
       dispatch(setIsLoadingConversations(true));
       try {
-        const data = await chatService.getConversations(conversationType);
-        const ordered = sortConversations(data || []);
+        let ordered = [];
+        if (conversationType === 'normal') {
+          const [normalData, requestsData] = await Promise.all([
+            chatService.getConversations('normal').catch(() => []),
+            chatService.getConversations('requests').catch(() => []),
+          ]);
+          const normalList = Array.isArray(normalData) ? normalData : [];
+          const requestsList = Array.isArray(requestsData) ? requestsData : [];
+          const outgoingRequests = requestsList.filter((conversation) => isOutgoingPendingRequest(conversation, currentUserId));
+          ordered = sortConversations(mergeUniqueConversations(normalList, outgoingRequests));
+        } else {
+          const requestOnly = await chatService.getConversations(conversationType);
+          ordered = sortConversations(requestOnly || []);
+        }
         dispatch(setConversations(ordered));
         refreshOnlineUsers(ordered);
         return ordered;
@@ -1077,7 +1140,7 @@ export default function ChatPage() {
 
     fetchConversationsPromiseRef.current = request;
     return request;
-  }, [conversationType, dispatch, refreshOnlineUsers]);
+  }, [conversationType, currentUserId, dispatch, refreshOnlineUsers]);
 
   const markLatestSeen = useCallback(async (items = messages, conversation = activeConversation) => {
     if (!conversation?._id || !currentUserId) return;
@@ -1254,6 +1317,18 @@ export default function ChatPage() {
     const conversation = conversations.find((item) => item._id === conversationIdFromUrl);
     if (conversation) setConversationAsActive(conversation, { skipNavigation: true });
   }, [activeConversation?._id, conversationIdFromUrl, conversations, setConversationAsActive]);
+
+  useEffect(() => {
+    const handleGlobalEsc = (event) => {
+      if (event.key !== 'Escape') return;
+      if (!activeConversation?._id) return;
+      event.preventDefault();
+      closeActiveChat();
+    };
+
+    window.addEventListener('keydown', handleGlobalEsc);
+    return () => window.removeEventListener('keydown', handleGlobalEsc);
+  }, [activeConversation?._id, closeActiveChat]);
 
   useEffect(() => {
     refreshOnlineUsers(conversations);
@@ -1736,9 +1811,22 @@ export default function ChatPage() {
     const cleanedMessageText = hasSharedContent
       ? messageText.replace(/https?:\/\/\S+/gi, '').trim()
       : messageText;
-    const hasMessageText = isReelShare ? false : Boolean(cleanedMessageText);
+    const hasMessageText = (isReelShare || isPostOrTweetShare) ? false : Boolean(cleanedMessageText);
     const sharedCreatorId = getSharedCreatorId(sharedContent);
     const sharedContentId = getSharedContentId(sharedContent);
+    const sharedCardCreatorName = sharedContent?.creatorUsername || sharedContent?.title || 'shared';
+    const sharedCardBodyText = String(
+      sharedContent?.caption
+      || sharedContent?.title
+      || cleanedMessageText
+      || ''
+    ).trim();
+    const sharedReelBodyText = String(
+      sharedContent?.caption
+      || sharedContent?.title
+      || cleanedMessageText
+      || ''
+    ).trim();
 
     const bubbleClass = mine
       ? 'bg-[#7C3AED] rounded-[22px] rounded-br-md shadow-sm'
@@ -1871,96 +1959,130 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={handleOpenSharedContent}
-              className="mb-2 block w-[250px] overflow-hidden rounded-[22px] border border-white/10 bg-[#16181f] text-left shadow-sm transition hover:opacity-95 sm:w-[280px]"
+              className={`mb-2 block w-[280px] overflow-hidden rounded-[22px] border text-left shadow-sm transition hover:opacity-95 sm:w-[360px] ${
+                mode === 'dark'
+                  ? 'border-white/10 bg-[#1b1d23]'
+                  : 'border-gray-200 bg-[#f3f4f6]'
+              }`}
             >
-              <div className="relative">
-                {resolvedSharedPreview ? (
-                  <img
-                    src={resolvedSharedPreview}
-                    alt={sharedContent?.title || 'Shared reel'}
-                    className="block h-[360px] w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-[360px] w-full items-center justify-center bg-black/30 text-sm text-white/70">
-                    Open shared reel
-                  </div>
-                )}
-
-                <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/65 to-transparent px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleOpenSharedCreatorProfile}
-                      className="h-7 w-7 overflow-hidden rounded-full bg-white/15"
-                    >
-                      {resolvedSharedCreatorAvatar ? (
-                        <img
-                          src={resolvedSharedCreatorAvatar}
-                          alt={resolvedSharedCreatorName || 'creator'}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[11px] font-bold text-white">
-                          {String(resolvedSharedCreatorName || 'U').charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenSharedCreatorProfile}
-                      className="truncate text-left text-[22px] font-semibold leading-none text-white"
-                    >
-                      {resolvedSharedCreatorName}
-                    </button>
-                    {sharedContent?.creatorVerified ? (
-                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#0095f6] text-[10px] font-bold text-white">
-                        ?
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <span className="absolute bottom-3 left-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </span>
-              </div>
-            </button>
-          ) : isPostOrTweetShare ? (
-            <button
-              type="button"
-              onClick={handleOpenSharedContent}
-              className="mb-2 block w-[250px] overflow-hidden rounded-[22px] border border-white/10 bg-[#1b1d23] text-left shadow-sm transition hover:opacity-95 sm:w-[280px]"
-            >
-              <div className="flex items-center gap-2 px-3 py-3">
+              <div className={`flex items-center gap-2 px-3 py-3 ${
+                mode === 'dark' ? 'bg-white/[0.03]' : 'bg-black/[0.03]'
+              }`}>
                 <button
                   type="button"
                   onClick={handleOpenSharedCreatorProfile}
-                  className="h-7 w-7 overflow-hidden rounded-full bg-white/10"
+                  className={`h-7 w-7 overflow-hidden rounded-full ${
+                    mode === 'dark' ? 'bg-white/10' : 'bg-black/10'
+                  }`}
                 >
-                  {sharedContent?.creatorAvatarUrl ? (
+                  {resolvedSharedCreatorAvatar ? (
                     <img
-                      src={sharedContent.creatorAvatarUrl}
-                      alt={sharedContent?.creatorUsername || 'creator'}
+                      src={resolvedSharedCreatorAvatar}
+                      alt={resolvedSharedCreatorName || 'creator'}
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[11px] font-bold text-white">
-                      {String(sharedContent?.creatorUsername || sharedContent?.title || 'U').charAt(0).toUpperCase()}
+                    <div className={`flex h-full w-full items-center justify-center text-[11px] font-bold ${
+                      mode === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}>
+                      {String(resolvedSharedCreatorName || 'U').charAt(0).toUpperCase()}
                     </div>
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={handleOpenSharedCreatorProfile}
-                  className="truncate text-left text-[22px] font-semibold leading-none text-white"
+                  className={`truncate text-left text-[22px] font-semibold leading-none ${
+                    mode === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
                 >
-                  {sharedContent?.creatorUsername || sharedContent?.title || 'shared'}
+                  {resolvedSharedCreatorName}
                 </button>
                 {sharedContent?.creatorVerified ? (
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#0095f6] text-[10px] font-bold text-white">
-                    ?
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#0095f6] text-white">
+                    <Check size={10} strokeWidth={3} />
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="relative">
+                {resolvedSharedPreview ? (
+                  <img
+                    src={resolvedSharedPreview}
+                    alt={sharedContent?.title || 'Shared reel'}
+                    className="block w-full h-auto max-h-[520px] object-contain bg-black"
+                  />
+                ) : (
+                  <div className={`flex h-[320px] w-full items-center justify-center px-4 text-center text-sm ${
+                    mode === 'dark' ? 'bg-black/30 text-white/70' : 'bg-black/10 text-gray-700'
+                  }`}>
+                    Open shared reel
+                  </div>
+                )}
+                {sharedContentType === 'reel' ? (
+                  <span className="absolute bottom-3 left-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                ) : null}
+              </div>
+
+              <div className={`px-3 py-2 text-sm ${
+                mode === 'dark' ? 'bg-black/20 text-white/95' : 'bg-white text-gray-900'
+              }`}>
+                <p className="line-clamp-3">
+                  <span className="font-semibold">{resolvedSharedCreatorName}</span>
+                  {sharedReelBodyText ? ` ${sharedReelBodyText}` : ''}
+                </p>
+              </div>
+            </button>
+          ) : isPostOrTweetShare ? (
+            <button
+              type="button"
+              onClick={handleOpenSharedContent}
+              className={`mb-2 block w-[280px] overflow-hidden rounded-[22px] border text-left shadow-sm transition hover:opacity-95 sm:w-[360px] ${
+                mode === 'dark'
+                  ? 'border-white/10 bg-[#1b1d23]'
+                  : 'border-gray-200 bg-[#f3f4f6]'
+              }`}
+            >
+              <div className={`flex items-center gap-2 px-3 py-3 ${
+                mode === 'dark' ? 'bg-white/[0.03]' : 'bg-black/[0.03]'
+              }`}>
+                <button
+                  type="button"
+                  onClick={handleOpenSharedCreatorProfile}
+                  className={`h-7 w-7 overflow-hidden rounded-full ${
+                    mode === 'dark' ? 'bg-white/10' : 'bg-black/10'
+                  }`}
+                >
+                  {sharedContent?.creatorAvatarUrl ? (
+                    <img
+                      src={sharedContent.creatorAvatarUrl}
+                      alt={sharedCardCreatorName || 'creator'}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className={`flex h-full w-full items-center justify-center text-[11px] font-bold ${
+                      mode === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}>
+                      {String(sharedCardCreatorName || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenSharedCreatorProfile}
+                  className={`truncate text-left text-[22px] font-semibold leading-none ${
+                    mode === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
+                >
+                  {sharedCardCreatorName}
+                </button>
+                {sharedContent?.creatorVerified ? (
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#0095f6] text-white">
+                    <Check size={10} strokeWidth={3} />
                   </span>
                 ) : null}
               </div>
@@ -1973,20 +2095,20 @@ export default function ChatPage() {
                     className="block w-full h-auto max-h-[420px] object-contain bg-black"
                   />
                 ) : (
-                  <div className="flex h-[260px] w-full items-center justify-center bg-black/30 px-4 text-center text-sm text-white/70">
+                  <div className={`flex h-[260px] w-full items-center justify-center px-4 text-center text-sm ${
+                    mode === 'dark' ? 'bg-black/30 text-white/70' : 'bg-black/10 text-gray-700'
+                  }`}>
                     Open shared {isPostOrTweetShare ? sharedContentType : 'content'}
                   </div>
                 )}
               </div>
 
-              <div className="bg-black/20 px-3 py-2 text-sm text-white/95">
-                <p className="line-clamp-2">
-                  <span className="font-semibold">
-                    {sharedContent?.creatorUsername || 'shared'}
-                  </span>
-                  {sharedContent?.caption || sharedContent?.title
-                    ? ` ${sharedContent.caption || sharedContent.title}`
-                    : ''}
+              <div className={`px-3 py-2 text-sm ${
+                mode === 'dark' ? 'bg-black/20 text-white/95' : 'bg-white text-gray-900'
+              }`}>
+                <p className="line-clamp-3">
+                  <span className="font-semibold">{sharedCardCreatorName}</span>
+                  {sharedCardBodyText ? ` ${sharedCardBodyText}` : ''}
                 </p>
               </div>
             </button>
@@ -2041,7 +2163,7 @@ export default function ChatPage() {
                     Open shared content
                   </div>
                 )}
-                {sharedContent?.previewType === 'video' ? (
+                {sharedContent?.previewType === 'video' && !isPostOrTweetShare ? (
                   <span className="absolute bottom-3 left-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M8 5v14l11-7z" />
@@ -2503,7 +2625,7 @@ export default function ChatPage() {
             <>
               <header className="flex items-center gap-3 border-b border-gray-100 dark:border-white/10 px-4 py-3 bg-white/80 dark:bg-black/80 backdrop-blur-md z-10 sticky top-0">
                 <button
-                  onClick={() => { dispatch(setActiveConversation(null)); navigate('/messages'); }}
+                  onClick={closeActiveChat}
                   className="md:hidden p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
                 >
                   <ChevronLeft size={24} />
@@ -2695,7 +2817,7 @@ export default function ChatPage() {
                           <div
                             key={message._id || `${message.createdAt}-${index}`}
                             className={`mb-1 flex group/msg 
-                            ${mine ? 'justify-end' : 'justify-start'} 
+                            ${mine ? 'justify-end pr-4 sm:pr-6' : 'justify-start'} 
                             ${samePrev ? 'mt-1' : 'mt-4'}
                             outline-none select-none [-webkit-tap-highlight-color:transparent]`}
                             onContextMenu={(event) => openContext(event, message)}
@@ -2732,7 +2854,7 @@ export default function ChatPage() {
                                   ) : null}
                                 </div>
 
-                                {!message.isDeleted && (
+                                {!message.isDeleted && hoveredMessageId === message._id && (
                                   <MessageActions
                                     message={message}
                                     mine={mine}
@@ -2890,8 +3012,8 @@ export default function ChatPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="border-b border-white/10 px-6 py-5 text-center">
-              <p className="text-4xl font-semibold leading-tight">Leave chat?</p>
-              <p className="mx-auto mt-3 max-w-[560px] text-[17px] leading-7 text-white/60">
+              <p className="text-3xl font-semibold leading-tight">Leave chat?</p>
+              <p className="mx-auto mt-3 max-w-[560px] text-[14px] leading-7 text-white/60">
                 You won't be able to send or receive messages unless someone adds you back to the chat. No one will be notified that you left the chat.
               </p>
             </div>
@@ -2902,7 +3024,7 @@ export default function ChatPage() {
                 setShowTopbarLeaveConfirm(false);
                 handleLeaveGroup();
               }}
-              className="w-full border-b border-white/10 px-6 py-4 text-2xl font-semibold text-red-400 transition hover:bg-white/5 disabled:opacity-50"
+              className="w-full border-b border-white/10 px-6 py-4 text-xl font-semibold text-red-400 transition hover:bg-white/5 disabled:opacity-50"
             >
               Leave
             </button>
@@ -2910,7 +3032,7 @@ export default function ChatPage() {
               type="button"
               disabled={groupActionLoading}
               onClick={() => setShowTopbarLeaveConfirm(false)}
-              className="w-full px-6 py-4 text-2xl font-medium text-white/85 transition hover:bg-white/5 disabled:opacity-50"
+              className="w-full px-6 py-4 text-xl font-medium text-white/85 transition hover:bg-white/5 disabled:opacity-50"
             >
               Cancel
             </button>

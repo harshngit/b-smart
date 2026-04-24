@@ -38,6 +38,46 @@ const getConversationOnlineUserId = (conversation, currentUserId) => {
   return getParticipantId(participants[0]);
 };
 const getLabelInitial = (label) => String(label || 'U').trim().charAt(0).toUpperCase() || 'U';
+const isShareableConversation = (conversation, currentUserId) => {
+  const participants = Array.isArray(conversation?.participants) ? conversation.participants : [];
+  const includesMe = participants.some((participant) => getParticipantId(participant) === normalizeId(currentUserId));
+  if (!includesMe) return false;
+  if (
+    conversation?.isRequest
+    && conversation?.requestStatus === 'pending'
+    && normalizeId(conversation?.requestedBy?._id || conversation?.requestedBy) !== normalizeId(currentUserId)
+  ) {
+    return false;
+  }
+  if (conversation?.isGroup) return true;
+  return participants.length >= 2;
+};
+const mergeUniqueConversations = (...lists) => {
+  const map = new Map();
+  lists.flat().forEach((conversation) => {
+    const id = getConversationId(conversation);
+    if (!id || map.has(id)) return;
+    map.set(id, conversation);
+  });
+  return Array.from(map.values());
+};
+const dedupeUsers = (users = []) => {
+  const map = new Map();
+  users.forEach((user) => {
+    const id = getUserId(user);
+    if (!id || map.has(id)) return;
+    map.set(id, user);
+  });
+  return Array.from(map.values());
+};
+const sortConversationsByLastMessage = (items = []) => (
+  [...items].sort((a, b) => new Date(b?.lastMessageAt || 0) - new Date(a?.lastMessageAt || 0))
+);
+const isOutgoingPendingRequest = (conversation, currentUserId) => (
+  Boolean(conversation?.isRequest)
+  && conversation?.requestStatus === 'pending'
+  && normalizeId(conversation?.requestedBy?._id || conversation?.requestedBy) === normalizeId(currentUserId)
+);
 
 function AvatarCircle({ src, label, className }) {
   return src ? (
@@ -82,6 +122,7 @@ export default function ShareContentModal({
 }) {
   const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
+  const sidebarConversations = useSelector((state) => state.chat?.conversations || []);
   const currentUserId = userObject?._id || userObject?.id || '';
 
   const [followingUsers, setFollowingUsers] = useState([]);
@@ -101,26 +142,35 @@ export default function ShareContentModal({
     let mounted = true;
     setLoadingUsers(true);
     setLoadingConversations(true);
+
+    const fetchAllFollowingUsers = async () => {
+      const pageLimit = 100;
+      let page = 1;
+      let allUsers = [];
+      while (page <= 20) {
+        const response = await getFollowing(currentUserId, { page, limit: pageLimit });
+        const users = Array.isArray(response?.users) ? response.users : [];
+        allUsers = [...allUsers, ...users];
+        const total = Number(response?.total || 0);
+        if ((total > 0 && allUsers.length >= total) || users.length < pageLimit) break;
+        page += 1;
+      }
+      return dedupeUsers(allUsers);
+    };
+
     Promise.all([
-      getFollowing(currentUserId, { page: 1, limit: 100 }).catch(() => ({ users: [] })),
+      fetchAllFollowingUsers().catch(() => []),
       getConversations('normal').catch(() => []),
+      getConversations('requests').catch(() => []),
     ])
-      .then(([followingRes, conversationsRes]) => {
+      .then(([followingUsersRes, normalConversationsRes, requestConversationsRes]) => {
         if (!mounted) return;
-        const users = Array.isArray(followingRes?.users) ? followingRes.users : [];
-        const allConversations = Array.isArray(conversationsRes) ? conversationsRes : [];
-        const shareableConversations = allConversations.filter((conversation) => {
-          const participants = Array.isArray(conversation?.participants) ? conversation.participants : [];
-          const includesMe = participants.some((participant) => getParticipantId(participant) === normalizeId(currentUserId));
-          if (!includesMe) return false;
-          if (conversation?.isRequest && conversation?.requestStatus === 'pending' && normalizeId(conversation?.requestedBy?._id || conversation?.requestedBy) !== normalizeId(currentUserId)) {
-            return false;
-          }
-          if (conversation?.isGroup) return true;
-          return participants.length >= 2;
-        });
-        setFollowingUsers(users);
-        setConversationList(shareableConversations);
+        const normalConversations = Array.isArray(normalConversationsRes) ? normalConversationsRes : [];
+        const requestConversations = Array.isArray(requestConversationsRes) ? requestConversationsRes : [];
+        const sidebar = Array.isArray(sidebarConversations) ? sidebarConversations : [];
+        const allConversations = mergeUniqueConversations(sidebar, normalConversations, requestConversations);
+        setFollowingUsers(Array.isArray(followingUsersRes) ? followingUsersRes : []);
+        setConversationList(allConversations.filter((conversation) => isShareableConversation(conversation, currentUserId)));
       })
       .finally(() => {
         if (!mounted) return;
@@ -131,7 +181,7 @@ export default function ShareContentModal({
     return () => {
       mounted = false;
     };
-  }, [isOpen, currentUserId]);
+  }, [isOpen, currentUserId, sidebarConversations]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -236,14 +286,38 @@ export default function ShareContentModal({
     if ((!selectedIds.length && !selectedConversationIds.length) || !contentType || !contentId || submitting) return;
     setSubmitting(true);
     try {
-      await shareContentToUsers({
+      const shareResponse = await shareContentToUsers({
         recipientIds: selectedIds,
         conversationIds: selectedConversationIds,
         contentType,
         contentId,
       });
-      const refreshedConversations = await getConversations('normal').catch(() => []);
-      if (Array.isArray(refreshedConversations)) {
+      const sentCount = Number(shareResponse?.sentCount || 0);
+      const failures = Array.isArray(shareResponse?.failures) ? shareResponse.failures : [];
+      const firstFailureReason = failures.length ? String(failures[0]?.reason || '').trim() : '';
+
+      if (sentCount < 1) {
+        window.alert(firstFailureReason || 'Share failed. No message was sent.');
+        return;
+      }
+
+      let refreshedConversations = [];
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const [normalConversationsRes, requestConversationsRes] = await Promise.all([
+          getConversations('normal').catch(() => []),
+          getConversations('requests').catch(() => []),
+        ]);
+        const normalConversations = Array.isArray(normalConversationsRes) ? normalConversationsRes : [];
+        const requestConversations = Array.isArray(requestConversationsRes) ? requestConversationsRes : [];
+        const outgoingRequests = requestConversations.filter((conversation) => isOutgoingPendingRequest(conversation, currentUserId));
+        refreshedConversations = sortConversationsByLastMessage(
+          mergeUniqueConversations(normalConversations, outgoingRequests)
+        );
+        if (refreshedConversations.length) break;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      if (refreshedConversations.length) {
         dispatch(setConversations(refreshedConversations));
       }
       onClose?.();

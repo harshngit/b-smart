@@ -1376,6 +1376,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     onClose();
   };
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handleModalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      handleClose();
+    };
+
+    window.addEventListener('keydown', handleModalEscape);
+    return () => window.removeEventListener('keydown', handleModalEscape);
+  }, [isOpen, handleClose]);
+
   const setAspect = (aspect) => {
     updateCurrentMedia({ aspect, zoom: 1, crop: { x: 0, y: 0 } });
     setShowRatioMenu(false);

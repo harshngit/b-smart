@@ -207,7 +207,7 @@ export default function VoiceRecorder({ onSend, onCancel, onStateChange, disable
         type="button"
         onClick={startRecording}
         disabled={disabled}
-        className="rounded-full p-2 text-gray-400 transition-colors hover:text-white disabled:opacity-40"
+        className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white disabled:opacity-40"
         title="Send voice message"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
