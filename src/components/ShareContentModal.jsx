@@ -301,8 +301,15 @@ export default function ShareContentModal({
         return;
       }
 
+      const sentConversationIds = Array.isArray(shareResponse?.conversationIds)
+        ? shareResponse.conversationIds.map((id) => String(id))
+        : [];
+
       let refreshedConversations = [];
-      for (let attempt = 0; attempt < 4; attempt += 1) {
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+        }
         const [normalConversationsRes, requestConversationsRes] = await Promise.all([
           getConversations('normal').catch(() => []),
           getConversations('requests').catch(() => []),
@@ -310,11 +317,14 @@ export default function ShareContentModal({
         const normalConversations = Array.isArray(normalConversationsRes) ? normalConversationsRes : [];
         const requestConversations = Array.isArray(requestConversationsRes) ? requestConversationsRes : [];
         const outgoingRequests = requestConversations.filter((conversation) => isOutgoingPendingRequest(conversation, currentUserId));
+        const allRequests = Array.isArray(requestConversationsRes) ? requestConversationsRes : [];
         refreshedConversations = sortConversationsByLastMessage(
-          mergeUniqueConversations(normalConversations, outgoingRequests)
+          mergeUniqueConversations(normalConversations, allRequests)
         );
-        if (refreshedConversations.length) break;
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const fetchedIds = refreshedConversations.map((c) => String(c._id));
+        const allSentFound = sentConversationIds.length === 0
+          || sentConversationIds.every((id) => fetchedIds.includes(id));
+        if (refreshedConversations.length && allSentFound) break;
       }
 
       if (refreshedConversations.length) {
