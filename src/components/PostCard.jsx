@@ -796,14 +796,12 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
             </div>
 
             <div className="mt-2 flex items-center gap-3 text-[14px] text-gray-500 dark:text-gray-400">
-              {commentsCount > 0 && (
-                <button onClick={() => onCommentClick?.(post)} className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
-                  {fmt(commentsCount)} {commentsCount === 1 ? 'comment' : 'comments'}
-                </button>
-              )}
-              {likeCount > 0 && (
-                <span>{fmt(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</span>
-              )}
+              <span className="cursor-default">
+                {fmt(likeCount)} {likeCount === 1 ? 'like' : 'likes'}
+              </span>
+              <button onClick={() => onCommentClick?.(post)} className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                {fmt(commentsCount)} {commentsCount === 1 ? 'comment' : 'comments'}
+              </button>
             </div>
           </div>
         </div>

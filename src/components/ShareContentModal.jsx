@@ -103,8 +103,8 @@ function ShareTargetAvatar({ target, currentUserId }) {
       <div className="relative h-full w-full">
         <AvatarCircle src={primarySrc} label={primaryLabel} className="h-full w-full" />
         {secondaryMember ? (
-          <div className="absolute -bottom-0.5 -right-0.5 h-6 w-6 overflow-hidden rounded-full ring-2 ring-[#1a1e28] md:h-7 md:w-7">
-            <AvatarCircle src={secondarySrc} label={secondaryLabel} className="h-full w-full text-xs" />
+          <div className="absolute -bottom-0.5 -right-0.5 h-5 w-5 overflow-hidden rounded-full ring-2 ring-[#1a1e28] md:h-6 md:w-6">
+            <AvatarCircle src={secondarySrc} label={secondaryLabel} className="h-full w-full text-[10px]" />
           </div>
         ) : null}
       </div>
@@ -349,25 +349,25 @@ export default function ShareContentModal({
   return (
     <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="flex w-full max-w-[600px] max-h-[78vh] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-[#1f2430] to-[#1a1e28] text-white shadow-2xl"
+        className="flex w-full max-w-[480px] max-h-[72vh] flex-col overflow-hidden rounded-[24px] border border-white/10 bg-gradient-to-b from-[#1f2430] to-[#1a1e28] text-white shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex items-center justify-between px-5 py-3">
           <button onClick={onClose} className="rounded-full p-2 text-white/85 transition hover:bg-white/10 hover:text-white" aria-label="Close share">
-            <X size={22} strokeWidth={2.1} />
+            <X size={20} strokeWidth={2.1} />
           </button>
-          <p className="text-[24px] font-semibold tracking-tight leading-none">Share</p>
+          <p className="text-[20px] font-semibold tracking-tight leading-none">Share</p>
           <div className="w-10" />
         </div>
 
         <div className="px-5 pb-3">
-          <div className="flex items-center gap-3 rounded-xl bg-[#252b36] px-4 py-2.5">
-            <Search size={18} className="text-white/50" />
+          <div className="flex items-center gap-3 rounded-xl bg-[#252b36] px-4 py-2">
+            <Search size={16} className="text-white/50" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search"
-              className="w-full bg-transparent text-[24px] text-white outline-none placeholder:text-white/50"
+              className="w-full bg-transparent text-[16px] text-white outline-none placeholder:text-white/50"
             />
           </div>
         </div>
@@ -382,7 +382,7 @@ export default function ShareContentModal({
           ) : null}
 
           {!loadingUsers && !loadingConversations && displayTargets.length ? (
-            <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 pb-4">
+            <div className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 md:grid-cols-5 pb-4">
               {displayTargets.map((target) => (
                 <button
                   key={target.key}
@@ -390,18 +390,18 @@ export default function ShareContentModal({
                   onClick={() => (target.type === 'conversation' ? toggleConversation(target.id) : toggleUser(target.id))}
                   className="flex flex-col items-center gap-2 text-center transition hover:opacity-90"
                 >
-                  <div className="relative h-14 w-14 md:h-16 md:w-16">
+                  <div className="relative h-12 w-12 md:h-14 md:w-14">
                     <ShareTargetAvatar target={target} currentUserId={currentUserId} />
                     {target.onlineUserId && onlineUserIds.includes(String(target.onlineUserId)) ? (
-                      <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[#1a1e28] bg-[#38d430]" />
+                      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#1a1e28] bg-[#38d430]" />
                     ) : null}
                     {target.selected ? (
-                      <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#2a2f9f] text-white ring-2 ring-[#1a1e28]">
-                        <Check size={14} />
+                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#2a2f9f] text-white ring-2 ring-[#1a1e28]">
+                        <Check size={12} />
                       </span>
                     ) : null}
                   </div>
-                  <p className="line-clamp-2 text-sm leading-tight text-white/95">
+                  <p className="line-clamp-2 text-xs leading-tight text-white/95">
                     {target.label}
                   </p>
                 </button>
@@ -415,9 +415,9 @@ export default function ShareContentModal({
             type="button"
             disabled={!selectedTotal || submitting}
             onClick={handleSend}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#4f58ff] px-5 py-3 text-base font-semibold text-white transition hover:bg-[#626afc] disabled:cursor-not-allowed disabled:bg-[#3a3f5d] disabled:text-white/60"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#4f58ff] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#626afc] disabled:cursor-not-allowed disabled:bg-[#3a3f5d] disabled:text-white/60"
           >
-            <Send size={16} />
+            <Send size={14} />
             {submitting ? 'Sharing...' : `Share (${selectedTotal})`}
           </button>
         </div>
