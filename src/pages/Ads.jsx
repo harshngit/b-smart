@@ -2129,7 +2129,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
       {/* Like / Dislike Short Toast */}
       {likeRewardPopup && (
-        <div className="fixed top-4 right-4 z-[200] pointer-events-none">
+        <div className="fixed top-20 left-1/2  -translate-x-1/2 -translate-y-1/2 z-[200] pointer-events-none">
           <div
             className={`min-w-[220px] max-w-[280px] rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur-md text-white ${
               likeRewardPopup.isLike
