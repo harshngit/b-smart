@@ -342,7 +342,7 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
   const currentName = currentUser.full_name || currentUser.username || 'User';
 
   return (
-    <aside className="hidden xl:block w-[280px] shrink-0 z-0">
+    <aside className="hidden xl:block w-[350px] shrink-0 z-0">
       <div className="sticky top-20">
         <div className="mb-6">
           <button
@@ -550,8 +550,8 @@ const Home = () => {
     <div>
       <LocationBar />
       <div className="max-w-[1280px] mx-auto xl:px-6">
-        <div className="xl:flex xl:items-start xl:justify-between xl:gap-12">
-          <div className="w-full max-w-[650px]">
+        <div className="xl:flex xl:items-start xl:justify-between xl:gap-16">
+          <div className="w-full max-w-[630px]">
             <StoryRail />
             <div className="mx-auto mb-4 flex w-full max-w-[470px] items-center gap-2 px-2 xl:mx-0">
               {[

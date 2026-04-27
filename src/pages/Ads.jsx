@@ -608,6 +608,13 @@ const Ads = ({ feedMode = 'user' }) => {
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const [showCtaButtons, setShowCtaButtons] = useState(false);  // shows after 50% progress
 
+  // Auto-dismiss like/dislike message
+  useEffect(() => {
+    if (!likeRewardPopup) return undefined;
+    const timer = setTimeout(() => setLikeRewardPopup(null), 3000);
+    return () => clearTimeout(timer);
+  }, [likeRewardPopup]);
+
   // Measure action-panel position so comment popup arrow aligns correctly
   useEffect(() => {
     const measure = () => {
@@ -1119,7 +1126,11 @@ const Ads = ({ feedMode = 'user' }) => {
       setLikeRewardPopup({ amount: Number(coinsRewarded) || 10, isLike: !isLiked });
 
     } catch (err) {
-      console.error('Like failed:', err);
+      console.error('Like failed:', {
+        status: err?.response?.status,
+        data: err?.response?.data,
+        message: err?.message,
+      });
       const apiMessage =
         err?.response?.data?.message
         || err?.response?.data?.error
@@ -2116,40 +2127,40 @@ const Ads = ({ feedMode = 'user' }) => {
         </div>
       )}
 
-      {/* ── Like / Dislike Coin Popup ── */}
+      {/* Like / Dislike Short Toast */}
       {likeRewardPopup && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+        <div className="fixed top-4 right-4 z-[200] pointer-events-none">
           <div
-            className="pointer-events-auto bg-white dark:bg-[#1c1c1e] rounded-3xl shadow-2xl px-8 py-7 flex flex-col items-center gap-4 border dark:border-white/10"
-            style={{ animation: 'popupIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards', minWidth: 260, borderColor: likeRewardPopup.isLike ? '#fca5a5' : '#d1d5db' }}
+            className={`min-w-[220px] max-w-[280px] rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur-md text-white ${
+              likeRewardPopup.isLike
+                ? 'bg-gradient-to-r from-orange-500 to-pink-600 border-orange-300/50'
+                : 'bg-gradient-to-r from-slate-600 to-slate-700 border-slate-400/40'
+            }`}
+            style={{ animation: 'popupIn 0.28s cubic-bezier(0.22,1,0.36,1) forwards' }}
           >
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${likeRewardPopup.isLike ? 'bg-gradient-to-br from-red-400 to-pink-500 shadow-red-300/50' : 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-gray-300/40'}`} style={{ animation: 'coinPulse 0.6s ease-out' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill={likeRewardPopup.isLike ? 'white' : 'white'} stroke="none">
-                {likeRewardPopup.isLike
-                  ? <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                  : <><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></>
-                }
-              </svg>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 h-8 w-8 shrink-0 rounded-full bg-white/20 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="none">
+                  {likeRewardPopup.isLike
+                    ? <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    : <><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></>
+                  }
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-black leading-tight">
+                  {likeRewardPopup.isLike ? `+${likeRewardPopup.amount}` : `-${likeRewardPopup.amount}`} Coins
+                </p>
+                <p className="mt-0.5 text-xs font-semibold text-white/90 leading-tight">
+                  {likeRewardPopup.isLike ? 'Thanks for liking' : 'Dislike recorded'}
+                </p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className={`text-2xl font-black ${likeRewardPopup.isLike ? 'text-red-500' : 'text-gray-500'}`}>
-                {likeRewardPopup.isLike ? `+${likeRewardPopup.amount}` : `-${likeRewardPopup.amount}`} Coins
-              </p>
-              <p className="text-gray-700 dark:text-gray-300 font-semibold text-sm mt-0.5">
-                {likeRewardPopup.isLike ? 'Thanks for liking! 💖' : 'Dislike recorded'}
-              </p>
-            </div>
-            <button
-              onClick={() => setLikeRewardPopup(null)}
-              className={`w-full text-white font-bold py-2.5 rounded-2xl text-sm hover:opacity-90 active:scale-95 transition-all shadow-md ${likeRewardPopup.isLike ? 'bg-gradient-to-r from-red-400 to-pink-500' : 'bg-gradient-to-r from-gray-400 to-gray-600'}`}
-            >
-              Got it!
-            </button>
           </div>
         </div>
       )}
 
-      {/* ── Coin Reward Toast ── */}
+      {/* Coin Reward Toast */}
       {coinToast && (
         <div
           key={coinToast.id}
@@ -2262,3 +2273,5 @@ const Ads = ({ feedMode = 'user' }) => {
 };
 
 export default Ads;
+
+

@@ -225,7 +225,7 @@ const Layout = () => {
         <div className={`
           ${showTopBar ? 'pt-16 md:pt-0' : 'pt-0 md:pt-0'}
           w-full flex justify-center
-          ${isMessagesPage ? 'md:max-w-none lg:max-w-none' : 'lg:max-w-[850px] mx-auto'}
+          ${isMessagesPage ? 'md:max-w-none lg:max-w-none' : 'lg:max-w-[1280px] mx-auto'}
           ${isMessagesPage ? 'px-0 md:px-0' : 'px-0 md:px-0'}
         `}>
           {/* Main content */}
