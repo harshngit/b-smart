@@ -318,6 +318,14 @@ const mapApiToForm = (data) => ({
 });
 
 const mapFormToBody = (form) => ({
+  company_details: {
+    company_name: form.companyName,
+    registered_name: form.registeredName,
+    registration_number: form.regNumber,
+    tax_id: form.taxId,
+    year_established: form.yearEstablished,
+    company_type: form.companyType,
+  },
   business_details: {
     industry_category: form.industry, business_nature: form.businessNature,
     service_coverage: form.coverage, country: form.country,
@@ -591,12 +599,12 @@ const CompanyInfo = () => {
 
           <SectionDivider>Registration Details</SectionDivider>
 
-          <Field label="Company Name" required><Input value={form.companyName} disabled placeholder="Company Name" /></Field>
-          <Field label="Registered Name" required><Input value={form.registeredName} disabled placeholder="Legal registered name" /></Field>
-          <Field label="Registration Number"><Input value={form.regNumber} disabled placeholder="CIN / Reg. No." /></Field>
-          <Field label="Tax ID / VAT / GST"><Input value={form.taxId} disabled placeholder="GSTIN / VAT ID" /></Field>
-          <Field label="Year Established"><Input value={form.yearEstablished} disabled placeholder="Year" /></Field>
-          <Field label="Company Type"><Input value={form.companyType} disabled placeholder="Company type" /></Field>
+          <Field label="Company Name" required><Input value={form.companyName} onChange={set("companyName")} disabled={D} placeholder="Company Name" /></Field>
+          <Field label="Registered Name" required><Input value={form.registeredName} onChange={set("registeredName")} disabled={D} placeholder="Legal registered name" /></Field>
+          <Field label="Registration Number"><Input value={form.regNumber} onChange={set("regNumber")} disabled={D} placeholder="CIN / Reg. No." /></Field>
+          <Field label="Tax ID / VAT / GST"><Input value={form.taxId} onChange={set("taxId")} disabled={D} placeholder="GSTIN / VAT ID" /></Field>
+          <Field label="Year Established"><Input value={form.yearEstablished} onChange={set("yearEstablished")} disabled={D} placeholder="Year" /></Field>
+          <Field label="Company Type"><Input value={form.companyType} onChange={set("companyType")} disabled={D} placeholder="Company type" /></Field>
 
           <SectionDivider>Business Details</SectionDivider>
 
@@ -676,12 +684,12 @@ const CompanyInfo = () => {
       <div className="md:hidden space-y-3">
         <CollapsibleSection title="Registration Details" icon={Building2} defaultOpen>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Company Name" required><Input value={form.companyName} disabled placeholder="Company Name" /></Field>
-            <Field label="Registered Name" required><Input value={form.registeredName} disabled placeholder="Legal name" /></Field>
-            <Field label="Reg. Number"><Input value={form.regNumber} disabled placeholder="CIN / Reg. No." /></Field>
-            <Field label="Tax ID / GST"><Input value={form.taxId} disabled placeholder="GSTIN" /></Field>
-            <Field label="Year Est."><Input value={form.yearEstablished} disabled placeholder="Year" /></Field>
-            <Field label="Type"><Input value={form.companyType} disabled placeholder="Type" /></Field>
+            <Field label="Company Name" required><Input value={form.companyName} onChange={set("companyName")} disabled={D} placeholder="Company Name" /></Field>
+            <Field label="Registered Name" required><Input value={form.registeredName} onChange={set("registeredName")} disabled={D} placeholder="Legal name" /></Field>
+            <Field label="Reg. Number"><Input value={form.regNumber} onChange={set("regNumber")} disabled={D} placeholder="CIN / Reg. No." /></Field>
+            <Field label="Tax ID / GST"><Input value={form.taxId} onChange={set("taxId")} disabled={D} placeholder="GSTIN" /></Field>
+            <Field label="Year Est."><Input value={form.yearEstablished} onChange={set("yearEstablished")} disabled={D} placeholder="Year" /></Field>
+            <Field label="Type"><Input value={form.companyType} onChange={set("companyType")} disabled={D} placeholder="Type" /></Field>
           </div>
         </CollapsibleSection>
 

@@ -1,15 +1,12 @@
-import { useState, useEffect, useCallback, createElement } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import api from "../../lib/api";
 import {
   Wallet,
-  TrendingUp,
-  TrendingDown,
   ArrowUpRight,
   ArrowDownLeft,
   RefreshCw,
-  Filter,
   Megaphone,
   BarChart2,
   Clock,
@@ -21,9 +18,8 @@ import {
   X,
 } from "lucide-react";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-// ─── Coin Icon (replaces ₹ symbol everywhere) ─────────────────────────────────
+// Helpers
+// Coin Icon (replaces INR symbol everywhere)
 const CoinIcon = ({ size = 16, className = "" }) => (
   <svg
     width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -39,15 +35,72 @@ const CoinIcon = ({ size = 16, className = "" }) => (
 );
 
 const formatCurrencyNum = (amount) => {
-  if (amount == null) return "—";
+  if (amount == null) return "-";
   return new Intl.NumberFormat("en-IN", {
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
   }).format(amount);
 };
 
+const formatMetric = (value) => {
+  const num = Number(value || 0);
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+  return `${num}`;
+};
+
+const getApiOrigin = () => {
+  const base = String(api?.defaults?.baseURL || "").trim();
+  if (!base) return "";
+  return base.replace(/\/api\/?$/i, "");
+};
+
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp", "svg", "avif"]);
+const NON_IMAGE_EXTENSIONS = new Set(["m3u8", "mpd", "ts", "mp4", "webm", "mov", "mkv"]);
+
+const getFileExt = (urlValue) => {
+  const str = String(urlValue || "").trim();
+  if (!str) return "";
+  const pathPart = str.split("?")[0].split("#")[0];
+  const parts = pathPart.split(".");
+  if (parts.length < 2) return "";
+  return parts[parts.length - 1].toLowerCase();
+};
+
+const isRenderableImageUrl = (urlValue) => {
+  const ext = getFileExt(urlValue);
+  if (!ext) return true;
+  if (NON_IMAGE_EXTENSIONS.has(ext)) return false;
+  if (IMAGE_EXTENSIONS.has(ext)) return true;
+  return true;
+};
+
+const buildThumbnailCandidates = (rawUrl) => {
+  const value = String(rawUrl || "").trim();
+  if (!value) return [];
+
+  const normalized = value.replace(/\\/g, "/");
+  const apiOrigin = getApiOrigin();
+  const set = new Set();
+
+  if (/^https?:\/\//i.test(normalized)) set.add(normalized);
+  if (normalized.startsWith("//")) {
+    set.add(`https:${normalized}`);
+    set.add(`http:${normalized}`);
+  }
+  if (apiOrigin) {
+    if (normalized.startsWith("/")) set.add(`${apiOrigin}${normalized}`);
+    if (normalized.startsWith("uploads/")) set.add(`${apiOrigin}/${normalized}`);
+    const fileName = normalized.split("/").filter(Boolean).pop();
+    if (fileName) set.add(`${apiOrigin}/uploads/${fileName}`);
+  }
+  if (normalized.startsWith("/")) set.add(normalized);
+
+  return Array.from(set).filter(isRenderableImageUrl);
+};
+
 const formatDate = (dateStr) => {
-  if (!dateStr) return "—";
+  if (!dateStr) return "-";
   return new Date(dateStr).toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -68,44 +121,43 @@ const formatTimeAgo = (dateStr) => {
   return `${Math.floor(hrs / 24)}d ago`;
 };
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// Sub-components
 
-const MetricCard = ({ label, value, icon, sublabel, onClick, highlight, loading }) => (
+
+const DashboardInfoCard = ({
+  className,
+  badge,
+  title,
+  subtitle,
+  secondaryBadge,
+  footer,
+  onClick,
+  loading,
+  children,
+  highlight = false,
+}) => (
   <div
     onClick={onClick}
-    className={`relative cursor-pointer rounded-2xl p-5 flex flex-col gap-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl border ${
-      highlight
-        ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white border-transparent shadow-lg shadow-pink-500/20"
-        : "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700"
-    }`}
+    className={`rounded-2xl p-5 border transition-all duration-300 h-full min-h-[240px] flex flex-col ${onClick ? "cursor-pointer hover:scale-[1.01] hover:shadow-xl" : ""} ${className}`}
   >
-    <div className="flex items-center justify-between">
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${highlight ? "bg-white/20" : "bg-gray-100 dark:bg-gray-800"}`}>
-        {icon
-          ? createElement(icon, { className: `w-5 h-5 ${highlight ? "text-white" : "text-gray-600 dark:text-gray-300"}` })
-          : null}
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        {loading ? (
+          <div className={`h-7 w-32 rounded-lg animate-pulse ${highlight ? "bg-white/20" : "bg-gray-100 dark:bg-gray-800"}`} />
+        ) : (
+          <h3 className="text-4xl md:text-3xl font-bold leading-none truncate">{title}</h3>
+        )}
+        {subtitle ? <p className={`text-base mt-1 font-medium ${highlight ? "text-white/90" : "text-gray-500 dark:text-gray-400"}`}>{subtitle}</p> : null}
+        {secondaryBadge ? (
+          <span className={`inline-flex mt-2 text-[11px] font-semibold px-2.5 py-1 rounded-full ${highlight ? "bg-white/20 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}`}>
+            {secondaryBadge}
+          </span>
+        ) : null}
       </div>
-      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${highlight ? "bg-white/20 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}`}>
-        {sublabel}
-      </span>
+     
     </div>
-    <div>
-      {loading ? (
-        <div className={`h-8 w-24 rounded-lg animate-pulse ${highlight ? "bg-white/20" : "bg-gray-100 dark:bg-gray-800"}`} />
-      ) : (
-        <div className={`text-3xl font-bold tracking-tight ${highlight ? "text-white" : "text-gray-900 dark:text-white"}`}>
-          {value}
-        </div>
-      )}
-      <div className={`text-sm mt-1 font-medium ${highlight ? "text-white/90" : "text-gray-500 dark:text-gray-400"}`}>
-        {label}
-      </div>
-    </div>
-    {onClick && (
-      <div className={`absolute bottom-4 right-4 text-xs font-semibold opacity-60 hover:opacity-100 transition-opacity ${highlight ? "text-white" : "text-pink-600 dark:text-pink-400"}`}>
-        View →
-      </div>
-    )}
+    {children ? <div className="mt-4 flex-1">{children}</div> : <div className="flex-1" />}
+    {footer ? <div className={`mt-4 text-sm font-semibold text-right ${highlight ? "text-white/80" : "text-pink-600 dark:text-pink-400"}`}>{footer}</div> : null}
   </div>
 );
 
@@ -150,7 +202,7 @@ const TransactionRow = ({ tx }) => (
             </div>
           )}
           {tx.ad?.title && (
-            <div className="text-xs text-pink-500 mt-0.5 truncate max-w-[180px]">📢 {tx.ad.title}</div>
+            <div className="text-xs text-pink-500 mt-0.5 truncate max-w-[180px]">Ad: {tx.ad.title}</div>
           )}
         </div>
       </div>
@@ -177,10 +229,42 @@ const TransactionRow = ({ tx }) => (
   </tr>
 );
 
-const TRANSACTION_TYPES = ["", "AD_SPEND", "RECHARGE", "REFUND", "BONUS"];
-const DIRECTIONS = ["", "credit", "debit"];
+const AdThumbnail = ({ thumbnail, caption }) => {
+  const sources = buildThumbnailCandidates(thumbnail);
+  const [index, setIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    setIndex(0);
+    setFailed(false);
+  }, [thumbnail]);
+
+  if (!sources.length || failed) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400">
+        No Image
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={sources[index]}
+      alt={caption || "Ad"}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      onError={() => {
+        if (index < sources.length - 1) {
+          setIndex((prev) => prev + 1);
+        } else {
+          setFailed(true);
+        }
+      }}
+    />
+  );
+};
+
+// Main Component
 
 export default function VendorDashboard() {
   const navigate = useNavigate();
@@ -196,8 +280,8 @@ export default function VendorDashboard() {
   const [walletError, setWalletError] = useState(null);
 
   // Active ads count
-  const [activeAdsCount, setActiveAdsCount] = useState(null);
-  const [adsLoading, setAdsLoading] = useState(true);
+  const [dashboardSummary, setDashboardSummary] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   // Profile completion
   const [profilePct, setProfilePct] = useState(null);
@@ -205,38 +289,19 @@ export default function VendorDashboard() {
     () => sessionStorage.getItem("profileBannerDismissed") === "1"
   );
 
-  // Filters
-  const [typeFilter, setTypeFilter] = useState("");
-  const [directionFilter, setDirectionFilter] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-
-  // ─── Fetch Wallet & History ───────────────────────────────────────────────
+  // Fetch wallet and history
   const fetchWalletData = useCallback(async () => {
     if (!userId) return;
     setWalletLoading(true);
     setWalletError(null);
     try {
-      const params = { limit: 7 };
-      if (typeFilter) params.type = typeFilter;
-      if (directionFilter) params.direction = directionFilter;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-
-      // /api/wallet/me — basic wallet + transaction history
-      const res = await api.get("/wallet/me", { params });
+      // /api/wallet/me - basic wallet + transaction history
+      const res = await api.get("/wallet/me", { params: { limit: 7 } });
       setWallet(res.data.wallet);
       setTotal(res.data.total || 0);
 
-      // /api/wallet/vendor/{userId}/history — detailed transactions with filters
-      const histParams = { limit: 7 };
-      if (typeFilter) histParams.type = typeFilter;
-      if (directionFilter) histParams.direction = directionFilter;
-      if (startDate) histParams.startDate = startDate;
-      if (endDate) histParams.endDate = endDate;
-
-      const histRes = await api.get(`/wallet/vendor/${userId}/history`, { params: histParams });
+      // /api/wallet/vendor/{userId}/history - detailed transactions with filters
+      const histRes = await api.get(`/wallet/vendor/${userId}/history`, { params: { limit: 7 } });
       setTransactions(histRes.data.transactions || []);
       if (histRes.data.total != null) setTotal(histRes.data.total);
     } catch (err) {
@@ -245,24 +310,22 @@ export default function VendorDashboard() {
     } finally {
       setWalletLoading(false);
     }
-  }, [userId, typeFilter, directionFilter, startDate, endDate]);
+  }, [userId]);
 
-  // ─── Fetch Active Ads Count ───────────────────────────────────────────────
-  const fetchActiveAds = useCallback(async () => {
+  // Fetch dashboard summary
+  const fetchDashboardSummary = useCallback(async () => {
     if (!userId) return;
-    setAdsLoading(true);
+    setDashboardLoading(true);
     try {
-      const res = await api.get(`/ads/user/${userId}`);
-      const ads = res.data?.ads || res.data || [];
-      const active = Array.isArray(ads)
-        ? ads.filter((ad) => (ad.status || "").toLowerCase() === "active").length
-        : 0;
-      setActiveAdsCount(active);
+      const res = await api.get(`/vendors/dashboard/${userId}`);
+      setDashboardSummary(res.data || null);
+      setProfilePct(res.data?.vendor?.profile_completion_percentage ?? null);
     } catch (err) {
-      console.error("Ads fetch error:", err);
-      setActiveAdsCount(0);
+      console.error("Dashboard summary fetch error:", err);
+      setDashboardSummary(null);
+      setProfilePct(null);
     } finally {
-      setAdsLoading(false);
+      setDashboardLoading(false);
     }
   }, [userId]);
 
@@ -271,18 +334,10 @@ export default function VendorDashboard() {
   }, [fetchWalletData]);
 
   useEffect(() => {
-    fetchActiveAds();
-  }, [fetchActiveAds]);
+    fetchDashboardSummary();
+  }, [fetchDashboardSummary]);
 
-  // ─── Fetch Profile Completion ──────────────────────────────────────────
-  useEffect(() => {
-    if (!userId) return;
-    api.get(`/vendors/profile/${userId}`)
-      .then(res => setProfilePct(res.data?.profile_completion_percentage ?? null))
-      .catch(() => {});
-  }, [userId]);
-
-  // ─── Derived stats ────────────────────────────────────────────────────────
+  // Derived stats
   const totalDebited = transactions
     .filter((t) => t.direction === "debit")
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -292,19 +347,29 @@ export default function VendorDashboard() {
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
   const recentActivity = transactions.slice(0, 5);
+  const vendorName =
+    dashboardSummary?.vendor?.company_name ||
+    userObject?.full_name ||
+    userObject?.username ||
+    "Vendor";
+  const isVendorVerified = !!dashboardSummary?.vendor?.validated;
+  const activeAdsCount = Number(dashboardSummary?.ads?.active_count || 0);
+  const activePackage = dashboardSummary?.package || null;
+  const salesOfficer = dashboardSummary?.sales_officer || null;
+  const packageName = activePackage?.name || "No Active Package";
+  const packageStatus = activePackage?.status === "active" ? "Active" : "Inactive";
+  const adsRemainingText = activePackage ? `${Math.max(0, Number(activePackage?.ads_remaining || 0))}` : "-";
+  const daysLeftText = activePackage
+    ? (activePackage?.days_left == null ? "-" : `${Math.max(0, Number(activePackage.days_left))}`)
+    : "-";
+  const totalAdsCount = Number(dashboardSummary?.ads?.total_count || 0);
+  const inactiveAdsCount = Math.max(0, totalAdsCount - activeAdsCount);
+  const profileCompletionText = profilePct == null ? "-" : `${Math.max(0, Math.min(100, Number(profilePct || 0)))}% Complete`;
+  const vendorRegisteredName = dashboardSummary?.vendor?.registered_name || "-";
+  const overview = dashboardSummary?.overview || {};
+  const popularAds = Array.isArray(dashboardSummary?.popular_ads) ? dashboardSummary.popular_ads : [];
 
-  const handleApplyFilters = () => {
-    fetchWalletData();
-  };
-
-  const handleClearFilters = () => {
-    setTypeFilter("");
-    setDirectionFilter("");
-    setStartDate("");
-    setEndDate("");
-  };
-
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // Render
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
       <div className="max-w-7xl mx-auto p-6 md:p-8">
@@ -324,13 +389,13 @@ export default function VendorDashboard() {
               Ad Dashboard
             </h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-              {userObject?.full_name || userObject?.username || "Vendor"} · Wallet & Performance Overview
+              {vendorName} · Wallet & Performance Overview
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { fetchWalletData(); fetchActiveAds(); }}
+              onClick={() => { fetchWalletData(); fetchDashboardSummary(); }}
               className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               title="Refresh"
             >
@@ -366,7 +431,7 @@ export default function VendorDashboard() {
                 <div className="flex items-center justify-between gap-4 mb-1">
                   <div>
                     <span className="text-sm font-bold text-amber-800 dark:text-amber-300">
-                      Complete your vendor profile — {profilePct}% done
+                      Complete your vendor profile - {profilePct}% done
                     </span>
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
                       A complete profile is required for account verification and to start running ads.
@@ -391,7 +456,7 @@ export default function VendorDashboard() {
                     onClick={() => navigate("/vendor/profile")}
                     className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-600 dark:bg-amber-500 text-white hover:opacity-90 transition-opacity"
                   >
-                    Complete Profile →
+                    Complete Profile -&gt;
                   </button>
                 </div>
               </div>
@@ -403,166 +468,186 @@ export default function VendorDashboard() {
 
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <MetricCard
-            label="Active Ads"
-            value={activeAdsCount != null ? activeAdsCount.toLocaleString() : "—"}
-            icon={Megaphone}
-            sublabel="Running"
+          <DashboardInfoCard
+            className="bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 text-gray-900 dark:text-white"
+            badge={isVendorVerified ? "Verified" : "Pending"}
+            title={vendorName}
+            subtitle="Vendor Profile"
+            secondaryBadge={isVendorVerified ? "Verified" : "Pending"}
+            footer="View ->>"
+            loading={dashboardLoading}
+            onClick={() => navigate("/vendor/profile")}
+          >
+            <div className="space-y-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+              <div className="flex items-center justify-between gap-3">
+                <span>Registered Name</span>
+                <span className="text-gray-800 dark:text-gray-200 truncate max-w-[55%] text-right">{vendorRegisteredName}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Profile Completion</span>
+                <span className="text-gray-800 dark:text-gray-200">{profileCompletionText}</span>
+              </div>
+            </div>
+          </DashboardInfoCard>
+
+          <DashboardInfoCard
+            className="bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 text-gray-900 dark:text-white"
+            badge={packageStatus}
+            title={packageName}
+            subtitle="Package Details"
+            secondaryBadge="Verified"
+            footer="View ->>"
+            loading={dashboardLoading}
+            onClick={() => navigate("/vendor/billing")}
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-4xl md:text-3xl font-bold leading-none">{adsRemainingText}</div>
+                <div className="text-sm mt-1 font-medium opacity-90">Ads Remain</div>
+              </div>
+              <div>
+                <div className="text-4xl md:text-3xl font-bold leading-none">{daysLeftText}</div>
+                <div className="text-sm mt-1 font-medium opacity-90">Days Left</div>
+              </div>
+            </div>
+          </DashboardInfoCard>
+
+          <DashboardInfoCard
+            className="bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white border-transparent shadow-lg shadow-pink-500/20"
+            badge="Running"
+            title={`${activeAdsCount}`}
+            subtitle="Active Ads"
+            secondaryBadge="Verified"
+            footer="View ->"
+            loading={dashboardLoading}
             onClick={() => navigate("/vendor/ads-management")}
             highlight
-            loading={adsLoading}
-          />
-          <MetricCard
-            label="Wallet Balance"
-            value={wallet ? <span className="flex items-center gap-1"><CoinIcon size={22} />{formatCurrencyNum(wallet.balance)}</span> : "—"}
-            icon={Wallet}
-            sublabel="Available"
-            onClick={() => navigate("/vendor/billing")}
-            loading={walletLoading}
-          />
-          <MetricCard
-            label="Total Credited"
-            value={walletLoading ? "—" : <span className="flex items-center gap-1"><CoinIcon size={22} />{totalCredited.toLocaleString("en-IN")}</span>}
-            icon={TrendingUp}
-            sublabel="This Page"
-            loading={walletLoading}
-          />
-          <MetricCard
-            label="Total Debited"
-            value={walletLoading ? "—" : <span className="flex items-center gap-1"><CoinIcon size={22} />{totalDebited.toLocaleString("en-IN")}</span>}
-            icon={TrendingDown}
-            sublabel="This Page"
-            loading={walletLoading}
-          />
-        </div>
+          >
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div className="text-2xl font-bold leading-none">{totalAdsCount}</div>
+                <div className="mt-1 text-white/80">Total Ads</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold leading-none">{inactiveAdsCount}</div>
+                <div className="mt-1 text-white/80">Inactive Ads</div>
+              </div>
+            </div>
+          </DashboardInfoCard>
 
+          <DashboardInfoCard
+            className="bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 text-gray-900 dark:text-white"
+            badge="View ->>"
+            title={salesOfficer?.full_name || "Not Assigned"}
+            subtitle="Sales Officer"
+            secondaryBadge="Verified"
+            loading={dashboardLoading}
+          >
+            <div className="space-y-2 text-sm">
+              <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Contact Details</div>
+              <div className="font-semibold">{salesOfficer?.phone || "-"}</div>
+              <div className="break-all font-semibold">{salesOfficer?.email || "-"}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 pt-1">Location: {salesOfficer?.location || "-"}</div>
+            </div>
+          </DashboardInfoCard>
+        </div>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 mb-6 shadow-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-500 text-white">
+              <div className="text-[11px] font-semibold opacity-90">Followers</div>
+              <div className="text-3xl font-bold leading-tight mt-0.5">{formatMetric(overview.followers)}</div>
+            </div>
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white">
+              <div className="text-[11px] font-semibold opacity-90">Views</div>
+              <div className="text-3xl font-bold leading-tight mt-0.5">{formatMetric(overview.views)}</div>
+            </div>
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-r from-sky-600 to-cyan-500 text-white">
+              <div className="text-[11px] font-semibold opacity-90">Reach</div>
+              <div className="text-3xl font-bold leading-tight mt-0.5">{formatMetric(overview.reach)}</div>
+            </div>
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white">
+              <div className="text-[11px] font-semibold opacity-90">Engagements</div>
+              <div className="text-3xl font-bold leading-tight mt-0.5">{formatMetric(overview.engagements)}</div>
+            </div>
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-r from-pink-600 to-rose-500 text-white">
+              <div className="text-[11px] font-semibold opacity-90">Website Clicks</div>
+              <div className="text-3xl font-bold leading-tight mt-0.5">{formatMetric(overview.website_clicks)}</div>
+            </div>
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-r from-fuchsia-700 to-purple-500 text-white">
+              <div className="text-[11px] font-semibold opacity-90">Profile Link Clicks</div>
+              <div className="text-3xl font-bold leading-tight mt-0.5">{formatMetric(overview.profile_link_clicks)}</div>
+            </div>
+          </div>
+        </div>
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* Wallet History Table */}
+          {/* Most Popular Ads */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-
-            {/* Table Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Wallet History</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{total} total transactions</p>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Most Popular Ads</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{popularAds.length} items</p>
               </div>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
-                  showFilters
-                    ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 border-pink-200 dark:border-pink-800"
-                    : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <Filter className="w-3 h-3" />
-                Filters {(typeFilter || startDate || endDate) ? "●" : ""}
-              </button>
+              <span className="text-xs font-semibold text-pink-600 dark:text-pink-400">View --&gt;</span>
             </div>
 
-            {/* Filters Row */}
-            {showFilters && (
-              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Type</label>
-                    <select
-                      value={typeFilter}
-                      onChange={(e) => setTypeFilter(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-pink-500/20"
-                    >
-                      {TRANSACTION_TYPES.map((t) => (
-                        <option key={t} value={t}>{t || "All Types"}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Direction</label>
-                    <select
-                      value={directionFilter}
-                      onChange={(e) => setDirectionFilter(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-pink-500/20"
-                    >
-                      {DIRECTIONS.map((d) => (
-                        <option key={d} value={d}>{d ? d[0].toUpperCase() + d.slice(1) : "All Directions"}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-pink-500/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">End Date</label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-pink-500/20"
-                    />
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <button
-                      onClick={handleApplyFilters}
-                      className="flex-1 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-orange-500 text-white text-xs font-bold hover:opacity-90 transition-opacity"
-                    >
-                      Apply
-                    </button>
-                    <button
-                      onClick={handleClearFilters}
-                      className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Table */}
             <div className="overflow-x-auto">
-              {walletLoading ? (
+              {dashboardLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Loading transactions…</span>
+                  <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Loading ads...</span>
                 </div>
-              ) : transactions.length === 0 ? (
+              ) : popularAds.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                     <BarChart2 className="w-7 h-7 text-gray-400" />
                   </div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No transactions found</p>
-                  {(typeFilter || startDate || endDate) && (
-                    <button onClick={handleClearFilters} className="text-xs text-pink-500 underline">Clear filters</button>
-                  )}
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No ad analytics available</p>
                 </div>
               ) : (
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-gray-100 dark:border-gray-800">
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Transaction</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Amount</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Direction</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Status</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Date</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Thumbnail</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Caption</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Published At</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Type</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Views</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Engagements</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Likes</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Comments</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Shares</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Saves</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                    {transactions.map((tx) => (
-                      <TransactionRow key={tx._id} tx={tx} />
+                    {popularAds.map((ad) => (
+                      <tr key={ad.ad_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                            <AdThumbnail thumbnail={ad.thumbnail} caption={ad.caption} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-200 max-w-[220px] truncate">
+                          {ad.caption || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                          {formatDate(ad.published_at)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{ad.type || "-"}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-blue-600 dark:text-blue-400">{Number(ad.views || 0).toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-violet-600 dark:text-violet-400">{Number(ad.engagements || 0).toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-sky-600 dark:text-sky-400">{Number(ad.likes || 0).toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-rose-600 dark:text-rose-400">{Number(ad.comments || 0).toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400">{Number(ad.shares || 0).toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-cyan-600 dark:text-cyan-400">{Number(ad.saves || 0).toLocaleString("en-IN")}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               )}
             </div>
           </div>
-
           {/* Right Panel */}
           <div className="flex flex-col gap-6">
 
@@ -578,7 +663,7 @@ export default function VendorDashboard() {
                   <div className="h-10 w-36 rounded-lg bg-white/10 animate-pulse mb-1" />
                 ) : (
                   <div className="text-4xl font-black mb-1">
-                    {wallet ? formatCurrencyNum(wallet.balance) : "—"}
+                    {wallet ? formatCurrencyNum(wallet.balance) : "-"}
                   </div>
                 )}
                 <div className="text-xs text-gray-400 font-medium">Available Balance</div>
@@ -587,13 +672,13 @@ export default function VendorDashboard() {
                   <div className="p-3 rounded-xl bg-white/5">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-green-400 mb-1">Credited</div>
                     <div className="text-lg font-extrabold">
-                      {walletLoading ? "—" : <span className="flex items-center gap-0.5"><CoinIcon size={15} />{totalCredited.toLocaleString("en-IN")}</span>}
+                      {walletLoading ? "-" : <span className="flex items-center gap-0.5"><CoinIcon size={15} />{totalCredited.toLocaleString("en-IN")}</span>}
                     </div>
                   </div>
                   <div className="p-3 rounded-xl bg-white/5">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-red-400 mb-1">Debited</div>
                     <div className="text-lg font-extrabold">
-                      {walletLoading ? "—" : <span className="flex items-center gap-0.5"><CoinIcon size={15} />{totalDebited.toLocaleString("en-IN")}</span>}
+                      {walletLoading ? "-" : <span className="flex items-center gap-0.5"><CoinIcon size={15} />{totalDebited.toLocaleString("en-IN")}</span>}
                     </div>
                   </div>
                 </div>
