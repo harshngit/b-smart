@@ -171,7 +171,7 @@ const DesktopFollowButton = ({ targetUserId }) => {
 // ── Location Bar ──────────────────────────────────────────────────────────────
 const LocationBar = () => (
   <div className="hidden md:block sticky top-0 z-30 bg-white dark:bg-black mb-4">
-    <div className="max-w-[1120px] mx-auto xl:px-6">
+    <div className="max-w-[1280px] mx-auto xl:px-6">
       <div className="flex items-center justify-between px-4 py-3 gap-4">
         <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange" style={{ fontFamily: 'cursive' }}>
           B-Smart
@@ -342,7 +342,7 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
   const currentName = currentUser.full_name || currentUser.username || 'User';
 
   return (
-    <aside className="hidden xl:block w-[319px] shrink-0 z-0">
+    <aside className="hidden xl:block w-[280px] shrink-0 z-0">
       <div className="sticky top-20">
         <div className="mb-6">
           <button
@@ -549,9 +549,9 @@ const Home = () => {
   return (
     <div>
       <LocationBar />
-      <div className="max-w-[1120px] mx-auto xl:px-6">
-        <div className="xl:flex xl:items-start xl:justify-between xl:gap-16">
-          <div className="w-full max-w-[630px]">
+      <div className="max-w-[1280px] mx-auto xl:px-6">
+        <div className="xl:flex xl:items-start xl:justify-between xl:gap-12">
+          <div className="w-full max-w-[650px]">
             <StoryRail />
             <div className="mx-auto mb-4 flex w-full max-w-[470px] items-center gap-2 px-2 xl:mx-0">
               {[

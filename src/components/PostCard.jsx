@@ -29,7 +29,11 @@ const fmt = (n = 0) => {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const isAdItem = (item) => item?.item_type === 'ad' || (item?.vendor_id && !item?.user_id?.username?.includes);
+const isAdItem = (item) => {
+  if (!item || typeof item !== 'object') return false;
+  if (item.item_type === 'ad' || item.type === 'ad' || item._type === 'ad') return true;
+  return Boolean(item.vendor_id || item.ads_type || item.ad_type || item.product_offer || item.coins_per_view);
+};
 const isTweetItem = (item) => item?.item_type === 'tweet';
 const getContentText = (item) => item?.content || item?.caption || '';
 const getCommentsCount = (item) => {
@@ -42,14 +46,6 @@ const getCommentsCount = (item) => {
   return Array.isArray(item?.comments) ? item.comments.length : 0;
 };
 const getLikeCount = (item) => item?.likesCount ?? item?.likes_count ?? (Array.isArray(item?.likes) ? item.likes.length : 0);
-
-const adAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
 
 // ─── Delete Confirmation Modal ─────────────────────────────────────────────────
 const DeleteModal = ({ isOpen, onClose, onConfirm, isDeleting }) => {
@@ -653,12 +649,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
 
     try {
       if (isAd) {
-        const ep = wasLiked ? `/api/ads/${postId}/dislike` : `/api/ads/${postId}/like`;
-        const res = await fetch(`${BASE_URL}${ep}`, {
-          method: 'POST', headers: adAuthHeaders(),
-          body: JSON.stringify({ user: { id: String(userObject._id || userObject.id || '') } }),
-        });
-        if (!res.ok) throw new Error();
+        const ep = wasLiked ? `/ads/${postId}/dislike` : `/ads/${postId}/like`;
+        await api.post(ep);
       } else if (isTweet) {
         await api.post(`/tweets/${postId}/${wasLiked ? 'unlike' : 'like'}`);
       } else if (post._id) {

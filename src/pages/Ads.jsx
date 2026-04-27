@@ -1094,17 +1094,8 @@ const Ads = ({ feedMode = 'user' }) => {
       : a));
 
     try {
-      const endpoint = isLiked ? `/api/ads/${adId}/dislike` : `/api/ads/${adId}/like`;
-      const res = await fetch(`${BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : undefined } }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      // Parse response for direct wallet update
-      let resData = {};
-      try { resData = await res.json(); } catch { /* non-JSON */ }
+      const endpoint = isLiked ? `/ads/${adId}/dislike` : `/ads/${adId}/like`;
+      const { data: resData = {} } = await api.post(endpoint);
 
       const directBal =
         resData?.wallet?.balance ??
@@ -1129,6 +1120,12 @@ const Ads = ({ feedMode = 'user' }) => {
 
     } catch (err) {
       console.error('Like failed:', err);
+      const apiMessage =
+        err?.response?.data?.message
+        || err?.response?.data?.error
+        || err?.message
+        || 'Unable to update like right now.';
+      setTimeout(() => window.alert(apiMessage), 0);
       // Rollback optimistic update
       setLikedIds(prev => { const s = new Set(prev); isLiked ? s.add(adId) : s.delete(adId); return s; });
       setAds(prev => prev.map(a => a._id === adId

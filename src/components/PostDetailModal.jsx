@@ -47,12 +47,6 @@ const getContentText = (item) => item?.content || item?.caption || '';
 const getCommentsCount = (item) => item?.commentsCount ?? item?.comments_count ?? 0;
 const getLikeCount = (item) => item?.likesCount ?? item?.likes_count ?? (Array.isArray(item?.likes) ? item.likes.length : 0);
 
-// ── Ad auth headers ────────────────────────────────────────────────────────────
-const adAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-};
-
 // ── Coin Icon ──────────────────────────────────────────────────────────────────
 const CoinIcon = ({ size = 13 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -676,8 +670,8 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
     if (!wasLiked && wasDisliked) setIsDisliked(false);
     try {
       if (isAd) {
-        const ep = wasLiked ? `/api/ads/${postId}/dislike` : `/api/ads/${postId}/like`;
-        await fetch(`${BASE_URL}${ep}`, { method: 'POST', headers: adAuthHeaders(), body: JSON.stringify({ user: { id: String(currentUserId || '') } }) });
+        const ep = wasLiked ? `/ads/${postId}/dislike` : `/ads/${postId}/like`;
+        await api.post(ep);
       } else if (isTweet) {
         await api.post(`/tweets/${postId}/${wasLiked ? 'unlike' : 'like'}`);
       } else if (post._id) {
