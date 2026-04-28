@@ -299,6 +299,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef(null);
+  const emojiPickerRefMobile = useRef(null);
   const [tags, setTags] = useState([]);
   const [showTagSearch, setShowTagSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1306,7 +1307,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     const emoji = typeof emojiData === 'string' ? emojiData : emojiData?.emoji || '';
     if (!emoji) return;
     setCaption(prev => prev + emoji);
-    setShowEmojiPicker(false);
+    // Don't close picker here — let user keep picking emojis
   };
 
   const handleImageClick = (e) => {
@@ -1384,6 +1385,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
     const handlePointerDown = (event) => {
       if (emojiPickerRef.current?.contains(event.target)) return;
+      if (emojiPickerRefMobile.current?.contains(event.target)) return;
       setShowEmojiPicker(false);
     };
 
@@ -2503,24 +2505,23 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
 
                   <textarea
-                    className="w-full flex-1 min-h-[260px] resize-none bg-transparent outline-none text-[17px] leading-8 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
+                    className="w-full flex-1 min-h-[160px] resize-none bg-transparent outline-none text-[14px] leading-6 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
                     placeholder="What's new?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
-                    maxLength={500}
                   />
 
-                  {/* Tweet images grid */}
+                  {/* Tweet images grid — pushed to bottom, never overlapping text */}
                   {media.length > 0 && (
-                    <div className={`mt-4 ${media.length === 1 ? 'max-w-[200px]' : 'w-full'}`}>
-                      <div className={`flex flex-wrap gap-2 ${media.length > 3 ? 'max-h-[300px] overflow-y-auto' : ''}`}>
+                    <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/10">
+                      <div className={`flex flex-wrap gap-2 ${media.length > 4 ? 'max-h-[200px] overflow-y-auto' : ''}`}>
                         {media.map((m, idx) => (
                           <div
                             key={m.id}
-                            className="relative group rounded-xl overflow-hidden bg-black"
+                            className="relative group rounded-lg overflow-hidden bg-black"
                             style={{
-                              width: media.length === 1 ? '100%' : '110px',
-                              aspectRatio: '4/5',
+                              width: media.length === 1 ? '180px' : '130px',
+                              aspectRatio: '16/9',
                               flexShrink: 0
                             }}
                           >
@@ -2533,16 +2534,16 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                             {/* X remove button */}
                             <button
                               onClick={(e) => { e.stopPropagation(); handleTweetRemoveMedia(idx); }}
-                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-white"
                             >
-                              <X size={12} />
+                              <X size={10} />
                             </button>
                             {/* Pencil edit button */}
                             <button
                               onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); setStep('crop'); }}
-                              className="absolute top-1.5 right-9 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
+                              className="absolute top-1 right-7 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-white"
                             >
-                              <Pencil size={11} />
+                              <Pencil size={9} />
                             </button>
                           </div>
                         ))}
@@ -2550,7 +2551,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     </div>
                   )}
 
-                  <div className="mt-5 flex items-center gap-4 text-gray-500 dark:text-white/55">
+                  <div className={`${media.length > 0 ? 'mt-3' : 'mt-auto'} flex items-center gap-4 text-gray-500 dark:text-white/55`}>
                     <button onClick={handleButtonClick} className="hover:text-gray-700 dark:hover:text-white transition-colors">
                       <Image size={20} />
                     </button>
@@ -2592,7 +2593,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   
                 </div>
 
-                <div className="flex-1 min-w-0 pt-1">
+                <div className="flex-1 min-w-0 pt-1 flex flex-col">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-bold text-[14px] truncate">{userObject?.username || 'User'}</span>
@@ -2615,24 +2616,23 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
 
                   <textarea
-                    className="mt-2 w-full min-h-[200px] resize-none bg-transparent outline-none text-[16px] leading-[1.6] tracking-[-0.02em] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
+                    className="mt-2 w-full flex-1 min-h-[140px] resize-none bg-transparent outline-none text-[14px] leading-[1.6] tracking-[-0.01em] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
                     placeholder="What's new?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
-                    maxLength={500}
                   />
 
                   {/* Tweet images grid - mobile */}
                   {media.length > 0 && (
-                    <div className={`mt-4 ${media.length === 1 ? 'max-w-[180px]' : 'w-full'}`}>
-                      <div className={`flex flex-wrap gap-2 ${media.length > 3 ? 'max-h-[260px] overflow-y-auto' : ''}`}>
+                    <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/10">
+                      <div className={`flex flex-wrap gap-2 ${media.length > 4 ? 'max-h-[180px] overflow-y-auto' : ''}`}>
                         {media.map((m, idx) => (
                           <div
                             key={m.id}
-                            className="relative group rounded-xl overflow-hidden bg-black"
+                            className="relative group rounded-lg overflow-hidden bg-black"
                             style={{
-                              width: media.length === 1 ? '100%' : '95px',
-                              aspectRatio: '4/5',
+                              width: media.length === 1 ? '160px' : '110px',
+                              aspectRatio: '16/9',
                               flexShrink: 0
                             }}
                           >
@@ -2645,16 +2645,16 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                             {/* X remove button */}
                             <button
                               onClick={(e) => { e.stopPropagation(); handleTweetRemoveMedia(idx); }}
-                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-white"
                             >
-                              <X size={12} />
+                              <X size={10} />
                             </button>
                             {/* Pencil edit button */}
                             <button
                               onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); setStep('crop'); }}
-                              className="absolute top-1.5 right-9 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
+                              className="absolute top-1 right-7 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-white"
                             >
-                              <Pencil size={11} />
+                              <Pencil size={9} />
                             </button>
                           </div>
                         ))}
@@ -2662,11 +2662,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     </div>
                   )}
 
-                  <div className="mt-5 flex items-center gap-5 text-gray-500 dark:text-white/50">
+                  <div className={`${media.length > 0 ? 'mt-3' : 'mt-auto'} flex items-center gap-5 text-gray-500 dark:text-white/50`}>
                     <button onClick={handleButtonClick} className="hover:text-gray-700 dark:hover:text-white transition-colors">
                       <Image size={28} strokeWidth={1.8} />
                     </button>
-                    <div ref={emojiPickerRef} className="relative">
+                    <div ref={emojiPickerRefMobile} className="relative">
                       {showEmojiPicker && (
                         <div className="absolute bottom-full left-0 mb-3 z-[80]">
                           <EmojiPicker
