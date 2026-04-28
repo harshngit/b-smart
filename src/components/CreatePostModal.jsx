@@ -5,7 +5,7 @@ import api from '../lib/api';
 import EmojiPicker from 'emoji-picker-react';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone,
   MousePointerClick, Target, Smartphone, Monitor, Calendar, Link2, Phone, Mail, MessageSquare,
-  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, FileText, Ellipsis
+  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, FileText, Ellipsis, Pencil
 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
@@ -767,11 +767,16 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       handleClose();
       return;
     }
-    // For tweet: going back from crop or edit always returns to tweet composer
-    if (postType === 'tweet' && (step === 'crop' || step === 'edit')) {
+    // For tweet: going back from crop clears image and returns to tweet composer
+    if (postType === 'tweet' && step === 'crop') {
       setMedia([]);
       setCurrentIndex(0);
       setStep('share');
+      return;
+    }
+    // For tweet: going back from edit returns to crop
+    if (postType === 'tweet' && step === 'edit') {
+      setStep('crop');
       return;
     }
     if (step === 'share') {
@@ -855,12 +860,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         }
       }));
       setMedia(newMedia);
-      // For tweets, skip edit step and go straight to tweet composer with cropped image
-      if (postType === 'tweet') {
-        setStep('share');
-      } else {
-        setStep('edit');
-      }
+      // For tweets, go to edit step (filters/adjustments), then share
+      setStep('edit');
     } else if (step === 'edit') {
       if (postType === 'ad') {
         setStep('adDetails');
@@ -1556,7 +1557,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       </button>
 
       <div className={`bg-white dark:bg-[#262626] md:max-h-[85vh] md:rounded-xl overflow-hidden flex flex-col transition-all duration-300 shadow-2xl ${postType === 'tweet' && step === 'share'
-        ? 'w-full h-full md:w-[720px] md:h-auto'
+        ? 'w-full h-full md:w-[720px] md:h-[680px]'
         : step === 'select'
         ? 'w-full h-full md:w-[500px] md:h-[550px]'
         : step === 'crop'
@@ -2458,7 +2459,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-5 pb-[13.5rem] md:pb-5">
+            <div className="flex-1 overflow-y-auto px-5 py-5 pb-5">
               <div className="hidden md:flex gap-4">
                 <div className="flex flex-col items-center shrink-0">
                   <div className="w-11 h-11 rounded-full bg-gray-200 dark:bg-[#222] overflow-hidden flex items-center justify-center">
@@ -2488,13 +2489,17 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
                   {/* Tweet images grid */}
                   {media.length > 0 && (
-                    <div className={`mt-4 ${media.length === 1 ? 'max-w-[260px]' : 'w-full'}`}>
-                      <div className={`flex flex-wrap gap-2 ${media.length > 3 ? 'max-h-[260px] overflow-y-auto' : ''}`}>
+                    <div className={`mt-4 ${media.length === 1 ? 'max-w-[200px]' : 'w-full'}`}>
+                      <div className={`flex flex-wrap gap-2 ${media.length > 3 ? 'max-h-[300px] overflow-y-auto' : ''}`}>
                         {media.map((m, idx) => (
                           <div
                             key={m.id}
                             className="relative group rounded-xl overflow-hidden bg-black"
-                            style={{ width: media.length === 1 ? '100%' : '120px', height: '120px', flexShrink: 0 }}
+                            style={{
+                              width: media.length === 1 ? '100%' : '110px',
+                              aspectRatio: '4/5',
+                              flexShrink: 0
+                            }}
                           >
                             <img
                               src={m.croppedUrl || m.url}
@@ -2502,11 +2507,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                               className="w-full h-full object-cover cursor-pointer"
                               onClick={() => { setTweetPreviewIndex(idx); setShowTweetPreview(true); }}
                             />
+                            {/* X remove button */}
                             <button
                               onClick={(e) => { e.stopPropagation(); handleTweetRemoveMedia(idx); }}
-                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
                             >
                               <X size={12} />
+                            </button>
+                            {/* Pencil edit button */}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); setStep('crop'); }}
+                              className="absolute top-1.5 right-9 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
+                            >
+                              <Pencil size={11} />
                             </button>
                           </div>
                         ))}
@@ -2588,13 +2601,17 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
                   {/* Tweet images grid - mobile */}
                   {media.length > 0 && (
-                    <div className={`mt-4 ${media.length === 1 ? 'max-w-[240px]' : 'w-full'}`}>
-                      <div className={`flex flex-wrap gap-2 ${media.length > 3 ? 'max-h-[240px] overflow-y-auto' : ''}`}>
+                    <div className={`mt-4 ${media.length === 1 ? 'max-w-[180px]' : 'w-full'}`}>
+                      <div className={`flex flex-wrap gap-2 ${media.length > 3 ? 'max-h-[260px] overflow-y-auto' : ''}`}>
                         {media.map((m, idx) => (
                           <div
                             key={m.id}
                             className="relative group rounded-xl overflow-hidden bg-black"
-                            style={{ width: media.length === 1 ? '100%' : '100px', height: '100px', flexShrink: 0 }}
+                            style={{
+                              width: media.length === 1 ? '100%' : '95px',
+                              aspectRatio: '4/5',
+                              flexShrink: 0
+                            }}
                           >
                             <img
                               src={m.croppedUrl || m.url}
@@ -2602,11 +2619,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                               className="w-full h-full object-cover cursor-pointer"
                               onClick={() => { setTweetPreviewIndex(idx); setShowTweetPreview(true); }}
                             />
+                            {/* X remove button */}
                             <button
                               onClick={(e) => { e.stopPropagation(); handleTweetRemoveMedia(idx); }}
                               className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
                             >
                               <X size={12} />
+                            </button>
+                            {/* Pencil edit button */}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); setStep('crop'); }}
+                              className="absolute top-1.5 right-9 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
+                            >
+                              <Pencil size={11} />
                             </button>
                           </div>
                         ))}
@@ -2642,35 +2667,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="hidden md:flex border-t border-gray-200 dark:border-white/10 px-5 py-4 items-center justify-between">
-              <span className="text-sm text-gray-500 dark:text-white/45">Reply options</span>
-              <button
-                onClick={() => handleNextStep('publish')}
-                disabled={isSubmitting || (!caption.trim() && media.length === 0)}
-                className="px-5 py-2 rounded-full bg-white text-black text-sm font-semibold disabled:opacity-30"
-              >
-                Post
-              </button>
-            </div>
-
-            <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white dark:bg-[#111111] border-t border-gray-200 dark:border-white/10 px-8 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <div className="flex items-center justify-end gap-4">
-                
-
-                <button
-                  onClick={() => handleNextStep('publish')}
-                  disabled={isSubmitting || (!caption.trim() && media.length === 0)}
-                  className={`h-[40px] min-w-[80px] rounded-full text-[14px] font-semibold transition-all ${
-                    isSubmitting || (!caption.trim() && media.length === 0)
-                      ? 'bg-gray-200 text-gray-500 dark:bg-white/10 dark:text-black/45'
-                      : 'bg-white text-black'
-                  }`}
-                >
-                  Post
-                </button>
               </div>
             </div>
           </div>
