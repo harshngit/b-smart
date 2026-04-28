@@ -544,6 +544,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [activeTab, setActiveTab] = useState('filters');
   const [showTweetPreview, setShowTweetPreview] = useState(false);
   const [tweetPreviewIndex, setTweetPreviewIndex] = useState(0);
+  const [mediaCountBeforeCrop, setMediaCountBeforeCrop] = useState(0);
 
   const fileInputRef = useRef(null);
   const cropContainerRef = useRef(null);
@@ -573,62 +574,65 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     if (step !== 'crop') return;
     const el = cropContainerRef.current;
     if (!el || !currentMedia) return;
+    const videoAspect = currentMedia.originalAspect || 1;
+    const aspect = currentMedia.aspect || 1;
     const compute = () => {
       const cw = el.clientWidth;
       const ch = el.clientHeight;
-      const videoAspect = currentMedia.originalAspect || 1;
       let vw, vh;
       if (cw / ch > videoAspect) { vh = ch; vw = vh * videoAspect; }
       else { vw = cw; vh = vw / videoAspect; }
-      const a = currentMedia.aspect || 1;
       let w = vw;
-      let h = w / a;
-      if (h > vh) { h = vh; w = h * a; }
-      setOverlaySize({ w, h });
+      let h = w / aspect;
+      if (h > vh) { h = vh; w = h * aspect; }
+      setOverlaySize(prev => (prev.w === w && prev.h === h) ? prev : { w, h });
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [step, currentMedia]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, currentMedia?.id, currentMedia?.originalAspect, currentMedia?.aspect]);
 
   useEffect(() => {
     if (step !== 'share') return;
     const el = shareContainerRef.current;
     if (!el || !currentMedia) return;
+    const aspect = currentMedia.aspect || 1;
     const compute = () => {
       const cw = el.clientWidth;
       const ch = el.clientHeight;
-      const a = currentMedia.aspect || 1;
       let w = cw;
-      let h = w / a;
-      if (h > ch) { h = ch; w = h * a; }
-      setShareBoxSize({ w, h });
+      let h = w / aspect;
+      if (h > ch) { h = ch; w = h * aspect; }
+      setShareBoxSize(prev => (prev.w === w && prev.h === h) ? prev : { w, h });
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [step, currentMedia]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, currentMedia?.id, currentMedia?.aspect]);
 
   useEffect(() => {
     if (step !== 'edit') return;
     const el = editContainerRef.current;
     if (!el || !currentMedia) return;
+    const aspect = currentMedia.aspect || 1;
     const compute = () => {
       const cw = el.clientWidth;
       const ch = el.clientHeight;
-      const a = currentMedia.aspect || 1;
       let w = cw;
-      let h = w / a;
-      if (h > ch) { h = ch; w = h * a; }
-      setEditBoxSize({ w, h });
+      let h = w / aspect;
+      if (h > ch) { h = ch; w = h * aspect; }
+      setEditBoxSize(prev => (prev.w === w && prev.h === h) ? prev : { w, h });
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [step, currentMedia]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, currentMedia?.id, currentMedia?.aspect]);
 
   useEffect(() => {
     if (step !== 'edit') return;
@@ -717,9 +721,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     }));
 
     if (postType === 'tweet') {
-      // Append new images to existing media, then go to crop for the new ones
+      // Save count of existing images before appending new ones
+      setMediaCountBeforeCrop(prev => { void prev; return media.length; });
       setMedia(prev => [...prev, ...newMedia]);
-      setCurrentIndex(prev => prev + newMedia.length > 0 ? (prev === 0 && prev === newMedia.length - 1 ? 0 : prev) : 0);
+      setCurrentIndex(media.length > 0 ? media.length : 0);
       setStep('crop');
     } else if (step === 'select') {
       setMedia(newMedia);
@@ -767,14 +772,14 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       handleClose();
       return;
     }
-    // For tweet: going back from crop clears image and returns to tweet composer
+    // For tweet: going back from crop restores only the pre-existing images
     if (postType === 'tweet' && step === 'crop') {
-      setMedia([]);
+      setMedia(prev => prev.slice(0, mediaCountBeforeCrop));
       setCurrentIndex(0);
       setStep('share');
       return;
     }
-    // For tweet: going back from edit returns to crop
+    // For tweet: going back from edit returns to crop (keep media as-is for re-editing)
     if (postType === 'tweet' && step === 'edit') {
       setStep('crop');
       return;
@@ -863,7 +868,20 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       // For tweets, go to edit step (filters/adjustments), then share
       setStep('edit');
     } else if (step === 'edit') {
-      if (postType === 'ad') {
+      if (postType === 'tweet') {
+        // Bake filters/adjustments into a preview URL so tweet composer shows edited image
+        const editedMedia = await Promise.all(media.map(async (item) => {
+          try {
+            const blob = await applyFiltersToImage(item);
+            const editedUrl = URL.createObjectURL(blob);
+            return { ...item, croppedUrl: editedUrl };
+          } catch {
+            return item;
+          }
+        }));
+        setMedia(editedMedia);
+        setStep('share');
+      } else if (postType === 'ad') {
         setStep('adDetails');
       } else {
         setStep('share');
@@ -1405,12 +1423,17 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     const handleModalEscape = (event) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
+      // If tweet preview is open, only close the preview
+      if (showTweetPreview) {
+        setShowTweetPreview(false);
+        return;
+      }
       handleClose();
     };
 
     window.addEventListener('keydown', handleModalEscape);
     return () => window.removeEventListener('keydown', handleModalEscape);
-  }, [isOpen, handleClose]);
+  }, [isOpen, showTweetPreview, handleClose]);
 
   const setAspect = (aspect) => {
     updateCurrentMedia({ aspect, zoom: 1, crop: { x: 0, y: 0 } });
@@ -1556,13 +1579,13 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         <X size={32} />
       </button>
 
-      <div className={`bg-white dark:bg-[#262626] md:max-h-[85vh] md:rounded-xl overflow-hidden flex flex-col transition-all duration-300 shadow-2xl ${postType === 'tweet' && step === 'share'
-        ? 'w-full h-full md:w-[720px] md:h-[680px]'
+      <div className={`bg-white dark:bg-[#262626] md:max-h-[85vh] md:rounded-xl flex flex-col transition-all duration-300 shadow-2xl ${postType === 'tweet' && step === 'share'
+        ? 'w-full h-full md:w-[720px] md:h-[750px] overflow-y-auto'
         : step === 'select'
-        ? 'w-full h-full md:w-[500px] md:h-[550px]'
+        ? 'w-full h-full md:w-[500px] md:h-[550px] overflow-hidden'
         : step === 'crop'
-          ? 'w-full h-full md:w-[750px] md:h-[800px]'
-          : 'w-full h-full md:w-[1100px] md:h-[800px]'
+          ? 'w-full h-full md:w-[750px] md:h-[800px] overflow-hidden'
+          : 'w-full h-full md:w-[1100px] md:h-[800px] overflow-hidden'
         }`}>
 
         {/* Header */}
@@ -2459,8 +2482,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-5 pb-5">
-              <div className="hidden md:flex gap-4">
+            <div className="flex-1 px-5 py-5 pb-5 flex flex-col">
+              <div className="hidden md:flex gap-4 flex-1">
                 <div className="flex flex-col items-center shrink-0">
                   <div className="w-11 h-11 rounded-full bg-gray-200 dark:bg-[#222] overflow-hidden flex items-center justify-center">
                     {userObject?.avatar_url ? (
@@ -2472,7 +2495,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   <div className="w-px flex-1 bg-gray-200 dark:bg-white/10 my-3" />
                 </div>
 
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex flex-col">
                   <div className="flex items-center gap-2 text-sm mb-2">
                     <span className="font-semibold text-gray-900 dark:text-white">{userObject?.username || 'User'}</span>
                     <span className="text-gray-400 dark:text-white/35">›</span>
@@ -2480,7 +2503,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
 
                   <textarea
-                    className="w-full min-h-[220px] resize-none bg-transparent outline-none text-[17px] leading-7 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
+                    className="w-full flex-1 min-h-[260px] resize-none bg-transparent outline-none text-[17px] leading-8 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
                     placeholder="What's new?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
@@ -2592,7 +2615,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
 
                   <textarea
-                    className="mt-1 w-full min-h-[160px] resize-none bg-transparent outline-none text-[16px] leading-[1.35] tracking-[-0.02em] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
+                    className="mt-2 w-full min-h-[200px] resize-none bg-transparent outline-none text-[16px] leading-[1.6] tracking-[-0.02em] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
                     placeholder="What's new?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
@@ -3393,7 +3416,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         >
           <button
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white z-10"
-            onClick={() => setShowTweetPreview(false)}
+            onClick={(e) => { e.stopPropagation(); setShowTweetPreview(false); }}
           >
             <X size={20} />
           </button>
