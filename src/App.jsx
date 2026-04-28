@@ -28,6 +28,7 @@ import VendorNotifications from './pages/vendor-pages/VendorNotifications';
 import ProtectedRoute from './components/ProtectedRoute';
 import Search from './pages/Search';
 import ChatPage from './pages/ChatPage';
+import Suggestions from './pages/Suggestions';
 
 import VendorPublicProfile from './pages/VendorPublicProfile';
 import VendorLayout from './components/VendorLayout';
@@ -110,6 +111,7 @@ function App() {
           <Route path="/notifications"    element={<Notifications />} />
           <Route path="/search"           element={<Search />} />
           <Route path="/messages"         element={<ChatPage />} />
+          <Route path="/suggestions"      element={<Suggestions />} />
           <Route path="/messages/:conversationId" element={<ChatPage />} />
           <Route path="/vendor/:userId/public" element={<VendorPublicProfile />} />
           <Route path="/ads/:adId/details" element={<AdPublicDetail />} />

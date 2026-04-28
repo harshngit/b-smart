@@ -225,41 +225,51 @@ const MobileSuggestedUsersCard = ({ users, onDismiss }) => {
     <div className="bg-white dark:bg-black border-b border-t border-gray-200 dark:border-gray-800 py-3 mb-0 lg:hidden">
       <div className="flex items-center justify-between px-4 mb-3">
         <span className="text-sm font-bold text-gray-900 dark:text-white">Suggested for you</span>
-        <button className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors">See all</button>
+        <button 
+          onClick={() => navigate('/suggestions')}
+          className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors"
+        >
+          See all
+        </button>
       </div>
       <div className="flex gap-3 overflow-x-auto px-4 scrollbar-hide pb-1">
         {users.map((user, i) => {
           if (dismissed[i]) return null;
           const u = user.user || user;
           const username = u.username || u.name || 'User';
+          const userId = u._id || u.id;
           const avatar = u.avatar_url || u.avatar || u.profile_picture || null;
           const reason = u.mutual_friends_count
             ? `${u.mutual_friends_count} mutual`
             : u.followed_by ? `Followed by ${u.followed_by}` : 'Suggested for you';
           return (
-            <div key={u._id || u.id || i}
-              className="relative flex-shrink-0 flex flex-col items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl p-4 w-[160px] gap-2 shadow-sm">
+            <div key={userId || i}
+              onClick={() => navigate(`/profile/${userId}`)}
+              className="relative flex-shrink-0 flex flex-col items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl p-4 w-[160px] gap-2 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#222] transition-colors">
               {/* Dismiss button */}
               <button
-                className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                onClick={() => setDismissed(p => ({ ...p, [i]: true }))}
+                className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 z-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDismissed(p => ({ ...p, [i]: true }));
+                }}
               >
                 <X size={11} />
               </button>
               {/* Avatar */}
               <div
-                className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center cursor-pointer ring-2 ring-offset-1 ring-pink-300/40"
-                onClick={() => navigate(`/profile/${username}`)}
+                className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center ring-2 ring-offset-1 ring-pink-300/40"
               >
                 {avatar
                   ? <img src={avatar} alt={username} className="w-full h-full object-cover" />
                   : <span className="text-white font-bold text-lg">{username.slice(0,1).toUpperCase()}</span>
                 }
               </div>
-              <p className="text-xs font-bold text-gray-900 dark:text-white text-center truncate w-full cursor-pointer"
-                onClick={() => navigate(`/profile/${username}`)}>{username}</p>
+              <p className="text-xs font-bold text-gray-900 dark:text-white text-center truncate w-full">{username}</p>
               <p className="text-[10px] text-gray-400 text-center truncate w-full">{reason}</p>
-              <DesktopFollowButton targetUserId={String(u._id || u.id || '')} />
+              <div onClick={(e) => e.stopPropagation()}>
+                <DesktopFollowButton targetUserId={String(userId || '')} />
+              </div>
             </div>
           );
         })}
@@ -273,10 +283,10 @@ const MobileSuggestedReelsCard = ({ reels }) => {
   if (!reels || reels.length === 0) return null;
 
   return (
-    <div className="bg-[#0d0d0f] border-b border-t border-gray-800 py-3 mb-0 lg:hidden">
+    <div className="bg-white dark:bg-[#0d0d0f] border-b border-t border-gray-200 dark:border-gray-800 py-3 mb-0 lg:hidden">
       <div className="flex items-center justify-between px-4 mb-3">
-        <span className="text-sm font-bold text-white">Suggested reels</span>
-        <button type="button" className="p-1 rounded-full text-white/80">
+        <span className="text-sm font-bold text-gray-900 dark:text-white">Suggested reels</span>
+        <button type="button" className="p-1 rounded-full text-gray-400 dark:text-white/80">
           <MoreHorizontal size={18} />
         </button>
       </div>
@@ -366,7 +376,11 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
 
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Suggested for you</p>
-          <button type="button" className="text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity">
+          <button 
+            type="button" 
+            onClick={() => navigate('/suggestions')}
+            className="text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity"
+          >
             See all
           </button>
         </div>

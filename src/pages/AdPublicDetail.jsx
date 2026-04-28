@@ -511,10 +511,10 @@ const MobileSuggestedReelsSection = ({ reels, loading, onOpenReel }) => {
   if (!loading && reels.length === 0) return null;
 
   return (
-    <div className="md:hidden mt-8 -mx-4 px-4 py-5 border-y border-gray-100 dark:border-gray-800 bg-[#0d0d0f]">
+    <div className="md:hidden mt-8 -mx-4 px-4 py-5 border-y border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0d0d0f]">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-lg font-bold text-white">Suggested reels</p>
-        <button type="button" className="p-1.5 rounded-full text-white/80">
+        <p className="text-lg font-bold text-gray-900 dark:text-white">Suggested reels</p>
+        <button type="button" className="p-1.5 rounded-full text-gray-400 dark:text-white/80">
           <MoreHorizontal size={18} />
         </button>
       </div>
@@ -522,7 +522,7 @@ const MobileSuggestedReelsSection = ({ reels, loading, onOpenReel }) => {
       {loading ? (
         <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {[...Array(3)].map((_, idx) => (
-            <div key={idx} className="w-[42vw] max-w-[190px] min-w-[150px] rounded-[24px] bg-white/5 animate-pulse" style={{ aspectRatio: '9/16' }} />
+            <div key={idx} className="w-[42vw] max-w-[190px] min-w-[150px] rounded-[24px] bg-gray-200 dark:bg-white/5 animate-pulse" style={{ aspectRatio: '9/16' }} />
           ))}
         </div>
       ) : (

@@ -542,6 +542,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [showZoomSlider, setShowZoomSlider] = useState(false);
   const [showMultiSelect, setShowMultiSelect] = useState(false);
   const [activeTab, setActiveTab] = useState('filters');
+  const [showTweetPreview, setShowTweetPreview] = useState(false);
+  const [tweetPreviewIndex, setTweetPreviewIndex] = useState(0);
 
   const fileInputRef = useRef(null);
   const cropContainerRef = useRef(null);
@@ -715,8 +717,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     }));
 
     if (postType === 'tweet') {
-      setMedia(newMedia);
-      setCurrentIndex(0);
+      // Append new images to existing media, then go to crop for the new ones
+      setMedia(prev => [...prev, ...newMedia]);
+      setCurrentIndex(prev => prev + newMedia.length > 0 ? (prev === 0 && prev === newMedia.length - 1 ? 0 : prev) : 0);
       setStep('crop');
     } else if (step === 'select') {
       setMedia(newMedia);
@@ -750,11 +753,25 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     if (currentIndex >= index && currentIndex > 0) setCurrentIndex(prev => prev - 1);
   };
 
+  // For tweet: remove single image without closing the modal
+  const handleTweetRemoveMedia = (index) => {
+    const newMedia = media.filter((_, i) => i !== index);
+    setMedia(newMedia);
+    setCurrentIndex(0);
+  };
+
   const handleButtonClick = () => fileInputRef.current?.click();
 
   const handleBack = () => {
     if (postType === 'tweet' && step === 'share') {
       handleClose();
+      return;
+    }
+    // For tweet: going back from crop or edit always returns to tweet composer
+    if (postType === 'tweet' && (step === 'crop' || step === 'edit')) {
+      setMedia([]);
+      setCurrentIndex(0);
+      setStep('share');
       return;
     }
     if (step === 'share') {
@@ -838,7 +855,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         }
       }));
       setMedia(newMedia);
-      setStep('edit');
+      // For tweets, skip edit step and go straight to tweet composer with cropped image
+      if (postType === 'tweet') {
+        setStep('share');
+      } else {
+        setStep('edit');
+      }
     } else if (step === 'edit') {
       if (postType === 'ad') {
         setStep('adDetails');
@@ -2457,26 +2479,38 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
 
                   <textarea
-                    className="w-full min-h-[140px] resize-none bg-transparent outline-none text-[17px] leading-7 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
+                    className="w-full min-h-[220px] resize-none bg-transparent outline-none text-[17px] leading-7 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
                     placeholder="What's new?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
                     maxLength={500}
                   />
 
-                  {currentMedia && (
-                    <div className="relative mt-4 w-full max-w-[420px] overflow-hidden rounded-2xl border border-white/10 bg-black">
-                      <img
-                        src={currentMedia.croppedUrl || currentMedia.url}
-                        alt="Tweet media"
-                        className="w-full h-auto max-h-[420px] object-contain"
-                      />
-                      <button
-                        onClick={(e) => handleRemoveMedia(currentIndex, e)}
-                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/70 flex items-center justify-center text-white"
-                      >
-                        <X size={16} />
-                      </button>
+                  {/* Tweet images grid */}
+                  {media.length > 0 && (
+                    <div className={`mt-4 ${media.length === 1 ? 'max-w-[260px]' : 'w-full'}`}>
+                      <div className={`flex flex-wrap gap-2 ${media.length > 3 ? 'max-h-[260px] overflow-y-auto' : ''}`}>
+                        {media.map((m, idx) => (
+                          <div
+                            key={m.id}
+                            className="relative group rounded-xl overflow-hidden bg-black"
+                            style={{ width: media.length === 1 ? '100%' : '120px', height: '120px', flexShrink: 0 }}
+                          >
+                            <img
+                              src={m.croppedUrl || m.url}
+                              alt="Tweet media"
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => { setTweetPreviewIndex(idx); setShowTweetPreview(true); }}
+                            />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleTweetRemoveMedia(idx); }}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -2506,17 +2540,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                         <Smile size={20} />
                       </button>
                     </div>
-                    <button type="button" className="opacity-50 cursor-default">
-                      <Copy size={20} />
-                    </button>
-                    <button type="button" className="opacity-50 cursor-default">
-                      <MapPin size={20} />
-                    </button>
-                  </div>
-
-                  <div className="mt-6 flex items-center gap-3 text-gray-400 dark:text-white/30">
-                    <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-[#1a1a1a] flex items-center justify-center text-[10px]">+</div>
-                    <span className="text-sm">Add to thread</span>
                   </div>
                 </div>
               </div>
@@ -2556,26 +2579,38 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
 
                   <textarea
-                    className="mt-1 w-full min-h-[60px] resize-none bg-transparent outline-none text-[16px] leading-[1.35] tracking-[-0.02em] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
+                    className="mt-1 w-full min-h-[160px] resize-none bg-transparent outline-none text-[16px] leading-[1.35] tracking-[-0.02em] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
                     placeholder="What's new?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
                     maxLength={500}
                   />
 
-                  {currentMedia && (
-                    <div className="relative mt-4 w-full max-w-[360px] overflow-hidden rounded-[22px] border border-white/10 bg-black">
-                      <img
-                        src={currentMedia.croppedUrl || currentMedia.url}
-                        alt="Tweet media"
-                        className="w-full h-auto max-h-[420px] object-contain"
-                      />
-                      <button
-                        onClick={(e) => handleRemoveMedia(currentIndex, e)}
-                        className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 flex items-center justify-center text-white"
-                      >
-                        <X size={18} />
-                      </button>
+                  {/* Tweet images grid - mobile */}
+                  {media.length > 0 && (
+                    <div className={`mt-4 ${media.length === 1 ? 'max-w-[240px]' : 'w-full'}`}>
+                      <div className={`flex flex-wrap gap-2 ${media.length > 3 ? 'max-h-[240px] overflow-y-auto' : ''}`}>
+                        {media.map((m, idx) => (
+                          <div
+                            key={m.id}
+                            className="relative group rounded-xl overflow-hidden bg-black"
+                            style={{ width: media.length === 1 ? '100%' : '100px', height: '100px', flexShrink: 0 }}
+                          >
+                            <img
+                              src={m.croppedUrl || m.url}
+                              alt="Tweet media"
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => { setTweetPreviewIndex(idx); setShowTweetPreview(true); }}
+                            />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleTweetRemoveMedia(idx); }}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -2605,20 +2640,6 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                         <Smile size={28} strokeWidth={1.8} />
                       </button>
                     </div>
-                    <button type="button" className="opacity-50 cursor-default">
-                      <Copy size={28} strokeWidth={1.8} />
-                    </button>
-                    <button type="button" className="opacity-50 cursor-default">
-                      <MessageSquare size={28} strokeWidth={1.8} />
-                    </button>
-                    <button type="button" className="opacity-50 cursor-default">
-                      <Ellipsis size={28} strokeWidth={1.8} />
-                    </button>
-                  </div>
-
-                  <div className="mt-9 flex items-center gap-4 text-gray-400 dark:text-white/35">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/15 flex items-center justify-center text-sm">+</div>
-                    <span className="text-[14px]">Add to thread</span>
                   </div>
                 </div>
               </div>
@@ -3365,6 +3386,50 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               <span className="text-white/60 text-[10px]">Tap image to zoom</span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Tweet Image Preview Modal */}
+      {showTweetPreview && media.length > 0 && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setShowTweetPreview(false)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white z-10"
+            onClick={() => setShowTweetPreview(false)}
+          >
+            <X size={20} />
+          </button>
+          {media.length > 1 && (
+            <button
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white z-10"
+              onClick={(e) => { e.stopPropagation(); setTweetPreviewIndex(i => (i - 1 + media.length) % media.length); }}
+            >
+              <ChevronLeft size={22} />
+            </button>
+          )}
+          <img
+            src={media[tweetPreviewIndex]?.croppedUrl || media[tweetPreviewIndex]?.url}
+            alt="Preview"
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          {media.length > 1 && (
+            <button
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white z-10"
+              onClick={(e) => { e.stopPropagation(); setTweetPreviewIndex(i => (i + 1) % media.length); }}
+            >
+              <ChevronRight size={22} />
+            </button>
+          )}
+          {media.length > 1 && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+              {media.map((_, i) => (
+                <div key={i} className={`w-2 h-2 rounded-full transition-all ${i === tweetPreviewIndex ? 'bg-white' : 'bg-white/40'}`} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
