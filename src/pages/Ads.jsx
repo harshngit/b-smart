@@ -1688,9 +1688,18 @@ const Ads = ({ feedMode = 'user' }) => {
               md:w-[360px] md:h-[90vh] md:rounded-2xl md:shadow-2xl
             ">
 
-              {/* ── Progress bar — bottom of card ── */}
-              <div className="absolute bottom-0 left-0 right-0 z-40 h-[3px] bg-white/20">
-                <div className="h-full bg-white transition-none" style={{ width: `${progress}%` }} />
+              {/* Progress bar — YouTube style */}
+              <div className="absolute bottom-0 left-0 right-0 z-40 px-1.5 pb-1">
+                <div className="relative h-[4px] w-full rounded-full bg-black/55">
+                  <div
+                    className="absolute left-0 top-0 h-full rounded-full bg-[#ff0033] transition-none"
+                    style={{ width: `${progress}%` }}
+                  />
+                  <div
+                    className="absolute top-1/2 h-[12px] w-[12px] -translate-y-1/2 rounded-full bg-[#ff0033] shadow-[0_0_0_2px_rgba(0,0,0,0.35)]"
+                    style={{ left: `calc(${progress}% - 6px)` }}
+                  />
+                </div>
               </div>
 
               {/* Slides */}
@@ -2273,5 +2282,6 @@ const Ads = ({ feedMode = 'user' }) => {
 };
 
 export default Ads;
+
 
 

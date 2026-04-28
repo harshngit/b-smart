@@ -647,7 +647,7 @@ export default function HighlightsRail({ users = [], variant = 'chat', allowCrea
 
   return (
     <>
-      <div className={isProfileVariant ? 'px-0 pb-2 pt-1' : 'border-b border-white/10 px-4 pb-3 pt-1 md:border-b-gray-100 md:px-5 md:py-4 md:dark:border-white/10'}>
+      <div className={isProfileVariant ? 'px-4 pb-2 pt-1' : 'border-b border-white/10 px-4 pb-3 pt-1 md:border-b-gray-100 md:px-5 md:py-4 md:dark:border-white/10'}>
         {!isProfileVariant ? (
           <div className="mb-3 flex items-center justify-between">
             <div>

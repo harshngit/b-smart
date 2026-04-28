@@ -11,6 +11,10 @@ import FollowingModal from '../components/FollowingModal';
 import HighlightsRail from '../components/HighlightsRail';
 import { setUser } from '../store/authSlice';
 import { createOrGetConversation } from '../services/chatService';
+import bSmartBanner1 from '../assets/B-smart-banners/1.png';
+import bSmartBanner2 from '../assets/B-smart-banners/2.png';
+import bSmartBanner3 from '../assets/B-smart-banners/3.png';
+import bSmartBanner4 from '../assets/B-smart-banners/4.png';
 import {
     checkFollowStatus,
     followUser,
@@ -28,6 +32,67 @@ const fmt = (n = 0) => {
 };
 
 const BASE_URL = 'https://api.bebsmart.in';
+const FAVORITE_BANNERS = [bSmartBanner1, bSmartBanner2, bSmartBanner3, bSmartBanner4];
+
+const InterestedSection = ({ activeIndex, onSelect, isDesktop = false }) => {
+    const visibleCount = isDesktop ? 4 : 3;
+    const orderedBanners = [...FAVORITE_BANNERS.slice(activeIndex), ...FAVORITE_BANNERS.slice(0, activeIndex)];
+    const visibleBanners = orderedBanners.slice(0, visibleCount);
+    const prevSlide = () => onSelect((activeIndex - 1 + FAVORITE_BANNERS.length) % FAVORITE_BANNERS.length);
+    const nextSlide = () => onSelect((activeIndex + 1) % FAVORITE_BANNERS.length);
+
+    return (
+        <div className={`w-full ${isDesktop ? 'max-w-[740px]' : 'max-w-[520px]'}`}>
+            <div className="mb-2 flex items-center justify-between">
+                <div className="text-[12px] font-semibold tracking-[0.02em] text-gray-800 dark:text-gray-200">
+                    Interested Section
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={prevSlide}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        aria-label="Previous banners"
+                    >
+                        &#8249;
+                    </button>
+                    <button
+                        type="button"
+                        onClick={nextSlide}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        aria-label="Next banners"
+                    >
+                        &#8250;
+                    </button>
+                </div>
+            </div>
+
+            <div className="overflow-hidden rounded-xl py-2">
+                <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
+                    {visibleBanners.map((banner, idx) => {
+                        const originalIndex = (activeIndex + idx) % FAVORITE_BANNERS.length;
+                        return (
+                            <button
+                                key={originalIndex}
+                                type="button"
+                                onClick={() => onSelect(originalIndex)}
+                                className="overflow-hidden rounded-lg transition-all"
+                                aria-label={`Show interested banner ${originalIndex + 1}`}
+                            >
+                                <img
+                                    src={banner}
+                                    alt={`Interested banner ${originalIndex + 1}`}
+                                    className={`${isDesktop ? 'h-[58px]' : 'h-[46px]'} w-full object-cover`}
+                                    loading="lazy"
+                                />
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const Profile = () => {
     const navigate = useNavigate();
@@ -62,6 +127,7 @@ const Profile = () => {
     const [notificationEnabled, setNotificationEnabled] = useState(false);
     const [notifLoading, setNotifLoading] = useState(false);
     const [isBioExpanded, setIsBioExpanded] = useState(false);
+    const [favoriteBannerIndex, setFavoriteBannerIndex] = useState(0);
     const userOptionsMenuRef = useRef(null);
 
     // Close user options menu when clicking outside
@@ -788,7 +854,7 @@ const Profile = () => {
                 </div>
             )}
 
-            {/* ═══════ MOBILE ═══════ */}
+            {/* MOBILE */}
             <div className="md:hidden flex flex-col h-[calc(120vh-60px)]">
 
                 <div className="flex-shrink-0 bg-white dark:bg-black">
@@ -800,69 +866,120 @@ const Profile = () => {
                                 </button>
                             )}
                         </div>
-                        {isOwnProfile && (
-                            <div className="flex items-center gap-4 text-gray-900 dark:text-white flex-shrink-0">
-                                <Link to="/create"><Plus size={26} /></Link>
-                                <Link to="/settings"><Menu size={26} /></Link>
-                            </div>
-                        )}
+                        {isOwnProfile && <div className="w-6" />}
                     </div>
 
-                    <div className="px-4 pt-6 pb-2">
-                        <div className="flex gap-6 items-start mb-6">
-                            {/* Avatar */}
+                    <div className="px-4 pt-3 pb-2">
+                        {/* Username row */}
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex items-center gap-2">
+                                <h1 className="truncate text-[30px] font-light leading-tight text-gray-900 dark:text-white">
+                                    {profileUser.username}
+                                </h1>
+                                {isVendor && vendorValidated && <VerifiedBadge />}
+                                {isProfilePrivate && !isOwnProfile && (
+                                    <Lock size={14} className="text-gray-400 flex-shrink-0" />
+                                )}
+                            </div>
+                            {isOwnProfile && (
+                                <div className="flex items-center gap-3 text-gray-900 dark:text-white">
+                                    <Link to="/create" aria-label="Create"><Plus size={20} /></Link>
+                                    <Link to="/settings" aria-label="Menu"><Menu size={20} /></Link>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Avatar + Stats row */}
+                        <div className="mb-3 flex items-center gap-4">
                             <div className="relative flex-shrink-0">
-                                <div className="w-[100px] h-[100px] rounded-full overflow-hidden border-[3px] border-white dark:border-gray-900" style={{boxShadow:'0 4px 20px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10)'}}>
-                                        {profileUser.avatar_url ? (
-                                            <img src={profileUser.avatar_url} alt={profileUser.username} className="w-full h-full object-cover rounded-full" />
-                                        ) : (
-                                            <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-xl font-bold text-gray-600 dark:text-gray-300 rounded-full">
-                                                {getInitials(profileUser.full_name || profileUser.username)}
-                                            </div>
-                                        )}
+                                <div className="h-[86px] w-[86px] overflow-hidden rounded-full border-[3px] border-white dark:border-gray-900" style={{boxShadow:'0 4px 20px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10)'}}>
+                                    {profileUser.avatar_url ? (
+                                        <img src={profileUser.avatar_url} alt={profileUser.username} className="h-full w-full rounded-full object-cover" />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-gray-200 to-gray-300 text-xl font-bold text-gray-600 dark:from-gray-700 dark:to-gray-800 dark:text-gray-300">
+                                            {getInitials(profileUser.full_name || profileUser.username)}
+                                        </div>
+                                    )}
                                 </div>
                                 {isOwnProfile && (
-                                    <button type="button" onClick={() => setShowAvatarModal(true)}
-                                        className="absolute bottom-0 right-0 w-7 h-7 bg-blue-500 text-white rounded-full border-2 border-white dark:border-black flex items-center justify-center shadow">
-                                        <Plus size={14} strokeWidth={3} />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAvatarModal(true)}
+                                        className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-blue-500 text-white shadow dark:border-black"
+                                    >
+                                        <Plus size={12} strokeWidth={3} />
                                     </button>
                                 )}
                             </div>
 
-                            {/* Info */}
-                            <div className="flex flex-col flex-1 pt-1 min-w-0">
-                                {/* Username row */}
-                                <div className="flex items-center gap-2 mb-3">
-                                    <h1 className="text-2xl font-light text-gray-900 dark:text-white truncate">
-                                        {profileUser.username}
-                                    </h1>
-                                    {isVendor && vendorValidated && <VerifiedBadge />}
-                                    {isProfilePrivate && !isOwnProfile && (
-                                        <Lock size={14} className="text-gray-400 flex-shrink-0" />
-                                    )}
-                                </div>
+                            <div className="grid flex-1 grid-cols-3 gap-2 text-center">
+                                {[
+                                    { val: profileUser.posts_count ?? userPosts.length, label: 'posts' },
+                                    { val: profileUser.followers_count || 0, label: 'followers' },
+                                    { val: profileUser.following_count || 0, label: 'following' },
+                                ].map(({ val, label }) => {
+                                    const isFollowers = label === 'followers';
+                                    const isFollowingStat = label === 'following';
+                                    const handleClick = isFollowers
+                                        ? () => setFollowersModalOpen(true)
+                                        : isFollowingStat
+                                            ? () => setFollowingModalOpen(true)
+                                            : undefined;
+                                    const content = (
+                                        <>
+                                            <div className="text-[28px] font-semibold leading-none text-gray-900 dark:text-white">{fmt(val)}</div>
+                                            <div className="mt-1 text-[12px] font-medium text-gray-500 dark:text-gray-400">{label}</div>
+                                        </>
+                                    );
+                                    return handleClick ? (
+                                        <button key={label} type="button" onClick={handleClick} className="rounded-lg py-1 transition hover:bg-gray-50 dark:hover:bg-gray-900">
+                                            {content}
+                                        </button>
+                                    ) : (
+                                        <div key={label} className="rounded-lg py-1">{content}</div>
+                                    );
+                                })}
+                            </div>
+                        </div>
 
-                                {/* Actions row */}
-                                <div className="flex flex-wrap items-center gap-2 mb-4">
+                        <div className="mb-3 min-w-0">
+                            <div className="text-[28px] font-semibold leading-tight text-gray-900 dark:text-white">{profileUser.full_name || profileUser.username}</div>
+                            {profileUser.bio && (
+                                <div className="mt-0.5">
+                                    <div className={`text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed ${!isBioExpanded ? 'line-clamp-1' : ''}`}>
+                                        {profileUser.bio}
+                                    </div>
+                                    {profileUser.bio.includes('\n') || profileUser.bio.length > 40 ? (
+                                        <button
+                                            onClick={() => setIsBioExpanded(!isBioExpanded)}
+                                            className="mt-0.5 text-[12px] font-bold text-gray-500 hover:underline dark:text-gray-400"
+                                        >
+                                            {isBioExpanded ? 'Show less' : 'Read more'}
+                                        </button>
+                                    ) : null}
+                                </div>
+                            )}
+                            <MutualFollowers />
+                        </div>
+
+                        {/* Actions row */}
+                        <div className="mb-4 flex flex-wrap items-center gap-2">
                                     {isOwnProfile ? (
                                         <>
-                                            <Link to="/edit-profile" className="px-6 py-2 bg-gradient-to-r from-orange-400 via-orange-500 to-pink-600 text-white text-sm font-bold rounded-xl text-center shadow-md shadow-orange-500/20 hover:opacity-95 transition-opacity">
+                                            <Link to="/edit-profile" className="h-9 min-w-[154px] px-6 inline-flex items-center justify-center bg-gradient-to-r from-orange-400 via-orange-500 to-pink-600 text-white text-sm font-bold rounded-xl text-center shadow-md shadow-orange-500/20 hover:opacity-95 transition-opacity">
                                                 Edit profile
                                             </Link>
-                                            <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
+                                            <button type="button" onClick={handleShareProfile} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
                                                 <Share2 size={18} />
                                             </button>
                                             <button type="button" onClick={() => setFavoriteProfile((prev) => !prev)}
-                                                className={`w-10 h-10 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
+                                                className={`w-9 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
                                                 aria-label="Favourite profile">
                                                 <Star size={18} fill={favoriteProfile ? 'currentColor' : 'none'} />
                                             </button>
-                                            <button type="button" onClick={handleOpenMessages} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
+                                            <button type="button" onClick={handleOpenMessages} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
                                                 <MessageCircle size={18} />
                                             </button>
-                                            <Link to="/settings" className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm hover:opacity-70 transition-opacity">
-                                                <Settings size={20} />
-                                            </Link>
                                         </>
                                     ) : (
                                         <>
@@ -870,15 +987,15 @@ const Profile = () => {
                                                 className={getFollowButtonClass('md')}>
                                                 {getFollowButtonLabel()}
                                             </button>
-                                            <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
+                                            <button type="button" onClick={handleShareProfile} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
                                                 <Share2 size={18} />
                                             </button>
                                             <button type="button" onClick={() => setFavoriteProfile((prev) => !prev)}
-                                                className={`w-10 h-10 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
+                                                className={`w-9 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
                                                 aria-label="Favourite">
                                                 <Star size={18} fill={favoriteProfile ? 'currentColor' : 'none'} />
                                             </button>
-                                            <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
+                                            <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
                                                 <MessageCircle size={18} />
                                             </button>
 
@@ -886,7 +1003,7 @@ const Profile = () => {
                                                 <button 
                                                     type="button" 
                                                     onClick={() => setShowUserOptionsMenu(!showUserOptionsMenu)} 
-                                                    className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm hover:opacity-70 transition-opacity"
+                                                    className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm hover:opacity-70 transition-opacity"
                                                 >
                                                     <MoreHorizontal size={20} />
                                                 </button>
@@ -916,64 +1033,16 @@ const Profile = () => {
                                             </div>
                                         </>
                                     )}
-                                </div>
+                        </div>
 
-                                {/* Stats */}
-                                <div className="flex gap-4 mb-4">
-                                    {[
-                                        { val: profileUser.posts_count ?? userPosts.length, label: 'posts' },
-                                        { val: profileUser.followers_count || 0, label: 'followers' },
-                                        { val: profileUser.following_count || 0, label: 'following' },
-                                    ].map(({ val, label }) => {
-                                        const isFollowers = label === 'followers';
-                                        const isFollowingStat = label === 'following';
-                                        const handleClick = isFollowers
-                                            ? () => setFollowersModalOpen(true)
-                                            : isFollowingStat
-                                                ? () => setFollowingModalOpen(true)
-                                                : undefined;
-
-                                        if (!handleClick) {
-                                            return (
-                                                <div key={label} className="flex gap-1 items-baseline">
-                                                    <span className="font-bold text-sm text-gray-900 dark:text-white">{fmt(val)}</span>
-                                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">{label}</span>
-                                                </div>
-                                            );
-                                        }
-
-                                        return (
-                                            <button key={label} type="button" onClick={handleClick} className="flex gap-1 items-baseline transition hover:opacity-80">
-                                                <span className="font-bold text-sm text-gray-900 dark:text-white">{fmt(val)}</span>
-                                                <span className="text-[11px] text-gray-500 dark:text-gray-400">{label}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Name + Bio */}
-                                <div className="min-w-0">
-                                    <div className="font-bold text-base text-gray-900 dark:text-white">{profileUser.full_name || profileUser.username}</div>
-                                    {profileUser.bio && (
-                                        <div className="mt-0.5">
-                                            <div className={`text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed ${!isBioExpanded ? 'line-clamp-1' : ''}`}>
-                                                {profileUser.bio}
-                                            </div>
-                                            {profileUser.bio.includes('\n') || profileUser.bio.length > 40 ? (
-                                                <button 
-                                                    onClick={() => setIsBioExpanded(!isBioExpanded)}
-                                                    className="text-[12px] font-bold text-gray-500 dark:text-gray-400 mt-0.5 hover:underline"
-                                                >
-                                                    {isBioExpanded ? 'Show less' : 'Read more'}
-                                                </button>
-                                            ) : null}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Mutual followers */}
-                                <MutualFollowers />
+                        {favoriteProfile && (
+                            <div className="mb-4">
+                                <InterestedSection
+                                    activeIndex={favoriteBannerIndex}
+                                    onSelect={setFavoriteBannerIndex}
+                                />
                             </div>
+                        )}
                         </div>
 
                         {!contentLocked && (
@@ -991,7 +1060,6 @@ const Profile = () => {
                                 <VendorBusinessCard />
                             </div>
                         )}
-                    </div>
 
                     {/* Tabs — only show when not locked */}
                     {!contentLocked && (
@@ -1016,7 +1084,7 @@ const Profile = () => {
             </div>
 
 
-            {/* ═══════ DESKTOP ═══════ */}
+            
             <div className="hidden md:flex flex-col h-[calc(100vh-0px)]">
 
                 <div className="flex-shrink-0 max-w-[935px] mx-auto w-full pt-12 px-8">
@@ -1166,6 +1234,15 @@ const Profile = () => {
                                     </>
                                 )}
                             </div>
+                            {favoriteProfile && (
+                                <div className="mb-6">
+                                    <InterestedSection
+                                        activeIndex={favoriteBannerIndex}
+                                        onSelect={setFavoriteBannerIndex}
+                                        isDesktop
+                                    />
+                                </div>
+                            )}
 
                             {/* Stats */}
                             <div className="flex gap-10 mb-6">
@@ -1304,3 +1381,4 @@ const Profile = () => {
 };
 
 export default Profile;
+
