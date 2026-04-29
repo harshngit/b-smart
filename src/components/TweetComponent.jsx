@@ -300,15 +300,22 @@ const TweetComponent = ({ tweet }) => {
             <Avatar src={authorAvatar} username={authorUsername} size="md" />
           </Link>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <Link to={`/profile/${authorUsername}`} className="font-semibold dark:text-white hover:underline">
-                {authorFullName || authorUsername}
-              </Link>
-              <span className="text-gray-500 dark:text-gray-400 text-xs">
-                {formatDateFull(tweet.createdAt || tweet.created_at)}
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Link to={`/profile/${authorUsername}`} className="font-bold text-[15px] dark:text-white hover:underline truncate">
+                  {authorFullName || authorUsername}
+                </Link>
+                <span className="text-gray-400 dark:text-gray-500 text-[13px] truncate">@{authorUsername}</span>
+                <span className="text-gray-400 dark:text-gray-500 text-xs shrink-0">·</span>
+                <span className="text-gray-400 dark:text-gray-500 text-xs shrink-0">
+                  {formatDateFull(tweet.createdAt || tweet.created_at)}
+                </span>
+              </div>
+              <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 ml-2 shrink-0">
+                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+              </button>
             </div>
-            <p className="dark:text-white text-gray-800 mt-2">{tweet.content}</p>
+            <p className="dark:text-white text-gray-900 mt-1.5 text-[15px] leading-[1.5]">{tweet.content}</p>
 
             {/* ── Image Gallery ── */}
             {resolvedImages.length > 0 && (

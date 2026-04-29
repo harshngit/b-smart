@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, X,
   Volume2, VolumeX, UserPlus, UserCheck, ShoppingBag, Loader2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -539,6 +539,125 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
   );
 };
 
+// ─── TweetImageGrid ────────────────────────────────────────────────────────────
+// Inline tweet image gallery: 1=compact, 2=side-by-side, 3+=stacked with +N overlay
+const TweetImageGrid = ({ images, onImageClick }) => {
+  if (!images.length) return null;
+  const count = images.length;
+
+  if (count === 1) {
+    return (
+      <div
+        className="mt-2 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 cursor-pointer max-w-[260px]"
+        style={{ aspectRatio: '1/1' }}
+        onClick={() => onImageClick(0)}
+      >
+        <img src={images[0]} alt="media" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+      </div>
+    );
+  }
+
+  if (count === 2) {
+    return (
+      <div className="mt-2 flex gap-1.5 max-w-[440px]">
+        {images.map((src, idx) => (
+          <div
+            key={idx}
+            className="flex-1 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 cursor-pointer"
+            style={{ aspectRatio: '1/1' }}
+            onClick={() => onImageClick(idx)}
+          >
+            <img src={src} alt={`media ${idx + 1}`} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // 3+ images: first full width, second below with +N overlay
+  const remaining = count - 2;
+  return (
+    <div className="mt-2 flex flex-col gap-1.5 max-w-[440px]">
+      <div
+        className="w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 cursor-pointer"
+        style={{ aspectRatio: '1/1' }}
+        onClick={() => onImageClick(0)}
+      >
+        <img src={images[0]} alt="media 1" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+      </div>
+      <div
+        className="relative w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 cursor-pointer"
+        style={{ aspectRatio: '1/1' }}
+        onClick={() => onImageClick(1)}
+      >
+        <img src={images[1]} alt="media 2" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+        {remaining > 0 && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <span className="text-white text-3xl font-bold drop-shadow-lg">+{remaining}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── TweetImagePreviewModal ─────────────────────────────────────────────────────
+const TweetImagePreviewModal = ({ images, initialIndex, isOpen, onClose }) => {
+  const [index, setIndex] = useState(initialIndex);
+  useEffect(() => { setIndex(initialIndex); }, [initialIndex]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowRight') setIndex(i => (i + 1) % images.length);
+      if (e.key === 'ArrowLeft') setIndex(i => (i - 1 + images.length) % images.length);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, images.length, onClose]);
+
+  if (!isOpen || !images.length) return null;
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center" onClick={onClose}>
+      <button
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white z-10"
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+      >
+        <X size={20} />
+      </button>
+      {images.length > 1 && (
+        <button
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white z-10"
+          onClick={(e) => { e.stopPropagation(); setIndex(i => (i - 1 + images.length) % images.length); }}
+        >
+          <ChevronLeft size={22} />
+        </button>
+      )}
+      <img
+        src={images[index]}
+        alt="Preview"
+        className="max-w-[90vw] max-h-[85vh] object-contain rounded-xl shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+      {images.length > 1 && (
+        <button
+          className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white z-10"
+          onClick={(e) => { e.stopPropagation(); setIndex(i => (i + 1) % images.length); }}
+        >
+          <ChevronRight size={22} />
+        </button>
+      )}
+      {images.length > 1 && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+          {images.map((_, i) => (
+            <div key={i} className={`w-2 h-2 rounded-full transition-all ${i === index ? 'bg-white' : 'bg-white/40'}`} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── PostCard ──────────────────────────────────────────────────────────────────
 const PostCard = ({ post, onCommentClick, onDelete }) => {
   const { userObject } = useSelector(s => s.auth);
@@ -711,6 +830,26 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   const profilePath = isAd ? `/vendor/${userId}/public` : `/profile/${userId}`;
 
   if (isTweet) {
+    const tweetImages = mediaItems
+      .map(item => {
+        const raw = item?.fileUrl || item?.url || item?.fileName;
+        if (!raw) return null;
+        const s = String(raw);
+        if (s.startsWith('http')) return s;
+        return `${BASE_URL}/uploads/${s.replace(/^\/+/, '').replace(/^uploads\//, '')}`;
+      })
+      .filter(Boolean);
+
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [tweetPreviewOpen, setTweetPreviewOpen] = useState(false);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [tweetPreviewIdx, setTweetPreviewIdx] = useState(0);
+
+    const handleTweetImageClick = (idx) => {
+      setTweetPreviewIdx(idx);
+      setTweetPreviewOpen(true);
+    };
+
     return (
       <div className="max-w-[640px] mx-auto bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-2xl px-4 py-3 mb-3">
         <div className="flex gap-3">
@@ -762,12 +901,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
               </p>
             )}
 
-            {mediaItems.length > 0 && (
-              <div className="mt-3 overflow-hidden rounded-[18px] border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111] shadow-[0_2px_10px_rgba(0,0,0,0.04)] dark:shadow-none">
-                <div className="overflow-hidden bg-[#f5f5f5] dark:bg-black">
-                  <MediaRenderer mediaItems={mediaItems} isAdType={false} peopleTags={[]} />
-                </div>
-              </div>
+            {tweetImages.length > 0 && (
+              <TweetImageGrid images={tweetImages} onImageClick={handleTweetImageClick} />
             )}
 
             <div className="mt-3 flex items-center gap-4 text-gray-900 dark:text-white">
@@ -811,6 +946,12 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
           onClose={() => setShowShareModal(false)}
           contentType={shareContentType}
           contentId={postId}
+        />
+        <TweetImagePreviewModal
+          images={tweetImages}
+          initialIndex={tweetPreviewIdx}
+          isOpen={tweetPreviewOpen}
+          onClose={() => setTweetPreviewOpen(false)}
         />
       </div>
     );

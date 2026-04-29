@@ -9,9 +9,12 @@ const resolveUrl = (raw) => {
 
 /**
  * TweetImageGallery
- * Matches the exact thumbnail layout used in CreatePostModal tweet composer:
- *  - 1 image  → compact card 180×120px, left-aligned
- *  - 2+ images → 2-col grid 260px wide, each 100px tall, second tile shows +N overlay
+ *
+ * Layout rules:
+ *  - 1 image  → single compact card, 16/9, max-width 320px, left-aligned
+ *  - 2 images → two equal cards side by side, 16/9 each
+ *  - 3+ images → first image full width (16/9) on top,
+ *                second image below with +N overlay if there are more than 3
  */
 const TweetImageGallery = ({ mediaItems = [], onImageClick }) => {
   if (!mediaItems.length) return null;
@@ -24,40 +27,79 @@ const TweetImageGallery = ({ mediaItems = [], onImageClick }) => {
 
   const count = images.length;
 
+  /* ── 1 image ── */
   if (count === 1) {
     return (
-      <div className="mt-3 flex">
+      <div className="mt-3">
         <div
-          className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 cursor-pointer"
-          style={{ width: 180 }}
+          className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 cursor-pointer max-w-[320px]"
+          style={{ aspectRatio: '16/9' }}
           onClick={() => onImageClick?.(0)}
         >
           <img
             src={images[0]}
             alt="Tweet media"
-            className="w-full object-cover hover:opacity-95 transition-opacity"
-            style={{ height: 120 }}
+            className="w-full h-full object-cover hover:opacity-90 transition-opacity"
           />
         </div>
       </div>
     );
   }
 
-  const remaining = count - 2;
+  /* ── 2 images ── */
+  if (count === 2) {
+    return (
+      <div className="mt-3 flex gap-1.5 max-w-[480px]">
+        {images.map((src, idx) => (
+          <div
+            key={idx}
+            className="flex-1 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 cursor-pointer"
+            style={{ aspectRatio: '16/9' }}
+            onClick={() => onImageClick?.(idx)}
+          >
+            <img
+              src={src}
+              alt={`Tweet media ${idx + 1}`}
+              className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+            />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  /* ── 3+ images ── */
+  const remaining = count - 2; // images hidden after index 1
 
   return (
-    <div
-      className="mt-3 grid grid-cols-2 gap-[2px] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800"
-      style={{ width: 260 }}
-    >
-      <div className="cursor-pointer overflow-hidden" onClick={() => onImageClick?.(0)}>
-        <img src={images[0]} alt="Tweet media 1" className="w-full object-cover hover:opacity-95 transition-opacity" style={{ height: 100 }} />
+    <div className="mt-3 flex flex-col gap-1.5 max-w-[480px]">
+      {/* Top: first image full width */}
+      <div
+        className="w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 cursor-pointer"
+        style={{ aspectRatio: '16/9' }}
+        onClick={() => onImageClick?.(0)}
+      >
+        <img
+          src={images[0]}
+          alt="Tweet media 1"
+          className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+        />
       </div>
-      <div className="relative cursor-pointer overflow-hidden" onClick={() => onImageClick?.(1)}>
-        <img src={images[1]} alt="Tweet media 2" className="w-full object-cover hover:opacity-95 transition-opacity" style={{ height: 100 }} />
+
+      {/* Bottom: second image with +N overlay if more than 3 */}
+      <div
+        className="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 cursor-pointer"
+        style={{ aspectRatio: '16/9' }}
+        onClick={() => onImageClick?.(1)}
+      >
+        <img
+          src={images[1]}
+          alt="Tweet media 2"
+          className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+        />
         {remaining > 0 && (
-          <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
-            <span className="text-white text-xl font-bold">+{remaining}</span>
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <span className="text-white text-3xl font-bold drop-shadow-lg">+{remaining}</span>
           </div>
         )}
       </div>
