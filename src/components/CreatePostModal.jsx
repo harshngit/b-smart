@@ -3,9 +3,11 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import EmojiPicker from 'emoji-picker-react';
+import promoteReelService from '../services/promoteReelService';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone,
   MousePointerClick, Target, Smartphone, Monitor, Calendar, Link2, Phone, Mail, MessageSquare,
-  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, FileText, Ellipsis, Pencil
+  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, FileText, Ellipsis, Pencil,
+  ShoppingBag, Trash2
 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
@@ -316,6 +318,23 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [isLoadingAllUsers, setIsLoadingAllUsers] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [adSubmitMode, setAdSubmitMode] = useState('publish');
+
+  // ── Promote products state ─────────────────────────────────────────────
+  const [promoteProducts, setPromoteProducts] = useState([]);          // submitted list
+  const emptyDraft = () => ({ product_name: '', product_description: '', product_price: '', visit_link: '', discount_amount: '', promote_img: '', _imgUploading: false });
+  const [productDraft, setProductDraft] = useState(null);              // null = no form open
+  const updateDraft = (field, value) => setProductDraft(prev => prev ? { ...prev, [field]: value } : prev);
+  const openDraftForm = () => setProductDraft(emptyDraft());
+  const cancelDraft = () => setProductDraft(null);
+  const submitDraft = () => {
+    if (!productDraft || !productDraft.product_name.trim() || !productDraft.product_price) return;
+    const { _imgUploading, ...clean } = productDraft;
+    setPromoteProducts(prev => [...prev, clean]);
+    setProductDraft(null);
+  };
+  const removeProduct = (i) => setPromoteProducts(prev => prev.filter((_, idx) => idx !== i));
+  // kept for backwards-compat (submit strips _imgUploading anyway)
+  const updateProduct = (i, field, value) => setPromoteProducts(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
   
   const CATEGORIES = [
     'Fashion', 'Electronics', 'Food & Dining', 'Beauty & Personal Care', 'Travel', 'Education',
@@ -660,6 +679,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     const validFiles = files.filter(file => {
       if (postType === 'post' || postType === 'tweet') return file.type.startsWith('image/');
       if (postType === 'reel') return file.type.startsWith('video/');
+      if (postType === 'promote') return file.type.startsWith('video/');
       if (postType === 'ad') return file.type.startsWith('image/') || file.type.startsWith('video/');
       return file.type.startsWith('image/') || file.type.startsWith('video/');
     });
@@ -786,7 +806,9 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       return;
     }
     if (step === 'share') {
-      setStep(postType === 'ad' ? 'adDetails' : 'edit');
+      setStep(postType === 'ad' ? 'adDetails' : postType === 'promote' ? 'promoteProducts' : 'edit');
+    } else if (step === 'promoteProducts') {
+      setStep('edit');
     } else if (step === 'adDetails') {
       setStep('edit');
     } else if (step === 'edit') {
@@ -884,9 +906,13 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         setStep('share');
       } else if (postType === 'ad') {
         setStep('adDetails');
+      } else if (postType === 'promote') {
+        setStep('promoteProducts');
       } else {
         setStep('share');
       }
+    } else if (step === 'promoteProducts') {
+      setStep('share');
     } else if (step === 'adDetails') {
       setStep('share');
     } else if (step === 'share') {
@@ -1148,6 +1174,38 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           };
           await api.post('https://api.bebsmart.in/api/posts/reels', payload);
 
+        } else if (postType === 'promote') {
+          // Promote reel — POST /api/promote-reels
+          const validProducts = promoteProducts
+            .filter(p => p.product_name.trim() && p.product_price)
+            .map(p => ({
+              product_name: p.product_name.trim(),
+              product_description: p.product_description.trim(),
+              product_price: parseFloat(p.product_price) || 0,
+              visit_link: p.visit_link.trim(),
+              discount_amount: parseFloat(p.discount_amount) || 0,
+              promote_img: p.promote_img || '',
+            }));
+
+          const payload = {
+            caption,
+            location,
+            media: processedMedia
+              .filter(m => m.media_type === 'video')
+              .map(m => { const copy = { ...m }; delete copy._fileUrl; return copy; }),
+            tags: hashtags,
+            people_tags: tags.map(t => ({
+              user_id: t.user.id,
+              username: t.user.username,
+              x: t.x,
+              y: t.y
+            })),
+            hide_likes_count: hideLikes,
+            turn_off_commenting: turnOffCommenting,
+            products: validProducts,
+          };
+          await promoteReelService.createPromoteReel(payload);
+
         } else if (postType === 'ad') {
           if (!ensureAdProfileCompletion()) {
             setIsSubmitting(false);
@@ -1408,6 +1466,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     setCurrentIndex(0);
     setCaption('');
     setAdMedia([]);
+    setPromoteProducts([]);
+    setProductDraft(null);
     
     setSelectedCategory("");
     setSelectedLanguages([]);
@@ -1597,7 +1657,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           {step === 'select' ? (
             <>
               <div className="w-10"></div>
-              <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'tweet' ? 'tweet' : postType === 'reel' ? 'reel' : postType === 'ad' ? 'ad' : 'post'}</h2>
+              <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'tweet' ? 'tweet' : postType === 'reel' ? 'reel' : postType === 'ad' ? 'ad' : postType === 'promote' ? 'promote' : 'post'}</h2>
               <button onClick={handleClose} className="text-black dark:text-white md:hidden"><X size={24} /></button>
               <div className="w-10 md:block hidden"></div>
             </>
@@ -1621,7 +1681,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 </button>
               </div>
               <h2 className="font-semibold text-base text-center dark:text-white flex-1">
-                {step === 'crop' ? 'Step 1 · Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Step 2 · Edit' : step === 'adDetails' ? 'Step 3 · Ad Details' : step === 'share' && postType === 'ad' ? 'Ad Setup' : 'Share'}
+                {step === 'crop' ? 'Step 1 · Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Step 2 · Edit' : step === 'promoteProducts' ? 'Step 3 · Products' : step === 'adDetails' ? 'Step 3 · Ad Details' : step === 'share' && postType === 'ad' ? 'Ad Setup' : step === 'share' && postType === 'promote' ? 'Step 4 · Promote Details' : 'Share'}
               </h2>
               <div className="w-auto min-w-[140px] flex justify-end items-center gap-2">
                   {step === 'share' && postType === 'ad' && (
@@ -1692,6 +1752,13 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     >
                       <Video size={18} className="text-pink-400" />
                       <span className="text-xs font-semibold">Reel</span>
+                    </button>
+                    <button
+                      onClick={() => setPostType('promote')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'promote' ? 'bg-white/20' : 'hover:bg-white/10'}`}
+                    >
+                      <ShoppingBag size={18} className="text-green-400" />
+                      <span className="text-xs font-semibold">Promote</span>
                     </button>
                   </>
                 )}
@@ -2073,6 +2140,311 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               </div>
             </div>
           </div>
+        ) : step === 'promoteProducts' ? (
+          /* ── PROMOTE PRODUCTS STEP ──────────────────────────────────────── */
+          <div className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden overflow-y-auto overflow-x-hidden min-h-0">
+
+            {/* ── LEFT PANEL : Draft form ───────────────────────────────── */}
+            <div className="w-full lg:w-[420px] flex-shrink-0 flex flex-col border-r border-gray-100 dark:border-white/10 bg-white dark:bg-[#0d0d0d] overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+
+              {/* Header */}
+              <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/10">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag size={16} className="text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                    {productDraft ? 'New Product' : 'Add Product'}
+                  </span>
+                </div>
+                {!productDraft && (
+                  <button
+                    onClick={openDraftForm}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-bold hover:opacity-80 transition-opacity"
+                  >
+                    <Plus size={13} /> New
+                  </button>
+                )}
+              </div>
+
+              {/* No form open yet */}
+              {!productDraft ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8 py-16 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+                    <ShoppingBag size={28} className="text-gray-300 dark:text-white/20" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                      {promoteProducts.length === 0 ? 'No products yet' : 'Add another product'}
+                    </p>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      {promoteProducts.length === 0
+                        ? 'Click "New" or the button below to add your first product.'
+                        : 'Click "New" to add another product to this promote reel.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={openDraftForm}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <Plus size={15} /> {promoteProducts.length === 0 ? 'Add First Product' : 'Add Another'}
+                  </button>
+                </div>
+              ) : (
+                /* Draft form */
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ scrollbarWidth: 'none' }}>
+
+                  {/* Product Image */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 block">Product Image</label>
+                    <div className="flex items-start gap-3">
+                      <label className="relative flex-shrink-0 w-20 h-20 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/15 bg-gray-100 dark:bg-white/5 flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 dark:hover:border-white/30 transition-colors overflow-hidden group">
+                        {productDraft._imgUploading ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <svg className="animate-spin w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-20"/>
+                              <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                            </svg>
+                            <span className="text-[9px] text-gray-400">Uploading…</span>
+                          </div>
+                        ) : productDraft.promote_img ? (
+                          <>
+                            <img src={productDraft.promote_img} alt="Product" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-[9px] font-bold">Change</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1">
+                            <Image size={18} className="text-gray-300 dark:text-white/20" />
+                            <span className="text-[9px] text-gray-400 text-center leading-tight">Upload<br/>Image</span>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            updateDraft('_imgUploading', true);
+                            try {
+                              const token = localStorage.getItem('token');
+                              const fd = new FormData();
+                              fd.append('file', file);
+                              const res = await fetch('https://api.bebsmart.in/api/upload/promote-product', {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${token}` },
+                                body: fd,
+                              });
+                              if (!res.ok) throw new Error('Upload failed');
+                              const data = await res.json();
+                              updateDraft('promote_img', data.promote_img || data.fileUrl || '');
+                            } catch {
+                              updateDraft('promote_img', '');
+                            } finally {
+                              updateDraft('_imgUploading', false);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                      <div className="flex-1 flex flex-col justify-center gap-1 pt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                          {productDraft.promote_img ? 'Image uploaded ✓' : 'Optional — JPG, PNG, WEBP up to 10 MB'}
+                        </p>
+                        {productDraft.promote_img && (
+                          <button onClick={() => updateDraft('promote_img', '')} className="text-[11px] text-red-400 hover:text-red-500 text-left transition-colors">
+                            Remove image
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Product Name */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">
+                      Product Name <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Wireless Earbuds Pro"
+                      value={productDraft.product_name}
+                      onChange={e => updateDraft('product_name', e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-white/30 transition-all placeholder-gray-300 dark:placeholder-white/20"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Description</label>
+                    <textarea
+                      placeholder="Short product description..."
+                      value={productDraft.product_description}
+                      onChange={e => updateDraft('product_description', e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-white/30 transition-all resize-none placeholder-gray-300 dark:placeholder-white/20"
+                    />
+                  </div>
+
+                  {/* Price + Discount */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">
+                        Price (₹) <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="1299"
+                        value={productDraft.product_price}
+                        onChange={e => updateDraft('product_price', e.target.value)}
+                        min={0}
+                        className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-white/30 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Discount (₹)</label>
+                      <input
+                        type="number"
+                        placeholder="200"
+                        value={productDraft.discount_amount}
+                        onChange={e => updateDraft('discount_amount', e.target.value)}
+                        min={0}
+                        className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-white/30 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Final price pill */}
+                  {productDraft.product_price && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                      <span className="text-xs text-gray-400">Final:</span>
+                      <span className="text-sm font-black text-gray-900 dark:text-white">
+                        ₹{Math.max(0, (parseFloat(productDraft.product_price) || 0) - (parseFloat(productDraft.discount_amount) || 0))}
+                      </span>
+                      {productDraft.discount_amount && parseFloat(productDraft.discount_amount) > 0 && (
+                        <span className="ml-auto text-[10px] font-bold text-emerald-500 dark:text-emerald-400">
+                          {Math.round(((parseFloat(productDraft.discount_amount) || 0) / (parseFloat(productDraft.product_price) || 1)) * 100)}% off
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Visit Link */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Visit Link</label>
+                    <input
+                      type="url"
+                      placeholder="https://shop.example.com/product"
+                      value={productDraft.visit_link}
+                      onChange={e => updateDraft('visit_link', e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-white/30 transition-all placeholder-gray-300 dark:placeholder-white/20"
+                    />
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={cancelDraft}
+                      className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={submitDraft}
+                      disabled={!productDraft.product_name.trim() || !productDraft.product_price || productDraft._imgUploading}
+                      className="flex-1 py-2.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-bold disabled:opacity-40 hover:opacity-80 transition-opacity"
+                    >
+                      {productDraft._imgUploading ? 'Uploading…' : 'Add Product'}
+                    </button>
+                  </div>
+
+                  <div className="pb-2" />
+                </div>
+              )}
+            </div>
+
+            {/* ── RIGHT PANEL : Submitted product list ─────────────────── */}
+            <div className="flex-1 flex flex-col bg-gray-50 dark:bg-[#111] overflow-hidden min-w-0">
+
+              {/* Panel header */}
+              <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#0d0d0d]">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  Products <span className="text-gray-400 font-normal ml-1">({promoteProducts.length})</span>
+                </span>
+                {promoteProducts.length > 0 && !productDraft && (
+                  <button
+                    onClick={openDraftForm}
+                    className="text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1 transition-colors"
+                  >
+                    <Plus size={12} /> Add more
+                  </button>
+                )}
+              </div>
+
+              {promoteProducts.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+                    <ShoppingBag size={20} className="text-gray-200 dark:text-white/10" />
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed max-w-[180px]">
+                    Fill in the form and click <strong className="text-gray-600 dark:text-gray-300">"Add Product"</strong> — it will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ scrollbarWidth: 'none' }}>
+                  {promoteProducts.map((product, i) => {
+                    const finalPrice = Math.max(0,
+                      (parseFloat(product.product_price) || 0) - (parseFloat(product.discount_amount) || 0)
+                    );
+                    const discountPct = product.product_price && product.discount_amount
+                      ? Math.round((parseFloat(product.discount_amount) / parseFloat(product.product_price)) * 100) : 0;
+
+                    return (
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-2xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/10">
+                        {/* Image */}
+                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-white/5 flex-shrink-0 flex items-center justify-center">
+                          {product.promote_img
+                            ? <img src={product.promote_img} alt={product.product_name} className="w-full h-full object-cover" />
+                            : <ShoppingBag size={18} className="text-gray-200 dark:text-white/15" />
+                          }
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-0.5">
+                            <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight">{product.product_name}</p>
+                            <button
+                              onClick={() => removeProduct(i)}
+                              className="flex-shrink-0 text-gray-300 dark:text-white/20 hover:text-red-400 dark:hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                          {product.product_description && (
+                            <p className="text-xs text-gray-400 line-clamp-1 mb-1.5">{product.product_description}</p>
+                          )}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-black text-gray-900 dark:text-white">₹{finalPrice}</span>
+                            {discountPct > 0 && (
+                              <>
+                                <span className="text-xs text-gray-300 dark:text-white/20 line-through">₹{product.product_price}</span>
+                                <span className="text-[10px] font-bold text-emerald-500 dark:text-emerald-400">{discountPct}% off</span>
+                              </>
+                            )}
+                          </div>
+                          {product.visit_link && (
+                            <p className="text-[10px] text-blue-400 truncate mt-0.5">{product.visit_link}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="pb-2" />
+                </div>
+              )}
+            </div>
+          </div>
+
         ) : step === 'adDetails' ? (
           /* AD DETAILS STEP — beautiful blue-themed UI */
           <div className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden overflow-y-auto overflow-x-hidden">
@@ -3147,7 +3519,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
       <input
         type="file" ref={fileInputRef} className="hidden" multiple
-        accept={postType === 'post' || postType === 'tweet' ? 'image/*' : postType === 'reel' ? 'video/*' : 'image/*,video/*'}
+        accept={postType === 'post' || postType === 'tweet' ? 'image/*' : postType === 'reel' || postType === 'promote' ? 'video/*' : 'image/*,video/*'}
         onChange={handleFileSelect}
       />
 
@@ -3302,6 +3674,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     ? 'Tweet Shared! 🎉'
                     : postType === 'reel'
                     ? 'Reel Published! 🎉'
+                    : postType === 'promote'
+                    ? 'Promote Reel Published! 🎉'
                     : postType === 'ad'
                     ? adSubmitMode === 'draft'
                       ? 'Ad Saved as Draft'

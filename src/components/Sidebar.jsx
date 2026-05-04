@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2 } from 'lucide-react';
+import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, ShoppingBag } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
 import { logoutUser } from '../store/authSlice';
 import {
@@ -515,6 +515,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
     { icon: Search, label: 'Search', path: null, action: openSidebarSearch },
     { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
     { icon: Clapperboard, label: 'Reels', path: '/reels' },
+    { icon: ShoppingBag, label: 'Promote', path: '/promote' },
     { icon: MessageCircle, label: 'Messages', path: '/messages' },
     { icon: Target, label: 'Ads', path: '/ads' },
     { icon: User, label: 'Profile', path: '/profile' },
@@ -615,6 +616,14 @@ const Sidebar = ({ onOpenCreateModal }) => {
                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                           >
                             <Video size={18} /> Upload Reel
+                          </button>
+                          <button
+                            onClick={() => { onOpenCreateModal('promote'); setIsCreateDropdownOpen(false); }}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
+                          >
+                            <ShoppingBag size={18} className="text-green-500" />
+                            <span>Promote Reel</span>
+                            <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">NEW</span>
                           </button>
                         </>
                       )}

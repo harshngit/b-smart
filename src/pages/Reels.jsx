@@ -814,16 +814,36 @@ const Reels = () => {
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Progress bar — YouTube style */}
-            <div className="absolute bottom-0 left-0 right-0 z-40 px-1.5 pb-1">
-              <div className="relative h-[4px] w-full rounded-full bg-black/55">
+            {/* Progress bar — white track, white fill, red dot on hover, draggable */}
+            <div className="absolute bottom-0 left-0 right-0 z-40 px-1.5 pb-1 group/progress select-none">
+              <div
+                className="relative h-[4px] w-full rounded-full bg-white/25 cursor-pointer"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                  const vid = videoRefs.current[currentIndex];
+                  if (vid && vid.duration > 0) { vid.currentTime = pct * vid.duration; setReelProgress(pct * 100); }
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const bar = e.currentTarget;
+                  const scrub = (ev) => {
+                    const rect = bar.getBoundingClientRect();
+                    const pct = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+                    const vid = videoRefs.current[currentIndex];
+                    if (vid && vid.duration > 0) { vid.currentTime = pct * vid.duration; setReelProgress(pct * 100); }
+                  };
+                  const up = () => { document.removeEventListener('mousemove', scrub); document.removeEventListener('mouseup', up); };
+                  document.addEventListener('mousemove', scrub);
+                  document.addEventListener('mouseup', up);
+                }}
+              >
+                {/* Fill — white */}
+                <div className="absolute left-0 top-0 h-full rounded-full bg-white transition-none" style={{ width: `${reelProgress}%` }} />
+                {/* Dot — invisible normally, red on hover */}
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-[#ff0033] transition-none"
-                  style={{ width: `${reelProgress}%` }}
-                />
-                <div
-                  className="absolute top-1/2 h-[12px] w-[12px] -translate-y-1/2 rounded-full bg-[#ff0033] shadow-[0_0_0_2px_rgba(0,0,0,0.35)]"
-                  style={{ left: `calc(${reelProgress}% - 6px)` }}
+                  className="absolute top-1/2 h-[14px] w-[14px] -translate-y-1/2 rounded-full bg-white opacity-0 group-hover/progress:opacity-100 group-hover/progress:bg-[#ff0033] shadow-[0_0_0_2px_rgba(0,0,0,0.4)] transition-all duration-150 pointer-events-none"
+                  style={{ left: `calc(${reelProgress}% - 7px)` }}
                 />
               </div>
             </div>
@@ -1069,4 +1089,3 @@ const Reels = () => {
 };
 
 export default Reels;
-
