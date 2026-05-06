@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, X, Check, Tag } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -32,66 +32,220 @@ const fmt = (n = 0) => {
 };
 
 const BASE_URL = 'https://api.bebsmart.in';
-const FAVORITE_BANNERS = [bSmartBanner1, bSmartBanner2, bSmartBanner3, bSmartBanner4];
+const ALL_BANNERS = [bSmartBanner1, bSmartBanner2, bSmartBanner3, bSmartBanner4];
 
-const InterestedSection = ({ activeIndex, onSelect, isDesktop = false }) => {
-    const visibleCount = isDesktop ? 4 : 3;
-    const orderedBanners = [...FAVORITE_BANNERS.slice(activeIndex), ...FAVORITE_BANNERS.slice(0, activeIndex)];
-    const visibleBanners = orderedBanners.slice(0, visibleCount);
-    const prevSlide = () => onSelect((activeIndex - 1 + FAVORITE_BANNERS.length) % FAVORITE_BANNERS.length);
-    const nextSlide = () => onSelect((activeIndex + 1) % FAVORITE_BANNERS.length);
+// Map each ad category to a banner image (cycles through available banners)
+const AD_CATEGORIES = [
+  'All','Accessories','Action Figures','Art Supplies','Baby Products',
+  'Beauty & Personal Care','Books','Clothing & Apparel','Electronics',
+  'Food & Beverages','Footwear','Gaming','Health & Wellness','Home & Kitchen',
+  'Jewellery','Mobile & Tablets','Pet Supplies','Sports & Fitness','Toys','Travel',
+];
 
-    return (
-        <div className={`w-full ${isDesktop ? 'max-w-[740px]' : 'max-w-[520px]'}`}>
-            <div className="mb-2 flex items-center justify-between">
-                <div className="text-[12px] font-semibold tracking-[0.02em] text-gray-800 dark:text-gray-200">
-                    Interested Section
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <button
-                        type="button"
-                        onClick={prevSlide}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                        aria-label="Previous banners"
-                    >
-                        &#8249;
-                    </button>
-                    <button
-                        type="button"
-                        onClick={nextSlide}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                        aria-label="Next banners"
-                    >
-                        &#8250;
-                    </button>
-                </div>
-            </div>
+const getBannerForCategory = (category) => {
+  const idx = AD_CATEGORIES.indexOf(category);
+  return ALL_BANNERS[idx % ALL_BANNERS.length];
+};
 
-            <div className="overflow-hidden rounded-xl py-2">
-                <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
-                    {visibleBanners.map((banner, idx) => {
-                        const originalIndex = (activeIndex + idx) % FAVORITE_BANNERS.length;
-                        return (
-                            <button
-                                key={originalIndex}
-                                type="button"
-                                onClick={() => onSelect(originalIndex)}
-                                className="overflow-hidden rounded-lg transition-all"
-                                aria-label={`Show interested banner ${originalIndex + 1}`}
-                            >
-                                <img
-                                    src={banner}
-                                    alt={`Interested banner ${originalIndex + 1}`}
-                                    className={`${isDesktop ? 'h-[58px]' : 'h-[46px]'} w-full object-cover`}
-                                    loading="lazy"
-                                />
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
+// ─── Interest Modal ───────────────────────────────────────────────────────────
+const InterestModal = ({ isOpen, onClose, profileUserId, isOwnProfile }) => {
+  const [selected, setSelected] = useState([]);
+  const [categories, setCategories] = useState(AD_CATEGORIES); // fallback to local list
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  // On every open: call GET /users/:id/interests to fetch both current interests
+  // AND the available_categories list from the API
+  useEffect(() => {
+    if (!isOpen || !profileUserId) return;
+    setLoading(true);
+    setError('');
+    api.get(`/users/${profileUserId}/interests`)
+      .then((res) => {
+        // API returns { ad_interests: [...], available_categories: [...] }
+        const interests = Array.isArray(res.data?.ad_interests) ? res.data.ad_interests : [];
+        const cats = Array.isArray(res.data?.available_categories) && res.data.available_categories.length > 0
+          ? res.data.available_categories
+          : AD_CATEGORIES;
+        setSelected(interests);
+        setCategories(cats);
+      })
+      .catch(() => {
+        // Fallback: keep local AD_CATEGORIES, clear selection
+        setCategories(AD_CATEGORIES);
+        setSelected([]);
+      })
+      .finally(() => setLoading(false));
+  }, [isOpen, profileUserId]);
+
+  const toggle = (cat) => {
+    if (!isOwnProfile) return;
+    setSelected((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
     );
+  };
+
+  const handleSave = async () => {
+    if (!isOwnProfile) { onClose(); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await api.post(`/users/${profileUserId}/interests`, { interests: selected });
+      onClose(selected);
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Failed to save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md bg-white dark:bg-[#111] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">
+              {isOwnProfile ? 'My Interests' : 'Interests'}
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {isOwnProfile ? 'Select ad categories to personalise your feed' : 'Ad interest categories'}
+            </p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Category grid */}
+        <div className="overflow-y-auto flex-1 px-4 py-4">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <Loader2 size={28} className="animate-spin text-orange-400" />
+              <p className="text-sm text-gray-400">Loading categories…</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5">
+              {categories.map((cat) => {
+                const isSelected = selected.includes(cat);
+                const banner = getBannerForCategory(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => toggle(cat)}
+                    disabled={!isOwnProfile}
+                    className={`relative overflow-hidden rounded-2xl h-20 text-left transition-all ${
+                      isSelected
+                        ? 'ring-2 ring-orange-500 ring-offset-2 dark:ring-offset-[#111]'
+                        : isOwnProfile ? 'hover:scale-[1.02] active:scale-[0.98]' : 'cursor-default'
+                    }`}
+                  >
+                    <img src={banner} alt={cat} className="absolute inset-0 w-full h-full object-cover" />
+                    <div className={`absolute inset-0 bg-gradient-to-t ${isSelected ? 'from-orange-900/80 via-orange-900/40' : 'from-black/70 via-black/30'} to-transparent`} />
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
+                        <Check size={11} className="text-white" strokeWidth={3} />
+                      </div>
+                    )}
+                    <span className="absolute bottom-2 left-2 right-2 text-white text-[11px] font-bold leading-tight line-clamp-2">
+                      {cat}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {isOwnProfile && (
+          <div className="px-4 pb-5 pt-3 border-t border-gray-100 dark:border-gray-800 shrink-0">
+            {error && <p className="text-xs text-red-500 mb-2 text-center">{error}</p>}
+            <div className="flex items-center gap-2 mb-2">
+              <Star size={13} className="text-orange-500 shrink-0" fill="currentColor" />
+              <p className="text-xs text-gray-500">{selected.length} categor{selected.length === 1 ? 'y' : 'ies'} selected</p>
+            </div>
+            <button
+              onClick={handleSave}
+              disabled={saving || loading}
+              className="w-full h-11 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-pink-600 text-white font-bold text-sm shadow-md hover:opacity-90 active:opacity-80 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {saving ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : 'Save Interests'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── InterestedSection — horizontal scrollable tiles, 3 visible ──────────────
+const InterestedSection = ({ interests = [] }) => {
+  const scrollRef = React.useRef(null);
+  const tiles = interests.map((cat) => ({ src: getBannerForCategory(cat), label: cat }));
+  if (tiles.length === 0) return null;
+
+  const scroll = (dir) => {
+    if (!scrollRef.current) return;
+    const amount = scrollRef.current.offsetWidth * 0.75;
+    scrollRef.current.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-1.5">
+          <Star size={13} className="text-orange-500" fill="currentColor" />
+          <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">Interested In</span>
+          <span className="text-[11px] text-gray-400">({tiles.length})</span>
+        </div>
+        {tiles.length > 3 && (
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => scroll('left')}
+              className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button type="button" onClick={() => scroll('right')}
+              className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Scrollable row — snaps, shows 3 tiles */}
+      <div
+        ref={scrollRef}
+        className="flex gap-2.5 overflow-x-auto pb-1"
+        style={{
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
+          scrollSnapType: 'x mandatory',
+        }}
+      >
+        {tiles.map((b, idx) => (
+          <div
+            key={idx}
+            className="flex-shrink-0 relative overflow-hidden rounded-2xl"
+            style={{ width: 'calc(33.333% - 7px)', scrollSnapAlign: 'start' }}
+          >
+            <img src={b.src} alt={b.label} className="w-full h-[72px] object-cover" loading="lazy" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+            <span className="absolute bottom-1.5 left-2 right-2 text-white text-[10px] font-bold leading-tight line-clamp-1 drop-shadow">
+              {b.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const Profile = () => {
@@ -128,6 +282,9 @@ const Profile = () => {
     const [notifLoading, setNotifLoading] = useState(false);
     const [isBioExpanded, setIsBioExpanded] = useState(false);
     const [favoriteBannerIndex, setFavoriteBannerIndex] = useState(0);
+    const [showInterestModal, setShowInterestModal] = useState(false);
+    const [showInterestsSection, setShowInterestsSection] = useState(true);
+    const [userInterests, setUserInterests] = useState([]);
     const userOptionsMenuRef = useRef(null);
 
     // Close user options menu when clicking outside
@@ -180,6 +337,18 @@ const Profile = () => {
         };
         fetchProfileUser();
     }, [userId, currentUser, isOwnProfile]);
+
+    // ── Fetch user interests ─────────────────────────────────────────────────
+    useEffect(() => {
+        const targetId = profileUser?._id || profileUser?.id || (isOwnProfile ? (currentUser?._id || currentUser?.id) : userId);
+        if (!targetId) return;
+        api.get(`/users/${targetId}/interests`)
+            .then((res) => {
+                const interests = res.data?.ad_interests || [];
+                setUserInterests(interests);
+            })
+            .catch(() => {});
+    }, [profileUser, isOwnProfile, currentUser, userId]);
 
     // ── Fetch notification preference status ────────────────────────────────
     useEffect(() => {
@@ -963,10 +1132,22 @@ const Profile = () => {
                                             <button type="button" onClick={handleShareProfile} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
                                                 <Share2 size={18} />
                                             </button>
-                                            <button type="button" onClick={() => setFavoriteProfile((prev) => !prev)}
-                                                className={`flex-1 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
-                                                aria-label="Favourite profile">
-                                                <Star size={18} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                            <button type="button"
+                                                onClick={() => {
+                                                    if (userInterests.length === 0) {
+                                                        // No interests yet — open modal to pick them
+                                                        setShowInterestModal(true);
+                                                    } else if (showInterestsSection) {
+                                                        // Section visible — open modal to edit, OR hide on double-intent
+                                                        setShowInterestModal(true);
+                                                    } else {
+                                                        // Section hidden — show it again
+                                                        setShowInterestsSection(true);
+                                                    }
+                                                }}
+                                                className={`flex-1 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${showInterestsSection && userInterests.length > 0 ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
+                                                aria-label="Interests">
+                                                <Star size={18} fill={showInterestsSection && userInterests.length > 0 ? 'currentColor' : 'none'} />
                                             </button>
                                             <button type="button" onClick={handleOpenMessages} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
                                                 <MessageCircle size={18} />
@@ -981,10 +1162,11 @@ const Profile = () => {
                                             <button type="button" onClick={handleShareProfile} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
                                                 <Share2 size={18} />
                                             </button>
-                                            <button type="button" onClick={() => setFavoriteProfile((prev) => !prev)}
-                                                className={`flex-1 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
-                                                aria-label="Favourite">
-                                                <Star size={18} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                            <button type="button"
+                                                onClick={() => setShowInterestsSection(v => !v)}
+                                                className={`flex-1 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${showInterestsSection && userInterests.length > 0 ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
+                                                aria-label="Interests">
+                                                <Star size={18} fill={showInterestsSection && userInterests.length > 0 ? 'currentColor' : 'none'} />
                                             </button>
                                             <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
                                                 <MessageCircle size={18} />
@@ -1026,12 +1208,9 @@ const Profile = () => {
                                     )}
                         </div>
 
-                        {favoriteProfile && (
+                        {userInterests.length > 0 && showInterestsSection && (
                             <div className="mb-4">
-                                <InterestedSection
-                                    activeIndex={favoriteBannerIndex}
-                                    onSelect={setFavoriteBannerIndex}
-                                />
+                                <InterestedSection interests={userInterests} />
                             </div>
                         )}
                         </div>
@@ -1125,8 +1304,15 @@ const Profile = () => {
                                 <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Share">
                                     <Share2 size={17} />
                                 </button>
-                                <button type="button" onClick={() => setFavoriteProfile(p => !p)} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="Favourite">
-                                    <Star size={17} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                <button type="button"
+                                    onClick={() => {
+                                        if (userInterests.length === 0) { setShowInterestModal(true); }
+                                        else if (showInterestsSection) { setShowInterestModal(true); }
+                                        else { setShowInterestsSection(true); }
+                                    }}
+                                    className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection && userInterests.length > 0 ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`}
+                                    aria-label="Interests">
+                                    <Star size={17} fill={showInterestsSection && userInterests.length > 0 ? 'currentColor' : 'none'} />
                                 </button>
                                 <button type="button" onClick={handleOpenMessages} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Message">
                                     <MessageCircle size={17} />
@@ -1143,8 +1329,11 @@ const Profile = () => {
                                 <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Share">
                                     <Share2 size={17} />
                                 </button>
-                                <button type="button" onClick={() => setFavoriteProfile(p => !p)} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="Favourite">
-                                    <Star size={17} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                <button type="button"
+                                    onClick={() => setShowInterestsSection(v => !v)}
+                                    className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection && userInterests.length > 0 ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`}
+                                    aria-label="Interests">
+                                    <Star size={17} fill={showInterestsSection && userInterests.length > 0 ? 'currentColor' : 'none'} />
                                 </button>
                                 <button type="button" onClick={handleOpenMessages} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Message">
                                     <MessageCircle size={17} />
@@ -1219,9 +1408,9 @@ const Profile = () => {
                     )}
 
                     {/* Interested section */}
-                    {favoriteProfile && (
+                    {userInterests.length > 0 && showInterestsSection && (
                         <div className="mt-6">
-                            <InterestedSection activeIndex={favoriteBannerIndex} onSelect={setFavoriteBannerIndex} isDesktop />
+                            <InterestedSection interests={userInterests} />
                         </div>
                     )}
 
@@ -1289,6 +1478,19 @@ const Profile = () => {
                 isOpen={followingModalOpen}
                 onClose={() => setFollowingModalOpen(false)}
                 userId={profileTargetUserId}
+                isOwnProfile={isOwnProfile}
+            />
+            <InterestModal
+                isOpen={showInterestModal}
+                onClose={(updatedInterests) => {
+                    setShowInterestModal(false);
+                    if (Array.isArray(updatedInterests)) {
+                        // Saved — update interests and HIDE the section (closed state)
+                        setUserInterests(updatedInterests);
+                        setShowInterestsSection(false);
+                    }
+                }}
+                profileUserId={profileUser?._id || profileUser?.id || userId}
                 isOwnProfile={isOwnProfile}
             />
         </div>
