@@ -170,11 +170,24 @@ const DesktopFollowButton = ({ targetUserId }) => {
   );
 };
 
+// ── Location Selector ────────────────────────────────────────────────────────
+const LocationSelector = ({ className = "" }) => (
+  <div className={`flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg cursor-pointer group hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors w-full ${className}`}>
+    <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="p-1.5 bg-white dark:bg-black rounded-full shadow-sm shrink-0">
+        <MapPin size={14} className="text-red-500" />
+      </div>
+      <span className="text-sm font-bold text-gray-900 dark:text-white truncate">Plat No.20, 2nd Floor, Shivaram Nivas, Sri...</span>
+    </div>
+    <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
+  </div>
+);
+
 // ── Location Bar ──────────────────────────────────────────────────────────────
 const LocationBar = ({ searchQuery, onSearchChange, searchLoading }) => (
-  <div className="hidden md:block sticky top-0 z-30 bg-white dark:bg-black mb-4 border-b border-gray-100 dark:border-gray-800 w-full">
-    <div className="max-w-[1200px] mx-auto xl:px-6">
-      <div className="flex items-center justify-between px-4 py-3 gap-8">
+  <div className="hidden md:block sticky top-0 z-30 bg-white dark:bg-black mb-4 border-b border-gray-100 dark:border-gray-800 w-full xl:px-6">
+    <div className="max-w-[1200px] mx-auto">
+      <div className="flex items-center justify-between py-3">
         <div className="flex items-center gap-12 flex-1">
           <h1 className="text-3xl font-normal text-[#bc1888] italic" style={{ fontFamily: "'Dancing Script', cursive" }}>
             b_smart
@@ -198,14 +211,9 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading }) => (
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg cursor-pointer group hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors w-auto min-w-[300px]">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="p-1.5 bg-white dark:bg-black rounded-full shadow-sm shrink-0">
-              <MapPin size={14} className="text-red-500" />
-            </div>
-            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">Plat No.20, 2nd Floor, Shivaram Nivas, Sri...</span>
-          </div>
-          <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
+        {/* Right: Location Selector aligned with Sidebar */}
+        <div className="hidden xl:block w-[350px]">
+          <LocationSelector />
         </div>
       </div>
     </div>
@@ -375,7 +383,7 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
 
   return (
     <aside className="hidden xl:block w-[350px] shrink-0 z-0">
-      <div className="sticky top-20">
+      <div className="sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto pb-20 scrollbar-hide">
         <div className="mb-6">
           <button
             type="button"
@@ -682,7 +690,7 @@ const Home = () => {
       )}
 
       <div className="w-full xl:px-6">
-        <div className="max-w-[1200px] mx-auto xl:flex xl:items-start xl:justify-between xl:gap-20">
+        <div className="max-w-[1200px] mx-auto xl:flex xl:items-start xl:justify-between xl:gap-[27rem]">
           <div className="w-full max-w-[700px]">
             <StoryRail />
             <div className="mx-auto mb-4 flex w-full max-w-[470px] items-center gap-2 px-2 xl:mx-0">

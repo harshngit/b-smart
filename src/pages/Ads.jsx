@@ -1655,7 +1655,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
           {/* Loading */}
           {loading && (
-            <div className="flex flex-col items-center gap-3 text-gray-400">
+            <div className="flex flex-col items-center gap-3 text-gray-400 md:-ml-[500px]">
               <Loader2 size={32} className="animate-spin" />
               <span className="text-sm">Loading ads…</span>
             </div>
@@ -1684,8 +1684,8 @@ const Ads = ({ feedMode = 'user' }) => {
               relative overflow-hidden bg-black
               /* Mobile: full height, capped at 430px wide, centred — Instagram style */
               w-full max-w-[430px] h-full
-              /* Desktop: fixed phone card */
-              md:w-[360px] md:h-[90vh] md:rounded-2xl md:shadow-2xl
+              /* Desktop: fixed phone card — shifted left to center between sidebar and right nav */
+              md:w-[360px] md:h-[90vh] md:rounded-2xl md:shadow-2xl md:-ml-[500px]
             ">
 
               {/* Progress bar — white track, white fill, red dot on hover; click/drag to scrub */}
@@ -1975,7 +1975,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
           {/* Desktop right actions + nav */}
           {!loading && !error && ad && (
-            <div ref={actionPanelRef} className="hidden md:flex flex-col gap-2 ml-4 justify-end h-full md:h-[85vh] pb-4">
+            <div ref={actionPanelRef} className="hidden md:flex flex-col gap-2 ml-4 justify-end h-full md:h-[85vh] pb-4 shrink-0">
               <ActionButtons
                 ad={ad}
                 likedIds={likedIds}
