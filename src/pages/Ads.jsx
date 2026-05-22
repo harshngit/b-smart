@@ -1318,7 +1318,7 @@ const Ads = ({ feedMode = 'user' }) => {
     <div className={`flex flex-col dark:bg-black overflow-hidden ${pageHeightClass}`}>
 
       {/* Desktop top bar */}
-      <div className="hidden md:flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0 relative overflow-visible">
+      <div className="hidden md:flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0 relative overflow-visible w-full">
         {/* Back button — hidden when search open */}
         <button
           onClick={() => navigate(-1)}
@@ -1328,7 +1328,7 @@ const Ads = ({ feedMode = 'user' }) => {
         </button>
 
         {/* Category pills — shrink/hide when search open */}
-        <div className={`flex items-center gap-1 overflow-x-auto scrollbar-none transition-all duration-300 ${searchOpen ? 'w-0 opacity-0 overflow-hidden flex-none' : 'flex-1 opacity-100'}`}>
+        <div className={`flex items-center gap-1 overflow-x-auto scrollbar-none transition-all w-0 duration-300 ${searchOpen ? 'w-0 opacity-0 overflow-hidden flex-none' : 'flex-1 min-w-0 opacity-100'}`}>
           {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)}
               className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all
@@ -1341,7 +1341,7 @@ const Ads = ({ feedMode = 'user' }) => {
         </div>
 
         {/* Search — expands to full width */}
-        <div ref={searchContainerRef} className={`transition-all duration-300 ease-in-out shrink-0 ${searchOpen ? 'flex-1' : ''}`}>
+        <div ref={searchContainerRef} className={`transition-all duration-300 ease-in-out shrink-0 ${searchOpen ? 'flex-1 min-w-0' : ''}`}>
           {searchOpen ? (
             <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 w-full">
               <Search size={15} className="text-gray-400 shrink-0" />
@@ -1655,7 +1655,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
           {/* Loading */}
           {loading && (
-            <div className="flex flex-col items-center gap-3 text-gray-400 md:-ml-[500px]">
+            <div className="flex flex-col items-center gap-3 text-gray-400">
               <Loader2 size={32} className="animate-spin" />
               <span className="text-sm">Loading ads…</span>
             </div>
@@ -1684,8 +1684,8 @@ const Ads = ({ feedMode = 'user' }) => {
               relative overflow-hidden bg-black
               /* Mobile: full height, capped at 430px wide, centred — Instagram style */
               w-full max-w-[430px] h-full
-              /* Desktop: fixed phone card — shifted left to center between sidebar and right nav */
-              md:w-[360px] md:h-[90vh] md:rounded-2xl md:shadow-2xl md:-ml-[500px]
+              /* Desktop: fixed phone card — centered between sidebar and right nav */
+              md:w-[360px] md:h-[90vh] md:rounded-2xl md:shadow-2xl
             ">
 
               {/* Progress bar — white track, white fill, red dot on hover; click/drag to scrub */}

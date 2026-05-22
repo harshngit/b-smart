@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Heart, MessageCircle, Send, MoreHorizontal, Music2,
-  Volume2, VolumeX, Bookmark, Loader2, X, Trash2, ChevronLeft
+  Volume2, VolumeX, Bookmark, Loader2, X, Trash2, ChevronLeft,
+  Search
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import commentService from '../services/commentService';
@@ -570,6 +571,91 @@ const Reels = () => {
     userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0
   );
 
+  // ── Search state ────────────────────────────────────────────────────────────
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchDropdownVisible, setSearchDropdownVisible] = useState(false);
+  const searchInputRef = useRef(null);
+  const searchContainerRef = useRef(null);
+  const searchDebounceRef = useRef(null);
+
+  const runSearch = useCallback(async (q) => {
+    const query = q.trim();
+    if (!query) { setSearchResults([]); setSearchDropdownVisible(false); return; }
+    setSearchLoading(true);
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        status: 'active',
+        page: 1,
+        limit: 20,
+      });
+      const res = await fetch(`${BASE_URL}/ads/search?${params}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
+        }
+      });
+      const data = await res.json();
+      const ads = Array.isArray(data) ? data : (data.ads || data.data || data.results || []);
+      const users = data.users || data.vendors || [];
+      setSearchResults([
+        ...users.map(u => ({ _type: 'user', ...u })),
+        ...ads.map(a => ({ _type: 'ad', ...a })),
+      ]);
+      setSearchDropdownVisible(true);
+    } catch { setSearchResults([]); }
+    finally { setSearchLoading(false); }
+  }, []);
+
+  const handleSearchInput = (e) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    clearTimeout(searchDebounceRef.current);
+    if (!q.trim()) { setSearchResults([]); setSearchDropdownVisible(false); return; }
+    searchDebounceRef.current = setTimeout(() => runSearch(q), 350);
+  };
+
+  const handleSearchOpen = () => {
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  };
+
+  const handleSearchClose = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchDropdownVisible(false);
+  };
+
+  const handleSearchResultClick = (item) => {
+    handleSearchClose();
+    if (item._type === 'user') {
+      const profilePath = item.role === 'vendor' 
+        ? `/vendor/${item._id || item.id}/public` 
+        : `/profile/${item._id || item.id}`;
+      navigate(profilePath);
+      return;
+    }
+    if (item._type === 'ad') {
+      const adId = item._id || item.id;
+      if (adId) navigate(`/ads?ad=${adId}`);
+    }
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setSearchDropdownVisible(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   useEffect(() => {
     const prevHtmlOverflow = document.documentElement.style.overflow;
     const prevBodyOverflow = document.body.style.overflow;
@@ -791,14 +877,127 @@ const Reels = () => {
   return (
     <>
       <div className={`w-full ${pageHeightClass} overflow-hidden flex flex-col dark:bg-black bg-white`}>
-        <div className="shrink-0 relative flex items-center px-3 py-2.5 md:px-4 md:py-3 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-black">
-          <button onClick={() => navigate(-1)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-colors">
-            <ChevronLeft size={22} />
+        <div className="shrink-0 relative flex items-center px-3 py-2 md:px-4 md:py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black overflow-visible w-full">
+          <button onClick={() => navigate(-1)} className={`p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1 shrink-0 transition-all duration-300 ${searchOpen ? 'opacity-0 w-0 overflow-hidden mr-0 p-0' : 'opacity-100'}`}>
+            <ChevronLeft size={16} />
           </button>
-          <div className="absolute left-1/2 -translate-x-1/2 text-gray-900 dark:text-white font-bold text-sm md:text-base">
-            Reels
+          
+          {!searchOpen && (
+            <div className="absolute left-1/2 -translate-x-1/2 text-gray-900 dark:text-white font-bold text-sm md:text-base">
+              Reels
+            </div>
+          )}
+
+          {/* Search — expands to full width */}
+          <div ref={searchContainerRef} className={`transition-all duration-300 ease-in-out shrink-0 ${searchOpen ? 'flex-1 min-w-0' : 'ml-auto'}`}>
+            {searchOpen ? (
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 w-full">
+                <Search size={15} className="text-gray-400 shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={handleSearchInput}
+                  placeholder="Search ads, users…"
+                  className="flex-1 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder-gray-400"
+                />
+                {searchLoading
+                  ? <Loader2 size={14} className="animate-spin text-gray-400 shrink-0" />
+                  : searchQuery
+                    ? <button onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDropdownVisible(false); searchInputRef.current?.focus(); }}>
+                        <X size={14} className="text-gray-400 hover:text-gray-700 dark:hover:text-white" />
+                      </button>
+                    : null
+                }
+                <button onClick={handleSearchClose} className="text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white ml-1 shrink-0">
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleSearchOpen} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 transition-colors">
+                <Search size={18} className="text-gray-900 dark:text-white" />
+              </button>
+            )}
+
+            {/* Desktop Search Dropdown */}
+            {searchOpen && searchDropdownVisible && (
+              <div className="absolute left-0 right-0 top-full mt-1 mx-4 bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 z-[60] max-h-96 overflow-y-auto">
+                {searchLoading && (
+                  <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span className="text-sm">Searching…</span>
+                  </div>
+                )}
+                {!searchLoading && searchResults.length === 0 && searchQuery.trim() && (
+                  <div className="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
+                    <Search size={20} className="opacity-40" />
+                    <span className="text-sm">No results for "{searchQuery}"</span>
+                  </div>
+                )}
+                {!searchLoading && searchResults.length > 0 && (
+                  <>
+                    {/* Users */}
+                    {searchResults.filter(r => r._type === 'user').length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">People</div>
+                        {searchResults.filter(r => r._type === 'user').map(u => (
+                          <button
+                            key={u._id || u.id}
+                            onClick={() => handleSearchResultClick(u)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                          >
+                            <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0 flex items-center justify-center">
+                              {u.avatar_url
+                                ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                                : <span className="text-xs font-bold text-gray-500">{(u.username || u.full_name || '?')[0].toUpperCase()}</span>
+                              }
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</div>
+                              {u.username && <div className="text-xs text-gray-400 truncate">@{u.username}</div>}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* Ads */}
+                    {searchResults.filter(r => r._type === 'ad').length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Ads</div>
+                        {searchResults.filter(r => r._type === 'ad').map(adItem => {
+                          const adUser = adItem.user_id || adItem.vendor_id || {};
+                          const mediaItem = adItem.media?.[0];
+                          const isVideoAd = mediaItem?.media_type === 'video';
+                          const thumb = mediaItem?.thumbnails?.[0]?.fileUrl || mediaItem?.thumbnail_url || (!isVideoAd ? mediaItem?.fileUrl : null);
+                          return (
+                            <button
+                              key={adItem._id || adItem.id}
+                              onClick={() => handleSearchResultClick(adItem)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                            >
+                              <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0 relative">
+                                {thumb ? (
+                                  <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400">🛍️</div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{adItem.caption || adItem.title || 'Ad'}</div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  {adItem.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium">{adItem.category}</span>}
+                                  {typeof adUser === 'object' && adUser.username && <span className="text-[10px] text-gray-400">@{adUser.username}</span>}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
-          <div className="w-9 h-9" />
         </div>
 
         <div className="flex-1 min-h-0 overflow-hidden relative flex items-center justify-center">
