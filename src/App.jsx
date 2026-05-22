@@ -29,6 +29,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Search from './pages/Search';
 import ChatPage from './pages/ChatPage';
 import Suggestions from './pages/Suggestions';
+import GlobalLoader from './components/GlobalLoader';
 
 import VendorPublicProfile from './pages/VendorPublicProfile';
 import VendorLayout from './components/VendorLayout';
@@ -84,61 +85,63 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login"              element={<Login />} />
-        <Route path="/signup"             element={<Signup />} />
-        <Route path="/vendor-signup"      element={<VendorSignup />} />
-        <Route path="/auth/google/success" element={<AuthCallback />} />
-        <Route path="/forgot-password"    element={<ForgotPassword />} />
-        <Route path="/verify-otp"         element={<VerifyOtp />} />
+      <GlobalLoader>
+        <Routes>
+          <Route path="/login"              element={<Login />} />
+          <Route path="/signup"             element={<Signup />} />
+          <Route path="/vendor-signup"      element={<VendorSignup />} />
+          <Route path="/auth/google/success" element={<AuthCallback />} />
+          <Route path="/forgot-password"    element={<ForgotPassword />} />
+          <Route path="/verify-otp"         element={<VerifyOtp />} />
 
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }>
-          <Route index                    element={<Home />} />
-          <Route path="/create"           element={<CreatePost />} />
-          <Route path="/reels"            element={<Reels />} />
-          <Route path="/promote"          element={<Promote />} />
-          <Route path="/ads"              element={<Ads />} />
-          <Route path="/vendor-ads"       element={<VendorAds />} />
-          <Route path="/profile"          element={<Profile />} />
-          <Route path="/profile/:userId"  element={<Profile />} />
-          <Route path="/edit-profile"     element={<EditProfile />} />
-          <Route path="/wallet"           element={<WalletDetails />} />
-          <Route path="/settings"         element={<Settings />} />
-          <Route path="/notifications"    element={<Notifications />} />
-          <Route path="/search"           element={<Search />} />
-          <Route path="/messages"         element={<ChatPage />} />
-          <Route path="/suggestions"      element={<Suggestions />} />
-          <Route path="/messages/:conversationId" element={<ChatPage />} />
-          <Route path="/vendor/:userId/public" element={<VendorPublicProfile />} />
-          <Route path="/ads/:adId/details" element={<AdPublicDetail />} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }>
+            <Route index                    element={<Home />} />
+            <Route path="/create"           element={<CreatePost />} />
+            <Route path="/reels"            element={<Reels />} />
+            <Route path="/promote"          element={<Promote />} />
+            <Route path="/ads"              element={<Ads />} />
+            <Route path="/vendor-ads"       element={<VendorAds />} />
+            <Route path="/profile"          element={<Profile />} />
+            <Route path="/profile/:userId"  element={<Profile />} />
+            <Route path="/edit-profile"     element={<EditProfile />} />
+            <Route path="/wallet"           element={<WalletDetails />} />
+            <Route path="/settings"         element={<Settings />} />
+            <Route path="/notifications"    element={<Notifications />} />
+            <Route path="/search"           element={<Search />} />
+            <Route path="/messages"         element={<ChatPage />} />
+            <Route path="/suggestions"      element={<Suggestions />} />
+            <Route path="/messages/:conversationId" element={<ChatPage />} />
+            <Route path="/vendor/:userId/public" element={<VendorPublicProfile />} />
+            <Route path="/ads/:adId/details" element={<AdPublicDetail />} />
 
-        </Route>
+          </Route>
 
-        <Route path="/vendor" element={
-          <ProtectedRoute>
-            <VendorLayout />
-          </ProtectedRoute>
-        }>
-          <Route path="dashboard"              element={<VendorDashboard />} />
-          <Route path="profile"                element={<VendorProfile />} />
-          <Route path="ads-management"         element={<AdsManagement />} />
-          <Route path="ads-management/:adId"   element={<AdDetails />} />
-          <Route path="analytics"              element={<ReportsAnalytics />} />
-          <Route path="billing"                element={<CoinsBilling />} />
-          <Route path="settings"               element={<VendorSettings />} />
-          <Route path="notifications"          element={<VendorNotifications />} />
-        </Route>
+          <Route path="/vendor" element={
+            <ProtectedRoute>
+              <VendorLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="dashboard"              element={<VendorDashboard />} />
+            <Route path="profile"                element={<VendorProfile />} />
+            <Route path="ads-management"         element={<AdsManagement />} />
+            <Route path="ads-management/:adId"   element={<AdDetails />} />
+            <Route path="analytics"              element={<ReportsAnalytics />} />
+            <Route path="billing"                element={<CoinsBilling />} />
+            <Route path="settings"               element={<VendorSettings />} />
+            <Route path="notifications"          element={<VendorNotifications />} />
+          </Route>
 
-        <Route path="/post/:postId" element={
-          <ProtectedRoute>
-            <MobilePostDetail />
-          </ProtectedRoute>
-        } />
-      </Routes>
+          <Route path="/post/:postId" element={
+            <ProtectedRoute>
+              <MobilePostDetail />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </GlobalLoader>
     </BrowserRouter>
   );
 }
