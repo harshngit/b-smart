@@ -49,6 +49,16 @@ const normalizeApiArray = (value) => {
   return [];
 };
 
+const normalizeAssetUrl = (value) => {
+  if (!value) return null;
+  const baseUrl = 'https://api.bebsmart.in';
+  if (/^http:\/\/api\.bebsmart\.in/i.test(String(value))) return String(value).replace(/^http:\/\//i, 'https://');
+  if (String(value).startsWith('http')) return value;
+  const normalized = String(value).replace(/^\/+/, '');
+  if (normalized.startsWith('uploads/')) return `${baseUrl}/${normalized}`;
+  return `${baseUrl}/uploads/${normalized}`;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatCount = (count) => {
   if (!count && count !== 0) return '0';
@@ -586,27 +596,35 @@ const Reels = () => {
     if (!query) { setSearchResults([]); setSearchDropdownVisible(false); return; }
     setSearchLoading(true);
     try {
-      const params = new URLSearchParams({
-        q: query,
-        status: 'active',
-        page: 1,
-        limit: 20,
-      });
-      const res = await fetch(`${BASE_URL}/ads/search?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
-        }
-      });
-      const data = await res.json();
-      const ads = Array.isArray(data) ? data : (data.ads || data.data || data.results || []);
-      const users = data.users || data.vendors || [];
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+
+      // Call both endpoints in parallel: existing ads/users and new reels search
+      const [adsRes, reelsRes] = await Promise.all([
+        fetch(`${BASE_URL}/ads/search?q=${encodeURIComponent(query)}&status=active&page=1&limit=20`, { headers }),
+        fetch(`${BASE_URL}/search/reels?q=${encodeURIComponent(query)}&page=1&limit=20`, { headers })
+      ]);
+
+      const adsData = await adsRes.json();
+      const reelsData = await reelsRes.json();
+
+      const ads = Array.isArray(adsData) ? adsData : (adsData.ads || adsData.data || adsData.results || []);
+      const users = adsData.users || adsData.vendors || [];
+      const reelsResults = normalizeApiArray(reelsData);
+
       setSearchResults([
         ...users.map(u => ({ _type: 'user', ...u })),
         ...ads.map(a => ({ _type: 'ad', ...a })),
+        ...reelsResults.map(r => ({ _type: 'reel', ...r })),
       ]);
       setSearchDropdownVisible(true);
-    } catch { setSearchResults([]); }
+    } catch (err) { 
+      console.error('Search error:', err);
+      setSearchResults([]); 
+    }
     finally { setSearchLoading(false); }
   }, []);
 
@@ -642,6 +660,12 @@ const Reels = () => {
     if (item._type === 'ad') {
       const adId = item._id || item.id;
       if (adId) navigate(`/ads?ad=${adId}`);
+      return;
+    }
+    if (item._type === 'reel') {
+      const reelId = item._id || item.id;
+      if (reelId) navigate(`/reels?reel=${reelId}`);
+      return;
     }
   };
 
@@ -957,6 +981,45 @@ const Reels = () => {
                             </div>
                           </button>
                         ))}
+                      </div>
+                    )}
+                    {/* Reels */}
+                    {searchResults.filter(r => r._type === 'reel').length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Reels</div>
+                        {searchResults.filter(r => r._type === 'reel').map(reelItem => {
+                          const reelUser = reelItem.user_id || {};
+                          const mediaItem = reelItem.media?.[0];
+                          const thumb = normalizeAssetUrl(
+                            mediaItem?.thumbnail?.[0]?.fileUrl || 
+                            mediaItem?.thumbnail?.[0]?.fileName || 
+                            mediaItem?.thumbnail_url || 
+                            mediaItem?.fileUrl ||
+                            mediaItem?.fileName
+                          );
+                          return (
+                            <button
+                              key={reelItem._id || reelItem.id}
+                              onClick={() => handleSearchResultClick(reelItem)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                            >
+                              <div className="w-10 h-16 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0 relative">
+                                {thumb ? (
+                                  <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400">🎬</div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{reelItem.caption || 'Reel'}</div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  {reelUser.username && <span className="text-[10px] text-gray-400">@{reelUser.username}</span>}
+                                  {reelItem.location && <span className="text-[10px] text-gray-500 truncate">📍 {reelItem.location}</span>}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                     {/* Ads */}

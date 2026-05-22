@@ -1,17 +1,26 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Heart, MessageCircle, Send, MoreHorizontal,
   Bookmark, ChevronLeft,
   ShoppingBag, Loader2, UserPlus, UserCheck, X, Trash2,
-  ExternalLink, RefreshCw
+  ExternalLink, RefreshCw, Search
 } from 'lucide-react';
 import promoteReelService from '../services/promoteReelService';
 import Avatar from '../components/Avatar';
 
 const BASE_URL = 'https://api.bebsmart.in';
 const IMAGE_DURATION = 15;
+
+const normalizeAssetUrl = (value) => {
+  if (!value) return null;
+  if (/^http:\/\/api\.bebsmart\.in/i.test(String(value))) return String(value).replace(/^http:\/\//i, 'https://');
+  if (String(value).startsWith('http')) return value;
+  const normalized = String(value).replace(/^\/+/, '');
+  if (normalized.startsWith('uploads/')) return `${BASE_URL}/${normalized}`;
+  return `${BASE_URL}/uploads/${normalized}`;
+};
 
 const authHeaders = () => {
   const token = localStorage.getItem('token');
@@ -282,10 +291,14 @@ const Caption = ({ text }) => {
 
 // ─── Product Strip (bottom overlay) ──────────────────────────────────────────
 // ─── HLS Video Player (handles .m3u8 streams via hls.js) ─────────────────────
-const HlsVideo = ({ src, thumb, isCurrent, isPaused, onTimeUpdate, onEnded, onClick }) => {
+const HlsVideo = ({ src, thumb, isCurrent, isPaused, onTimeUpdate, onEnded, onClick, onRef }) => {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (videoRef.current) onRef?.(videoRef.current);
+  }, [onRef]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -469,8 +482,9 @@ const Promote = () => {
   const { userObject } = useSelector(s => s.auth);
   const currentUserId = userObject?._id || userObject?.id || null;
   const currentUserAvatar = userObject?.avatar_url || null;
-  const currentUserName = userObject?.full_name || userObject?.username || 'You';
+  const currentUserName = userObject?._full_name || userObject?.username || 'You';
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const pageHeightClass = 'h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]';
 
   useEffect(() => {
@@ -485,6 +499,19 @@ const Promote = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Jump to specific promote reel if ID in URL
+  useEffect(() => {
+    const targetId = searchParams.get('id');
+    if (!targetId || !promotes.length) return;
+    const idx = promotes.findIndex(p => String(p._id || p.id) === String(targetId));
+    if (idx !== -1 && idx !== currentIndex) {
+      setCurrentIndex(idx);
+      setIsPausedByUser(false);
+      setProgress(0);
+    }
+  }, [searchParams, promotes, currentIndex]);
+
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
   const [progress, setProgress] = useState(0);
@@ -501,6 +528,81 @@ const Promote = () => {
   const [loadingComments, setLoadingComments] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
   const [commentText, setCommentText] = useState('');
+
+  // ── Search state ────────────────────────────────────────────────────────────
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchDropdownVisible, setSearchDropdownVisible] = useState(false);
+  const searchInputRef = useRef(null);
+  const searchContainerRef = useRef(null);
+  const searchDebounceRef = useRef(null);
+
+  const runSearch = useCallback(async (q) => {
+    const query = q.trim();
+    if (!query) { setSearchResults([]); setSearchDropdownVisible(false); return; }
+    setSearchLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+
+      const res = await fetch(`${BASE_URL}/api/search/promote-reels?q=${encodeURIComponent(query)}&page=1&limit=20`, { headers });
+      const data = await res.json();
+      
+      // Handle array or { data: [...] } structure
+      const results = Array.isArray(data) ? data : (data.data || data.results || []);
+      
+      setSearchResults(results.map(r => ({ _type: 'promote', ...r })));
+      setSearchDropdownVisible(true);
+    } catch (err) { 
+      console.error('Search error:', err);
+      setSearchResults([]); 
+    }
+    finally { setSearchLoading(false); }
+  }, []);
+
+  const handleSearchInput = (e) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    clearTimeout(searchDebounceRef.current);
+    if (!q.trim()) { setSearchResults([]); setSearchDropdownVisible(false); return; }
+    searchDebounceRef.current = setTimeout(() => runSearch(q), 350);
+  };
+
+  const handleSearchOpen = () => {
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  };
+
+  const handleSearchClose = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchDropdownVisible(false);
+  };
+
+  const handleSearchResultClick = (item) => {
+    handleSearchClose();
+    const promoteId = item._id || item.id;
+    if (promoteId) {
+      navigate(`/promote?id=${promoteId}`);
+    }
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setSearchDropdownVisible(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const isAnimatingRef = useRef(false);
   const videoRefs = useRef({});
@@ -757,14 +859,106 @@ const Promote = () => {
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className={`flex flex-col dark:bg-black overflow-hidden ${pageHeightClass}`}>
-       <div className="shrink-0 relative flex items-center px-3 py-2.5 md:px-4 md:py-3 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-black">
-                <button onClick={() => navigate(-1)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-colors">
+       <div className="shrink-0 relative flex items-center px-3 py-2 md:px-4 md:py-2 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-black overflow-visible w-full">
+                <button onClick={() => navigate(-1)} className={`p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1 shrink-0 transition-all duration-300 ${searchOpen ? 'opacity-0 w-0 overflow-hidden mr-0 p-0' : 'opacity-100'}`}>
                   <ChevronLeft size={22} />
                 </button>
-                <div className="absolute left-1/2 -translate-x-1/2 text-gray-900 dark:text-white font-bold text-sm md:text-base">
-                  Promote
+                
+                {!searchOpen && (
+                  <div className="absolute left-1/2 -translate-x-1/2 text-gray-900 dark:text-white font-bold text-sm md:text-base">
+                    Promote
+                  </div>
+                )}
+
+                {/* Search — expands to full width */}
+                <div ref={searchContainerRef} className={`transition-all duration-300 ease-in-out shrink-0 ${searchOpen ? 'flex-1 min-w-0' : 'ml-auto'}`}>
+                  {searchOpen ? (
+                    <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 w-full">
+                      <Search size={15} className="text-gray-400 shrink-0" />
+                      <input
+                        ref={searchInputRef}
+                        value={searchQuery}
+                        onChange={handleSearchInput}
+                        placeholder="Search promotes, products…"
+                        className="flex-1 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder-gray-400"
+                      />
+                      {searchLoading
+                        ? <Loader2 size={14} className="animate-spin text-gray-400 shrink-0" />
+                        : searchQuery
+                          ? <button onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDropdownVisible(false); searchInputRef.current?.focus(); }}>
+                              <X size={14} className="text-gray-400 hover:text-gray-700 dark:hover:text-white" />
+                            </button>
+                          : null
+                      }
+                      <button onClick={handleSearchClose} className="text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white ml-1 shrink-0">
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={handleSearchOpen} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 transition-colors">
+                      <Search size={18} className="text-gray-900 dark:text-white" />
+                    </button>
+                  )}
+
+                  {/* Desktop Search Dropdown */}
+                  {searchOpen && searchDropdownVisible && (
+                    <div className="absolute left-0 right-0 top-full mt-1 mx-4 bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 z-[60] max-h-96 overflow-y-auto">
+                      {searchLoading && (
+                        <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
+                          <Loader2 size={16} className="animate-spin" />
+                          <span className="text-sm">Searching…</span>
+                        </div>
+                      )}
+                      {!searchLoading && searchResults.length === 0 && searchQuery.trim() && (
+                        <div className="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
+                          <Search size={20} className="opacity-40" />
+                          <span className="text-sm">No results for "{searchQuery}"</span>
+                        </div>
+                      )}
+                      {!searchLoading && searchResults.length > 0 && (
+                        <div>
+                          <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Promoted Reels</div>
+                          {searchResults.map(item => {
+                            const user = item.user_id || {};
+                            const mediaItem = Array.isArray(item.media) ? item.media[0] : null;
+                            const thumb = normalizeAssetUrl(
+                              mediaItem?.thumbnail?.[0]?.fileUrl || 
+                              mediaItem?.thumbnail?.[0]?.fileName || 
+                              mediaItem?.thumbnail_url || 
+                              mediaItem?.fileUrl ||
+                              mediaItem?.fileName
+                            );
+                            return (
+                              <button
+                                key={item._id || item.id}
+                                onClick={() => handleSearchResultClick(item)}
+                                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                              >
+                                <div className="w-10 h-16 rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0 relative">
+                                  {thumb ? (
+                                    <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400">🎬</div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{item.caption || 'Promoted Reel'}</div>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    {user.username && <span className="text-[10px] text-gray-400">@{user.username}</span>}
+                                    {item.location && <span className="text-[10px] text-gray-500 truncate">📍 {item.location}</span>}
+                                  </div>
+                                  {item.products?.[0] && (
+                                    <div className="text-[9px] text-blue-500 font-bold mt-1">📦 {item.products[0].product_name}</div>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="w-9 h-9" />
               </div>
     
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
@@ -853,11 +1047,13 @@ const Promote = () => {
 
                 {promotes.map((p, index) => {
                   const mediaItem = Array.isArray(p.media) ? p.media[0] : null;
-                  const src = mediaItem?.fileUrl || mediaItem?.url || (mediaItem?.fileName ? `${BASE_URL}/uploads/${mediaItem.fileName}` : null);
-                  const isVideo = mediaItem?.type === 'video' || src?.includes('.m3u8');
-                  // thumbnail: from thumbnails[] or thumbnail[]
+                  const src = normalizeAssetUrl(mediaItem?.fileUrl || mediaItem?.url || mediaItem?.fileName);
+                  const isVideo = mediaItem?.type === 'video' || src?.includes('.m3u8') || src?.includes('.mp4');
+                  
+                  // thumbnail normalization
                   const thumbItem = mediaItem?.thumbnails?.[0] || (Array.isArray(mediaItem?.thumbnail) ? mediaItem.thumbnail[0] : mediaItem?.thumbnail);
-                  const thumbSrc = thumbItem?.fileUrl || (thumbItem?.fileName ? `${BASE_URL}/uploads/${thumbItem.fileName}` : null);
+                  const thumbSrc = normalizeAssetUrl(thumbItem?.fileUrl || thumbItem?.fileName || mediaItem?.thumbnail_url);
+                  
                   const isCurrent = index === currentIndex;
                   const user = p.user_id || {};
                   const username = user.username || user.full_name || 'User';
@@ -871,6 +1067,7 @@ const Promote = () => {
                           thumb={thumbSrc}
                           isCurrent={isCurrent}
                           isPaused={isCurrent && isPausedByUser}
+                          onRef={(el) => { if (el) videoRefs.current[index] = el; }}
                           onTimeUpdate={(pct) => { if (isCurrent) setProgress(pct); }}
                           onEnded={() => {
                             if (!isCurrent) return;

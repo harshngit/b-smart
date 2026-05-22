@@ -690,7 +690,7 @@ const Home = () => {
       )}
 
       <div className="w-full xl:px-6">
-        <div className="max-w-[1200px] mx-auto xl:flex xl:items-start xl:justify-between xl:gap-[27rem]">
+        <div className="max-w-[1200px] mx-auto xl:flex xl:items-start xl:justify-between xl:gap-8">
           <div className="w-full max-w-[700px]">
             <StoryRail />
             <div className="mx-auto mb-4 flex w-full max-w-[470px] items-center gap-2 px-2 xl:mx-0">

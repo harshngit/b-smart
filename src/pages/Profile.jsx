@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Twitter, Play, Image } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Twitter, Play, Image, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -18,6 +18,21 @@ import bSmartBanner1 from '../assets/B-smart-banners/1.png';
 import bSmartBanner2 from '../assets/B-smart-banners/2.png';
 import bSmartBanner3 from '../assets/B-smart-banners/3.png';
 import bSmartBanner4 from '../assets/B-smart-banners/4.png';
+import bSmartBanner5 from '../assets/B-smart-banners/5.png';
+import bSmartBanner6 from '../assets/B-smart-banners/6.png';
+import bSmartBanner7 from '../assets/B-smart-banners/7.png';
+import bSmartBanner8 from '../assets/B-smart-banners/8.png';
+import bSmartBanner9 from '../assets/B-smart-banners/9.png';
+import bSmartBanner10 from '../assets/B-smart-banners/10.png';
+import bSmartBanner11 from '../assets/B-smart-banners/11.png';
+import bSmartBanner12 from '../assets/B-smart-banners/12.png';
+import bSmartBanner13 from '../assets/B-smart-banners/13.png';
+import bSmartBanner14 from '../assets/B-smart-banners/14.png';
+import bSmartBanner15 from '../assets/B-smart-banners/15.png';
+import bSmartBanner16 from '../assets/B-smart-banners/16.png';
+import bSmartBanner17 from '../assets/B-smart-banners/17.png';
+import bSmartBanner18 from '../assets/B-smart-banners/18.png';
+import bSmartBanner19 from '../assets/B-smart-banners/19.png';
 import {
     checkFollowStatus,
     followUser,
@@ -37,6 +52,13 @@ const fmt = (n = 0) => {
 const BASE_URL = 'https://api.bebsmart.in';
 const FAVORITE_BANNERS = [bSmartBanner1, bSmartBanner2, bSmartBanner3, bSmartBanner4];
 
+const CATEGORY_IMAGES_LIST = [
+    bSmartBanner1, bSmartBanner2, bSmartBanner3, bSmartBanner4, bSmartBanner5,
+    bSmartBanner6, bSmartBanner7, bSmartBanner8, bSmartBanner9, bSmartBanner10,
+    bSmartBanner11, bSmartBanner12, bSmartBanner13, bSmartBanner14, bSmartBanner15,
+    bSmartBanner16, bSmartBanner17, bSmartBanner18, bSmartBanner19
+];
+
 // ── Ad interest categories — seeded from API, fallback list for offline ───────
 const AD_CATEGORIES_FALLBACK = [
     'Accessories','Action Figures','Art Supplies','Baby Products',
@@ -45,6 +67,12 @@ const AD_CATEGORIES_FALLBACK = [
     'Home & Kitchen','Jewellery','Mobile & Tablets','Pet Supplies',
     'Sports & Fitness','Toys','Travel',
 ];
+
+const getCategoryImage = (categoryName) => {
+    const idx = AD_CATEGORIES_FALLBACK.indexOf(categoryName);
+    if (idx !== -1) return CATEGORY_IMAGES_LIST[idx];
+    return null;
+};
 
 // Category → emoji mapping for visual flair
 const CATEGORY_EMOJI = {
@@ -269,67 +297,82 @@ const InterestsModal = ({ isOpen, onClose, currentInterests = [], categories = A
     );
 };
 
-const InterestedSection = ({ activeIndex, onSelect, isDesktop = false, interests = [], isOwnProfile = false, onAdd }) => {
-    const visibleCount = 3;
-    const orderedBanners = [...FAVORITE_BANNERS.slice(activeIndex), ...FAVORITE_BANNERS.slice(0, activeIndex)];
-    const visibleBanners = orderedBanners.slice(0, visibleCount);
-    const prevSlide = () => onSelect((activeIndex - 1 + FAVORITE_BANNERS.length) % FAVORITE_BANNERS.length);
-    const nextSlide = () => onSelect((activeIndex + 1) % FAVORITE_BANNERS.length);
+const InterestedSection = ({ isDesktop = false, interests = [], isOwnProfile = false, onAdd }) => {
+    const scrollRef = useRef(null);
+
+    const scroll = (direction) => {
+        if (scrollRef.current) {
+            const { scrollLeft, clientWidth } = scrollRef.current;
+            const scrollTo = direction === 'left' ? scrollLeft - clientWidth / 1.5 : scrollLeft + clientWidth / 1.5;
+            scrollRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
+        }
+    };
+
+    if (interests.length === 0) {
+        return (
+            <div className="w-full py-4 text-center">
+                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium italic">No interests listed yet.</p>
+            </div>
+        );
+    }
 
     return (
-        <div className={`w-full ${isDesktop ? 'max-w-[740px]' : 'max-w-[520px]'}`}>
-            <div className="mb-2 flex items-center justify-between">
-                <div className="text-[12px] font-semibold tracking-[0.02em] text-gray-800 dark:text-gray-200">
+        <div className="w-full max-w-full overflow-hidden">
+            <div className="mb-2.5 flex items-center justify-between">
+                <div className="text-[13px] font-bold tracking-tight text-gray-900 dark:text-white">
                     Interested Section
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                     <button
                         type="button"
-                        onClick={prevSlide}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                        aria-label="Previous banners"
+                        onClick={() => scroll('left')}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white transition hover:bg-gray-200 dark:hover:bg-gray-700 shadow-sm"
+                        aria-label="Previous"
                     >
-                        &#8249;
+                        <ChevronLeft size={12} />
                     </button>
                     <button
                         type="button"
-                        onClick={nextSlide}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                        aria-label="Next banners"
+                        onClick={() => scroll('right')}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white transition hover:bg-gray-200 dark:hover:bg-gray-700 shadow-sm"
+                        aria-label="Next"
                     >
-                        &#8250;
+                        <ChevronRight size={12} />
                     </button>
                 </div>
             </div>
 
-            {/* Banner carousel */}
-            <div className="overflow-hidden rounded-xl py-2">
-                <div className="grid grid-cols-3 gap-2">
-                    {visibleBanners.map((banner, idx) => {
-                        const originalIndex = (activeIndex + idx) % FAVORITE_BANNERS.length;
-                        return (
-                            <button
-                                key={originalIndex}
-                                type="button"
-                                onClick={() => onSelect(originalIndex)}
-                                className="overflow-hidden rounded-lg transition-all"
-                                aria-label={`Show interested banner ${originalIndex + 1}`}
-                            >
-                                <img
-                                    src={banner}
-                                    alt={`Interested banner ${originalIndex + 1}`}
-                                    className={`${isDesktop ? 'h-[58px]' : 'h-[46px]'} w-full object-cover`}
-                                    loading="lazy"
-                                />
-                            </button>
-                        );
-                    })}
-                </div>
+            <div 
+                ref={scrollRef}
+                className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5"
+                style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+                {interests.map((interest) => {
+                    const img = getCategoryImage(interest);
+                    return (
+                        <div key={interest} className="flex-shrink-0 w-[115px] sm:w-[135px] aspect-[16/9] relative rounded-lg overflow-hidden shadow-sm group border border-gray-100 dark:border-gray-800">
+                            {img ? (
+                                <img src={img} alt={interest} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            ) : (
+                                <div className="w-full h-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+                                    <span className="text-lg">🏷️</span>
+                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent flex items-end p-2">
+                                <span className="text-white text-[9px] font-bold truncate leading-tight italic tracking-tight">{interest}</span>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
+            <style>{`
+                .scrollbar-none::-webkit-scrollbar { display: none; }
+            `}</style>
         </div>
     );
 };
 
+// ── Profile ───────────────────────────────────────────────────────────────────
 const Profile = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
@@ -356,6 +399,7 @@ const Profile = () => {
     const [availableCategories, setAvailableCategories] = useState(AD_CATEGORIES_FALLBACK);
     const [loadingInterests, setLoadingInterests] = useState(false);
     const [showAddImageModal, setShowAddImageModal] = useState(false);
+    const [showInterestsSection, setShowInterestsSection] = useState(false);
 
     const [userAds, setUserAds] = useState([]);
     const [loadingAds, setLoadingAds] = useState(false);
@@ -366,14 +410,12 @@ const Profile = () => {
     const [messageLoading, setMessageLoading] = useState(false);
     const [vendorInfo, setVendorInfo] = useState(null);
     const [rewardToast, setRewardToast] = useState(null);
-    const [favoriteProfile, setFavoriteProfile] = useState(false);
     const [followersModalOpen, setFollowersModalOpen] = useState(false);
     const [followingModalOpen, setFollowingModalOpen] = useState(false);
     const [showUserOptionsMenu, setShowUserOptionsMenu] = useState(false);
     const [notificationEnabled, setNotificationEnabled] = useState(false);
     const [notifLoading, setNotifLoading] = useState(false);
     const [isBioExpanded, setIsBioExpanded] = useState(false);
-    const [favoriteBannerIndex, setFavoriteBannerIndex] = useState(0);
     const userOptionsMenuRef = useRef(null);
 
     // Close user options menu when clicking outside
@@ -512,6 +554,31 @@ const Profile = () => {
             alert(err?.response?.data?.message || 'Failed to save interests. Please try again.');
         } finally {
             setSavingInterests(false);
+        }
+    };
+
+    const handleStarClick = async () => {
+        if (showInterestsSection) {
+            setShowInterestsSection(false);
+            return;
+        }
+
+        const profileUserId = profileUser?._id || profileUser?.id;
+        if (!profileUserId) return;
+
+        try {
+            setLoadingInterests(true);
+            const { data } = await api.get(`/users/${profileUserId}/interests`);
+            setUserInterests(data.ad_interests || []);
+            if (Array.isArray(data.available_categories) && data.available_categories.length > 0) {
+                setAvailableCategories(data.available_categories);
+            }
+            setShowInterestsSection(true);
+        } catch (err) {
+            console.error('[Profile] Failed to fetch interests:', err);
+            setShowInterestsSection(true);
+        } finally {
+            setLoadingInterests(false);
         }
     };
 
@@ -1283,7 +1350,7 @@ const Profile = () => {
     };
 
     return (
-        <div className="min-h-screen bg-white dark:bg-black md:bg-gray-50 md:dark:bg-black">
+        <div className="min-h-screen bg-white dark:bg-black md:bg-gray-50 md:dark:bg-black overflow-x-hidden">
             {rewardToast && (
                 <div className={`fixed top-20 right-4 z-[80] rounded-xl border px-4 py-3 text-sm font-semibold shadow-lg animate-in fade-in slide-in-from-right-4 duration-300 ${
                     rewardToast.type === 'success'
@@ -1400,10 +1467,10 @@ const Profile = () => {
                                             <button type="button" onClick={handleShareProfile} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
                                                 <Share2 size={18} />
                                             </button>
-                                            <button type="button" onClick={() => setFavoriteProfile((prev) => !prev)}
-                                                className={`flex-1 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
-                                                aria-label="Favourite profile">
-                                                <Star size={18} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                            <button type="button" onClick={handleStarClick}
+                                                className={`flex-1 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
+                                                aria-label="View interests">
+                                                <Star size={18} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                             </button>
                                             <button type="button" onClick={() => setShowInterestsModal(true)}
                                                 className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
@@ -1423,10 +1490,10 @@ const Profile = () => {
                                             <button type="button" onClick={handleShareProfile} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
                                                 <Share2 size={18} />
                                             </button>
-                                            <button type="button" onClick={() => setFavoriteProfile((prev) => !prev)}
-                                                className={`flex-1 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
-                                                aria-label="Favourite">
-                                                <Star size={18} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                            <button type="button" onClick={handleStarClick}
+                                                className={`flex-1 h-9 flex items-center justify-center rounded-xl border shadow-sm transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white'}`}
+                                                aria-label="View interests">
+                                                <Star size={18} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                             </button>
                                             <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
                                                 <MessageCircle size={18} />
@@ -1468,11 +1535,9 @@ const Profile = () => {
                                     )}
                         </div>
 
-                        {favoriteProfile && (
+                        {showInterestsSection && (
                             <div className="mb-4">
                                 <InterestedSection
-                                    activeIndex={favoriteBannerIndex}
-                                    onSelect={setFavoriteBannerIndex}
                                     interests={userInterests}
                                     isOwnProfile={isOwnProfile}
                                     onAdd={() => setShowInterestsModal(true)}
@@ -1570,8 +1635,8 @@ const Profile = () => {
                                 <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Share">
                                     <Share2 size={17} />
                                 </button>
-                                <button type="button" onClick={() => setFavoriteProfile(p => !p)} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="Favourite">
-                                    <Star size={17} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                <button type="button" onClick={handleStarClick} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="View interests">
+                                    <Star size={17} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                 </button>
                                 <button type="button" onClick={() => setShowInterestsModal(true)}
                                     className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
@@ -1593,8 +1658,8 @@ const Profile = () => {
                                 <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Share">
                                     <Share2 size={17} />
                                 </button>
-                                <button type="button" onClick={() => setFavoriteProfile(p => !p)} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${favoriteProfile ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="Favourite">
-                                    <Star size={17} fill={favoriteProfile ? 'currentColor' : 'none'} />
+                                <button type="button" onClick={handleStarClick} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="View interests">
+                                    <Star size={17} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                 </button>
                                 <button type="button" onClick={handleOpenMessages} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Message">
                                     <MessageCircle size={17} />
@@ -1669,10 +1734,14 @@ const Profile = () => {
                     )}
 
                     {/* Interested section */}
-                    {favoriteProfile && (
+                    {showInterestsSection && (
                         <div className="mt-6">
-                            <InterestedSection activeIndex={favoriteBannerIndex} onSelect={setFavoriteBannerIndex} isDesktop
-                                interests={userInterests} isOwnProfile={isOwnProfile} onAdd={() => setShowInterestsModal(true)} />
+                            <InterestedSection 
+                                isDesktop
+                                interests={userInterests} 
+                                isOwnProfile={isOwnProfile} 
+                                onAdd={() => setShowInterestsModal(true)} 
+                            />
                         </div>
                     )}
 
