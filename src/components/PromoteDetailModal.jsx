@@ -269,8 +269,12 @@ const ModalMediaPanel = ({ item, isOpen }) => {
     if (!isVideo || !isOpen) return;
     const vid = videoRef.current;
     if (!vid) return;
-    // Small delay to let modal render
-    const t = setTimeout(() => { vid.play().catch(() => {}); }, 200);
+    // Small delay to let modal render and browser register interaction if any
+    const t = setTimeout(() => { 
+      if (vid.paused) vid.play().catch((err) => {
+        console.warn("Autoplay failed in modal:", err);
+      }); 
+    }, 300);
     return () => clearTimeout(t);
   }, [isVideo, isOpen, mediaSrc]);
 
@@ -305,8 +309,8 @@ const ModalMediaPanel = ({ item, isOpen }) => {
             ref={videoRef}
             key={`${mediaSrc}-${currentIndex}`}
             src={mediaSrc}
-            className="w-full h-full object-contain"
-            style={{ display: videoReady ? 'block' : 'none' }}
+            className={`w-full h-full object-contain ${videoReady ? 'block' : 'hidden'}`}
+            autoPlay
             muted={isMuted}
             playsInline
             loop

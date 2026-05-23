@@ -127,7 +127,7 @@ const CardMedia = ({ item }) => {
 
   const showThumb = thumbSrc && !videoReady;
 
-  // IntersectionObserver — play when 50% visible, pause when scrolled away
+  // IntersectionObserver — play when visible, pause when scrolled away
   useEffect(() => {
     if (!isVideo) return;
     const container = containerRef.current;
@@ -138,18 +138,19 @@ const CardMedia = ({ item }) => {
         const vid = videoRef.current;
         if (!vid) return;
         if (entry.isIntersecting) {
-          vid.play().catch(() => {});
-          setUserPaused(false);
+          if (!userPaused) {
+            vid.play().catch(() => {});
+          }
         } else {
           vid.pause();
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.1 }
     );
     observer.observe(container);
     return () => observer.disconnect();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVideo, currentIndex]);
+  }, [isVideo, currentIndex, userPaused]);
 
   const goNext = (e) => { e.stopPropagation(); setCurrentIndex(i => (i + 1) % mediaItems.length); setVideoReady(false); setVideoPlaying(false); setUserPaused(false); };
   const goPrev = (e) => { e.stopPropagation(); setCurrentIndex(i => (i - 1 + mediaItems.length) % mediaItems.length); setVideoReady(false); setVideoPlaying(false); setUserPaused(false); };
@@ -194,15 +195,17 @@ const CardMedia = ({ item }) => {
             ref={videoRef}
             key={`${mediaSrc}-${currentIndex}`}
             src={mediaSrc}
-            className="w-full h-auto max-h-[600px] object-contain"
-            style={{ display: videoReady ? 'block' : 'none' }}
+            className={`w-full h-auto max-h-[600px] object-contain ${videoReady ? 'block' : 'hidden'}`}
+            autoPlay
             muted={isMuted}
             playsInline
             loop
             poster={thumbSrc || undefined}
             onLoadedMetadata={(e) => {
               setVideoReady(true);
-              if (isVisibleRef.current) e.currentTarget.play().catch(() => {});
+              if (isVisibleRef.current && !userPaused) {
+                e.currentTarget.play().catch(() => {});
+              }
             }}
             onCanPlay={() => setVideoReady(true)}
             onPlay={() => setVideoPlaying(true)}

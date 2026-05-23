@@ -292,7 +292,7 @@ export default function EditContentModal({ isOpen, onClose, item, contentType = 
           <div className="flex min-h-[220px] items-center justify-center overflow-hidden bg-black relative">
             {previewUrl ? (
               isVideo ? (
-                <video src={previewUrl} className="h-full max-h-full w-full object-contain" controls muted />
+                <video src={previewUrl} className="h-full max-h-full w-full object-contain" controls />
               ) : (
                 <img src={previewUrl} alt="Preview" className="h-full max-h-full w-full object-contain" />
               )

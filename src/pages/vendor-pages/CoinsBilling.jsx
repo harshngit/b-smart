@@ -1138,8 +1138,8 @@ export default function CoinsBilling() {
   const debited  = transactions.filter(t => t.direction === "debit").reduce((s, t)  => s + Number(t.amount || 0), 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
+    <div className="font-sans transition-colors duration-300">
+      <div className="max-w-7xl mx-auto py-4 md:py-8">
 
         {/* ── Page Header ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">

@@ -28,19 +28,20 @@ const VendorLayout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-black">
       <div 
+        className="shrink-0"
         onMouseEnter={() => setIsSidebarHovered(true)}
         onMouseLeave={() => setIsSidebarHovered(false)}
       >
         <Sidebar onOpenCreateModal={handleOpenCreateModal} />
       </div>
 
-      <div className={`min-h-screen transition-all duration-300 ${isSidebarHovered ? 'md:pl-64' : 'md:pl-20'}`}>
+      <div className={`flex-1 min-h-screen transition-all duration-300`}>
         <TopBar />
 
         {/* Full width container for vendor dashboard pages */}
-        <div className="pt-16 md:pt-4 w-full px-4 md:px-8 pb-20 md:pb-4">
+        <div className="pt-16 md:pt-0 w-full px-4 md:px-8 pb-20 md:pb-4">
           <Outlet context={{ handleOpenCreateModal }} />
         </div>
       </div>

@@ -258,8 +258,8 @@ export default function VendorNotifications() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="max-w-3xl mx-auto px-4 py-8">
+    <div>
+      <div className="max-w-3xl mx-auto px-4 py-4 md:py-8">
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex items-start justify-between mb-6">

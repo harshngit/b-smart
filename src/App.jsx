@@ -85,9 +85,9 @@ function App() {
 
   return (
     <BrowserRouter>
-      <GlobalLoader>
-        <Routes>
-          <Route path="/login"              element={<Login />} />
+      <GlobalLoader />
+      <Routes>
+        <Route path="/login"              element={<Login />} />
           <Route path="/signup"             element={<Signup />} />
           <Route path="/vendor-signup"      element={<VendorSignup />} />
           <Route path="/auth/google/success" element={<AuthCallback />} />
@@ -141,7 +141,6 @@ function App() {
             </ProtectedRoute>
           } />
         </Routes>
-      </GlobalLoader>
     </BrowserRouter>
   );
 }

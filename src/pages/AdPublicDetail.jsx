@@ -543,6 +543,7 @@ const MobileSuggestedReelsSection = ({ reels, loading, onOpenReel }) => {
                       {thumb && <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:opacity-0 transition-opacity duration-300" />}
                       <video
                         src={src}
+                        autoPlay
                         muted
                         loop
                         playsInline

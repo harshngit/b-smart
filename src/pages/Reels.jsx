@@ -1131,6 +1131,7 @@ const Reels = () => {
                           src={videoUrl}
                           poster={thumbnail || undefined}
                           className="w-full h-full object-cover"
+                          autoPlay={isCurrent}
                           loop
                           muted={isMuted}
                           playsInline

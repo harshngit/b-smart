@@ -620,8 +620,8 @@ export default function ReportsAnalytics() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
+    <div>
+      <div className="mx-auto max-w-7xl space-y-6 py-4 md:py-8">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight md:text-3xl"><span className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-600 bg-clip-text text-transparent">Reports & Analytics</span></h1>

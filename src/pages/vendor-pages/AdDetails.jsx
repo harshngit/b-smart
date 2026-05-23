@@ -1926,9 +1926,9 @@ export default function AdDetails() {
   const totalCommentPages = Math.max(1, Math.ceil(commentsTotal / COMMENTS_PER_PAGE));
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        <div className="pb-20 pt-2">
+    <div className="font-sans transition-colors duration-300">
+      <div className="max-w-7xl mx-auto py-4 md:py-8">
+        <div className="pb-20">
 
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">

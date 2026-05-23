@@ -371,8 +371,8 @@ export default function VendorDashboard() {
 
   // Render
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
+    <div className="font-sans">
+      <div className="max-w-7xl mx-auto py-4 md:py-8">
 
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">

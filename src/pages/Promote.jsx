@@ -688,7 +688,7 @@ const Promote = () => {
       if (vid && Number(idx) !== currentIndex) { vid.pause(); try { vid.currentTime = 0; } catch {} }
     });
     const promote = promotes[currentIndex];
-    if (!promote?.media?.[0]?.type === 'video') return;
+    if (promote?.media?.[0]?.type !== 'video') return;
     if (isPausedByUser) return;
     let rafId;
     let attempts = 0;

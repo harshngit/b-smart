@@ -7,7 +7,7 @@ import promoteReelService from '../services/promoteReelService';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone,
   MousePointerClick, Target, Smartphone, Monitor, Calendar, Link2, Phone, Mail, MessageSquare,
   TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, FileText, Ellipsis, Pencil,
-  ShoppingBag, Trash2
+  ShoppingBag, Trash2, Volume2, VolumeX, Play, Pause
 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
@@ -553,6 +553,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [uploadStage, setUploadStage] = useState('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState('');
+  const [validationError, setValidationError] = useState('');
   
   const [draggingTagId, setDraggingTagId] = useState(null);
 
@@ -575,9 +576,16 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const trimTrackRef = useRef(null);
   const [dragHandle, setDragHandle] = useState(null);
   const editVideoRef = useRef(null);
+  const adDetailsVideoRef = useRef(null);
+  const shareVideoRef = useRef(null);
   const shareContainerRef = useRef(null);
   const [trimPlayTime, setTrimPlayTime] = useState(0);
   const [shareBoxSize, setShareBoxSize] = useState({ w: 0, h: 0 });
+
+  const [adDetailsMuted, setAdDetailsMuted] = useState(false);
+  const [adDetailsPaused, setAdDetailsPaused] = useState(false);
+  const [shareVideoMuted, setShareVideoMuted] = useState(false);
+  const [shareVideoPaused, setShareVideoPaused] = useState(false);
 
   const currentMedia = media[currentIndex];
 
@@ -914,8 +922,73 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     } else if (step === 'promoteProducts') {
       setStep('share');
     } else if (step === 'adDetails') {
+      if (!adTitle.trim()) {
+        setValidationError("Please enter an ad title.");
+        return;
+      }
+      if (!selectedCategory) {
+        setValidationError("Please select an ad category.");
+        return;
+      }
+      if (!adType) {
+        setValidationError("Please select an ad type.");
+        return;
+      }
+
+      // CTA Validation
+      if (['view_site', 'install_app', 'book_now', 'learn_more'].includes(ctaType)) {
+        if (!ctaUrl.trim()) {
+          setValidationError("Please enter a destination URL.");
+          return;
+        }
+      } else if (['contact_info', 'call_now'].includes(ctaType)) {
+        if (!ctaPhone.trim() && !ctaWhatsapp.trim() && !ctaEmail.trim()) {
+          setValidationError("Please provide at least one contact method (Phone, WhatsApp, or Email).");
+          return;
+        }
+      }
+
+      if (!policyAgreed) {
+        setValidationError("You must agree to the Ad Content Policy to continue.");
+        return;
+      }
       setStep('share');
     } else if (step === 'share') {
+      if (postType === 'ad') {
+        if (selectedCountries.length === 0) {
+          setValidationError("Please select at least one country for targeting.");
+          return;
+        }
+
+        const total = parseFloat(totalBudgetCoins);
+        const daily = parseFloat(dailyBudgetCoins);
+
+        if (isNaN(total) || total < 100) {
+          setValidationError("Total budget must be at least 100 coins.");
+          return;
+        }
+
+        if (!isNaN(daily) && daily > 0 && daily > total) {
+          setValidationError("Daily budget limit cannot exceed the total budget.");
+          return;
+        }
+
+        if (!budgetStartDate) {
+          setValidationError("Please select a start date.");
+          return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const startDate = new Date(budgetStartDate);
+        startDate.setHours(0, 0, 0, 0);
+
+        if (startDate < today) {
+          setValidationError("Start date cannot be in the past.");
+          return;
+        }
+      }
+
       if (isSubmitting) return;
       setAdSubmitMode(submitMode);
       setIsSubmitting(true);
@@ -1021,7 +1094,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           });
 
           const { fileName: serverFileName, url: serverUrl, fileUrl: serverFileUrl, media: uploadedTweetMedia } = uploadResponse.data;
-          const finalUrl = uploadedTweetMedia?.url || serverUrl || serverFileUrl;
+          const finalUrl = uploadedTweetMedia?.url || serverFileUrl || serverUrl;
 
           // Generate Filter CSS
           const filterDef = FILTERS.find(f => f.name === item.filter);
@@ -1234,8 +1307,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               const uploadRes = await api.post('https://api.bebsmart.in/api/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
               });
-              const { fileName: fn, url: fu, fileUrl: ffu } = uploadRes.data;
-              uploadedAdGallery.push({ link: fu || ffu || '', filename: fn || '' });
+              const { fileName: fn, fileUrl: ffu } = uploadRes.data;
+              uploadedAdGallery.push({ link: ffu || '', filename: fn || '' });
             } catch (e) {
               console.error('adMedia upload failed', e);
             }
@@ -1795,7 +1868,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     <video
                       src={currentMedia.url}
                       className="absolute inset-0 w-full h-full object-contain"
-                      autoPlay muted playsInline controls
+                      autoPlay playsInline controls
                     />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div
@@ -2449,10 +2522,43 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           /* AD DETAILS STEP — beautiful blue-themed UI */
           <div className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden overflow-y-auto overflow-x-hidden">
             {/* Left: Media Preview */}
-            <div className="relative bg-black flex items-center justify-center select-none lg:w-[400px] w-full h-56 lg:h-auto flex-shrink-0">
+            <div className="relative bg-black flex items-center justify-center select-none lg:w-[400px] w-full h-56 lg:h-auto flex-shrink-0 group">
               {currentMedia && (
                 currentMedia.type === 'video' ? (
-                  <video src={currentMedia.croppedUrl || currentMedia.url} className="w-full h-full object-contain" muted autoPlay loop playsInline onLoadedMetadata={(e) => { e.currentTarget.currentTime = currentMedia.trimStart || 0; }} />
+                  <>
+                    <video
+                      ref={adDetailsVideoRef}
+                      src={currentMedia.croppedUrl || currentMedia.url}
+                      className="w-full h-full object-contain"
+                      autoPlay
+                      loop
+                      playsInline
+                      muted={adDetailsMuted}
+                      onLoadedMetadata={(e) => { e.currentTarget.currentTime = currentMedia.trimStart || 0; }}
+                    />
+                    {/* Video Controls Overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => {
+                            const v = adDetailsVideoRef.current;
+                            if (!v) return;
+                            if (v.paused) { v.play(); setAdDetailsPaused(false); }
+                            else { v.pause(); setAdDetailsPaused(true); }
+                          }}
+                          className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70 transition-all"
+                        >
+                          {adDetailsPaused ? <Play size={24} fill="currentColor" /> : <Pause size={24} fill="currentColor" />}
+                        </button>
+                        <button
+                          onClick={() => setAdDetailsMuted(!adDetailsMuted)}
+                          className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70 transition-all"
+                        >
+                          {adDetailsMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <img src={currentMedia.croppedUrl || currentMedia.url} className="max-w-full max-h-full object-contain" style={getFilterStyle(currentMedia)} alt="Ad Preview" />
                 )
@@ -2681,16 +2787,27 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                       ))}
                     </div>
                     <div className="space-y-2">
-                      {[
-                        { placeholder: 'Destination URL (https://...)', value: ctaUrl, setter: setCtaUrl, type: 'url' },
-                        { placeholder: 'Deep Link (e.g. myapp://product/123)', value: ctaDeepLink, setter: setCtaDeepLink, type: 'text' },
-                        { placeholder: 'Phone number (for Call Now)', value: ctaPhone, setter: setCtaPhone, type: 'tel' },
-                        { placeholder: 'WhatsApp number (e.g. 919876543210)', value: ctaWhatsapp, setter: setCtaWhatsapp, type: 'text' },
-                        { placeholder: 'Contact email', value: ctaEmail, setter: setCtaEmail, type: 'email' },
-                      ].map(f => (
-                        <input key={f.placeholder} type={f.type} placeholder={f.placeholder} value={f.value} onChange={e => f.setter(e.target.value)}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
-                      ))}
+                      {/* URL & Deep Link: for Site, App, Book, Learn */}
+                      {['view_site', 'install_app', 'book_now', 'learn_more'].includes(ctaType) && (
+                        <>
+                          <input type="url" placeholder="Destination URL (https://...)" value={ctaUrl} onChange={e => setCtaUrl(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
+                          <input type="text" placeholder="Deep Link (e.g. myapp://product/123)" value={ctaDeepLink} onChange={e => setCtaDeepLink(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
+                        </>
+                      )}
+
+                      {/* Contact Info: for Contact & Call Now */}
+                      {['contact_info', 'call_now'].includes(ctaType) && (
+                        <>
+                          <input type="tel" placeholder="Phone number (for Call Now)" value={ctaPhone} onChange={e => setCtaPhone(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
+                          <input type="text" placeholder="WhatsApp number (e.g. 919876543210)" value={ctaWhatsapp} onChange={e => setCtaWhatsapp(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
+                          <input type="email" placeholder="Contact email" value={ctaEmail} onChange={e => setCtaEmail(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3068,16 +3185,17 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         ) : (
           <div className="flex-1 flex flex-col md:flex-row lg:overflow-hidden overflow-y-auto overflow-x-hidden">
             {/* Left: Final Image Preview */}
-            <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center select-none w-full h-auto md:flex-[2]">
+            <div className="relative bg-[#f0f0f0] dark:bg-[#121212] flex items-center justify-center select-none w-full h-auto md:flex-[2] group">
               {currentMedia && (
                 <div ref={shareContainerRef} data-media-container className="relative w-full h-full flex items-center justify-center" onClick={handleImageClick}>
                   {currentMedia.type === 'video' ? (
-                    <div style={{ width: shareBoxSize.w, height: shareBoxSize.h }} className="overflow-hidden bg-black rounded">
+                    <div style={{ width: shareBoxSize.w, height: shareBoxSize.h }} className="overflow-hidden bg-black rounded relative">
                       <video
+                        ref={shareVideoRef}
                         src={currentMedia.croppedUrl || currentMedia.url}
                         className="w-full h-full object-cover"
                         controls={false} autoPlay loop
-                        muted={!currentMedia.soundOn}
+                        muted={shareVideoMuted}
                         onLoadedMetadata={(e) => { e.currentTarget.currentTime = currentMedia.trimStart || 0; }}
                         onTimeUpdate={(e) => {
                           const v = e.currentTarget;
@@ -3088,6 +3206,28 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                           }
                         }}
                       />
+                      {/* Video Controls Overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 z-30" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => {
+                              const v = shareVideoRef.current;
+                              if (!v) return;
+                              if (v.paused) { v.play(); setShareVideoPaused(false); }
+                              else { v.pause(); setShareVideoPaused(true); }
+                            }}
+                            className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70 transition-all"
+                          >
+                            {shareVideoPaused ? <Play size={24} fill="currentColor" /> : <Pause size={24} fill="currentColor" />}
+                          </button>
+                          <button
+                            onClick={() => setShareVideoMuted(!shareVideoMuted)}
+                            className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70 transition-all"
+                          >
+                            {shareVideoMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <img
@@ -3700,6 +3840,28 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           </div>
         );
       })()}
+
+      {/* Validation Error Popup */}
+      {validationError && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-amber-100 dark:border-amber-900/40 flex flex-col items-center gap-5">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800">
+              <svg className="w-9 h-9 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+            </div>
+            <div className="flex flex-col items-center gap-1 text-center">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Action Required</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{validationError}</p>
+            </div>
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setValidationError('')} className="flex-1 py-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-sm hover:opacity-90 transition-opacity">
+                Got it, let me fix it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Popup */}
       {uploadStage === 'error' && !isSubmitting && (

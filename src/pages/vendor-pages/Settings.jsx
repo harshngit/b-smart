@@ -411,8 +411,8 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans transition-colors duration-300">
-      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
+    <div className="font-sans transition-colors duration-300">
+      <div className="max-w-7xl mx-auto py-4 md:py-8 space-y-8">
         <div>
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-red-500 to-pink-600">

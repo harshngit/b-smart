@@ -803,6 +803,56 @@ const PrivacyScreen = ({ onBack }) => {
   );
 };
 
+// ── Help & Support Screen ───────────────────────────────────────────────────
+const HelpSupportScreen = ({ onBack }) => {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-black pb-20">
+      <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center gap-3 z-40">
+        <button onClick={onBack} className="text-gray-800 dark:text-white">
+          <ArrowLeft size={22} />
+        </button>
+        <h1 className="text-base font-semibold dark:text-white">Help & Support</h1>
+      </div>
+
+      <div className="max-w-2xl mx-auto pt-4 px-4 space-y-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-16 h-16 rounded-full bg-pink-50 dark:bg-gray-800 flex items-center justify-center text-[#fa3f5e] mb-4">
+              <HelpCircle size={32} />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">How can we help?</h2>
+            <p className="text-sm text-gray-500 mt-1">Our team is here to support you with any questions or issues.</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">Frequently Asked Questions</h3>
+              <p className="text-xs text-gray-500 leading-relaxed">Browse through our common questions about accounts, ads, and vendor tools.</p>
+            </div>
+            
+            <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">Contact Support</h3>
+              <p className="text-xs text-gray-500 leading-relaxed mb-3">Email us directly for personalized assistance.</p>
+              <a href="mailto:support@bebsmart.in" className="inline-block px-4 py-2 bg-[#fa3f5e] text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity">
+                Email Support
+              </a>
+            </div>
+
+            <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">Community Guidelines</h3>
+              <p className="text-xs text-gray-500 leading-relaxed">Learn about our standards for maintaining a safe and professional community.</p>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest">B-Smart Support Version 1.0.0</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const fmt = (n = 0) => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
@@ -814,8 +864,7 @@ const settingsSections = [
   {
     title: 'Preferences',
     items: [
-      { icon: Globe2, label: 'Language / Region', subLabel: 'Default: English' },
-      { icon: Bell, label: 'Notifications', subLabel: 'Manage notifications' },
+      { icon: Bell, label: 'Notifications', subLabel: 'Manage notifications', key: 'notifications' },
     ],
   },
   {
@@ -823,14 +872,13 @@ const settingsSections = [
     items: [
       { icon: Shield, label: 'Privacy', subLabel: 'Account privacy & follow requests', key: 'privacy' },
       { icon: Lock, label: 'Security', subLabel: 'Password & 2FA', key: 'security' },
-      { icon: SlidersHorizontal, label: 'Content Settings', subLabel: 'Moderation & restrictions' },
     ],
   },
   {
     title: 'About',
     items: [
       { icon: Info, label: 'About b Smart', subLabel: 'Version 1.0.0' },
-      { icon: HelpCircle, label: 'Help & Support', subLabel: 'Contact support' },
+      { icon: HelpCircle, label: 'Help & Support', subLabel: 'Contact support', key: 'help' },
     ],
   },
 ];
@@ -841,7 +889,7 @@ const Settings = () => {
   const { mode } = useSelector((state) => state.theme);
   const { userObject } = useSelector((state) => state.auth);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [screen, setScreen] = useState(null); // null | "security" | "privacy"
+  const [screen, setScreen] = useState(null); // null | "security" | "privacy" | "help"
 
   const userEmail = userObject?.email || "";
   const userId = userObject?._id || userObject?.id;
@@ -865,6 +913,10 @@ const Settings = () => {
 
   if (screen === "privacy") {
     return <PrivacyScreen onBack={() => setScreen(null)} />;
+  }
+
+  if (screen === "help") {
+    return <HelpSupportScreen onBack={() => setScreen(null)} />;
   }
 
   return (
@@ -910,6 +962,8 @@ const Settings = () => {
                     onClick={() => {
                       if (item.key === 'security') setScreen('security');
                       else if (item.key === 'privacy') setScreen('privacy');
+                      else if (item.key === 'help') setScreen('help');
+                      else if (item.key === 'notifications') navigate('/notifications');
                     }}
                     className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
                   >
