@@ -604,6 +604,8 @@ const Ads = ({ feedMode = 'user' }) => {
   const videoRefs = useRef({});
   const progressIntervalRef = useRef(null);
   const imageTimerRef = useRef(null);
+  // Track how many times the current video has fully played (resets on index change)
+  const playCountRef = useRef(0);
   // Track manually paused video (user tapped to pause/resume)
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const [showCtaButtons, setShowCtaButtons] = useState(false);  // shows after 50% progress
@@ -956,9 +958,10 @@ const Ads = ({ feedMode = 'user' }) => {
     if (!currentAd) return;
     const isVideo = currentAd.media?.[0]?.media_type === 'video';
 
-    // Reset progress bar on every slide change
+    // Reset progress bar and play count on every slide change
     setProgress(0);
     clearTimers();
+    playCountRef.current = 0;
 
     if (isVideo) return; // video handles its own progress via JSX event handlers
 
@@ -1688,41 +1691,13 @@ const Ads = ({ feedMode = 'user' }) => {
               md:w-[360px] md:h-[90vh] md:rounded-2xl md:shadow-2xl
             ">
 
-              {/* Progress bar — white track, white fill, red dot on hover; click/drag to scrub */}
-              <div className="absolute bottom-0 left-0 right-0 z-40 px-1.5 pb-1 group/progress select-none">
-                <div
-                  className="relative h-[4px] w-full rounded-full bg-white/25 cursor-pointer"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-                    const vid = videoRefs.current[currentIndex];
-                    if (vid && vid.duration > 0) { vid.currentTime = pct * vid.duration; setProgress(pct * 100); }
-                    else { setProgress(pct * 100); }
-                  }}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    const bar = e.currentTarget;
-                    const scrub = (ev) => {
-                      const rect = bar.getBoundingClientRect();
-                      const pct = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
-                      const vid = videoRefs.current[currentIndex];
-                      if (vid && vid.duration > 0) { vid.currentTime = pct * vid.duration; setProgress(pct * 100); }
-                      else { setProgress(pct * 100); }
-                    };
-                    const up = () => { document.removeEventListener('mousemove', scrub); document.removeEventListener('mouseup', up); };
-                    document.addEventListener('mousemove', scrub);
-                    document.addEventListener('mouseup', up);
-                  }}
-                >
+              {/* Progress bar — read-only, no dot, no scrubbing */}
+              <div className="absolute bottom-0 left-0 right-0 z-40 px-1.5 pb-1 select-none">
+                <div className="relative h-[4px] w-full rounded-full bg-white/25">
                   {/* Fill — white */}
                   <div
                     className="absolute left-0 top-0 h-full rounded-full bg-white transition-none"
                     style={{ width: `${progress}%` }}
-                  />
-                  {/* Scrubber dot — invisible normally, red on hover */}
-                  <div
-                    className="absolute top-1/2 h-[14px] w-[14px] -translate-y-1/2 rounded-full bg-white opacity-0 group-hover/progress:opacity-100 group-hover/progress:bg-[#ff0033] shadow-[0_0_0_2px_rgba(0,0,0,0.4)] transition-all duration-150 pointer-events-none"
-                    style={{ left: `calc(${progress}% - 7px)` }}
                   />
                 </div>
               </div>
@@ -1770,31 +1745,11 @@ const Ads = ({ feedMode = 'user' }) => {
                             onTimeUpdate={e => {
                               if (!isCurrent) return;
                               const vid = e.target;
-                              const m = a.media?.[0];
-                              const start   = m?.timing_window?.start    ?? m?.video_meta?.selected_start  ?? 0;
-                              const end     = m?.timing_window?.end      ?? m?.video_meta?.selected_end    ?? null;
-                              const dur     = m?.video_meta?.final_duration ?? null;
-                              const ct      = vid.currentTime;
-
-                              // Hit the trim end → mark 100%, record the first complete view, then replay
-                              if (end !== null && ct >= end) {
-                                setProgress(100);
-                                trackView(a._id);
-                                // Replay from start
-                                vid.currentTime = start > 0 ? start : 0;
-                                setProgress(0);
-                                setIsPausedByUser(false);
-                                vid.play().catch(() => {});
-                                return;
-                              }
-
-                              // Move progress bar + trigger CTA after 50%
-                              let pct = 0;
-                              if (dur && dur > 0) {
-                                pct = Math.min(((ct - start) / dur) * 100, 100);
-                              } else if (vid.duration > 0) {
-                                pct = (ct / vid.duration) * 100;
-                              }
+                              // Only update progress when video is actually playing
+                              if (vid.paused || vid.readyState < 2) return;
+                              const dur = vid.duration;
+                              const ct  = vid.currentTime;
+                              const pct = dur > 0 ? Math.min((ct / dur) * 100, 100) : 0;
                               setProgress(pct);
                             }}
                             onEnded={() => {
@@ -1802,15 +1757,22 @@ const Ads = ({ feedMode = 'user' }) => {
                               setProgress(100);
                               setIsPausedByUser(false);
 
-                              // Record only the first complete watch for this ad in the current session.
+                              // Record only the first complete watch for this ad
                               trackView(a._id);
 
-                              // Replay the video from the beginning
+                              // Count this play; after 3 full plays auto-advance to next ad
+                              playCountRef.current += 1;
+                              if (playCountRef.current >= 3) {
+                                playCountRef.current = 0;
+                                setProgress(0);
+                                setCurrentIndex(prev => (prev + 1 < adsRef.current.length ? prev + 1 : 0));
+                                return;
+                              }
+
+                              // Replay from the beginning
                               const vid = videoRefs.current[index];
                               if (vid) {
-                                const m = a.media?.[0];
-                                const start = m?.timing_window?.start ?? m?.video_meta?.selected_start ?? 0;
-                                vid.currentTime = start > 0 ? start : 0;
+                                vid.currentTime = 0;
                                 setProgress(0);
                                 vid.play().catch(() => {});
                               }
