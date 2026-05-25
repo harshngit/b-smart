@@ -1,5 +1,6 @@
 import api from '../lib/api';
 import { disconnectChatSocket } from '../socket/chatSocket';
+import { unregisterPush } from './pushService';
 
 const authService = {
   login: async (credentials) => {
@@ -10,7 +11,9 @@ const authService = {
     }
     return response.data;
   },
-  logout: () => {
+  logout: async () => {
+    // Clear push tokens on backend before wiping local token
+    await unregisterPush().catch(() => {});
     disconnectChatSocket();
     localStorage.removeItem('token');
     delete api.defaults.headers.common['Authorization'];

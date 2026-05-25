@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchMe, setLoading } from './store/authSlice';
 import socketService from './services/socketService';
+import { registerWebPush } from './services/pushService';
 
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -63,6 +64,13 @@ function App() {
     } else {
       dispatch(setLoading(false));
     }
+
+    // Register service worker for push notifications (web)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.error('[SW] Registration failed:', err);
+      });
+    }
   }, [dispatch]);
 
   // ── Socket.IO — connect when authenticated, disconnect on logout ─────────
@@ -73,6 +81,8 @@ function App() {
     const token = localStorage.getItem('token');
     if (isAuthenticated && token) {
       socketService.connect(token);
+      // Register web push subscription after login
+      registerWebPush();
     } else {
       socketService.disconnect();
     }
