@@ -1,48 +1,85 @@
 /* eslint-disable no-restricted-globals */
-// ─── Bsmart Service Worker ────────────────────────────────────────────────────
-// Place this file at: public/sw.js
-// It handles background push notifications for the web app.
+// ─── Bsmart Service Worker ─────────────────────────────────────────────────────
 
-const CACHE_NAME = 'bsmart-v1';
+self.addEventListener('install',  () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-// ── Install — cache nothing critical, just activate immediately ───────────────
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-});
+// ── Emoji icon map per notification type ──────────────────────────────────────
+const TYPE_ICON = {
+  like:                     '❤️',
+  comment:                  '💬',
+  follow:                   '👤',
+  follow_request:           '👤',
+  follow_accepted:          '✅',
+  mention:                  '📣',
+  comment_like:             '❤️',
+  comment_reply:            '💬',
+  post_save:                '🔖',
+  ad_comment:               '💬',
+  ad_like:                  '❤️',
+  coins_credited:           '🪙',
+  coins_debited:            '🪙',
+  subscribed_user_post:     '📸',
+  subscribed_user_reel:     '🎬',
+  subscribed_vendor_post:   '🏪',
+  subscription_expiring:    '⏳',
+  subscription_expired:     '⚠️',
+  vendor_approved:          '✅',
+  ad_approved:              '✅',
+  ad_rejected:              '❌',
+  vendor_rejected:          '❌',
+  order:                    '📦',
+  payout:                   '💸',
+  story_view:               '👁️',
+  login_alert:              '🔐',
+  chat:                     '💬',
+  general:                  '🔔',
+};
 
-// ── Activate — take control of all open tabs immediately ─────────────────────
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
-// ── Push — show notification when a push arrives from the server ──────────────
+// ── Push handler ──────────────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
   let data = {};
-
   try {
     data = event.data?.json() || {};
   } catch {
-    data = { title: 'Bsmart', body: event.data?.text() || 'You have a new notification.' };
+    data = { body: event.data?.text() || 'You have a new notification.' };
   }
 
   const {
-    title = 'Bsmart',
-    body  = 'You have a new notification.',
-    link  = '/',
-    type  = 'general',
-    icon  = '/bsmart-icon.png',   // put your app icon in /public/bsmart-icon.png
-    badge = '/bsmart-badge.png',  // small monochrome badge icon (optional)
+    title       = 'Bsmart',
+    body        = 'You have a new notification.',
+    link        = '/',
+    type        = 'general',
+    senderName  = '',
+    senderAvatar = '',
   } = data;
 
+  const emoji   = TYPE_ICON[type] || '🔔';
+  const isChat  = type === 'chat';
+
+  // ── Build rich notification options ────────────────────────────────────────
   const options = {
     body,
-    icon,
-    badge,
-    data: { link, type },
-    vibrate: [100, 50, 100],
-    tag: type,              // groups notifications of the same type (replaces older ones)
-    renotify: true,         // vibrate even if same tag
-    requireInteraction: false,
+    icon:  '/bsmart-logo.png',     // your app logo — place in /public/bsmart-logo.png
+    badge: '/bsmart-badge.png',    // small monochrome icon — place in /public/bsmart-badge.png
+    image: isChat && senderAvatar ? senderAvatar : undefined,  // show avatar in chat notifications
+    data:  { link, type },
+    vibrate:         [100, 50, 100, 50, 100],
+    tag:             isChat ? `chat-${link}` : type,   // chat notifications group by conversation
+    renotify:        true,
+    requireInteraction: isChat,    // chat stays until dismissed; others auto-dismiss
+    silent:          false,
+
+    // Action buttons
+    actions: isChat
+      ? [
+          { action: 'reply',    title: '💬 Open Chat' },
+          { action: 'dismiss',  title: '✕ Dismiss'   },
+        ]
+      : [
+          { action: 'open',    title: `${emoji} View` },
+          { action: 'dismiss', title: '✕ Dismiss'    },
+        ],
   };
 
   event.waitUntil(
@@ -50,27 +87,31 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// ── Notification click — open/focus the app and navigate to the link ──────────
+// ── Notification click handler ────────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const link = event.notification.data?.link || '/';
+  if (event.action === 'dismiss') return;
+
+  const link    = event.notification.data?.link || '/';
   const fullUrl = self.location.origin + link;
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a tab with the app is already open, focus it and navigate
-      for (const client of clientList) {
-        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
-          client.focus();
-          client.navigate(fullUrl);
-          return;
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Focus existing tab if open
+        for (const client of clientList) {
+          if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+            client.focus();
+            client.navigate(fullUrl);
+            return;
+          }
         }
-      }
-      // Otherwise open a new tab
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(fullUrl);
-      }
-    })
+        // Open new tab
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(fullUrl);
+        }
+      })
   );
 });

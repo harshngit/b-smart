@@ -184,41 +184,88 @@ const LocationSelector = ({ className = "" }) => (
 );
 
 // ── Location Bar ──────────────────────────────────────────────────────────────
-const LocationBar = ({ searchQuery, onSearchChange, searchLoading }) => (
-  <div className="hidden md:block sticky top-0 z-30 bg-white dark:bg-black mb-4 border-b border-gray-100 dark:border-gray-800 w-full xl:px-6">
-    <div className="max-w-[1200px] mx-auto">
-      <div className="flex items-center justify-between py-3">
-        <div className="flex items-center gap-12 flex-1">
-          <h1 className="text-3xl font-normal text-[#bc1888] italic" style={{ fontFamily: "'Dancing Script', cursive" }}>
-            b_smart
-          </h1>
-          
-          {/* Search bar */}
-          <div className="relative w-full max-w-[400px]">
-            <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 px-4 py-2 rounded-xl border border-transparent focus-within:border-gray-200 dark:focus-within:border-gray-700 transition-all">
-              <Search size={18} className="text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Search"
-                className="bg-transparent border-none outline-none text-sm w-full dark:text-white"
-              />
-              {searchLoading && (
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-insta-pink" />
+const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults }) => {
+  const navigate = useNavigate();
+  return (
+    <div className="hidden md:block sticky top-0 z-30 bg-white dark:bg-black mb-4 border-b border-gray-100 dark:border-gray-800 w-full xl:px-6">
+      <div className="max-w-[1200px] mx-auto">
+        <div className="flex items-center justify-between py-3">
+          <div className="flex items-center gap-12 flex-1">
+            <h1 className="text-3xl font-normal text-[#bc1888] italic" style={{ fontFamily: "'Dancing Script', cursive" }}>
+              b_smart
+            </h1>
+            
+            {/* Search bar */}
+            <div className="relative w-full max-w-[400px]">
+              <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 px-4 py-2 rounded-xl border border-transparent focus-within:border-gray-200 dark:focus-within:border-gray-700 transition-all">
+                <Search size={18} className="text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  placeholder="Search"
+                  className="bg-transparent border-none outline-none text-sm w-full dark:text-white"
+                />
+                {searchLoading && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-insta-pink" />
+                )}
+              </div>
+
+              {/* Search Results Dropdown - Now nested inside the relative container */}
+              {searchQuery.trim() && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-white/10 shadow-2xl z-[100] max-h-[400px] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                  {searchLoading && searchResults.users.length === 0 && searchResults.posts.length === 0 && (
+                    <div className="p-8 text-center text-gray-400">Searching...</div>
+                  )}
+                  
+                  {!searchLoading && searchResults.users.length === 0 && searchResults.posts.length === 0 && searchResults.reels.length === 0 && (
+                    <div className="p-8 text-center text-gray-400">No results found for "{searchQuery}"</div>
+                  )}
+
+                  {searchResults.users.length > 0 && (
+                    <div className="p-2 border-b border-gray-50 dark:border-white/5">
+                      <p className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">People</p>
+                      {searchResults.users.map(u => (
+                        <button
+                          key={u._id || u.id}
+                          onClick={() => {
+                            const profilePath = u.role === 'vendor' ? `/vendor/${u._id || u.id}/public` : `/profile/${u._id || u.id}`;
+                            navigate(profilePath);
+                            onSearchChange(''); // Clear search using the prop function
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0">
+                            {u.avatar_url || u.profile_picture ? (
+                              <img src={u.avatar_url || u.profile_picture} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-400">
+                                {(u.username || u.full_name || '?')[0].toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</p>
+                            {u.username && <p className="text-xs text-gray-500 truncate">@{u.username}</p>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Right: Location Selector aligned with Sidebar */}
-        <div className="hidden xl:block w-[350px]">
-          <LocationSelector />
+          {/* Right: Location Selector aligned with Sidebar */}
+          <div className="hidden xl:block w-[350px]">
+            <LocationSelector />
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Skeleton Loader ───────────────────────────────────────────────────────────
 const FeedSkeleton = () => (
@@ -642,52 +689,11 @@ const Home = () => {
         searchQuery={searchQuery} 
         onSearchChange={handleSearchChange} 
         searchLoading={searchLoading} 
+        searchResults={searchResults}
       />
 
       {/* Search Results Dropdown */}
-      {searchQuery.trim() && (
-        <div className="hidden md:block absolute top-16 left-1/2 -translate-x-1/2 w-full max-w-[400px] bg-white dark:bg-[#1c1c1c] rounded-b-2xl border border-gray-100 dark:border-white/10 shadow-2xl z-[100] max-h-[400px] overflow-y-auto">
-          {searchLoading && searchResults.users.length === 0 && searchResults.posts.length === 0 && (
-            <div className="p-8 text-center text-gray-400">Searching...</div>
-          )}
-          
-          {!searchLoading && searchResults.users.length === 0 && searchResults.posts.length === 0 && searchResults.reels.length === 0 && (
-            <div className="p-8 text-center text-gray-400">No results found for "{searchQuery}"</div>
-          )}
-
-          {searchResults.users.length > 0 && (
-            <div className="p-2 border-b border-gray-50 dark:border-white/5">
-              <p className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">People</p>
-              {searchResults.users.map(u => (
-                <button
-                  key={u._id || u.id}
-                  onClick={() => {
-                    const profilePath = u.role === 'vendor' ? `/vendor/${u._id || u.id}/public` : `/profile/${u._id || u.id}`;
-                    navigate(profilePath);
-                    setSearchQuery('');
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-left"
-                >
-                  <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0">
-                    {u.avatar_url || u.profile_picture ? (
-                      <img src={u.avatar_url || u.profile_picture} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-400">
-                        {(u.username || u.full_name || '?')[0].toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</p>
-                    {u.username && <p className="text-xs text-gray-500 truncate">@{u.username}</p>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          {/* Add more sections for posts/reels if desired, but user asked for "similar", so users is primary */}
-        </div>
-      )}
+      {/* Moved inside LocationBar search container to fix overlapping */}
 
       <div className="w-full xl:px-6">
         <div className="max-w-[1200px] mx-auto xl:flex xl:items-start xl:justify-between xl:gap-8">
