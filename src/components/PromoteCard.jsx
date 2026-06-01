@@ -58,7 +58,7 @@ const timeAgo = (raw) => {
   return new Date(raw).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-// ── Product Card — matches the Promote.jsx / detail card style exactly ─────────
+// ── Product Card — compact horizontal Instagram-style rectangle ───────────────
 const ProductCard = ({ product }) => {
   const finalPrice = Math.max(0, (product.product_price || 0) - (product.discount_amount || 0));
   const discountPct = product.product_price && product.discount_amount
@@ -66,39 +66,30 @@ const ProductCard = ({ product }) => {
   const href = product.visit_link && !['', '#'].includes(product.visit_link) ? product.visit_link : null;
 
   return (
-    <div className="flex-shrink-0 w-[160px] rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] shadow-sm">
-      {/* Image */}
-      <div className="w-full h-[90px] bg-gray-100 dark:bg-gray-800 overflow-hidden">
+    <div className="flex-shrink-0 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded-2xl overflow-hidden shadow-sm" style={{ width: 140 }}>
+      {/* Thumbnail */}
+      <div className="w-full bg-gray-800" style={{ height: 100 }}>
         {product.promote_img
           ? <img src={toAbsUrl(product.promote_img)} alt={product.product_name} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
-          : <div className="w-full h-full flex items-center justify-center"><ShoppingBag size={24} className="text-gray-300" /></div>}
+          : <div className="w-full h-full flex items-center justify-center"><ShoppingBag size={20} className="text-gray-500" /></div>}
       </div>
-      {/* Info */}
-      <div className="p-2.5">
-        <p className="text-[11px] font-bold text-gray-900 dark:text-white line-clamp-1 leading-tight">{product.product_name}</p>
-        {product.product_description && (
-          <p className="text-[9px] text-gray-400 line-clamp-1 mt-0.5">{product.product_description}</p>
-        )}
-        {/* Price row */}
-        <div className="flex items-baseline gap-1 flex-wrap mt-1">
-          <span className="text-[13px] font-black text-orange-600 dark:text-orange-400">&#8377;{finalPrice.toLocaleString()}</span>
+      {/* Info + CTA */}
+      <div className="flex flex-col gap-1.5 p-2 flex-1">
+        <p className="text-[11px] font-bold text-white truncate leading-tight">{product.product_name}</p>
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[11px] font-black text-orange-400">&#8377;{finalPrice.toLocaleString()}</span>
           {discountPct > 0 && (
-            <>
-              <span className="text-[9px] text-gray-400 line-through">&#8377;{product.product_price}</span>
-              <span className="text-[9px] font-bold text-green-500">{discountPct}% off</span>
-            </>
+            <span className="text-[9px] text-gray-400">{discountPct}% off</span>
           )}
         </div>
-        {/* Visit Website button */}
         {href ? (
           <a href={href} target="_blank" rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
-            className="mt-2 flex items-center justify-center w-full py-1.5 rounded-lg bg-blue-500 text-white text-[10px] font-bold hover:bg-blue-600 active:scale-95 transition-all gap-1">
-            <ExternalLink size={9} />
-            Visit Website
+            className="flex items-center justify-center gap-1 bg-blue-500 hover:bg-blue-600 active:scale-95 text-white text-[10px] font-bold px-2 py-1.5 rounded-lg transition-all mt-auto">
+            <ExternalLink size={9} /> Visit
           </a>
         ) : (
-          <div className="mt-2 w-full py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-400 text-[10px] text-center">No link</div>
+          <span className="text-[9px] text-gray-500 text-center">No link</span>
         )}
       </div>
     </div>
@@ -332,10 +323,6 @@ const PromoteCard = ({ item, onOpenDetail }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [productsOpen, setProductsOpen] = useState(true);
 
-  const handleToggleProducts = useCallback(() => {
-    setProductsOpen(prev => !prev);
-  }, []);
-
   const id = item?._id || item?.promote_reel_id;
   const author = item?.user_id || {};
   const username = author?.username || 'User';
@@ -348,10 +335,6 @@ const PromoteCard = ({ item, onOpenDetail }) => {
   const products = Array.isArray(item?.products) ? item.products : [];
   const createdAt = item?.createdAt || item?.created_at;
 
-  useEffect(() => {
-    setIsLiked(item?.is_liked_by_me || false);
-    setLikeCount(item?.likes_count ?? (Array.isArray(item?.likes) ? item.likes.length : 0));
-  }, [item]);
 
   const handleLike = async (e) => {
     e.stopPropagation();
@@ -407,49 +390,10 @@ const PromoteCard = ({ item, onOpenDetail }) => {
       <CardMedia item={item} />
 
       {/* ── Action Bar ── */}
-      <div className="px-3 pt-2">
-
-        {/* Products toggle + panel */}
-        {products.length > 0 && (
-          <div className="mb-3 border-b border-gray-100 dark:border-gray-800">
-            {/* Toggle row */}
-            <button
-              type="button"
-              onClick={handleToggleProducts}
-              className="flex items-center gap-2 w-full py-2"
-            >
-              <ShoppingBag size={13} className="text-orange-500 shrink-0" />
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Products</span>
-              <span className="text-[10px] text-gray-400">({products.length})</span>
-              <svg
-                className="ml-auto text-gray-400"
-                style={{ transform: productsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }}
-                width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-
-            {/* Products panel — always rendered, display toggled via CSS */}
-            <div
-              style={{
-                display: productsOpen ? 'flex' : 'none',
-                gap: '12px',
-                paddingBottom: '12px',
-                overflowX: 'auto',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-                WebkitOverflowScrolling: 'touch',
-              }}
-            >
-              {products.map((p, i) => <ProductCard key={p._id || i} product={p} />)}
-            </div>
-          </div>
-        )}
+      <div className="px-3 pt-3">
 
         {/* Like | Comment | Send  ···  Follow */}
-        <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-4">
             <button onClick={handleLike} className="active:scale-90 transition-transform group" aria-label="Like">
               <Heart size={24} className={`transition-all duration-200 group-active:scale-125 ${isLiked ? 'fill-red-500 text-red-500' : 'text-black dark:text-white'}`} />
@@ -465,6 +409,36 @@ const PromoteCard = ({ item, onOpenDetail }) => {
             <FollowButton targetUserId={String(authorId)} />
           )}
         </div>
+
+        {/* Products — below Follow button */}
+        {products.length > 0 && (
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setProductsOpen(v => !v); }}
+              className="flex items-center gap-2 w-full py-1.5 mb-2"
+            >
+              <ShoppingBag size={13} className="text-orange-500 shrink-0" />
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Products <span className="text-gray-400 font-normal">({products.length})</span>
+              </span>
+              <svg
+                className="ml-auto text-gray-400 transition-transform duration-300"
+                style={{ transform: productsOpen ? 'rotate(0deg)' : 'rotate(180deg)' }}
+                width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+
+            {productsOpen && (
+              <div className="flex flex-row gap-2 pb-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {products.map((p, i) => <ProductCard key={p._id || i} product={p} />)}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Like count */}
         {likeCount > 0 && (

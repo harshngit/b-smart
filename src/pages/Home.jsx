@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { ChevronDown, MapPin, UserPlus, Play, X, MoreHorizontal, Search } from 'lucide-react';
-import StoryRail from '../components/StoryRail';
+import { ChevronDown, MapPin, X, MoreHorizontal, Search } from 'lucide-react';
 import PostCard from '../components/PostCard';
 import PostDetailModal from '../components/PostDetailModal';
 import TweetDetailModal from '../components/TweetDetailModal';
 import PromoteCard from '../components/PromoteCard';
 import PromoteDetailModal from '../components/PromoteDetailModal';
+import StoryRail from '../components/StoryRail';
 import api from '../lib/api';
 import {
   checkFollowStatus,
@@ -188,7 +188,7 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults
   const navigate = useNavigate();
   return (
     <div className="hidden md:block sticky top-0 z-30 bg-white dark:bg-black mb-4 border-b border-gray-100 dark:border-gray-800 w-full xl:px-6">
-      <div className="max-w-[1200px] mx-auto">
+      <div className="max-w-[1200px] ml-auto">
         <div className="flex items-center justify-between py-3">
           <div className="flex items-center gap-12 flex-1">
             <h1 className="text-3xl font-normal text-[#bc1888] italic" style={{ fontFamily: "'Dancing Script', cursive" }}>
@@ -269,7 +269,7 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults
 
 // ── Skeleton Loader ───────────────────────────────────────────────────────────
 const FeedSkeleton = () => (
-  <div className="max-w-[470px] mx-auto">
+  <div className="max-w-[470px] ml-0">
     {[1, 2, 3].map(i => (
       <div key={i} className="bg-white dark:bg-black mb-4 border-b border-gray-200 dark:border-gray-800 pb-4 md:rounded-lg md:border animate-pulse">
         <div className="flex items-center gap-2.5 p-3">
@@ -291,7 +291,7 @@ const FeedSkeleton = () => (
 );
 
 // ── Mobile Suggested Users Card (horizontal scroll, Instagram-style) ──────────
-const MobileSuggestedUsersCard = ({ users, onDismiss }) => {
+const MobileSuggestedUsersCard = ({ users }) => {
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState({});
   if (!users || users.length === 0) return null;
@@ -467,7 +467,6 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
             const user = entry.user || entry;
             const userId = user._id || user.id;
             const username = user.username || user.full_name || `user-${idx}`;
-            const fullName = user.full_name || user.name || username;
             const avatar = normalizeAssetUrl(user.avatar_url || user.avatar || user.profile_picture);
             const reason = user.mutual_friends_count
               ? `${user.mutual_friends_count} mutual connections`
@@ -624,7 +623,7 @@ const Home = () => {
       const res = await fetch(`${BASE_URL}/api/suggestions/users`, { headers: adAuthHeaders() });
       if (!res.ok) return [];
       return normalizeApiArray(await res.json());
-    } catch (e) { return []; }
+    } catch { return []; }
   }, []);
 
   const fetchSuggestedReels = useCallback(async () => {
@@ -632,7 +631,7 @@ const Home = () => {
       const res = await fetch(`${BASE_URL}/api/suggestions/reels?limit=10`, { headers: adAuthHeaders() });
       if (!res.ok) return [];
       return normalizeApiArray(await res.json());
-    } catch (e) { return []; }
+    } catch { return []; }
   }, []);
 
   const loadFeed = useCallback(async () => {
@@ -696,10 +695,10 @@ const Home = () => {
       {/* Moved inside LocationBar search container to fix overlapping */}
 
       <div className="w-full xl:px-6">
-        <div className="max-w-[1200px] mx-auto xl:flex xl:items-start xl:justify-between xl:gap-8">
+        <div className="max-w-[1200px] ml-auto xl:flex xl:items-start xl:justify-between xl:gap-8">
           <div className="w-full max-w-[700px]">
-            <StoryRail />
-            <div className="mx-auto mb-4 flex w-full max-w-[470px] items-center gap-2 px-2 xl:mx-0">
+            {activeTab !== 'tweets' && <StoryRail />}
+            <div className="ml-0 mb-4 flex w-full max-w-[470px] items-center gap-2 px-2 pt-2">
               {[
                 { key: 'all', label: 'All' },
                 { key: 'following', label: 'Following' },
@@ -719,7 +718,7 @@ const Home = () => {
                 </button>
               ))}
             </div>
-            <div className="w-full max-w-[470px] mx-auto xl:mx-0 pb-4">
+            <div className="w-full max-w-[470px] ml-0 pb-4">
             {loading ? (
               <FeedSkeleton />
             ) : feed.length === 0 ? (
