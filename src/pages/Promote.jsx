@@ -5,7 +5,7 @@ import {
   Heart, MessageCircle, Send, MoreHorizontal,
   Bookmark, ChevronLeft,
   ShoppingBag, Loader2, UserPlus, UserCheck, X, Trash2,
-  ExternalLink, RefreshCw, Search
+  RefreshCw, Search
 } from 'lucide-react';
 import promoteReelService from '../services/promoteReelService';
 import Avatar from '../components/Avatar';
@@ -207,7 +207,7 @@ const FollowButton = ({ userId, mobile = false }) => {
   };
   return (
     <button onClick={toggle} disabled={loading}
-      className={`shrink-0 whitespace-nowrap flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all
+      className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-1 min-w-[108px] h-7 px-3 rounded-full text-[10px] font-semibold transition-all
         ${followed
           ? mobile ? 'border border-white/40 bg-white/20 text-white backdrop-blur-sm' : 'border border-green-500/60 bg-green-500/10 text-green-400'
           : mobile ? 'border border-white/40 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20' : 'border border-blue-500/60 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
@@ -386,39 +386,52 @@ const ProductCards = ({ products, open }) => {
       onClick={e => e.stopPropagation()}
     >
       {products.map((p, i) => {
-        const finalPrice = Math.max(0, (p.product_price || 0) - (p.discount_amount || 0));
-        const discountPct = p.product_price && p.discount_amount
-          ? Math.round((p.discount_amount / p.product_price) * 100) : 0;
+        const originalPrice = p.product_price || 0;
+        const discount = p.discount_amount || 0;
+        const finalPrice = Math.max(0, originalPrice - discount);
+        const discountPct = originalPrice && discount
+          ? Math.round((discount / originalPrice) * 100) : 0;
         const href = p.visit_link && !['', '#'].includes(p.visit_link) ? p.visit_link : null;
+        const rating = p.rating ?? p.product_rating ?? null;
         return (
           <div key={i}
-            className="flex-shrink-0 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded-2xl overflow-hidden shadow-sm"
-            style={{ width: 140 }}
+            className="flex-shrink-0 flex flex-row bg-white rounded-xl overflow-hidden shadow-md"
+            style={{ width: 190 }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Thumbnail */}
-            <div className="w-full bg-gray-800" style={{ height: 100 }}>
+            {/* Left: square thumbnail with rating badge */}
+            <div className="relative flex-shrink-0 bg-gray-100" style={{ width: 64, height: 80 }}>
               {p.promote_img
-                ? <img src={p.promote_img} alt={p.product_name} className="w-full h-full object-cover" />
-                : <div className="w-full h-full flex items-center justify-center"><ShoppingBag size={20} className="text-gray-500" /></div>}
+                ? <img src={normalizeAssetUrl(p.promote_img)} alt={p.product_name} className="w-full h-full object-cover" />
+                : <div className="w-full h-full flex items-center justify-center"><ShoppingBag size={16} className="text-gray-400" /></div>}
+              {rating != null && (
+                <div className="absolute bottom-1 left-1 flex items-center gap-0.5 bg-black/55 text-white text-[9px] font-medium px-1 py-0.5 rounded-full">
+                  <span>{rating}</span>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="#FBBF24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+              )}
             </div>
-            {/* Info + CTA */}
-            <div className="flex flex-col gap-1.5 p-2 flex-1">
-              <p className="text-[11px] font-bold text-white truncate leading-tight">{p.product_name}</p>
+
+            {/* Right: info + CTA */}
+            <div className="flex flex-col justify-between gap-1 p-2 flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-gray-900 truncate leading-tight">{p.product_name}</p>
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-[11px] font-black text-orange-400">₹{finalPrice.toLocaleString()}</span>
+                <span className="text-[12px] font-semibold text-gray-900">₹{finalPrice.toLocaleString()}</span>
                 {discountPct > 0 && (
-                  <span className="text-[9px] text-gray-400">{discountPct}% off</span>
+                  <>
+                    <span className="text-[10px] font-normal text-gray-400 line-through">₹{originalPrice.toLocaleString()}</span>
+                    <span className="text-[10px] font-medium text-green-500">{discountPct}% off</span>
+                  </>
                 )}
               </div>
               {href ? (
                 <a href={href} target="_blank" rel="noopener noreferrer"
                   onClick={e => e.stopPropagation()}
-                  className="flex items-center justify-center gap-1 bg-blue-500 hover:bg-blue-600 active:scale-95 text-white text-[10px] font-bold px-2 py-1.5 rounded-lg transition-all mt-auto">
-                  <ExternalLink size={9} /> Visit
+                  className="flex items-center justify-center bg-blue-500 hover:bg-blue-600 active:scale-95 text-white text-[10px] font-medium px-2 py-1 rounded-lg transition-all w-full">
+                  Visit Website
                 </a>
               ) : (
-                <span className="text-[9px] text-gray-500 text-center">No link</span>
+                <span className="text-[9px] text-gray-400 text-center">No link</span>
               )}
             </div>
           </div>
@@ -452,7 +465,7 @@ const SlideBottomInfo = ({ p }) => {
         {products.length > 0 && (
           <button
             onClick={e => { e.stopPropagation(); setProductsOpen(v => !v); }}
-            className="flex items-center gap-1 bg-black/30 backdrop-blur-sm border border-white/20 rounded-full px-2.5 py-1 active:scale-95 transition-all shrink-0"
+            className="flex items-center justify-center gap-1 min-w-[108px] h-7 px-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-full text-[10px] active:scale-95 transition-all shrink-0"
           >
             <ShoppingBag size={10} className="text-white" />
             <span className="text-white text-[10px] font-semibold whitespace-nowrap">

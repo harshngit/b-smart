@@ -269,7 +269,7 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults
 
 // ── Skeleton Loader ───────────────────────────────────────────────────────────
 const FeedSkeleton = () => (
-  <div className="max-w-[470px] ml-0">
+  <div className="max-w-[650px] ml-0">
     {[1, 2, 3].map(i => (
       <div key={i} className="bg-white dark:bg-black mb-4 border-b border-gray-200 dark:border-gray-800 pb-4 md:rounded-lg md:border animate-pulse">
         <div className="flex items-center gap-2.5 p-3">
@@ -524,41 +524,12 @@ const Footer = () => (
   </footer>
 );
 
-// ── Build feed with ads + mobile suggestions ──────────────────────────────────
-const AD_INTERVAL = 4;
-
-const buildFeed = (posts, ads, suggestedUsers, suggestedReels) => {
-  const safePosts = normalizeApiArray(posts);
-  const safeAds   = normalizeApiArray(ads);
-
-  // Pick a random position between index 2 and 5 for suggestion block
-  const suggPos = safePosts.length > 2 ? 2 + Math.floor(Math.random() * Math.min(3, safePosts.length - 2)) : -1;
-
-  const feed = [];
-  let adIdx = 0;
-  let suggInserted = false;
-  let reelsInserted = false;
-
-  safePosts.forEach((post, i) => {
-    feed.push(post);
-    // Insert ad
-    if (safeAds.length > 0 && (i + 1) % AD_INTERVAL === 0 && adIdx < safeAds.length) {
-      feed.push({ ...safeAds[adIdx % safeAds.length], item_type: 'ad' });
-      adIdx++;
-      if (!reelsInserted && suggestedReels.length > 0) {
-        feed.push({ item_type: 'mobile_reels_suggestion', reels: suggestedReels });
-        reelsInserted = true;
-      }
-    }
-    // Insert suggestion block (mobile only — hidden on lg via CSS)
-    if (!suggInserted && i === suggPos && suggestedUsers.length > 0) {
-      feed.push({ item_type: 'mobile_suggestion', users: suggestedUsers });
-      suggInserted = true;
-    }
-  });
-
-  if (!reelsInserted && suggestedReels.length > 0) {
-    feed.splice(Math.min(feed.length, 2), 0, { item_type: 'mobile_reels_suggestion', reels: suggestedReels });
+// Feed order is determined by the API. Frontend only injects the mobile
+// suggested-users card once at position 2 (a UI-only widget, not content).
+const injectSuggestionCard = (posts, suggestedUsers) => {
+  const feed = [...posts];
+  if (suggestedUsers.length > 0 && feed.length > 2) {
+    feed.splice(2, 0, { item_type: 'mobile_suggestion', users: suggestedUsers });
   }
   return feed;
 };
@@ -571,7 +542,6 @@ const Home = () => {
 
   const [posts,          setPosts]          = useState([]);
   const [suggestedUsers, setSuggestedUsers] = useState([]);
-  const [suggestedReels, setSuggestedReels] = useState([]);
   const [feed,           setFeed]           = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [selectedItem,   setSelectedItem]   = useState(null);
@@ -626,37 +596,24 @@ const Home = () => {
     } catch { return []; }
   }, []);
 
-  const fetchSuggestedReels = useCallback(async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/api/suggestions/reels?limit=10`, { headers: adAuthHeaders() });
-      if (!res.ok) return [];
-      return normalizeApiArray(await res.json());
-    } catch { return []; }
-  }, []);
-
   const loadFeed = useCallback(async () => {
     setLoading(true);
-    const [fetchedPosts, fetchedUsers, fetchedReels] = await Promise.all([
+    const [fetchedPosts, fetchedUsers] = await Promise.all([
       fetchPosts(),
       fetchSuggestedUsers(),
-      activeTab === 'tweets' ? Promise.resolve([]) : fetchSuggestedReels(),
     ]);
     const viewerId = userObject?._id || userObject?.id;
-    const [visiblePosts, visibleReels] = await Promise.all([
-      filterPrivateItemsForViewer(fetchedPosts, viewerId),
-      filterPrivateItemsForViewer(fetchedReels, viewerId),
-    ]);
+    const visiblePosts = await filterPrivateItemsForViewer(fetchedPosts, viewerId);
     setPosts(visiblePosts);
     setSuggestedUsers(fetchedUsers);
-    setSuggestedReels(visibleReels);
-    setFeed(activeTab === 'tweets' ? visiblePosts : buildFeed(visiblePosts, [], fetchedUsers, visibleReels));
+    setFeed(injectSuggestionCard(visiblePosts, fetchedUsers));
     setLoading(false);
-  }, [activeTab, fetchPosts, fetchSuggestedUsers, fetchSuggestedReels, userObject]);
+  }, [fetchPosts, fetchSuggestedUsers, userObject]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
   useEffect(() => {
-    setFeed(activeTab === 'tweets' ? posts : buildFeed(posts, [], suggestedUsers, suggestedReels));
-  }, [activeTab, posts, suggestedUsers, suggestedReels]);
+    setFeed(injectSuggestionCard(posts, suggestedUsers));
+  }, [activeTab, posts, suggestedUsers]);
 
   useEffect(() => {
     if (userObject?.role === 'vendor') navigate('/vendor/dashboard');
@@ -697,8 +654,8 @@ const Home = () => {
       <div className="w-full xl:px-6">
         <div className="max-w-[1200px] ml-auto xl:flex xl:items-start xl:justify-between xl:gap-8">
           <div className="w-full max-w-[700px]">
-            {activeTab !== 'tweets' && <StoryRail />}
-            <div className="ml-0 mb-4 flex w-full max-w-[470px] items-center gap-2 px-2 pt-2">
+            <StoryRail />
+            <div className="ml-0 mb-4 flex w-full max-w-[650px] items-center gap-2 px-2 pt-2">
               {[
                 { key: 'all', label: 'All' },
                 { key: 'following', label: 'Following' },
@@ -718,7 +675,7 @@ const Home = () => {
                 </button>
               ))}
             </div>
-            <div className="w-full max-w-[470px] ml-0 pb-4">
+            <div className="w-full max-w-[650px] ml-0 pb-4">
             {loading ? (
               <FeedSkeleton />
             ) : feed.length === 0 ? (
