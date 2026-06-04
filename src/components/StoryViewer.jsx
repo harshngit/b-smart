@@ -246,12 +246,12 @@ const StoryViewer = ({ initialStoryIndex, stories, onClose }) => {
     const onKey = (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goNext();
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') goPrev();
-      else if (e.key === 'Escape') onClose();
+      else if (e.key === 'Escape') { if (showViewers) setShowViewers(false); else onClose(); }
       else if (e.key === ' ') { e.preventDefault(); setIsPaused(v => !v); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goNext, goPrev, onClose]);
+  }, [goNext, goPrev, onClose, showViewers]);
 
   // ── Touch swipe ────────────────────────────────────────────────────────────
   const onTouchStart = (e) => { touchX.current = e.touches[0].clientX; touchY.current = e.touches[0].clientY; };

@@ -246,6 +246,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     }
   }, [isOpen, initialType]);
 
+
   useEffect(() => {
     let active = true;
 
@@ -1513,7 +1514,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     };
   }, [showEmojiPicker]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setStep('select');
     setMedia([]);
     setCurrentIndex(0);
@@ -1521,16 +1522,14 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     setAdMedia([]);
     setPromoteProducts([]);
     setProductDraft(null);
-    
-    setSelectedCategory("");
+    setSelectedCategory('');
     setSelectedLanguages([]);
     setSelectedCountries([]);
     setSelectedStates([]);
     setTotalBudgetCoins('');
-    
     setTags([]);
     onClose();
-  };
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
