@@ -83,7 +83,7 @@ const StoryRail = () => {
 
   const handleStoryClick = (index) => {
     const story = stories[index];
-    if (!story || story.itemsCount === 0) return;
+    if (!story?.id) return;
     setSelectedStoryIndex(index);
   };
 
@@ -116,10 +116,12 @@ const StoryRail = () => {
               >
                 {/* Avatar ring */}
                 <div className="relative">
-                  <div className={`
-                    w-[66px] h-[66px] rounded-full p-[2.5px] flex items-center justify-center
-                    ${hasStory && !hasSeen ? 'bg-orange-500' : 'bg-gray-200 dark:bg-gray-800'}
-                  `}>
+                  <div className={`w-[66px] h-[66px] rounded-full p-[2.5px] flex items-center justify-center
+                    ${hasStory && !hasSeen
+                      ? 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-600'
+                      : hasSeen
+                        ? 'bg-gray-400 dark:bg-gray-600'
+                        : 'bg-transparent'}`}>
                     <div className="w-full h-full rounded-full bg-white dark:bg-black p-[2px]">
                       {story.avatarUrl ? (
                         <img
