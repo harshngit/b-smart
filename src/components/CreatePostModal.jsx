@@ -96,36 +96,64 @@ async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParam
     video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
     document.body.appendChild(video);
 
-    const cleanup = () => {
-      try { document.body.removeChild(video); } catch (err) {
-        console.warn('Video element cleanup failed', err);
-      }
+    const cleanup = (audioCtx) => {
+      try { document.body.removeChild(video); } catch (e) { void e; }
       URL.revokeObjectURL(objectUrl);
+      if (audioCtx) try { audioCtx.close(); } catch (e) { void e; }
     };
 
     video.onloadedmetadata = async () => {
       const totalDuration = trimEnd - trimStart;
       if (totalDuration <= 0.05) {
-        cleanup();
+        cleanup(null);
+        resolve(originalFile);
+        return;
+      }
+
+      // Short-circuit: no real trim + no real crop → return original file with audio intact
+      const needsTrim = trimStart > 0.1 || trimEnd < (video.duration - 0.1);
+      const needsCrop = cropParams && (
+        cropParams.x > 0.5 || cropParams.y > 0.5 ||
+        Math.abs((cropParams.width  ?? video.videoWidth)  - video.videoWidth)  > 2 ||
+        Math.abs((cropParams.height ?? video.videoHeight) - video.videoHeight) > 2
+      );
+      if (!needsTrim && !needsCrop) {
+        cleanup(null);
         resolve(originalFile);
         return;
       }
 
       const natW = video.videoWidth  || 1280;
       const natH = video.videoHeight || 720;
-
       const srcX = cropParams?.x      ?? 0;
       const srcY = cropParams?.y      ?? 0;
       const srcW = cropParams?.width  ?? natW;
       const srcH = cropParams?.height ?? natH;
-
       const outW = cropParams?.outputWidth  ?? natW;
       const outH = cropParams?.outputHeight ?? natH;
 
       const canvas = document.createElement('canvas');
       canvas.width  = outW;
       canvas.height = outH;
-      const ctx = canvas.getContext('2d');
+      const ctx2d = canvas.getContext('2d');
+
+      // ── Audio: decode from original file via Web Audio API ──────────────
+      let audioCtx = null;
+      let audioDestination = null;
+      let audioSource = null;
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const arrayBuffer = await originalFile.arrayBuffer();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        audioDestination = audioCtx.createMediaStreamDestination();
+        audioSource = audioCtx.createBufferSource();
+        audioSource.buffer = audioBuffer;
+        audioSource.connect(audioDestination);
+      } catch {
+        // File has no audio track or AudioContext unavailable — proceed video-only
+        if (audioCtx) try { audioCtx.close(); } catch (e) { void e; }
+        audioCtx = null; audioDestination = null; audioSource = null;
+      }
 
       const mimeType =
         MediaRecorder.isTypeSupported('video/mp4;codecs=avc1') ? 'video/mp4;codecs=avc1' :
@@ -136,7 +164,13 @@ async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParam
 
       let stream, recorder;
       try {
-        stream   = canvas.captureStream(30);
+        const canvasStream = canvas.captureStream(30);
+        // Combine canvas video tracks + Web Audio API audio tracks
+        const combined = new MediaStream([
+          ...canvasStream.getVideoTracks(),
+          ...(audioDestination ? audioDestination.stream.getAudioTracks() : []),
+        ]);
+        stream = combined;
         recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
       } catch {
         try {
@@ -148,7 +182,7 @@ async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParam
           if (!vStream) throw new Error('no stream');
           recorder = new MediaRecorder(vStream, { mimeType });
         } catch {
-          cleanup();
+          cleanup(audioCtx);
           resolve(originalFile);
           return;
         }
@@ -158,12 +192,12 @@ async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParam
       recorder.ondataavailable = (e) => { if (e.data?.size > 0) chunks.push(e.data); };
 
       recorder.onstop = () => {
-        cleanup();
+        cleanup(audioCtx);
         const blob = new Blob(chunks, { type: 'video/mp4' });
         resolve(new File([blob], 'video.mp4', { type: 'video/mp4' }));
       };
 
-      recorder.onerror = () => { cleanup(); resolve(originalFile); };
+      recorder.onerror = () => { cleanup(audioCtx); resolve(originalFile); };
 
       video.currentTime = trimStart;
       await new Promise(res => {
@@ -172,6 +206,8 @@ async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParam
       });
 
       recorder.start(100);
+      // Start audio from trimStart offset, play for exactly totalDuration
+      if (audioSource) audioSource.start(0, trimStart, totalDuration);
       video.play().catch(() => {});
 
       const drawFrame = () => {
@@ -181,22 +217,22 @@ async function processVideoForUpload(originalFile, trimStart, trimEnd, cropParam
 
         if (video.currentTime >= trimEnd - 0.05 || video.ended || video.paused) {
           video.pause();
+          if (audioSource) try { audioSource.stop(); } catch (e) { void e; }
           if (recorder.state === 'recording') {
-            ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+            ctx2d.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
             recorder.stop();
           }
           return;
         }
 
-        ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
-
+        ctx2d.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
         if (recorder.state === 'recording') requestAnimationFrame(drawFrame);
       };
 
       requestAnimationFrame(drawFrame);
     };
 
-    video.onerror = () => { cleanup(); resolve(originalFile); };
+    video.onerror = () => { cleanup(null); resolve(originalFile); };
   });
 }
 
@@ -236,6 +272,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [step, setStep] = useState('select');
   const { userObject } = useSelector((state) => state.auth);
   const mode = useSelector((state) => state.theme?.mode || 'light');
+  const [vendorWalletBalance, setVendorWalletBalance] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(false);
   const userId = userObject?._id || userObject?.id;
   const [postType, setPostType] = useState(initialType);
   
@@ -286,6 +324,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     return () => { active = false; };
   }, [isOpen, userId, userObject?.role]);
 
+  const fetchVendorWallet = useCallback(async () => {
+    setWalletLoading(true);
+    try {
+      const res = await api.get('/wallet/me');
+      const bal = res.data?.balance ?? res.data?.wallet?.balance ?? 0;
+      setVendorWalletBalance(Math.floor(Number(bal)));
+    } catch {
+      setVendorWalletBalance(0);
+    } finally {
+      setWalletLoading(false);
+    }
+  }, []);
+
   const [media, setMedia] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -299,6 +350,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [hideLikes, setHideLikes] = useState(false);
   const [turnOffCommenting, setTurnOffCommenting] = useState(false);
   const [isAdvancedSettingsOpen, setIsAdvancedSettingsOpen] = useState(false);
+  const advancedSettingsRef = useRef(null);
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef(null);
@@ -335,7 +387,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   };
   const removeProduct = (i) => setPromoteProducts(prev => prev.filter((_, idx) => idx !== i));
   // kept for backwards-compat (submit strips _imgUploading anyway)
-  const updateProduct = (i, field, value) => setPromoteProducts(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
+  const _updateProduct = (i, field, value) => setPromoteProducts(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
   
   const CATEGORIES = [
     'Fashion', 'Electronics', 'Food & Dining', 'Beauty & Personal Care', 'Travel', 'Education',
@@ -358,7 +410,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   ].sort();
 
   const [categories, setCategories] = useState(CATEGORIES);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [_isLoadingCategories, setIsLoadingCategories] = useState(false);
   
   // Ad multi-select states
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -371,7 +423,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [adTitle, setAdTitle] = useState('');
   const [adDescription, setAdDescription] = useState('');
   const [adType, setAdType] = useState('promote');
-  const [subCategory, setSubCategory] = useState('');
+  const [subCategory, _setSubCategory] = useState('');
   const [keywords, setKeywords] = useState([]);
   const [keywordInput, setKeywordInput] = useState('');
 
@@ -389,22 +441,22 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [budgetEndDate, setBudgetEndDate] = useState('');
 
   // Targeting new fields
-  const [selectedCities, setSelectedCities] = useState([]);
-  const [cityInput, setCityInput] = useState('');
+  const [selectedCities, _setSelectedCities] = useState([]);
+  const [_cityInput, _setCityInput] = useState('');
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
-  const [genderTarget, setGenderTarget] = useState('all');
+  const [genderTarget, setGenderTarget] = useState('');
   const [selectedInterests, setSelectedInterests] = useState([]);
   const [interestInput, setInterestInput] = useState('');
   const [selectedDeviceTypes, setSelectedDeviceTypes] = useState([]);
 
   // Tracking / UTM
-  const [utmSource, setUtmSource] = useState('');
-  const [utmMedium, setUtmMedium] = useState('');
-  const [utmCampaign, setUtmCampaign] = useState('');
-  const [utmTerm, setUtmTerm] = useState('');
-  const [utmContent, setUtmContent] = useState('');
-  const [conversionPixelId, setConversionPixelId] = useState('');
+  const [utmSource, _setUtmSource] = useState('');
+  const [utmMedium, _setUtmMedium] = useState('');
+  const [utmCampaign, _setUtmCampaign] = useState('');
+  const [utmTerm, _setUtmTerm] = useState('');
+  const [utmContent, _setUtmContent] = useState('');
+  const [conversionPixelId, _setConversionPixelId] = useState('');
 
   // Engagement controls (new)
   const [disableShare, setDisableShare] = useState(false);
@@ -416,7 +468,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [policyAgreed, setPolicyAgreed] = useState(false);
 
   // A/B testing
-  const [abTestingEnabled, setAbTestingEnabled] = useState(false);
+  const [_abTestingEnabled, _setAbTestingEnabled] = useState(false);
 
   // Search states for accordions
   const [countrySearch, setCountrySearch] = useState('');
@@ -424,7 +476,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [languageSearch, setLanguageSearch] = useState('');
 
   // Scheduling
-  const [scheduleSlots, setScheduleSlots] = useState([]);
+  const [_scheduleSlots, _setScheduleSlots] = useState([]);
 
   // Accordion state — extended
   // 'category' | 'country' | 'state' | 'language' | 'budget' | 'cta' | 'adtype' | 'targeting_advanced' | 'tracking' | 'engagement' | 'compliance' | null
@@ -435,7 +487,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [statesByCountry, setStatesByCountry] = useState({}); // { countryName: [states] }
   const [isLoadingStates, setIsLoadingStates] = useState(false);
   const [languagesByState, setLanguagesByState] = useState({}); // { 'country|state': [languages] }
-  const [isLoadingLanguages, setIsLoadingLanguages] = useState(false);
+  const [isLoadingLanguages, _setIsLoadingLanguages] = useState(false);
   
   // Accordion state: 'category' | 'country' | 'state' | 'language' | 'budget' | null
   const [openAccordion, setOpenAccordion] = useState(null);
@@ -548,7 +600,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     setLanguagesByState(newLangMap);
     const allValidLangs = new Set(Object.values(newLangMap).flat());
     setSelectedLanguages(prev => prev.filter(l => allValidLangs.has(l)));
-  }, [selectedStates, statesByCountry]);
+  }, [selectedStates, statesByCountry, selectedCountries]);
 
 
   const [uploadStage, setUploadStage] = useState('idle');
@@ -676,6 +728,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
         v.currentTime = s;
       }
     } catch { void 0; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, currentMedia?.trimStart, currentMedia?.trimEnd, currentMedia?.type]);
 
   const handleFileSelect = (e) => {
@@ -929,34 +982,86 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
       if (!selectedCategory) errs.selectedCategory = "Please select a category.";
       if (!adType) errs.adType = "Please select an ad type.";
       if (['view_site', 'install_app', 'book_now', 'learn_more'].includes(ctaType)) {
-        if (!ctaUrl.trim()) errs.ctaUrl = "Please enter a destination URL.";
+        if (!ctaUrl.trim()) {
+          errs.ctaUrl = "Please enter a destination URL.";
+        } else {
+          try { new URL(ctaUrl.trim()); } catch { errs.ctaUrl = "Please enter a valid URL starting with https://."; }
+        }
       } else if (['contact_info', 'call_now'].includes(ctaType)) {
-        if (!ctaPhone.trim() && !ctaWhatsapp.trim() && !ctaEmail.trim()) errs.ctaContact = "Please provide at least one contact method (Phone, WhatsApp, or Email).";
+        if (!ctaPhone.trim() && !ctaWhatsapp.trim() && !ctaEmail.trim())
+          errs.ctaContact = "Please provide at least one contact method (Phone, WhatsApp, or Email).";
       }
+      if (keywords.length === 0) errs.keywords = "Please add at least one keyword.";
+      if (!ageMin) {
+        errs.ageMin = "Min age is required.";
+      } else {
+        const minAge = parseInt(ageMin, 10);
+        if (isNaN(minAge) || minAge < 13 || minAge > 99) errs.ageMin = "Min age must be between 13 and 99.";
+      }
+      if (!ageMax) {
+        errs.ageMax = "Max age is required.";
+      } else {
+        const maxAge = parseInt(ageMax, 10);
+        if (isNaN(maxAge) || maxAge < 13 || maxAge > 100) errs.ageMax = "Max age must be between 13 and 100.";
+      }
+      if (!errs.ageMin && !errs.ageMax && ageMin && ageMax) {
+        if (parseInt(ageMin, 10) >= parseInt(ageMax, 10)) errs.ageMin = "Min age must be less than max age.";
+      }
+      if (!genderTarget) errs.genderTarget = "Please select a gender target.";
+      if (selectedInterests.length === 0) errs.interests = "Please add at least one interest.";
       if (!policyAgreed) errs.policyAgreed = "You must agree to the Ad Content Policy to continue.";
       if (Object.keys(errs).length > 0) {
         setFieldErrors(errs);
+        const firstKey = Object.keys(errs)[0];
+        requestAnimationFrame(() => {
+          const el = document.getElementById(`field-${firstKey}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
         return;
       }
       setFieldErrors({});
+      if (postType === 'ad') fetchVendorWallet();
       setStep('share');
     } else if (step === 'share') {
       if (postType === 'ad') {
         const errs = {};
         if (selectedCountries.length === 0) errs.countries = "Please select at least one country for targeting.";
+        if (selectedCountries.length > 0 && selectedStates.length === 0) errs.states = "Please select at least one state.";
+        if (selectedStates.length > 0 && selectedLanguages.length === 0) errs.languages = "Please select at least one language.";
         const total = parseFloat(totalBudgetCoins);
         const daily = parseFloat(dailyBudgetCoins);
-        if (isNaN(total) || total < 100) errs.totalBudget = "Total budget must be at least 100 coins.";
-        if (!isNaN(daily) && daily > 0 && !isNaN(total) && daily > total) errs.dailyBudget = "Daily budget cannot exceed the total budget.";
+        if (!totalBudgetCoins) {
+          errs.totalBudget = "Total budget is required.";
+        } else if (isNaN(total) || total < 100) {
+          errs.totalBudget = "Total budget must be at least 100 coins.";
+        } else if (total > vendorWalletBalance) {
+          errs.totalBudget = `Insufficient balance. You have ${vendorWalletBalance.toLocaleString()} 🪙 available.`;
+        }
+        if (dailyBudgetCoins && !isNaN(daily) && daily > 0) {
+          if (!isNaN(total) && daily > total) errs.dailyBudget = "Daily budget cannot exceed the total budget.";
+        }
         if (!budgetStartDate) {
           errs.startDate = "Please select a start date.";
         } else {
           const today = new Date(); today.setHours(0, 0, 0, 0);
           const startDate = new Date(budgetStartDate); startDate.setHours(0, 0, 0, 0);
           if (startDate < today) errs.startDate = "Start date cannot be in the past.";
+          if (budgetEndDate) {
+            const endDate = new Date(budgetEndDate); endDate.setHours(0, 0, 0, 0);
+            if (endDate <= startDate) errs.endDate = "End date must be after the start date.";
+          }
         }
         if (Object.keys(errs).length > 0) {
           setFieldErrors(errs);
+          const hasBudgetErr = errs.totalBudget || errs.dailyBudget || errs.startDate || errs.endDate;
+          const firstTargetingErr = errs.countries ? 'country' : errs.states ? 'state' : errs.languages ? 'language' : null;
+          if (hasBudgetErr) setOpenAccordion('budget');
+          else if (firstTargetingErr) setOpenAccordion(firstTargetingErr);
+          const firstKey = Object.keys(errs)[0];
+          requestAnimationFrame(() => {
+            const el = document.getElementById(`field-${firstKey}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
           return;
         }
         setFieldErrors({});
@@ -1485,6 +1590,24 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     setTags(tags.filter(t => t.id !== tagId));
   };
 
+  const handleToggleTag = (e, user) => {
+    e.stopPropagation();
+    const uname = user.username;
+    const existing = tags.find(t => t.user?.username === uname);
+    if (existing) {
+      setTags(prev => prev.filter(t => t.id !== existing.id));
+    } else {
+      // Add new tag at a slightly offset position so multiple tags don't stack
+      const offset = tags.length * 10;
+      setTags(prev => [...prev, {
+        id: Math.random().toString(36).substr(2, 9),
+        x: Math.min(80, 30 + offset),
+        y: Math.min(80, 40 + offset),
+        user,
+      }]);
+    }
+  };
+
   useEffect(() => {
     if (showTagSearch) {
       const timer = setTimeout(() => fetchUsers(searchQuery), 300);
@@ -1527,6 +1650,12 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     setSelectedCountries([]);
     setSelectedStates([]);
     setTotalBudgetCoins('');
+    setKeywords([]);
+    setAgeMin('');
+    setAgeMax('');
+    setGenderTarget('');
+    setSelectedInterests([]);
+    setFieldErrors({});
     setTags([]);
     onClose();
   }, [onClose]);
@@ -1618,7 +1747,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     v.crossOrigin = 'anonymous';
     v.src = item.croppedUrl || item.url;
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const _ctx = canvas.getContext('2d');
     const run = async () => {
       await new Promise(res => { v.onloadedmetadata = res; });
       const duration = isFinite(v.duration) ? v.duration : 0;
@@ -2561,7 +2690,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Ad Content</span>
                   </div>
                   <div className="p-4 space-y-3">
-                    <div>
+                    <div id="field-adTitle">
                       <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Ad Title <span className="text-blue-500">*</span></label>
                       <input type="text" placeholder="e.g. Summer Sale — Up to 50% Off" value={adTitle}
                         onChange={(e) => { setAdTitle(e.target.value); if (fieldErrors.adTitle) setFieldErrors(p => ({ ...p, adTitle: undefined })); }}
@@ -2698,7 +2827,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
                   <div className="p-4 space-y-4">
                     {/* Category Dropdown */}
-                    <div>
+                    <div id="field-selectedCategory">
                       <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Ad Category <span className="text-blue-500">*</span></label>
                       <div className="relative">
                         <select
@@ -2717,7 +2846,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     </div>
 
                     {/* Ad Type: Promote or General */}
-                    <div>
+                    <div id="field-adType">
                       <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Ad Type <span className="text-blue-500">*</span></label>
                       <div className="grid grid-cols-2 gap-3">
                         {[
@@ -2774,19 +2903,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     <div className="space-y-2">
                       {/* URL & Deep Link: for Site, App, Book, Learn */}
                       {['view_site', 'install_app', 'book_now', 'learn_more'].includes(ctaType) && (
-                        <>
+                        <div id="field-ctaUrl" className="space-y-2">
                           <input type="url" placeholder="Destination URL (https://...)" value={ctaUrl}
                             onChange={e => { setCtaUrl(e.target.value); if (fieldErrors.ctaUrl) setFieldErrors(p => ({ ...p, ctaUrl: undefined })); }}
                             className={`w-full px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400 ${fieldErrors.ctaUrl ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
                           {fieldErrors.ctaUrl && <p className="mt-1 text-xs text-red-500">{fieldErrors.ctaUrl}</p>}
                           <input type="text" placeholder="Deep Link (e.g. myapp://product/123)" value={ctaDeepLink} onChange={e => setCtaDeepLink(e.target.value)}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
-                        </>
+                        </div>
                       )}
 
                       {/* Contact Info: for Contact & Call Now */}
                       {['contact_info', 'call_now'].includes(ctaType) && (
-                        <>
+                        <div id="field-ctaContact" className="space-y-2">
                           <input type="tel" placeholder="Phone number (for Call Now)" value={ctaPhone}
                             onChange={e => { setCtaPhone(e.target.value); if (fieldErrors.ctaContact) setFieldErrors(p => ({ ...p, ctaContact: undefined })); }}
                             className={`w-full px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400 ${fieldErrors.ctaContact ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
@@ -2797,7 +2926,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                             onChange={e => { setCtaEmail(e.target.value); if (fieldErrors.ctaContact) setFieldErrors(p => ({ ...p, ctaContact: undefined })); }}
                             className={`w-full px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400 ${fieldErrors.ctaContact ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
                           {fieldErrors.ctaContact && <p className="mt-1 text-xs text-red-500">{fieldErrors.ctaContact}</p>}
-                        </>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -2809,14 +2938,15 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0">
                       <Zap size={12} className="text-white" />
                     </div>
-                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Keywords</span>
+                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Keywords <span className="text-blue-500 normal-case font-normal">*</span></span>
                   </div>
-                  <div className="p-4">
+                  <div className="p-4" id="field-keywords">
                     <div className="flex gap-2 mb-2">
-                      <input type="text" placeholder="Type a keyword & press Enter" value={keywordInput} onChange={e => setKeywordInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && keywordInput.trim()) { setKeywords(prev => [...prev, keywordInput.trim()]); setKeywordInput(''); e.preventDefault(); }}}
-                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
-                      <button onClick={() => { if (keywordInput.trim()) { setKeywords(prev => [...prev, keywordInput.trim()]); setKeywordInput(''); }}}
+                      <input type="text" placeholder="Type a keyword & press Enter" value={keywordInput}
+                        onChange={e => { setKeywordInput(e.target.value); if (fieldErrors.keywords) setFieldErrors(p => ({ ...p, keywords: undefined })); }}
+                        onKeyDown={e => { if (e.key === 'Enter' && keywordInput.trim()) { setKeywords(prev => [...prev, keywordInput.trim()]); setKeywordInput(''); setFieldErrors(p => ({ ...p, keywords: undefined })); e.preventDefault(); }}}
+                        className={`flex-1 px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400 ${fieldErrors.keywords && keywords.length === 0 ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
+                      <button onClick={() => { if (keywordInput.trim()) { setKeywords(prev => [...prev, keywordInput.trim()]); setKeywordInput(''); setFieldErrors(p => ({ ...p, keywords: undefined })); }}}
                         className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold shadow-sm hover:opacity-90 transition-opacity">+</button>
                     </div>
                     {keywords.length > 0 && (
@@ -2828,6 +2958,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                         ))}
                       </div>
                     )}
+                    {fieldErrors.keywords && <p className="mt-2 text-xs text-red-500">{fieldErrors.keywords}</p>}
                   </div>
                 </div>
 
@@ -2841,21 +2972,27 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   </div>
                   <div className="p-4 space-y-4">
                     {/* Age Range */}
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 block">Age Range</label>
+                    <div id="field-ageMin">
+                      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 block">Age Range <span className="text-blue-500">*</span></label>
                       <div className="flex gap-2">
-                        <input type="number" placeholder="Min (13)" value={ageMin} onChange={e => setAgeMin(e.target.value)} min={13} max={99}
-                          className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all" />
-                        <input type="number" placeholder="Max (65)" value={ageMax} onChange={e => setAgeMax(e.target.value)} min={13} max={100}
-                          className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all" />
+                        <input type="number" placeholder="Min (13)" value={ageMin}
+                          onChange={e => { setAgeMin(e.target.value); if (fieldErrors.ageMin) setFieldErrors(p => ({ ...p, ageMin: undefined })); }}
+                          min={13} max={99}
+                          className={`w-full px-3 py-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all ${fieldErrors.ageMin ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
+                        <input type="number" placeholder="Max (65)" value={ageMax}
+                          onChange={e => { setAgeMax(e.target.value); if (fieldErrors.ageMax) setFieldErrors(p => ({ ...p, ageMax: undefined })); }}
+                          min={13} max={100}
+                          className={`w-full px-3 py-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all ${fieldErrors.ageMax ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
                       </div>
+                      {fieldErrors.ageMin && <p className="mt-1 text-xs text-red-500">{fieldErrors.ageMin}</p>}
+                      {fieldErrors.ageMax && <p className="mt-1 text-xs text-red-500">{fieldErrors.ageMax}</p>}
                     </div>
                     {/* Gender */}
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 block">Gender</label>
-                      <div className="grid grid-cols-4 gap-2">
+                    <div id="field-genderTarget">
+                      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 block">Gender <span className="text-blue-500">*</span></label>
+                      <div className={`grid grid-cols-4 gap-2 p-2 rounded-xl border-2 transition-all ${fieldErrors.genderTarget ? 'border-red-400 dark:border-red-500 bg-red-50/30 dark:bg-red-950/10' : 'border-transparent'}`}>
                         {['all', 'male', 'female', 'other'].map(g => (
-                          <button key={g} onClick={() => setGenderTarget(g)}
+                          <button key={g} onClick={() => { setGenderTarget(g); if (fieldErrors.genderTarget) setFieldErrors(p => ({ ...p, genderTarget: undefined })); }}
                             className={`py-2 rounded-xl text-xs font-bold border-2 capitalize transition-all ${
                               genderTarget === g
                                 ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white border-blue-500'
@@ -2865,15 +3002,17 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                           </button>
                         ))}
                       </div>
+                      {fieldErrors.genderTarget && <p className="mt-1 text-xs text-red-500">{fieldErrors.genderTarget}</p>}
                     </div>
                     {/* Interests */}
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 block">Interests</label>
+                    <div id="field-interests">
+                      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 block">Interests <span className="text-blue-500">*</span></label>
                       <div className="flex gap-2 mb-2">
-                        <input type="text" placeholder="Add interest & press Enter" value={interestInput} onChange={e => setInterestInput(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter' && interestInput.trim()) { setSelectedInterests(prev => [...prev, interestInput.trim()]); setInterestInput(''); e.preventDefault(); }}}
-                          className="flex-1 px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400" />
-                        <button onClick={() => { if (interestInput.trim()) { setSelectedInterests(prev => [...prev, interestInput.trim()]); setInterestInput(''); }}}
+                        <input type="text" placeholder="Add interest & press Enter" value={interestInput}
+                          onChange={e => { setInterestInput(e.target.value); if (fieldErrors.interests) setFieldErrors(p => ({ ...p, interests: undefined })); }}
+                          onKeyDown={e => { if (e.key === 'Enter' && interestInput.trim()) { setSelectedInterests(prev => [...prev, interestInput.trim()]); setInterestInput(''); setFieldErrors(p => ({ ...p, interests: undefined })); e.preventDefault(); }}}
+                          className={`flex-1 px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all placeholder-gray-400 ${fieldErrors.interests && selectedInterests.length === 0 ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
+                        <button onClick={() => { if (interestInput.trim()) { setSelectedInterests(prev => [...prev, interestInput.trim()]); setInterestInput(''); setFieldErrors(p => ({ ...p, interests: undefined })); }}}
                           className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold hover:opacity-90 transition-opacity">+</button>
                       </div>
                       {selectedInterests.length > 0 && (
@@ -2885,6 +3024,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                           ))}
                         </div>
                       )}
+                      {fieldErrors.interests && <p className="mt-2 text-xs text-red-500">{fieldErrors.interests}</p>}
                     </div>
                     {/* Device Types */}
                     <div>
@@ -2918,7 +3058,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     </div>
                     <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Review & Submit</span>
                   </div>
-                  <div className="p-4">
+                  <div className="p-4" id="field-policyAgreed">
                     <div className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                       policyAgreed
                         ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-400 dark:border-blue-700'
@@ -3200,8 +3340,8 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                           }
                         }}
                       />
-                      {/* Video Controls Overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 z-30" onClick={(e) => e.stopPropagation()}>
+                      {/* Video Controls Overlay — z-10 keeps it below tags (z-20), hidden only during tag search or active drag */}
+                      <div className={`absolute inset-0 flex items-center justify-center transition-opacity bg-black/20 z-10 ${(showTagSearch || draggingTagId) ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`} onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-4">
                           <button
                             onClick={() => {
@@ -3380,7 +3520,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 pb-1">Audience Targeting</div>
 
                   {/* Country accordion */}
-                  <div className={`border rounded-xl overflow-hidden ${fieldErrors.countries ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}>
+                  <div id="field-countries" className={`border rounded-xl overflow-hidden ${fieldErrors.countries ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}>
                     <button onClick={() => { setOpenAccordion(openAccordion === 'country' ? null : 'country'); if (fieldErrors.countries) setFieldErrors(p => ({ ...p, countries: undefined })); }}
                       className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
                       <span className="flex items-center gap-2"><Globe size={14} className="text-blue-500" />Country {selectedCountries.length > 0 && `(${selectedCountries.length} selected)`}</span>
@@ -3424,10 +3564,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
 
                   {/* State accordion — only shown after country selected */}
                   {selectedCountries.length > 0 && (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                      <button onClick={() => setOpenAccordion(openAccordion === 'state' ? null : 'state')}
+                    <>
+                    <div id="field-states" className={`border rounded-xl overflow-hidden ${fieldErrors.states ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}>
+                      <button onClick={() => { setOpenAccordion(openAccordion === 'state' ? null : 'state'); if (fieldErrors.states) setFieldErrors(p => ({ ...p, states: undefined })); }}
                         className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
-                        <span className="flex items-center gap-2"><MapPin size={14} className="text-blue-400" />State {selectedStates.length > 0 && `(${selectedStates.length} selected)`}</span>
+                        <span className="flex items-center gap-2"><MapPin size={14} className="text-blue-400" />State <span className="text-red-500 text-xs">*</span> {selectedStates.length > 0 && `(${selectedStates.length} selected)`}</span>
                         <ChevronDown size={16} className={`transition-transform ${openAccordion === 'state' ? 'rotate-180' : ''}`} />
                       </button>
                       {openAccordion === 'state' && (
@@ -3472,14 +3613,17 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                         </div>
                       )}
                     </div>
+                    {fieldErrors.states && <p className="mt-1 text-xs text-red-500">{fieldErrors.states}</p>}
+                  </>
                   )}
 
                   {/* Language accordion — only shown after state selected */}
                   {selectedStates.length > 0 && (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                      <button onClick={() => setOpenAccordion(openAccordion === 'language' ? null : 'language')}
+                    <>
+                    <div id="field-languages" className={`border rounded-xl overflow-hidden ${fieldErrors.languages ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}>
+                      <button onClick={() => { setOpenAccordion(openAccordion === 'language' ? null : 'language'); if (fieldErrors.languages) setFieldErrors(p => ({ ...p, languages: undefined })); }}
                         className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
-                        <span className="flex items-center gap-2"><Globe size={14} className="text-purple-500" />Language {selectedLanguages.length > 0 && `(${selectedLanguages.length} selected)`}</span>
+                        <span className="flex items-center gap-2"><Globe size={14} className="text-purple-500" />Language <span className="text-red-500 text-xs">*</span> {selectedLanguages.length > 0 && `(${selectedLanguages.length} selected)`}</span>
                         <ChevronDown size={16} className={`transition-transform ${openAccordion === 'language' ? 'rotate-180' : ''}`} />
                       </button>
                       {openAccordion === 'language' && (
@@ -3522,23 +3666,54 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                         </div>
                       )}
                     </div>
+                    {fieldErrors.languages && <p className="mt-1 text-xs text-red-500">{fieldErrors.languages}</p>}
+                  </>
                   )}
 
                   {/* ── Budget & Duration ── */}
                   <div className="pt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 pb-1">Budget & Duration</div>
 
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                  <div className={`border rounded-xl overflow-hidden ${(fieldErrors.totalBudget || fieldErrors.dailyBudget || fieldErrors.startDate || fieldErrors.endDate) ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}>
                     <button onClick={() => setOpenAccordion(openAccordion === 'budget' ? null : 'budget')}
                       className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 text-sm font-semibold dark:text-white">
-                      <span className="flex items-center gap-2"><Coins size={14} className="text-amber-500" />Budget {totalBudgetCoins && `· ${totalBudgetCoins} 🪙`}</span>
-                      <ChevronDown size={16} className={`transition-transform ${openAccordion === 'budget' ? 'rotate-180' : ''}`} />
+                      <span className="flex items-center gap-2">
+                        <Coins size={14} className="text-amber-500" />
+                        Budget {totalBudgetCoins && `· ${totalBudgetCoins} 🪙`}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                          {walletLoading ? 'Loading…' : `Balance: ${vendorWalletBalance.toLocaleString()} 🪙`}
+                        </span>
+                        <ChevronDown size={16} className={`transition-transform ${openAccordion === 'budget' ? 'rotate-180' : ''}`} />
+                      </div>
                     </button>
                     {openAccordion === 'budget' && (
                       <div className="p-3 bg-white dark:bg-black space-y-3">
-                        <div>
-                          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Total Budget (Coins) *</label>
+                        {/* Balance chip inside accordion */}
+                        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Available Balance</span>
+                          {walletLoading
+                            ? <span className="text-xs text-amber-500">Loading…</span>
+                            : <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{vendorWalletBalance.toLocaleString()} 🪙</span>
+                          }
+                        </div>
+                        <div id="field-totalBudget">
+                          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Total Budget (Coins) <span className="text-red-500">*</span></label>
                           <input type="number" value={totalBudgetCoins}
-                            onChange={e => { setTotalBudgetCoins(e.target.value); if (fieldErrors.totalBudget) setFieldErrors(p => ({ ...p, totalBudget: undefined })); }}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setTotalBudgetCoins(val);
+                              const n = parseFloat(val);
+                              if (!val) {
+                                setFieldErrors(p => ({ ...p, totalBudget: 'Total budget is required.' }));
+                              } else if (isNaN(n) || n < 100) {
+                                setFieldErrors(p => ({ ...p, totalBudget: 'Total budget must be at least 100 coins.' }));
+                              } else if (n > vendorWalletBalance) {
+                                setFieldErrors(p => ({ ...p, totalBudget: `Insufficient balance. You have ${vendorWalletBalance.toLocaleString()} 🪙 available.` }));
+                              } else {
+                                setFieldErrors(p => ({ ...p, totalBudget: undefined }));
+                              }
+                            }}
                             placeholder="e.g. 5000 (min 100)"
                             className={`w-full p-2.5 rounded-lg border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500 ${fieldErrors.totalBudget ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
                           {fieldErrors.totalBudget && <p className="mt-1 text-xs text-red-500">{fieldErrors.totalBudget}</p>}
@@ -3546,26 +3721,38 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                         <div>
                           <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Daily Budget Limit (Coins)</label>
                           <input type="number" value={dailyBudgetCoins}
-                            onChange={e => { setDailyBudgetCoins(e.target.value); if (fieldErrors.dailyBudget) setFieldErrors(p => ({ ...p, dailyBudget: undefined })); }}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setDailyBudgetCoins(val);
+                              const daily = parseFloat(val);
+                              const total = parseFloat(totalBudgetCoins);
+                              if (val && !isNaN(daily) && daily > 0 && !isNaN(total) && daily > total) {
+                                setFieldErrors(p => ({ ...p, dailyBudget: 'Daily budget cannot exceed the total budget.' }));
+                              } else {
+                                setFieldErrors(p => ({ ...p, dailyBudget: undefined }));
+                              }
+                            }}
                             placeholder="e.g. 500 (0 = no limit)"
                             className={`w-full p-2.5 rounded-lg border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500 ${fieldErrors.dailyBudget ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
                           {fieldErrors.dailyBudget && <p className="mt-1 text-xs text-red-500">{fieldErrors.dailyBudget}</p>}
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Start Date</label>
+                          <div id="field-startDate">
+                            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Start Date <span className="text-red-500">*</span></label>
                             <input type="date" value={budgetStartDate}
                               onChange={e => { setBudgetStartDate(e.target.value); if (fieldErrors.startDate) setFieldErrors(p => ({ ...p, startDate: undefined })); }}
                               className={`w-full p-2.5 rounded-lg border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500 ${fieldErrors.startDate ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
                             {fieldErrors.startDate && <p className="mt-1 text-xs text-red-500">{fieldErrors.startDate}</p>}
                           </div>
-                          <div>
+                          <div id="field-endDate">
                             <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">End Date</label>
-                            <input type="date" value={budgetEndDate} onChange={e => setBudgetEndDate(e.target.value)}
-                              className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500" />
+                            <input type="date" value={budgetEndDate}
+                              onChange={e => { setBudgetEndDate(e.target.value); if (fieldErrors.endDate) setFieldErrors(p => ({ ...p, endDate: undefined })); }}
+                              className={`w-full p-2.5 rounded-lg border bg-gray-50 dark:bg-gray-900 text-sm dark:text-white outline-none focus:ring-2 focus:ring-amber-500 ${fieldErrors.endDate ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`} />
+                            {fieldErrors.endDate && <p className="mt-1 text-xs text-red-500">{fieldErrors.endDate}</p>}
                           </div>
                         </div>
-                        <p className="text-xs text-gray-400">Minimum 100 coins required. Budget is deducted from your wallet on creation.</p>
+                        <p className="text-xs text-gray-400">Minimum 100 coins. Max equals your available balance. Budget deducted on creation.</p>
                       </div>
                     )}
                   </div>
@@ -3600,33 +3787,84 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 </div>
               )}
 
-              {/* Tag Section */}
-              <div className="flex flex-col">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900" onClick={() => { setShowTagSearch(true); setSearchQuery(''); fetchUsers(''); }}>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Add Tag</span>
+              {/* Tag Section + Advanced Settings — kept in one flex-col container */}
+              <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+                {/* Add Tag header */}
+                <div
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900"
+                  onClick={(e) => { e.stopPropagation(); setShowTagSearch(true); setSearchQuery(''); fetchUsers(''); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Add Tag</span>
+                    {tags.length > 0 && (
+                      <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full">{tags.length} selected</span>
+                    )}
+                  </div>
                   <UserPlus size={20} className="text-gray-800 dark:text-gray-200" />
                 </div>
-                {allUsers.length > 0 && (
-                  <div className="px-4 py-2 max-h-40 overflow-y-auto flex flex-col gap-2 pr-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+
+                {/* User list */}
+                {(allUsers.length > 0 || isLoadingAllUsers) && (
+                  <div className="px-3 py-2 max-h-44 overflow-y-auto flex flex-col gap-1 border-b border-gray-100 dark:border-gray-800" style={{ scrollbarWidth: 'none' }}>
                     {isLoadingAllUsers ? (
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Loading users...</div>
-                    ) : allUsers.map(u => (
-                      <div key={u.id} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 rounded-md px-2 py-1" onClick={() => handleTagUser(u)}>
-                        <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center">
-                          {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt={u.username} /> : <span className="text-xs font-semibold text-gray-800 dark:text-white">{(u.username || '').slice(0, 1).toUpperCase()}</span>}
+                      <div className="text-xs text-gray-400 py-2 px-1">Loading users...</div>
+                    ) : allUsers.map(u => {
+                      const isTagged = !!u.username && tags.some(t => t.user?.username === u.username);
+                      return (
+                        <div
+                          key={u.username || u._id || u.id}
+                          className={`flex items-center gap-3 rounded-xl px-3 py-2 cursor-pointer transition-all ${
+                            isTagged
+                              ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
+                          }`}
+                          onClick={(e) => handleToggleTag(e, u)}
+                        >
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex-shrink-0 flex items-center justify-center">
+                            {u.avatar_url
+                              ? <img src={u.avatar_url} className="w-full h-full object-cover" alt={u.username} />
+                              : <span className="text-xs font-semibold text-gray-800 dark:text-white">{(u.username || '').slice(0, 1).toUpperCase()}</span>
+                            }
+                          </div>
+                          <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                            <span className={`text-sm font-semibold truncate ${isTagged ? 'text-blue-700 dark:text-blue-300' : 'dark:text-white'}`}>{u.username}</span>
+                            {u.full_name && <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{u.full_name}</span>}
+                          </div>
+                          {isTagged ? (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                                <svg width="10" height="8" viewBox="0 0 12 9" fill="none"><polyline points="1,4.5 4.5,8 11,1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              </div>
+                              <button
+                                onClick={(e) => handleToggleTag(e, u)}
+                                className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/50 flex items-center justify-center text-red-500 transition-colors"
+                              >
+                                <X size={10} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" />
+                          )}
                         </div>
-                        <div className="flex flex-col overflow-hidden">
-                          <span className="text-sm font-semibold truncate dark:text-white">{u.username}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{u.full_name}</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
                 {/* Advanced Settings */}
-                <div className="border-b border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900" onClick={() => setIsAdvancedSettingsOpen(!isAdvancedSettingsOpen)}>
+                <div className="border-b border-gray-100 dark:border-gray-800" ref={advancedSettingsRef}>
+                  <div
+                    className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900"
+                    onClick={() => {
+                      const opening = !isAdvancedSettingsOpen;
+                      setIsAdvancedSettingsOpen(opening);
+                      if (opening) {
+                        requestAnimationFrame(() => {
+                          advancedSettingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        });
+                      }
+                    }}
+                  >
                     <span className="text-sm text-gray-800 dark:text-gray-200 font-medium">Advanced Settings</span>
                     {isAdvancedSettingsOpen ? <ChevronUp size={20} className="text-gray-600 dark:text-gray-400" /> : <ChevronDown size={20} className="text-gray-600 dark:text-gray-400" />}
                   </div>

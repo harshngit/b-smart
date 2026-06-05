@@ -77,6 +77,7 @@ export default function AdsManagement() {
   const [showAdLimitPopup, setShowAdLimitPopup] = useState(false);
   const [editingAd, setEditingAd] = useState(null);
   const [actionKey, setActionKey] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // adId to delete
 
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -251,8 +252,13 @@ export default function AdsManagement() {
     } finally { setActionKey(""); }
   };
 
-  const handleDeleteAd = async (adId) => {
-    if (!window.confirm("Delete this ad?")) return;
+  const handleDeleteAd = (adId) => {
+    setDeleteConfirm(adId);
+  };
+
+  const confirmDeleteAd = async () => {
+    const adId = deleteConfirm;
+    setDeleteConfirm(null);
     const key = `${adId}:delete`;
     try {
       setActionKey(key); setError("");
@@ -672,6 +678,35 @@ export default function AdsManagement() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Delete Confirmation Modal ── */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+              <div className="flex flex-col items-center text-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-500" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Delete this ad?</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone. The ad and all its data will be permanently removed.</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteAd}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
