@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   X, Heart, MessageCircle, Send, MoreHorizontal,
   Smile, ChevronLeft, ChevronRight, Loader2, UserPlus, UserCheck
@@ -6,6 +6,10 @@ import {
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
+import {
+  checkFollowStatus, followUser, unfollowUser, cancelFollowRequest,
+  FOLLOW_STATUS_CHANGED_EVENT, normalizeFollowStateFromStatus,
+} from '../services/followService';
 import tweetCommentService from '../services/tweetCommentService';
 import Avatar from './Avatar';
 import ContentReportModal from './ContentReportModal';
@@ -44,19 +48,64 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, isDeleting }) => {
 
 const FollowButton = ({ targetUserId }) => {
   const { userObject } = useSelector(s => s.auth);
-  const [following, setFollowing] = useState(false);
+  const [followState, setFollowState] = useState('not_following');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!userObject || !targetUserId) return;
+    if (String(userObject._id || userObject.id) === String(targetUserId)) return;
+    checkFollowStatus(targetUserId)
+      .then(status => { if (isMounted) setFollowState(normalizeFollowStateFromStatus(status)); })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [targetUserId, userObject]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const d = e?.detail || {};
+      if (String(d.userId || '') !== String(targetUserId || '')) return;
+      if (['following', 'requested', 'not_following'].includes(d.state)) setFollowState(d.state);
+    };
+    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+  }, [targetUserId]);
+
   const handleClick = useCallback(async (e) => {
-    e.stopPropagation(); if (!userObject || loading) return;
-    const was = following; setFollowing(!was); setLoading(true);
-    try { await api.post(was ? '/unfollow' : '/follow', { followedUserId: targetUserId }); }
-    catch { setFollowing(was); } finally { setLoading(false); }
-  }, [userObject, loading, following, targetUserId]);
+    e.stopPropagation();
+    if (!userObject || loading) return;
+    const prev = followState;
+    setLoading(true);
+    try {
+      if (followState === 'following') {
+        await unfollowUser(targetUserId);
+        setFollowState('not_following');
+      } else if (followState === 'requested') {
+        await cancelFollowRequest(targetUserId);
+        setFollowState('not_following');
+      } else {
+        const res = await followUser(targetUserId);
+        setFollowState(normalizeFollowStateFromStatus(res));
+      }
+    } catch {
+      setFollowState(prev);
+    } finally {
+      setLoading(false);
+    }
+  }, [userObject, loading, followState, targetUserId]);
+
   if (!targetUserId) return null;
+  const isFollowing = followState === 'following';
+  const isRequested = followState === 'requested';
   return (
-    <button onClick={handleClick} disabled={loading} className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border transition-all ${loading?'opacity-50':''} ${following?'border-gray-300 dark:border-gray-600 text-gray-500':'border-blue-500 text-blue-500 bg-blue-50 dark:bg-blue-500/10'}`}>
-      {loading ? <Loader2 size={10} className="animate-spin"/> : following ? <UserCheck size={10}/> : <UserPlus size={10}/>}
-      <span>{following ? 'Following' : 'Follow'}</span>
+    <button onClick={handleClick} disabled={loading}
+      className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border transition-all ${loading ? 'opacity-50' : ''} ${
+        isFollowing || isRequested
+          ? 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
+          : 'border-blue-500 text-blue-500 bg-blue-50 dark:bg-blue-500/10'
+      }`}>
+      {loading ? <Loader2 size={10} className="animate-spin" /> : (isFollowing || isRequested) ? <UserCheck size={10} /> : <UserPlus size={10} />}
+      <span>{isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}</span>
     </button>
   );
 };
@@ -170,11 +219,34 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
     return () => window.removeEventListener('keydown', fn);
   }, [isOpen, onClose]);
 
+  // Sync like state with feed (PostCard)
+  useEffect(() => {
+    if (!tweetId) return;
+    const handler = (e) => {
+      const d = e.detail;
+      if (String(d.postId) !== String(tweetId)) return;
+      if (d.isLiked !== undefined) setIsLiked(d.isLiked);
+      if (d.likeCount !== undefined) setLikeCount(d.likeCount);
+    };
+    window.addEventListener('bsmart:post-state', handler);
+    return () => window.removeEventListener('bsmart:post-state', handler);
+  }, [tweetId]);
+
   const handleLike = async () => {
     if (!userObject) return;
-    const was = isLiked; setIsLiked(!was); setLikeCount(c => !was ? c+1 : Math.max(0,c-1));
+    const was = isLiked;
+    const wasCount = likeCount;
+    const newLiked = !was;
+    const newCount = newLiked ? wasCount + 1 : Math.max(0, wasCount - 1);
+    setIsLiked(newLiked);
+    setLikeCount(newCount);
+    window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(tweetId), isLiked: newLiked, likeCount: newCount } }));
     try { await api.post(`/tweets/${tweetId}/${was?'unlike':'like'}`); }
-    catch { setIsLiked(was); setLikeCount(c => was ? c+1 : Math.max(0,c-1)); }
+    catch {
+      setIsLiked(was);
+      setLikeCount(wasCount);
+      window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(tweetId), isLiked: was, likeCount: wasCount } }));
+    }
   };
 
   const handlePostComment = async (e) => {
@@ -207,7 +279,7 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
   if (!isOpen || !tweet) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 md:p-10">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 md:p-10">
       <button onClick={onClose} className="absolute top-4 right-4 text-white hover:opacity-75 z-[60]"><X size={24}/></button>
 
       <div className="bg-white dark:bg-black max-w-[90vw] md:max-w-[1100px] w-full max-h-[90vh] h-full md:h-[85vh] flex flex-col md:flex-row overflow-hidden rounded-md md:rounded-r-xl animate-in fade-in zoom-in duration-200">

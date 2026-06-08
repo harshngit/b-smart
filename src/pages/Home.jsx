@@ -11,6 +11,7 @@ import PromoteDetailModal from '../components/PromoteDetailModal';
 import StoryRail from '../components/StoryRail';
 import StoryViewer from '../components/StoryViewer';
 import api from '../lib/api';
+import bsmartLogo from '../assets/bsmart.png';
 import {
   checkFollowStatus,
   bulkCheckFollowStatus,
@@ -189,13 +190,11 @@ const LocationSelector = ({ className = "" }) => (
 const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults }) => {
   const navigate = useNavigate();
   return (
-    <div className="hidden md:block sticky top-0 z-30 bg-white dark:bg-black mb-4 border-b border-gray-100 dark:border-gray-800 w-full xl:px-6">
-      <div className="max-w-[1200px] ml-auto">
-        <div className="flex items-center justify-between py-3">
-          <div className="flex items-center gap-12 flex-1">
-            <h1 className="text-3xl font-normal text-[#bc1888] italic" style={{ fontFamily: "'Dancing Script', cursive" }}>
-              b_smart
-            </h1>
+    <div className="hidden md:block fixed top-0 left-20 right-0 h-16 z-[55] bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800">
+      <div className="h-full xl:px-6">
+        <div className="max-w-[1200px] ml-auto h-full flex items-center justify-between">
+          <div className="flex items-center gap-8 flex-1">
+            <img src={bsmartLogo} alt="b_smart" className="h-[70px] w-auto flex-shrink-0" />
             
             {/* Search bar */}
             <div className="relative w-full max-w-[400px]">
@@ -458,8 +457,8 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
 
   return (
     <>
-      <aside className="hidden xl:block w-[350px] shrink-0 z-0">
-        <div className="sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto pb-20 scrollbar-hide">
+      <aside className="hidden xl:flex xl:flex-col w-[350px] shrink-0 z-0">
+        <div className="h-full overflow-y-auto pb-20 scrollbar-hide">
           <div className="mb-6">
             <div className="flex items-center gap-3 min-w-0">
               {/* Avatar — orange ring if current user has a story */}
@@ -704,20 +703,20 @@ const Home = () => {
   };
 
   return (
-    <div className="relative">
-      <LocationBar 
-        searchQuery={searchQuery} 
-        onSearchChange={handleSearchChange} 
-        searchLoading={searchLoading} 
+    <div className="relative pt-[52px] md:pt-16">
+      <LocationBar
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchLoading={searchLoading}
         searchResults={searchResults}
       />
 
       {/* Search Results Dropdown */}
       {/* Moved inside LocationBar search container to fix overlapping */}
 
-      <div className="w-full xl:px-6">
-        <div className="max-w-[1200px] ml-auto xl:flex xl:items-start xl:justify-between xl:gap-8">
-          <div className="w-full max-w-[700px]">
+      <div className="w-full xl:px-6 md:h-[calc(100vh-4rem)] md:overflow-hidden">
+        <div className="max-w-[1200px] ml-auto xl:flex xl:items-stretch xl:justify-between xl:gap-8 md:h-full">
+          <div className="w-full max-w-[700px] md:overflow-y-auto scrollbar-hide">
             <StoryRail />
             <div className="ml-0 mb-4 flex w-full max-w-[650px] items-center gap-2 px-2 pt-2">
               {[
@@ -775,13 +774,12 @@ const Home = () => {
               })
             )}
             </div>
+            <Footer />
           </div>
 
           <DesktopSuggestionsRail currentUser={userObject} suggestedUsers={suggestedUsers} />
         </div>
       </div>
-      
-      <Footer />
 
       <PostDetailModal
         isOpen={!!selectedItem}

@@ -438,7 +438,7 @@ const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile 
       <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
         ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
         <Bookmark size={20} className={savedIds.has(ad._id)
-          ? (mobile ? 'text-yellow-400 fill-yellow-400' : 'text-yellow-500 fill-yellow-500')
+          ? (mobile ? 'text-black fill-black' : 'text-black fill-black')
           : mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
       </div>
       <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>Save</span>
@@ -1991,9 +1991,8 @@ const Ads = ({ feedMode = 'user' }) => {
                             {/* View Ad Details */}
                             <button
                               onClick={() => { trackAdClick(a._id); navigate(`/ads/${a._id}/details`); }}
-                              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/25 text-white text-xs font-bold hover:bg-black/60 active:scale-95 transition-all shadow-lg"
+                              className="flex-1 flex items-center justify-center py-2.5 px-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/25 text-white text-xs font-bold hover:bg-black/60 active:scale-95 transition-all shadow-lg"
                             >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                               Visit Ad Details
                             </button>
                             {/* CTA based on type */}
@@ -2008,8 +2007,8 @@ const Ads = ({ feedMode = 'user' }) => {
                               return (
                                 <a href={href} target={cta.type !== 'call_now' ? '_blank' : '_self'} rel="noopener noreferrer"
                                   onClick={() => trackAdClick(a._id)}
-                                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-600 text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-lg">
-                                  {icon}{label}
+                                  className="flex-1 flex items-center justify-center py-2.5 px-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-600 text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-lg">
+                                  {label}
                                 </a>
                               );
                             })()}

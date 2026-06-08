@@ -787,14 +787,32 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
     return () => clearTimeout(t);
   }, [post, userObject, isAd, isTweet]);
 
+  // Sync like/save state with other components (e.g. PostDetailModal)
+  useEffect(() => {
+    if (!postId) return;
+    const handler = (e) => {
+      const d = e.detail;
+      if (String(d.postId) !== String(postId)) return;
+      if (d.isLiked !== undefined) setIsLiked(d.isLiked);
+      if (d.likeCount !== undefined) setLikeCount(d.likeCount);
+      if (d.isSaved !== undefined) setIsSaved(d.isSaved);
+    };
+    window.addEventListener('bsmart:post-state', handler);
+    return () => window.removeEventListener('bsmart:post-state', handler);
+  }, [postId]);
+
   // ── Like handler ──────────────────────────────────────────────────────────
   const handleLike = async () => {
     if (!userObject) return;
     const wasLiked = isLiked;
+    const wasCount = likeCount;
     const wasDisliked = isDisliked;
-    setIsLiked(!wasLiked);
-    setLikeCount(c => !wasLiked ? c + 1 : Math.max(0, c - 1));
-    if (!wasLiked && wasDisliked) setIsDisliked(false);
+    const newLiked = !wasLiked;
+    const newCount = newLiked ? wasCount + 1 : Math.max(0, wasCount - 1);
+    setIsLiked(newLiked);
+    setLikeCount(newCount);
+    if (newLiked && wasDisliked) setIsDisliked(false);
+    window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isLiked: newLiked, likeCount: newCount } }));
 
     try {
       if (isAd) {
@@ -813,8 +831,9 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
       }
     } catch {
       setIsLiked(wasLiked);
-      setLikeCount(c => wasLiked ? c + 1 : Math.max(0, c - 1));
-      if (!wasLiked && wasDisliked) setIsDisliked(wasDisliked);
+      setLikeCount(wasCount);
+      if (newLiked && wasDisliked) setIsDisliked(wasDisliked);
+      window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isLiked: wasLiked, likeCount: wasCount } }));
     }
   };
 
@@ -825,10 +844,15 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
     e.stopPropagation();
     if (!userObject || !postId || isAd || isTweet) return;
     const was = isSaved;
-    setIsSaved(!was);
+    const newSaved = !was;
+    setIsSaved(newSaved);
+    window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: newSaved } }));
     try {
       await api.post(`/posts/${postId}/${was ? 'unsave' : 'save'}`);
-    } catch { setIsSaved(was); }
+    } catch {
+      setIsSaved(was);
+      window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: was } }));
+    }
   };
 
   // ── Delete handler ─────────────────────────────────────────────────────────

@@ -3,20 +3,10 @@ import { Heart, MessageCircle, Wallet } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useNotificationSocket } from '../hooks/useNotificationSocket';
-
-// ─── B-Smart Logo ─────────────────────────────────────────────────────────────
+import bsmartLogo from '../assets/bsmart.png';
 
 const BSmartLogo = () => (
-  <div className="flex items-center gap-2">
-    {/* Icon */}
-    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#f09433] via-[#e6683c] via-[#dc2743] to-[#bc1888] flex items-center justify-center shadow-md shadow-pink-500/30 flex-shrink-0">
-      <span className="text-white font-black text-sm leading-none">b</span>
-    </div>
-    {/* Wordmark */}
-    <span className="text-xl font-normal text-[#bc1888] italic tracking-tight" style={{ fontFamily: 'cursive' }}>
-      b_smart
-    </span>
-  </div>
+  <img src={bsmartLogo} alt="b_smart" className="h-8 w-auto" />
 );
 
 const TopBar = () => {
@@ -34,7 +24,7 @@ const TopBar = () => {
   };
 
   return (
-    <div className="md:hidden fixed top-0 left-0 right-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 px-4 py-2.5 flex justify-between items-center z-50">
+    <div className="md:hidden fixed top-0 left-0 right-0 bg-white/90 dark:bg-black/90 backdrop-blur-sm px-4 py-2.5 flex justify-between items-center z-50">
       {/* Left: B-Smart logo */}
       <Link to="/" className="flex items-center gap-2">
         <BSmartLogo />

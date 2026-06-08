@@ -250,7 +250,7 @@ const ActionButtons = ({ promote, likedIds, toggleLike, savedIds, toggleSave, mo
     <button onClick={() => toggleSave(promote._id)} className="flex flex-col items-center gap-1">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
         ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-        <Bookmark size={20} className={savedIds.has(promote._id) ? (mobile ? 'text-yellow-400 fill-yellow-400' : 'text-yellow-500 fill-yellow-500') : mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
+        <Bookmark size={20} className={savedIds.has(promote._id) ? (mobile ? 'text-black fill-black' : 'text-black fill-black') : mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
       </div>
       <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>Save</span>
     </button>

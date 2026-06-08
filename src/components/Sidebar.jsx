@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, ShoppingBag } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
+import bsmartLogo from '../assets/bsmart.png';
 import { logoutUser } from '../store/authSlice';
 import {
   setTypingUser,
@@ -529,20 +530,11 @@ const Sidebar = ({ onOpenCreateModal }) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="p-6 mb-2">
+        <div className="h-16 flex-shrink-0 flex items-center px-4">
           {isHovered ? (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-white font-bold text-lg shadow-md">
-                b
-              </div>
-              <h1 className="text-3xl font-normal text-[#bc1888] italic transition-opacity duration-300" style={{ fontFamily: 'cursive' }}>
-                b_smart
-              </h1>
-            </div>
+            <img src={bsmartLogo} alt="b_smart" className="h-[70px] w-auto" />
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-white font-bold text-xl shadow-md transition-transform hover:scale-105">
-              b
-            </div>
+            <></>
           )}
         </div>
 
@@ -818,7 +810,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
           <div className="hidden md:block fixed inset-0 z-[45]" onClick={closeSidebarSearch} />
           <div
             ref={sidebarSearchRef}
-            className="hidden md:flex flex-col fixed top-0 left-20 h-full w-[400px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl"
+            className="hidden md:flex flex-col fixed top-0 left-20 h-screen w-[400px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl"
             style={{ animation: 'slideInSearch 0.22s cubic-bezier(0.4,0,0.2,1)' }}
           >
             {/* Header */}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import BottomNav from './BottomNav';
 import TopBar from './TopBar';
@@ -8,28 +8,14 @@ import CreatePostModal from './CreatePostModal';
 import api from '../lib/api';
 import { fetchMe, setUser } from '../store/authSlice';
 
-const BASE_URL = 'https://api.bebsmart.in';
-
-const adAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-};
-
-const normalizeArr = (v) => {
-  if (Array.isArray(v)) return v;
-  if (!v || typeof v !== 'object') return [];
-  const keys = ['data','users','suggestions','results','items'];
-  for (const k of keys) { if (Array.isArray(v[k])) return v[k]; if (v.data && Array.isArray(v.data[k])) return v.data[k]; }
-  return [];
-};
 
 const Layout = () => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
   const isMessagesPage = location.pathname.startsWith('/messages');
-  const isExcludedPage = ['/profile', '/settings', '/promote'].includes(location.pathname) || isMessagesPage;
-  const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname) || isMessagesPage;
+  const isExcludedPage = ['/promote'].includes(location.pathname) || isMessagesPage;
+  const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
   const showTopBar = !isExcludedPage && !isFullScreenPage;
 
   const [walletCoins, setWalletCoins] = useState(null);
@@ -239,11 +225,11 @@ const Layout = () => {
     <div className={`flex min-h-screen bg-gray-50 dark:bg-black md:pb-0 ${isFullScreenPage ? 'pb-0' : 'pb-16'}`}>
       <Sidebar onOpenCreateModal={handleOpenCreateModal} />
 
-      <div className="flex-1 min-h-screen transition-all duration-300 md:ml-20">
+<div className="flex-1 min-h-screen transition-all duration-300 md:ml-20">
         {showTopBar && <TopBar />}
 
         <div className={`
-          ${showTopBar ? 'pt-16 md:pt-0' : 'pt-0 md:pt-0'}
+          ${showTopBar ? 'pt-16' : 'pt-0'} md:pt-0
           w-full
         `}>
           {/* Main content */}

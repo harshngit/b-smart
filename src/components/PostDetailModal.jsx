@@ -8,6 +8,10 @@ import { supabase } from '../lib/supabase';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
+import {
+  checkFollowStatus, followUser, unfollowUser, cancelFollowRequest,
+  FOLLOW_STATUS_CHANGED_EVENT, normalizeFollowStateFromStatus,
+} from '../services/followService';
 import postCommentService from '../services/commentService';
 import adCommentService from '../services/commentServiceJS';
 import tweetCommentService from '../services/tweetCommentService';
@@ -44,7 +48,6 @@ const formatDateFull = (dateString) => {
 const isAdItem = (item) => item?.item_type === 'ad' || !!item?.vendor_id;
 const isTweetItem = (item) => item?.item_type === 'tweet';
 const getContentText = (item) => item?.content || item?.caption || '';
-const getCommentsCount = (item) => item?.commentsCount ?? item?.comments_count ?? 0;
 const getLikeCount = (item) => item?.likesCount ?? item?.likes_count ?? (Array.isArray(item?.likes) ? item.likes.length : 0);
 
 // ── Coin Icon ──────────────────────────────────────────────────────────────────
@@ -82,34 +85,64 @@ const ShopCTA = ({ offer }) => {
 // ── Follow Button ──────────────────────────────────────────────────────────────
 const FollowButton = ({ targetUserId }) => {
   const { userObject } = useSelector(s => s.auth);
-  const [following, setFollowing] = useState(false);
+  const [followState, setFollowState] = useState('not_following');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!userObject || !targetUserId) return;
+    if (String(userObject._id || userObject.id) === String(targetUserId)) return;
+    checkFollowStatus(targetUserId)
+      .then(status => { if (isMounted) setFollowState(normalizeFollowStateFromStatus(status)); })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [targetUserId, userObject]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const d = e?.detail || {};
+      if (String(d.userId || '') !== String(targetUserId || '')) return;
+      if (['following', 'requested', 'not_following'].includes(d.state)) setFollowState(d.state);
+    };
+    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+  }, [targetUserId]);
 
   const handleClick = useCallback(async (e) => {
     e.stopPropagation();
     if (!userObject || loading) return;
-    const was = following;
-    setFollowing(!was);
+    const prev = followState;
     setLoading(true);
     try {
-      await api.post(was ? '/unfollow' : '/follow', { followedUserId: targetUserId });
+      if (followState === 'following') {
+        await unfollowUser(targetUserId);
+        setFollowState('not_following');
+      } else if (followState === 'requested') {
+        await cancelFollowRequest(targetUserId);
+        setFollowState('not_following');
+      } else {
+        const res = await followUser(targetUserId);
+        setFollowState(normalizeFollowStateFromStatus(res));
+      }
     } catch {
-      setFollowing(was);
+      setFollowState(prev);
     } finally {
       setLoading(false);
     }
-  }, [userObject, loading, following, targetUserId]);
+  }, [userObject, loading, followState, targetUserId]);
 
   if (!targetUserId) return null;
+  const isFollowing = followState === 'following';
+  const isRequested = followState === 'requested';
   return (
     <button onClick={handleClick} disabled={loading}
       className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border transition-all ${loading ? 'opacity-50' : ''} ${
-        following
+        isFollowing || isRequested
           ? 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
           : 'border-blue-500 text-blue-500 bg-blue-50 dark:bg-blue-500/10'
       }`}>
-      {loading ? <Loader2 size={10} className="animate-spin" /> : following ? <UserCheck size={10} /> : <UserPlus size={10} />}
-      <span>{following ? 'Following' : 'Follow'}</span>
+      {loading ? <Loader2 size={10} className="animate-spin" /> : (isFollowing || isRequested) ? <UserCheck size={10} /> : <UserPlus size={10} />}
+      <span>{isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}</span>
     </button>
   );
 };
@@ -118,7 +151,7 @@ const FollowButton = ({ targetUserId }) => {
 const DeleteModal = ({ isOpen, onClose, onConfirm, isDeleting }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
         {isDeleting ? (
           <div className="flex flex-col items-center py-8">
@@ -570,12 +603,32 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
       // Fetch fresh post data + comments
       if (!isAd && initialPost._id) {
         api.get(`${isTweet ? '/tweets' : '/posts'}/${initialPost._id}`)
-          .then(({ data }) => { setPost(data); })
+          .then(({ data }) => {
+            setPost(data);
+            if (data.is_liked_by_me !== undefined) setIsLiked(data.is_liked_by_me);
+            const freshCount = getLikeCount(data);
+            if (freshCount !== undefined) setLikeCount(freshCount);
+            if (data.is_saved_by_me !== undefined) setIsSaved(data.is_saved_by_me);
+          })
           .catch(() => {});
       }
       fetchComments(initialPost._id || initialPost.id);
     }
   }, [isOpen, initialPost, currentUserId, isAd, isTweet, fetchComments]);
+
+  // Sync like/save state with feed (PostCard)
+  useEffect(() => {
+    if (!postId) return;
+    const handler = (e) => {
+      const d = e.detail;
+      if (String(d.postId) !== String(postId)) return;
+      if (d.isLiked !== undefined) setIsLiked(d.isLiked);
+      if (d.likeCount !== undefined) setLikeCount(d.likeCount);
+      if (d.isSaved !== undefined) setIsSaved(d.isSaved);
+    };
+    window.addEventListener('bsmart:post-state', handler);
+    return () => window.removeEventListener('bsmart:post-state', handler);
+  }, [postId]);
 
   const handlePostComment = async (e) => {
     e?.preventDefault();
@@ -664,10 +717,14 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   const handleLike = async () => {
     if (!userObject) return;
     const wasLiked = isLiked;
+    const wasCount = likeCount;
     const wasDisliked = isDisliked;
-    setIsLiked(!wasLiked);
-    setLikeCount(c => !wasLiked ? c + 1 : Math.max(0, c - 1));
-    if (!wasLiked && wasDisliked) setIsDisliked(false);
+    const newLiked = !wasLiked;
+    const newCount = newLiked ? wasCount + 1 : Math.max(0, wasCount - 1);
+    setIsLiked(newLiked);
+    setLikeCount(newCount);
+    if (newLiked && wasDisliked) setIsDisliked(false);
+    window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isLiked: newLiked, likeCount: newCount } }));
     try {
       if (isAd) {
         const ep = wasLiked ? `/ads/${postId}/dislike` : `/ads/${postId}/like`;
@@ -680,13 +737,26 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
         const likes = post.likes || [];
         const updated = wasLiked ? likes.filter(l => l.user_id !== userObject.id) : [...likes, { user_id: userObject.id }];
         await supabase.from('posts').update({ likes: updated }).eq('id', post.id);
-        setPost(prev => ({ ...prev, likes: updated, is_liked_by_me: !wasLiked }));
+        setPost(prev => ({ ...prev, likes: updated, is_liked_by_me: newLiked }));
       }
     } catch {
       setIsLiked(wasLiked);
-      setLikeCount(c => wasLiked ? c + 1 : Math.max(0, c - 1));
-      if (!wasLiked && wasDisliked) setIsDisliked(wasDisliked);
+      setLikeCount(wasCount);
+      if (newLiked && wasDisliked) setIsDisliked(wasDisliked);
+      window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isLiked: wasLiked, likeCount: wasCount } }));
     }
+  };
+
+  // ── Save post ───────────────────────────────────────────────────────────────
+  const handleSave = () => {
+    if (!postId || isTweet) return;
+    const newSaved = !isSaved;
+    setIsSaved(newSaved);
+    window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: newSaved } }));
+    api.post(`/posts/${postId}/${isSaved ? 'unsave' : 'save'}`).catch(() => {
+      setIsSaved(isSaved);
+      window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: isSaved } }));
+    });
   };
 
   // ── Delete post ─────────────────────────────────────────────────────────────
@@ -721,7 +791,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   const profilePath = isAd ? `/vendor/${userId}/public` : `/profile/${userId}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 md:p-10">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 md:p-10">
       <button onClick={onClose} className="absolute top-4 right-4 text-white hover:opacity-75 z-[60]">
         <X size={24} />
       </button>
@@ -944,7 +1014,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                     <FollowButton targetUserId={String(userId)} />
                   )}
                   {!isTweet && (
-                    <button onClick={() => setIsSaved(s => !s)} className="hover:opacity-50 transition-opacity active:scale-90">
+                    <button onClick={handleSave} className="hover:opacity-50 transition-opacity active:scale-90">
                       <Bookmark size={24} className={isSaved ? 'fill-black text-black dark:fill-white dark:text-white' : 'text-gray-900 dark:text-white'} />
                     </button>
                   )}

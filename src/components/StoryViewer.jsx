@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import bsmartLogo from '../assets/bsmart.png';
 import { X, ChevronRight, Heart, Volume2, VolumeX, Pause, Play, MoreHorizontal, ChevronLeft, Eye } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -303,7 +304,7 @@ const StoryViewer = ({ initialStoryIndex, stories, onClose }) => {
     >
       {/* b_smart brand — top left */}
       <div className="absolute top-5 left-6 z-50 select-none pointer-events-none">
-        <span className="text-2xl font-normal italic text-[#bc1888]" style={{ fontFamily: 'cursive' }}>b_smart</span>
+        <img src={bsmartLogo} alt="b_smart" className="h-[50px] w-auto" />
       </div>
 
       {/* X close — top right */}

@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import api from '../lib/api';
 import authService from '../services/authService';
 import { setUser } from '../store/authSlice';
-import { ArrowLeft, User, Mail, Phone, Lock, Sparkles, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Lock, Sparkles, Eye, EyeOff, ChevronDown, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -28,10 +28,56 @@ const Signup = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [genderOpen, setGenderOpen] = useState(false);
+  const genderRef = useRef(null);
+
+  // ── Field availability checks ─────────────────────────────────────────────
+  const [checks, setChecks] = useState({ email: null, username: null, phone: null });
+  const [checkLoading, setCheckLoading] = useState({ email: false, username: false, phone: false });
+
+  useEffect(() => {
+    const handler = (e) => { if (genderRef.current && !genderRef.current.contains(e.target)) setGenderOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const checkField = async (field, value) => {
+    if (!value.trim()) return;
+    setCheckLoading(p => ({ ...p, [field]: true }));
+    try {
+      await api.post(`/users/check/${field}`, { [field]: value.trim() });
+      setChecks(p => ({ ...p, [field]: true }));
+    } catch {
+      setChecks(p => ({ ...p, [field]: false }));
+    } finally {
+      setCheckLoading(p => ({ ...p, [field]: false }));
+    }
+  };
+
+  const FieldStatus = ({ field }) => {
+    if (checkLoading[field]) return <Loader2 size={16} className="animate-spin text-gray-400" />;
+    if (checks[field] === true) return <CheckCircle2 size={16} className="text-green-500" />;
+    if (checks[field] === false) return <XCircle size={16} className="text-red-500" />;
+    return null;
+  };
+
+  const fieldMsg = (field) => {
+    if (checks[field] === false) return { email: 'Email already registered.', username: 'Username already taken.', phone: 'Phone already registered.' }[field];
+    if (checks[field] === true) return { email: 'Email available.', username: 'Username available.', phone: 'Phone available.' }[field];
+    return null;
+  };
+
+  const inputCls = (field) =>
+    `w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-900 border rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600 dark:text-white ${
+      checks[field] === false ? 'border-red-400 dark:border-red-500' :
+      checks[field] === true  ? 'border-green-400 dark:border-green-500' :
+      'border-gray-200 dark:border-gray-800'
+    }`;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
+    if (['email', 'username', 'phone'].includes(name)) setChecks(p => ({ ...p, [name]: null }));
   };
 
   const handleSubmit = async (e) => {
@@ -182,16 +228,12 @@ const Signup = () => {
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500 group-focus-within:text-insta-pink transition-colors">
                   <Mail size={18} />
                 </div>
-                <input
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  placeholder="john@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600 dark:text-white"
-                  required
-                />
+                <input name="email" type="email" value={form.email} onChange={handleChange}
+                  onBlur={() => checkField('email', form.email)}
+                  placeholder="john@example.com" className={inputCls('email')} required />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><FieldStatus field="email" /></div>
               </div>
+              {fieldMsg('email') && <p className={`text-xs ml-1 ${checks.email === false ? 'text-red-500' : 'text-green-600'}`}>{fieldMsg('email')}</p>}
             </div>
 
             <div className="space-y-1">
@@ -200,30 +242,48 @@ const Signup = () => {
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500 group-focus-within:text-insta-pink transition-colors">
                   <Phone size={18} />
                 </div>
-                <input
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                  placeholder="+1 234 567 890"
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600 dark:text-white"
-                  required
-                />
+                <input name="phone" value={form.phone} onChange={handleChange}
+                  onBlur={() => checkField('phone', form.phone)}
+                  placeholder="+1 234 567 890" className={inputCls('phone')} required />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><FieldStatus field="phone" /></div>
               </div>
+              {fieldMsg('phone') && <p className={`text-xs ml-1 ${checks.phone === false ? 'text-red-500' : 'text-green-600'}`}>{fieldMsg('phone')}</p>}
             </div>
 
-            <div className="space-y-1">
+            {/* Custom Gender Dropdown */}
+            <div className="space-y-1" ref={genderRef}>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-1">Gender</label>
-              <select
-                name="gender"
-                value={form.gender}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all text-gray-900 dark:text-white"
-                required
-              >
-                <option value="" disabled>Select gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setGenderOpen(v => !v)}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border rounded-xl transition-all text-left ${genderOpen ? 'border-insta-pink ring-2 ring-insta-pink/20' : 'border-gray-200 dark:border-gray-800'}`}
+                >
+                  <span className={form.gender ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600'}>
+                    {form.gender ? form.gender.charAt(0).toUpperCase() + form.gender.slice(1) : 'Select gender'}
+                  </span>
+                  <ChevronDown size={18} className={`text-gray-400 transition-transform ${genderOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {genderOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-xl z-20 overflow-hidden">
+                    {[
+                      { value: 'male', label: 'Male' },
+                      { value: 'female', label: 'Female' },
+                      { value: 'other', label: 'Other' },
+                      { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => { setForm(f => ({ ...f, gender: opt.value })); setGenderOpen(false); }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${form.gender === opt.value ? 'text-insta-pink font-semibold bg-insta-pink/5' : 'text-gray-700 dark:text-gray-200'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -302,15 +362,12 @@ const Signup = () => {
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500 group-focus-within:text-insta-pink transition-colors">
                   <User size={18} />
                 </div>
-                <input
-                  name="username"
-                  value={form.username}
-                  onChange={handleChange}
-                  placeholder="johndoe"
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-insta-pink/20 focus:border-insta-pink transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600 dark:text-white"
-                  required
-                />
+                <input name="username" value={form.username} onChange={handleChange}
+                  onBlur={() => checkField('username', form.username)}
+                  placeholder="johndoe" className={inputCls('username')} required />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><FieldStatus field="username" /></div>
               </div>
+              {fieldMsg('username') && <p className={`text-xs ml-1 ${checks.username === false ? 'text-red-500' : 'text-green-600'}`}>{fieldMsg('username')}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

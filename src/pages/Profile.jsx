@@ -314,8 +314,17 @@ const InterestedSection = ({ isDesktop = false, interests = [], isOwnProfile = f
 
     if (interests.length === 0) {
         return (
-            <div className="w-full py-4 text-center">
+            <div className="w-full py-4 flex flex-col items-center gap-3">
                 <p className="text-sm text-gray-500 dark:text-gray-400 font-medium italic">No interests listed yet.</p>
+                {isOwnProfile && onAdd && (
+                    <button
+                        type="button"
+                        onClick={onAdd}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold transition-colors shadow-sm"
+                    >
+                        <Plus size={13} /> Add interests
+                    </button>
+                )}
             </div>
         );
     }

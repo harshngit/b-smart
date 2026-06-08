@@ -936,6 +936,7 @@ export default function ChatPage() {
   const [sharedReelMetaMap, setSharedReelMetaMap] = useState({});
   const [sharedDetailItem, setSharedDetailItem] = useState(null);
   const [showTopbarLeaveConfirm, setShowTopbarLeaveConfirm] = useState(false);
+  const [incomingRequestsCount, setIncomingRequestsCount] = useState(0);
 
   const closeActiveChat = useCallback(() => {
     dispatch(setActiveConversation(null));
@@ -965,6 +966,7 @@ export default function ChatPage() {
   const activeConversationIsGroupAdmin = String(activeConversation?.groupAdmin?._id || activeConversation?.groupAdmin || '') === String(currentUserId);
   const isRequestsView = conversationType === 'requests';
   const requestCount = conversations.length;
+  const totalUnreadMessages = Object.values(unreadCounts).reduce((sum, count) => sum + Number(count || 0), 0);
 
   useEffect(() => { activeConversationIdRef.current = activeId; }, [activeId]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -1117,6 +1119,8 @@ export default function ChatPage() {
           const normalList = Array.isArray(normalData) ? normalData : [];
           const requestsList = Array.isArray(requestsData) ? requestsData : [];
           const outgoingRequests = requestsList.filter((conversation) => isOutgoingPendingRequest(conversation, currentUserId));
+          const incoming = requestsList.filter((conversation) => isConversationRequestForMe(conversation, currentUserId));
+          setIncomingRequestsCount(incoming.length);
           ordered = sortConversations(mergeUniqueConversations(normalList, outgoingRequests));
         } else {
           const requestOnly = await chatService.getConversations(conversationType);
@@ -2389,8 +2393,8 @@ export default function ChatPage() {
           <div className={`${isRequestsView ? 'hidden' : 'flex items-center justify-between px-4 pb-2 pt-3 md:px-5 md:pb-3 md:pt-4'}`}>
             <div className="flex items-center gap-3">
               {[
-                { key: 'normal', label: 'Messages' },
-                { key: 'requests', label: 'Requests' },
+                { key: 'normal', label: 'Messages', count: totalUnreadMessages },
+                { key: 'requests', label: 'Requests', count: incomingRequestsCount },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -2401,13 +2405,18 @@ export default function ChatPage() {
                     dispatch(setMessages([]));
                     navigate('/messages');
                   }}
-                  className={`text-[15px] font-bold transition md:text-[15px] ${
+                  className={`flex items-center gap-1.5 text-[15px] font-bold transition md:text-[15px] ${
                     conversationType === tab.key
                       ? 'text-white md:text-gray-900 md:dark:text-white'
                       : 'text-white/55 hover:text-white md:text-gray-500 md:hover:text-gray-700 md:dark:text-gray-400 md:dark:hover:text-white'
                   }`}
                 >
                   {tab.label}
+                  {tab.count > 0 && (
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center leading-none">
+                      {tab.count > 99 ? '99+' : tab.count}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

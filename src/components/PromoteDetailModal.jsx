@@ -8,6 +8,10 @@ import {
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
+import {
+  checkFollowStatus, followUser, unfollowUser, cancelFollowRequest,
+  FOLLOW_STATUS_CHANGED_EVENT, normalizeFollowStateFromStatus,
+} from '../services/followService';
 import promoteReelService from '../services/promoteReelService';
 import Avatar from './Avatar';
 import ShareContentModal from './ShareContentModal';
@@ -120,29 +124,64 @@ const ProductCard = ({ product }) => {
 
 const FollowButton = ({ targetUserId }) => {
   const { userObject } = useSelector(s => s.auth);
-  const [following, setFollowing] = useState(false);
+  const [followState, setFollowState] = useState('not_following');
   const [loading, setLoading] = useState(false);
+
   useEffect(() => {
+    let isMounted = true;
     if (!userObject || !targetUserId) return;
-    api.get(`/follow/status/${targetUserId}`).then(({ data }) => {
-      setFollowing(data?.isFollowing || data?.status === 'following' || false);
-    }).catch(() => {});
+    if (String(userObject._id || userObject.id) === String(targetUserId)) return;
+    checkFollowStatus(targetUserId)
+      .then(status => { if (isMounted) setFollowState(normalizeFollowStateFromStatus(status)); })
+      .catch(() => {});
+    return () => { isMounted = false; };
   }, [targetUserId, userObject]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const d = e?.detail || {};
+      if (String(d.userId || '') !== String(targetUserId || '')) return;
+      if (['following', 'requested', 'not_following'].includes(d.state)) setFollowState(d.state);
+    };
+    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+  }, [targetUserId]);
+
   const handleClick = useCallback(async (e) => {
     e.stopPropagation();
     if (!userObject || loading) return;
-    const was = following;
-    setFollowing(!was); setLoading(true);
-    try { await api.post(was ? '/unfollow' : '/follow', { followedUserId: targetUserId }); }
-    catch { setFollowing(was); }
-    finally { setLoading(false); }
-  }, [userObject, loading, following, targetUserId]);
+    const prev = followState;
+    setLoading(true);
+    try {
+      if (followState === 'following') {
+        await unfollowUser(targetUserId);
+        setFollowState('not_following');
+      } else if (followState === 'requested') {
+        await cancelFollowRequest(targetUserId);
+        setFollowState('not_following');
+      } else {
+        const res = await followUser(targetUserId);
+        setFollowState(normalizeFollowStateFromStatus(res));
+      }
+    } catch {
+      setFollowState(prev);
+    } finally {
+      setLoading(false);
+    }
+  }, [userObject, loading, followState, targetUserId]);
+
   if (!targetUserId) return null;
+  const isFollowing = followState === 'following';
+  const isRequested = followState === 'requested';
   return (
     <button onClick={handleClick} disabled={loading}
-      className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border transition-all ${loading ? 'opacity-50' : ''} ${following ? 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400' : 'border-blue-500 text-blue-500 bg-blue-50 dark:bg-blue-500/10'}`}>
-      {loading ? <Loader2 size={10} className="animate-spin" /> : following ? <UserCheck size={10} /> : <UserPlus size={10} />}
-      <span>{following ? 'Following' : 'Follow'}</span>
+      className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border transition-all ${loading ? 'opacity-50' : ''} ${
+        isFollowing || isRequested
+          ? 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
+          : 'border-blue-500 text-blue-500 bg-blue-50 dark:bg-blue-500/10'
+      }`}>
+      {loading ? <Loader2 size={10} className="animate-spin" /> : (isFollowing || isRequested) ? <UserCheck size={10} /> : <UserPlus size={10} />}
+      <span>{isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}</span>
     </button>
   );
 };
@@ -463,19 +502,37 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
     if (!isExpanded && (!replies[commentId] || replies[commentId].length === 0)) loadReplies(commentId);
     setExpandedComments(prev => ({ ...prev, [commentId]: !prev[commentId] }));
   };
+  // Sync like state with feed (PostCard/PromoteCard)
+  useEffect(() => {
+    if (!id) return;
+    const handler = (e) => {
+      const d = e.detail;
+      if (String(d.postId) !== String(id)) return;
+      if (d.isLiked !== undefined) setIsLiked(d.isLiked);
+      if (d.likeCount !== undefined) setLikeCount(d.likeCount);
+    };
+    window.addEventListener('bsmart:post-state', handler);
+    return () => window.removeEventListener('bsmart:post-state', handler);
+  }, [id]);
+
   const handleLike = async () => {
     if (!userObject || !id || likeLoading) return;
     const wasLiked = isLiked;
-    setIsLiked(!wasLiked);
-    setLikeCount(c => wasLiked ? Math.max(0, c - 1) : c + 1);
+    const wasCount = likeCount;
+    const newLiked = !wasLiked;
+    const newCount = newLiked ? wasCount + 1 : Math.max(0, wasCount - 1);
+    setIsLiked(newLiked);
+    setLikeCount(newCount);
     setLikeLoading(true);
+    window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(id), isLiked: newLiked, likeCount: newCount } }));
     try {
       if (wasLiked) await promoteReelService.unlikePromoteReel(id);
       else await promoteReelService.likePromoteReel(id);
     } catch (err) {
       console.error('[PromoteDetailModal] like/unlike failed — id:', id, 'status:', err?.response?.status, err?.message);
       setIsLiked(wasLiked);
-      setLikeCount(c => wasLiked ? c + 1 : Math.max(0, c - 1));
+      setLikeCount(wasCount);
+      window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(id), isLiked: wasLiked, likeCount: wasCount } }));
     } finally {
       setLikeLoading(false);
     }
@@ -498,7 +555,7 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 md:p-10"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 md:p-10"
       onClick={onClose}
     >
       <button onClick={onClose} className="absolute top-4 right-4 text-white hover:opacity-75 z-[60]">
