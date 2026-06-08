@@ -6,7 +6,7 @@ import { useNotificationSocket } from '../hooks/useNotificationSocket';
 import bsmartLogo from '../assets/bsmart.png';
 
 const BSmartLogo = () => (
-  <img src={bsmartLogo} alt="b_smart" className="h-8 w-auto" />
+  <img src={bsmartLogo} alt="b_smart" className="h-[45px] w-auto" />
 );
 
 const TopBar = () => {

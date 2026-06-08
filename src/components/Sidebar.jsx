@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, ShoppingBag } from 'lucide-react';
@@ -531,7 +531,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
         onMouseLeave={() => setIsHovered(false)}
       >
         <div className="h-16 flex-shrink-0 flex items-center px-4">
-          {isHovered ? (
+          {isHovered && location.pathname !== '/' ? (
             <img src={bsmartLogo} alt="b_smart" className="h-[70px] w-auto" />
           ) : (
             <></>

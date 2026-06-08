@@ -190,10 +190,10 @@ const LocationSelector = ({ className = "" }) => (
 const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults }) => {
   const navigate = useNavigate();
   return (
-    <div className="hidden md:block fixed top-0 left-20 right-0 h-16 z-[55] bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800">
-      <div className="h-full xl:px-6">
-        <div className="max-w-[1200px] ml-auto h-full flex items-center justify-between">
-          <div className="flex items-center gap-8 flex-1">
+    <div className="hidden md:block fixed top-0 left-0 right-0 h-16 z-[55] bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800">
+      <div className="h-full pl-20 xl:pr-6">
+        <div className="max-w-[1280px] ml-auto h-full flex items-center justify-between px-4">
+          <div className="flex items-center gap-6 flex-1">
             <img src={bsmartLogo} alt="b_smart" className="h-[70px] w-auto flex-shrink-0" />
             
             {/* Search bar */}
@@ -258,8 +258,8 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults
             </div>
           </div>
 
-          {/* Right: Location Selector aligned with Sidebar */}
-          <div className="hidden xl:block w-[350px]">
+          {/* Right: Location Selector aligned with suggestions rail */}
+          <div className="hidden xl:block w-[300px] shrink-0">
             <LocationSelector />
           </div>
         </div>
@@ -270,7 +270,7 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults
 
 // ── Skeleton Loader ───────────────────────────────────────────────────────────
 const FeedSkeleton = () => (
-  <div className="max-w-[650px] ml-0">
+  <div className="lg:max-w-[650px] max-w-[430px] ml-0">
     {[1, 2, 3].map(i => (
       <div key={i} className="bg-white dark:bg-black mb-4 border-b border-gray-200 dark:border-gray-800 pb-4 md:rounded-lg md:border animate-pulse">
         <div className="flex items-center gap-2.5 p-3">
@@ -323,28 +323,26 @@ const MobileSuggestedUsersCard = ({ users }) => {
           return (
             <div key={userId || i}
               onClick={() => navigate(`/profile/${userId}`)}
-              className="relative flex-shrink-0 flex flex-col items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl p-4 w-[160px] gap-2 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#222] transition-colors">
+              className="relative flex-shrink-0 flex flex-col items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl p-3 w-[120px] gap-1.5 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#222] transition-colors">
               {/* Dismiss button */}
               <button
-                className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 z-10"
+                className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 z-10"
                 onClick={(e) => {
                   e.stopPropagation();
                   setDismissed(p => ({ ...p, [i]: true }));
                 }}
               >
-                <X size={11} />
+                <X size={9} />
               </button>
               {/* Avatar */}
-              <div
-                className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center ring-2 ring-offset-1 ring-pink-300/40"
-              >
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center ring-2 ring-offset-1 ring-pink-300/40">
                 {avatar
                   ? <img src={avatar} alt={username} className="w-full h-full object-cover" />
-                  : <span className="text-white font-bold text-lg">{username.slice(0,1).toUpperCase()}</span>
+                  : <span className="text-white font-bold text-sm">{username.slice(0,1).toUpperCase()}</span>
                 }
               </div>
-              <p className="text-xs font-bold text-gray-900 dark:text-white text-center truncate w-full">{username}</p>
-              <p className="text-[10px] text-gray-400 text-center truncate w-full">{reason}</p>
+              <p className="text-[11px] font-bold text-gray-900 dark:text-white text-center truncate w-full">{username}</p>
+              <p className="text-[9px] text-gray-400 text-center truncate w-full">{reason}</p>
               <div onClick={(e) => e.stopPropagation()}>
                 <DesktopFollowButton targetUserId={String(userId || '')} />
               </div>
@@ -381,7 +379,7 @@ const MobileSuggestedReelsCard = ({ reels }) => {
             <button
               key={reel._id || reel.id || i}
               onClick={() => navigate(`/reels?id=${reel._id || reel.id}`)}
-              className="group relative flex-shrink-0 w-[160px] overflow-hidden rounded-3xl border border-white/10 bg-black text-left shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+              className="group relative flex-shrink-0 w-[110px] overflow-hidden rounded-2xl border border-white/10 bg-black text-left shadow-[0_8px_20px_rgba(0,0,0,0.25)]"
               style={{ aspectRatio: '9/16' }}
             >
               {thumb ? (
@@ -396,16 +394,16 @@ const MobileSuggestedReelsCard = ({ reels }) => {
                 </div>
               </div>
 
-              <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black via-black/45 to-transparent">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black via-black/45 to-transparent">
+                <div className="flex items-center gap-1.5 mb-1">
                   {avatar ? (
-                    <img src={avatar} alt={username} className="w-7 h-7 rounded-full object-cover border border-white/20" />
+                    <img src={avatar} alt={username} className="w-5 h-5 rounded-full object-cover border border-white/20 shrink-0" />
                   ) : (
-                    <div className="w-7 h-7 rounded-full bg-white/15 border border-white/15" />
+                    <div className="w-5 h-5 rounded-full bg-white/15 border border-white/15 shrink-0" />
                   )}
-                  <span className="text-[11px] font-semibold text-white truncate">{username}</span>
+                  <span className="text-[9px] font-semibold text-white truncate">{username}</span>
                 </div>
-                <p className="text-[11px] leading-4 text-white/95 line-clamp-2">{caption}</p>
+                <p className="text-[9px] leading-3 text-white/90 line-clamp-2">{caption}</p>
               </div>
             </button>
           );
@@ -458,7 +456,7 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
   return (
     <>
       <aside className="hidden xl:flex xl:flex-col w-[350px] shrink-0 z-0">
-        <div className="h-full overflow-y-auto pb-20 scrollbar-hide">
+        <div className="h-full overflow-y-auto pt-6 pb-20 scrollbar-hide">
           <div className="mb-6">
             <div className="flex items-center gap-3 min-w-0">
               {/* Avatar — orange ring if current user has a story */}
@@ -703,7 +701,8 @@ const Home = () => {
   };
 
   return (
-    <div className="relative pt-[52px] md:pt-16">
+    <div className="relative md:pt-16 bg-white dark:bg-black overflow-x-hidden">
+
       <LocationBar
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
@@ -711,14 +710,11 @@ const Home = () => {
         searchResults={searchResults}
       />
 
-      {/* Search Results Dropdown */}
-      {/* Moved inside LocationBar search container to fix overlapping */}
-
-      <div className="w-full xl:px-6 md:h-[calc(100vh-4rem)] md:overflow-hidden">
-        <div className="max-w-[1200px] ml-auto xl:flex xl:items-stretch xl:justify-between xl:gap-8 md:h-full">
-          <div className="w-full max-w-[700px] md:overflow-y-auto scrollbar-hide">
+      <div className="w-full md:h-[calc(100vh-4rem)] md:overflow-hidden overflow-x-hidden">
+        <div className="w-full md:max-w-[1280px] md:ml-auto md:px-4 xl:pr-6 xl:flex xl:items-stretch xl:justify-between xl:gap-8 md:h-full">
+          <div className="w-full max-w-[700px] md:overflow-y-auto scrollbar-hide overflow-x-hidden">
             <StoryRail />
-            <div className="ml-0 mb-4 flex w-full max-w-[650px] items-center gap-2 px-2 pt-2">
+            <div className="flex items-center gap-2 px-3 pt-1 pb-2 overflow-x-auto scrollbar-none border-b border-gray-100 dark:border-gray-800">
               {[
                 { key: 'all', label: 'All' },
                 { key: 'following', label: 'Following' },
@@ -738,7 +734,7 @@ const Home = () => {
                 </button>
               ))}
             </div>
-            <div className="w-full max-w-[650px] ml-0 pb-4">
+            <div className="max-w-[430px] lg:max-w-[650px] pb-4">
             {loading ? (
               <FeedSkeleton />
             ) : feed.length === 0 ? (

@@ -464,53 +464,37 @@ const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile 
   </div>
 );
 
-// ─── Product Offer ─────────────────────────────────────────────────────────────
-const ProductOffer = ({ offer }) => {
-  if (!offer) return null;
-  const href = offer.link && !['daasda', '', '#'].includes(offer.link) ? offer.link : '#';
-  return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2 mt-2 hover:bg-white/20 transition-colors">
-      <ShoppingBag size={14} className="text-white shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-white text-xs font-semibold truncate">{offer.title}</p>
-        {offer.description && <p className="text-white/60 text-[10px] truncate">{offer.description}</p>}
-      </div>
-      {offer.price > 0 && (
-        <span className="text-amber-300 text-xs font-bold shrink-0">Rs.{offer.price.toLocaleString()}</span>
-      )}
-    </a>
-  );
-};
 
-// ─── Caption with "...more" expand ───────────────────────────────────────────
-const Caption = ({ text }) => {
-  const [expanded, setExpanded] = useState(false);
+// ─── Inline caption — 40-char preview, scrollable expanded state ─────────────
+const CaptionInline = ({ text, isExpanded, onExpand, onCollapse }) => {
   if (!text) return null;
-  const words = text.trim().split(/\s+/);
-  const isLong = words.length > 5;
-  const preview = isLong ? words.slice(0, 5).join(' ') : text;
-
+  const isLong = text.length > 40;
   return (
-    <p className="text-white text-sm leading-relaxed mb-2">
-      {expanded || !isLong ? (
-        <>
-          {text}
-          {expanded && isLong && (
-            <button onClick={() => setExpanded(false)} className="text-white/60 ml-1.5 hover:text-white transition-colors text-sm font-semibold">
-              less
+    <div className="min-w-0 flex-1">
+      {isExpanded ? (
+        <div className="max-h-24 overflow-y-auto scrollbar-none pr-1">
+          <span className="text-white/90 text-sm leading-relaxed break-words">{text}</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onCollapse(); }}
+            className="text-white/60 ml-1 hover:text-white transition-colors text-sm font-semibold"
+          >
+            less
+          </button>
+        </div>
+      ) : (
+        <span className="text-white/80 text-sm leading-snug">
+          {isLong ? text.slice(0, 40) : text}
+          {isLong && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onExpand(); }}
+              className="text-white/60 ml-0.5 hover:text-white transition-colors text-sm font-medium"
+            >
+              ...more
             </button>
           )}
-        </>
-      ) : (
-        <>
-          {preview}
-          <button onClick={() => setExpanded(true)} className="text-white/60 ml-1 hover:text-white transition-colors font-medium">
-            ... more
-          </button>
-        </>
+        </span>
       )}
-    </p>
+    </div>
   );
 };
 
@@ -660,7 +644,7 @@ const Ads = ({ feedMode = 'user' }) => {
   const [progress, setProgress] = useState(0);
   const [likedIds, setLikedIds] = useState(new Set());
   const [savedIds, setSavedIds] = useState(new Set());
-  const [coinToast, setCoinToast] = useState(null); // { amount, id }
+  const [viewRewardPopup, setViewRewardPopup] = useState(null); // { amount, id }
   const [likeRewardPopup, setLikeRewardPopup] = useState(null); // { amount, isLike } — shown on every like/dislike
   const [reportAd, setReportAd] = useState(null);
   const [editAd, setEditAd] = useState(null);
@@ -669,15 +653,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
   // Track which ad IDs the current user has already viewed this session.
   // Using a ref so it never triggers re-renders and persists across index changes.
-  const viewedIdsRef = useRef(null);
-  if (viewedIdsRef.current === null) {
-    try {
-      const stored = sessionStorage.getItem('ads_viewed_ids');
-      viewedIdsRef.current = stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      viewedIdsRef.current = new Set();
-    }
-  }
+  const viewedIdsRef = useRef(new Set());
 
   // Comments state
   const [activeCommentAdId, setActiveCommentAdId] = useState(null);
@@ -714,7 +690,8 @@ const Ads = ({ feedMode = 'user' }) => {
   const playCountRef = useRef(0);
   // Track manually paused video (user tapped to pause/resume)
   const [isPausedByUser, setIsPausedByUser] = useState(false);
-  const [showCtaButtons, setShowCtaButtons] = useState(false);  // shows after 50% progress
+  const [showCtaButtons, setShowCtaButtons] = useState(false);
+  const [captionExpandedAdId, setCaptionExpandedAdId] = useState(null);
 
   // Sync muted state directly to video DOM nodes — React's `muted` prop
   // does not reliably update the browser's .muted property after first render.
@@ -916,7 +893,6 @@ const Ads = ({ feedMode = 'user' }) => {
         setAds(enriched);
         setCurrentIndex(0);
         setProgress(0);
-        setShowCtaButtons(false);
         setLikedIds(new Set(enriched.filter(a => a.is_liked_by_me).map(a => a._id)));
         return;
       }
@@ -1019,58 +995,43 @@ const Ads = ({ feedMode = 'user' }) => {
     if (!adId) return;
     const key = String(adId);
     if (viewedIdsRef.current.has(key)) return;
-
     viewedIdsRef.current.add(key);
-    try {
-      sessionStorage.setItem('ads_viewed_ids', JSON.stringify([...viewedIdsRef.current]));
-    } catch { /* sessionStorage unavailable — in-memory ref still guards */ }
 
     try {
-      // Fix: send user.id as string — backend expects { "user": { "id": "..." } }
-      const body = { user: { id: currentUserId ? String(currentUserId) : undefined } };
       const res = await fetch(`${BASE_URL}/api/ads/${adId}/view`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify(body),
+        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : undefined } }),
       });
-      // Accept 200/201 as success; treat 4xx/5xx as failure but don't crash
+
       let resData = {};
       try { resData = await res.json(); } catch { /* non-JSON body */ }
 
       if (!res.ok) {
         viewedIdsRef.current.delete(key);
-        console.warn(`View API returned ${res.status}:`, resData);
-        refreshWallet();
-        setTimeout(refreshWallet, 1500);
+        console.warn(`[view] API ${res.status}:`, resData);
         return;
       }
 
-      const coinsRewarded =
-        resData?.coins_rewarded ??
-        resData?.coins ??
-        resData?.reward ??
-        resData?.data?.coins_rewarded;
+      console.log('[view] response:', resData);
 
-      // Always refresh wallet after view to reflect any coin credit
+      // API schema: { message, view_count, rewarded, reward }
+      const rewardAmount = Number(resData?.reward ?? resData?.coins_rewarded ?? resData?.coins ?? 0);
+
       refreshWallet();
-      setTimeout(refreshWallet, 1000);
-      setTimeout(refreshWallet, 3000);
+      setTimeout(refreshWallet, 1500);
 
-      // Show only the top coin toast when rewarded is explicitly true.
-      const isRewarded = resData?.rewarded === true;
-      if (isRewarded) {
-        const rewardAmount = (coinsRewarded && Number(coinsRewarded) > 0)
-          ? Number(coinsRewarded)
-          : (() => {
-              const adCoins = adsRef.current.find(a => String(a._id) === String(adId))?.coins_reward;
-              return adCoins && Number(adCoins) > 0 ? Number(adCoins) : 10;
-            })();
+      if (resData?.rewarded === true) {
+        const amount = rewardAmount > 0
+          ? rewardAmount
+          : Number(adsRef.current.find(a => String(a._id) === String(adId))?.coins_reward ?? 10);
         const toastId = Date.now();
-        setCoinToast({ amount: rewardAmount, id: toastId });
-        setTimeout(() => setCoinToast(t => t?.id === toastId ? null : t), 3000);
+        setViewRewardPopup({ amount, id: toastId });
+        setTimeout(() => setViewRewardPopup(t => t?.id === toastId ? null : t), 3500);
       }
     } catch (err) {
-      console.error('View tracking failed:', err);
+      console.error('[view] tracking failed:', err);
+      viewedIdsRef.current.delete(key);
     }
   }, [currentUserId, refreshWallet]);
 
@@ -1160,18 +1121,17 @@ const Ads = ({ feedMode = 'user' }) => {
     return () => cancelAnimationFrame(rafId);
   }, [currentIndex, ads, isPausedByUser]);
 
-  // ── 3-second timer to show CTA buttons ──────────────────────────────────────
+  // ── 3-second timer to reveal Row 3 buttons ───────────────────────────────────
   const ctaTimerRef = useRef(null);
   useEffect(() => {
     clearTimeout(ctaTimerRef.current);
     setShowCtaButtons(false);
-    ctaTimerRef.current = setTimeout(() => {
-      setShowCtaButtons(true);
-    }, 3000);
+    setCaptionExpandedAdId(null);
+    ctaTimerRef.current = setTimeout(() => setShowCtaButtons(true), 3000);
     return () => clearTimeout(ctaTimerRef.current);
   }, [currentIndex]);
 
-  // ── Navigation ───────────────────────────────────────────────────────────────
+// ── Navigation ───────────────────────────────────────────────────────────────
   const goToIndex = useCallback((index) => {
     if (isAnimatingRef.current) return;
     const next = Math.min(ads.length - 1, Math.max(0, index));
@@ -1183,28 +1143,6 @@ const Ads = ({ feedMode = 'user' }) => {
     setCurrentIndex(next);
     setTimeout(() => { isAnimatingRef.current = false; }, 500);
   }, [currentIndex, ads.length]);
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'ArrowDown') goToIndex(currentIndex + 1);
-      else if (e.key === 'ArrowUp') goToIndex(currentIndex - 1);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [goToIndex, currentIndex]);
-
-  const handleWheel = useCallback((e) => {
-    if (Math.abs(e.deltaY) < 30) return;
-    e.deltaY > 0 ? goToIndex(currentIndex + 1) : goToIndex(currentIndex - 1);
-  }, [goToIndex, currentIndex]);
-
-  const handleTouchStart = (e) => setTouchStartY(e.touches[0].clientY);
-  const handleTouchEnd = (e) => {
-    if (touchStartY === null) return;
-    const diff = touchStartY - e.changedTouches[0].clientY;
-    if (Math.abs(diff) > 50) diff > 0 ? goToIndex(currentIndex + 1) : goToIndex(currentIndex - 1);
-    setTouchStartY(null);
-  };
 
   // ── Tap to pause / resume video ──────────────────────────────────────────────
   const handleVideoTap = useCallback((index) => {
@@ -1218,6 +1156,33 @@ const Ads = ({ feedMode = 'user' }) => {
       setIsPausedByUser(true);
     }
   }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowDown') goToIndex(currentIndex + 1);
+      else if (e.key === 'ArrowUp') goToIndex(currentIndex - 1);
+      else if (e.key === ' ') {
+        e.preventDefault();
+        const ad = adsRef.current[currentIndex];
+        if (ad?.media?.[0]?.media_type === 'video') handleVideoTap(currentIndex);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goToIndex, currentIndex, handleVideoTap]);
+
+  const handleWheel = useCallback((e) => {
+    if (Math.abs(e.deltaY) < 30) return;
+    e.deltaY > 0 ? goToIndex(currentIndex + 1) : goToIndex(currentIndex - 1);
+  }, [goToIndex, currentIndex]);
+
+  const handleTouchStart = (e) => setTouchStartY(e.touches[0].clientY);
+  const handleTouchEnd = (e) => {
+    if (touchStartY === null) return;
+    const diff = touchStartY - e.changedTouches[0].clientY;
+    if (Math.abs(diff) > 50) diff > 0 ? goToIndex(currentIndex + 1) : goToIndex(currentIndex - 1);
+    setTouchStartY(null);
+  };
   const toggleLike = useCallback(async (adId) => {
     const isLiked = likedIds.has(adId);
 
@@ -1845,7 +1810,7 @@ const Ads = ({ feedMode = 'user' }) => {
 
                       {/* Media */}
                       {isVideo || a.media?.[0]?.processing ? (
-                        <div className="w-full h-full relative" onClick={() => isCurrent && handleVideoTap(index)}>
+                        <div className="w-full h-full relative">
                           <AdVideo
                             src={src}
                             isHls={a.media?.[0]?.hls ?? false}
@@ -1911,29 +1876,6 @@ const Ads = ({ feedMode = 'user' }) => {
                       {/* Gradient */}
                       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/80 pointer-events-none" />
 
-                      {/* Mute btn — video only */}
-                      {isVideo && isCurrent && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const newMuted = !isMuted;
-                            setIsMuted(newMuted);
-                            // Must set .muted synchronously inside the click handler
-                            // (user-gesture context) so the browser allows audio playback.
-                            const vid = videoRefs.current[currentIndex];
-                            if (vid) {
-                              vid.muted = newMuted;
-                              if (!newMuted && vid.paused) {
-                                vid.play().catch(() => {});
-                              }
-                            }
-                          }}
-                          onTouchEnd={e => e.stopPropagation()}
-                          className="absolute bottom-[24px] md:bottom-10 right-[55px] md:right-4 bg-black/50 p-2.5 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-50">
-                          {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                        </button>
-                      )}
-
                       {/* Coins badge */}
                       {a.coins_reward > 0 && (
                         <div className="absolute top-10 left-3 z-20 flex items-center gap-1 bg-amber-500/80 backdrop-blur-sm rounded-full px-2 py-1">
@@ -1942,73 +1884,108 @@ const Ads = ({ feedMode = 'user' }) => {
                         </div>
                       )}
 
-                      {/* Bottom info — flex column, Vendor info + Caption above, CTA buttons below */}
-                      <div className="absolute bottom-0 left-0 w-full z-20 flex flex-col justify-end" style={{ paddingRight: '60px' }}>
+                      {/* Mute button — always visible, separate from info rows */}
+                      {isCurrent && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const newMuted = !isMuted;
+                            setIsMuted(newMuted);
+                            const vid = videoRefs.current[currentIndex];
+                            if (vid) {
+                              vid.muted = newMuted;
+                              if (!newMuted && vid.paused) vid.play().catch(() => {});
+                            }
+                          }}
+                          onTouchEnd={e => e.stopPropagation()}
+                          className="absolute bottom-6 right-[72px] z-30 bg-black/50 p-2 rounded-full text-white backdrop-blur-sm hover:bg-black/70 active:scale-90 transition-transform"
+                        >
+                          {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                        </button>
+                      )}
 
-                        {/* Vendor + caption + tags */}
-                        <div className="px-4 pt-4 pb-2">
-                          {/* Vendor row */}
-                          <div className="flex items-center gap-2 mb-2 flex-nowrap min-w-0">
-                            <button
-                              onClick={() => { trackAdClick(a._id); const uid = a.user_id?._id || a.user_id?.id || a.vendor_id?._id; if (uid) navigate(`/vendor/${uid}/public`); }}
-                              className="flex items-center gap-2 active:opacity-70 transition-opacity min-w-0 flex-1"
-                            >
-                              {a.user_id?.avatar_url
-                                ? <img src={a.user_id.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover shrink-0" alt="user" />
-                                : <div className="w-8 h-8 rounded-full border border-white/30 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shrink-0">{(a.vendor_id?.business_name || 'A')[0]}</div>
-                              }
-                              <span className="font-bold text-white text-sm hover:underline decoration-white/60 underline-offset-2 truncate">
-                                {a.vendor_id?.business_name || a.user_id?.username}
-                              </span>
-                            </button>
-                            {a.total_budget_coins > 0 && (
-                              <div className="shrink-0 flex items-center gap-1 bg-amber-500/20 border border-amber-400/40 rounded-full px-1.5 py-0.5">
-                                <CoinIcon size={11} /><span className="text-amber-300 text-[10px] font-bold">{fmt(a.total_budget_coins)}</span>
-                              </div>
-                            )}
-                            <FollowButton userId={a.user_id?._id} mobile />
-                          </div>
+                      {/* Bottom info — 3 rows */}
+                      <div className={`absolute bottom-0 left-0 w-full z-20 px-4 pt-3 pb-6 flex flex-col gap-2 transition-all duration-300 ${captionExpandedAdId === a._id ? 'bg-gradient-to-t from-black/95 via-black/80 to-transparent' : ''}`} style={{ paddingRight: '68px' }}>
 
-                          {a.category && (
-                            <span className="text-white/70 text-[10px] bg-white/10 px-2 py-0.5 rounded-full inline-block mb-1">{a.category}</span>
+                        {/* Row 1: Company Logo | Company Name (truncated) | Coins Reward | Follow Button */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <button
+                            onClick={() => { trackAdClick(a._id); const uid = a.user_id?._id || a.user_id?.id || a.vendor_id?._id; if (uid) navigate(`/vendor/${uid}/public`); }}
+                            className="flex items-center gap-2 active:opacity-70 transition-opacity min-w-0 flex-1"
+                          >
+                            {a.user_id?.avatar_url
+                              ? <img src={a.user_id.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover shrink-0" alt="user" />
+                              : <div className="w-8 h-8 rounded-full border border-white/30 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shrink-0">{(a.vendor_id?.business_name || 'A')[0]}</div>
+                            }
+                            <span className="font-bold text-white text-sm truncate">
+                              {a.vendor_id?.business_name || a.user_id?.username}
+                            </span>
+                          </button>
+                          {a.total_budget_coins > 0 && (
+                            <div className="shrink-0 flex items-center gap-1 bg-amber-500/20 border border-amber-400/40 rounded-full px-1.5 py-0.5">
+                              <CoinIcon size={11} /><span className="text-amber-300 text-[10px] font-bold">{fmt(a.total_budget_coins)}</span>
+                            </div>
                           )}
-
-                          <Caption text={a.caption} />
-
-                          <div className="flex items-center gap-2 flex-wrap mb-2">
-                            {a.hashtags?.slice(0, 3).map(h => <span key={h} className="text-white/50 text-[10px]">#{h}</span>)}
-                          </div>
-
-                          {a.product_offer?.length > 0 && <ProductOffer offer={a.product_offer[0]} />}
+                          <FollowButton userId={a.user_id?._id} mobile />
                         </div>
 
-                        {/* CTA Buttons — slide up from bottom, below caption */}
+                        {/* Row 2: Ad Category • Ad Description (truncated) */}
+                        {(a.category || a.caption) && (
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {a.category && (
+                              <span className="text-white/90 text-sm font-semibold shrink-0 bg-white/10 backdrop-blur-sm rounded-full px-2 py-0.5">{a.category}</span>
+                            )}
+                            {a.category && a.caption && (
+                              <span className="text-white text-base font-bold shrink-0">•</span>
+                            )}
+                            {a.caption && (
+                              <CaptionInline
+                                text={a.caption}
+                                isExpanded={captionExpandedAdId === a._id}
+                                onExpand={() => setCaptionExpandedAdId(a._id)}
+                                onCollapse={() => setCaptionExpandedAdId(null)}
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Row 3: Links only — slide in after 3s, zero height when hidden */}
                         <div
                           className="overflow-hidden transition-all duration-500 ease-out"
-                          style={{ maxHeight: isCurrent && showCtaButtons ? '100px' : '0px', opacity: isCurrent && showCtaButtons ? 1 : 0 }}
+                          style={{ maxHeight: isCurrent && showCtaButtons ? '48px' : '0px', opacity: isCurrent && showCtaButtons ? 1 : 0 }}
                         >
-                          <div className="flex gap-2 px-4 pb-6 pt-2">
-                            {/* View Ad Details */}
+                          <div className="flex items-center gap-2">
                             <button
                               onClick={() => { trackAdClick(a._id); navigate(`/ads/${a._id}/details`); }}
-                              className="flex-1 flex items-center justify-center py-2.5 px-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/25 text-white text-xs font-bold hover:bg-black/60 active:scale-95 transition-all shadow-lg"
+                              className="shrink-0 flex items-center justify-center py-1.5 px-3 rounded-xl bg-black/40 backdrop-blur-md border border-white/25 text-white text-xs font-bold hover:bg-black/60 active:scale-95 transition-all"
                             >
-                              Visit Ad Details
+                              Visit Details
                             </button>
-                            {/* CTA based on type */}
                             {a.cta?.type && (() => {
                               const cta = a.cta;
                               const label = cta.type === 'view_site' ? 'Visit Website' : cta.type === 'call_now' ? 'Call Now' : cta.type === 'install_app' ? 'Install App' : cta.type === 'book_now' ? 'Book Now' : cta.type === 'contact_info' ? 'Contact Us' : 'Learn More';
                               const icon = cta.type === 'call_now'
-                                ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
+                                ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                : <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
                               const href = cta.type === 'call_now' && cta.phone_number ? `tel:${cta.phone_number}` : cta.url?.trim() || cta.deep_link?.trim() || null;
                               if (!href) return null;
                               return (
                                 <a href={href} target={cta.type !== 'call_now' ? '_blank' : '_self'} rel="noopener noreferrer"
                                   onClick={() => trackAdClick(a._id)}
-                                  className="flex-1 flex items-center justify-center py-2.5 px-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-600 text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-lg">
-                                  {label}
+                                  className="shrink-0 flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all">
+                                  {icon}{label}
+                                </a>
+                              );
+                            })()}
+                            {a.product_offer?.length > 0 && (() => {
+                              const offer = a.product_offer[0];
+                              const href = offer.link && !['daasda', '', '#'].includes(offer.link) ? offer.link : null;
+                              if (!href) return null;
+                              return (
+                                <a href={href} target="_blank" rel="noopener noreferrer"
+                                  className="shrink-0 flex items-center gap-1 py-1.5 px-3 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-semibold hover:bg-white/20 transition-colors">
+                                  <ShoppingBag size={11} className="shrink-0" />
+                                  <span className="truncate max-w-[80px]">{offer.title}</span>
                                 </a>
                               );
                             })()}
@@ -2190,18 +2167,27 @@ const Ads = ({ feedMode = 'user' }) => {
         </div>
       )}
 
-      {/* Coin Reward Toast */}
-      {coinToast && (
-        <div
-          key={coinToast.id}
-          className="fixed top-20 left-1/2 z-[100] -translate-x-1/2 flex items-center gap-2 bg-amber-500 text-white px-4 py-2.5 rounded-full shadow-2xl font-bold text-sm animate-bounce"
-          style={{ animation: 'coinToastIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards' }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" fill="#FCD34D" stroke="#D97706" strokeWidth="1.5"/>
-            <text x="12" y="16.5" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#7C2D12">B</text>
-          </svg>
-          +{coinToast.amount} Coins Earned!
+      {/* View Reward Popup */}
+      {viewRewardPopup && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[200] pointer-events-none">
+          <div
+            key={viewRewardPopup.id}
+            className="min-w-[220px] max-w-[280px] rounded-2xl border border-amber-300/50 px-4 py-3 shadow-2xl backdrop-blur-md text-white bg-gradient-to-r from-amber-500 to-yellow-500"
+            style={{ animation: 'popupIn 0.28s cubic-bezier(0.22,1,0.36,1) forwards' }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 h-8 w-8 shrink-0 rounded-full bg-white/20 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" fill="#FCD34D" stroke="white" strokeWidth="1.5"/>
+                  <text x="12" y="16.5" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#7C2D12">B</text>
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-black leading-tight">+{viewRewardPopup.amount} Coins</p>
+                <p className="mt-0.5 text-xs font-semibold text-white/90 leading-tight">Coins for watching</p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

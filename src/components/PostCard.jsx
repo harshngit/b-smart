@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal,
   ChevronLeft, ChevronRight, X,
@@ -438,15 +438,15 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
           {/* Thumbnail shown until video is ready */}
           {thumbnailUrl && (
             <img src={thumbnailUrl} alt="thumbnail"
-              className="w-full h-auto max-h-[600px] object-contain"
-              style={{ display: showThumb ? 'block' : 'none', minHeight: 300 }} />
+              className="w-full object-contain"
+              style={{ display: showThumb ? 'block' : 'none', maxHeight: 'min(560px, 100vw)' }} />
           )}
           <video
             ref={videoRef}
             key={`${mediaSrc}-${currentIndex}`}
             src={mediaSrc}
-            className="w-full h-auto max-h-[600px] object-contain"
-            style={{ display: videoReady ? 'block' : 'none' }}
+            className="w-full object-contain"
+            style={{ display: videoReady ? 'block' : 'none', maxHeight: 'min(560px, 100vw)' }}
             muted={isMuted}
             playsInline
             loop={false}
@@ -501,8 +501,8 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
           <img
             src={mediaSrc || currentItem.image}
             alt="Post"
-            className="w-full h-auto max-h-[600px] object-contain"
-            style={currentItem.image_editing?.filter?.css ? { filter: currentItem.image_editing.filter.css } : {}}
+            className="w-full object-contain"
+            style={{ maxHeight: 'min(560px, 100vw)', ...(currentItem.image_editing?.filter?.css ? { filter: currentItem.image_editing.filter.css } : {}) }}
           />
           <PeopleTagsOverlay tags={peopleTags} />
         </div>

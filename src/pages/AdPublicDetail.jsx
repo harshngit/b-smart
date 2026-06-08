@@ -3,10 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import api from '../lib/api';
 import {
-  ArrowLeft, Heart, MessageCircle, Share2, Bookmark,
+  ArrowLeft, Heart, MessageCircle,
   Globe, Phone, Mail, MessageSquare, ExternalLink,
   MapPin, Tag, Play, Volume2, VolumeX, BadgeCheck,
-  ShoppingBag, Eye, ChevronRight, ChevronLeft, X, Film, MoreHorizontal,
+  ShoppingBag, Eye, ChevronRight, ChevronLeft, X, Film,
 } from 'lucide-react';
 
 const BASE_URL = 'https://api.bebsmart.in';
@@ -27,17 +27,6 @@ const toAbsoluteUploadUrl = (value) => {
   const normalized = String(value).replace(/^\/+/, '');
   if (normalized.startsWith('uploads/')) return `${BASE_URL}/${normalized}`;
   return `${BASE_URL}/uploads/${normalized}`;
-};
-
-const getPreviewMedia = (item) => {
-  const media = item?.media?.[0];
-  const isVideo = media?.media_type === 'video' || media?.type === 'video' || item?.type === 'reel';
-  const thumb = isVideo
-    ? toAbsoluteUploadUrl(media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url)
-    : toAbsoluteUploadUrl(media?.fileUrl || media?.fileName);
-  const src = toAbsoluteUploadUrl(media?.fileUrl || media?.fileName);
-
-  return { media, isVideo, thumb, src };
 };
 
 // ─── Gallery helpers ──────────────────────────────────────────────────────────
@@ -173,10 +162,7 @@ const AdGallerySection = ({ items }) => {
     <>
       <div className="mt-8">
         {/* Header — mirrors the "More from Expert Shoes / See all" reference */}
-        <div className="flex items-center gap-2 mb-3">
-          <Film size={15} className="text-pink-500" />
-          <p className="text-sm font-bold text-gray-900 dark:text-white">Gallery</p>
-        </div>
+        
 
         {/* Grid — portrait cards matching the reference screenshot */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
@@ -445,166 +431,44 @@ const MiniAdCard = ({ ad, onClick }) => {
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-const MobileSuggestedAdsSection = ({ ads, loading, onOpenAd }) => {
-  if (!loading && ads.length === 0) return null;
-
+// ─── Comment Avatar ──────────────────────────────────────────────────────────
+const CommentAvatar = ({ name = '', url = '' }) => {
+  if (url) return <img src={toAbsoluteUploadUrl(url)} alt={name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />;
+  const initials = (name.trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('') || 'U').toUpperCase();
+  const hue = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   return (
-    <div className="md:hidden mt-8 -mx-4 px-4 py-5 border-y border-gray-100 dark:border-gray-800 bg-white/50 dark:bg-white/[0.02]">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <p className="text-lg font-bold text-gray-900 dark:text-white">Suggested ads</p>
-          <p className="text-xs text-gray-400">More ads you may want to explore</p>
-        </div>
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Mobile</span>
-      </div>
-
-      {loading ? (
-        <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {[...Array(3)].map((_, idx) => (
-            <div key={idx} className="w-[42vw] max-w-[190px] min-w-[150px] rounded-[28px] bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ aspectRatio: '9/16' }} />
-          ))}
-        </div>
-      ) : (
-        <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {ads.map((item) => {
-            const media = item.media?.[0];
-            const thumb = media?.media_type === 'video'
-              ? toAbsoluteUploadUrl(media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url)
-              : toAbsoluteUploadUrl(media?.fileUrl || media?.fileName);
-
-            return (
-              <button
-                key={item._id}
-                onClick={() => onOpenAd(item._id)}
-                className="group snap-start w-[42vw] max-w-[190px] min-w-[150px] text-left"
-              >
-                <div className="relative overflow-hidden rounded-[28px] bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm" style={{ aspectRatio: '9/16' }}>
-                  {thumb ? (
-                    <img src={thumb} alt={item.ad_title || item.caption || 'Suggested ad'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-orange-100 to-pink-100 dark:from-orange-900/30 dark:to-pink-900/30 flex items-center justify-center">
-                      <ShoppingBag size={22} className="text-orange-300" />
-                    </div>
-                  )}
-
-                  {media?.media_type === 'video' && (
-                    <div className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
-                      <Play size={10} className="text-white fill-white ml-0.5" />
-                    </div>
-                  )}
-
-                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/45 to-transparent">
-                    <p className="text-[11px] font-bold text-white line-clamp-2">{item.ad_title || item.caption || 'Suggested ad'}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const MobileSuggestedReelsSection = ({ reels, loading, onOpenReel }) => {
-  if (!loading && reels.length === 0) return null;
-
-  return (
-    <div className="md:hidden mt-8 -mx-4 px-4 py-5 border-y border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0d0d0f]">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-lg font-bold text-gray-900 dark:text-white">Suggested reels</p>
-        <button type="button" className="p-1.5 rounded-full text-gray-400 dark:text-white/80">
-          <MoreHorizontal size={18} />
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {[...Array(3)].map((_, idx) => (
-            <div key={idx} className="w-[42vw] max-w-[190px] min-w-[150px] rounded-[24px] bg-gray-200 dark:bg-white/5 animate-pulse" style={{ aspectRatio: '9/16' }} />
-          ))}
-        </div>
-      ) : (
-        <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {reels.map((reel) => {
-            const { isVideo, thumb, src } = getPreviewMedia(reel);
-            const title = reel.caption || reel.title || reel.user_id?.username || 'Suggested reel';
-
-            return (
-              <button
-                key={reel._id}
-                onClick={() => onOpenReel(reel._id)}
-                className="group snap-start w-[42vw] max-w-[190px] min-w-[150px] text-left"
-              >
-                <div className="relative overflow-hidden rounded-[24px] bg-black border border-white/10 shadow-[0_12px_30px_rgba(0,0,0,0.35)]" style={{ aspectRatio: '9/16' }}>
-                  {isVideo && src ? (
-                    <>
-                      {thumb && <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:opacity-0 transition-opacity duration-300" />}
-                      <video
-                        src={src}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
-                        className="w-full h-full object-cover"
-                      />
-                    </>
-                  ) : thumb ? (
-                    <img src={thumb} alt={title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-950" />
-                  )}
-
-                  <div className="absolute inset-x-0 top-0 p-2.5 flex items-center justify-end">
-                    <div className="w-7 h-7 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center text-white">
-                      <MoreHorizontal size={14} />
-                    </div>
-                  </div>
-
-                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black via-black/45 to-transparent">
-                    <div className="flex items-center gap-2 mb-2">
-                      {reel.user_id?.avatar_url ? (
-                        <img src={toAbsoluteUploadUrl(reel.user_id.avatar_url)} alt={reel.user_id?.username || 'User'} className="w-7 h-7 rounded-full object-cover border border-white/20" />
-                      ) : (
-                        <div className="w-7 h-7 rounded-full bg-white/15 border border-white/15" />
-                      )}
-                      <span className="text-[11px] font-semibold text-white truncate">
-                        {reel.user_id?.username || reel.user_id?.full_name || 'reel'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] leading-4 text-white/95 line-clamp-2">{title}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
+    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+      style={{ background: `hsl(${hue},60%,50%)` }}>
+      {initials}
     </div>
   );
 };
 
 export default function AdPublicDetail() {
-  const { adId }   = useParams();
-  const navigate   = useNavigate();
+  const { adId }       = useParams();
+  const navigate       = useNavigate();
   const { userObject } = useSelector(s => s.auth);
 
   const [ad, setAd]           = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [isMuted, setIsMuted] = useState(true);
+  const [imgError, setImgError] = useState(false);
 
   const [liked, setLiked]             = useState(false);
   const [likesCount, setLikesCount]   = useState(0);
   const [likeLoading, setLikeLoading] = useState(false);
 
+  const [comments, setComments]           = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsPage, setCommentsPage]   = useState(1);
+  const [commentsTotal, setCommentsTotal] = useState(0);
+  const COMMENTS_PER_PAGE = 5;
+
   const [vendorAds, setVendorAds]               = useState([]);
   const [vendorAdsLoading, setVendorAdsLoading] = useState(false);
-  const [suggestedReels, setSuggestedReels] = useState([]);
-  const [suggestedReelsLoading, setSuggestedReelsLoading] = useState(false);
 
+  // Fetch ad
   useEffect(() => {
     if (!adId) return;
     setLoading(true);
@@ -619,6 +483,22 @@ export default function AdPublicDetail() {
       .finally(() => setLoading(false));
   }, [adId]);
 
+  // Fetch comments
+  useEffect(() => {
+    if (!adId) return;
+    setCommentsLoading(true);
+    api.get(`/ads/${adId}/comments`, { params: { page: commentsPage, limit: COMMENTS_PER_PAGE } })
+      .then(res => {
+        const data  = Array.isArray(res.data) ? res.data : res.data?.comments || res.data?.data || [];
+        const total = res.data?.total || res.data?.totalCount || data.length;
+        setComments(data);
+        setCommentsTotal(total);
+      })
+      .catch(() => setComments([]))
+      .finally(() => setCommentsLoading(false));
+  }, [adId, commentsPage]);
+
+  // Fetch vendor ads
   useEffect(() => {
     if (!ad) return;
     const uid = ad.user_id?._id || ad.vendor_id?._id;
@@ -627,26 +507,11 @@ export default function AdPublicDetail() {
     api.get(`/ads/user/${uid}`)
       .then(res => {
         const list = Array.isArray(res.data) ? res.data : res.data?.ads || res.data?.data || [];
-        setVendorAds(list.filter(a => a._id !== adId).slice(0, 6));
+        setVendorAds(list.filter(a => a._id !== adId).slice(0, 8));
       })
       .catch(() => {})
       .finally(() => setVendorAdsLoading(false));
   }, [ad, adId]);
-
-  useEffect(() => {
-    setSuggestedReelsLoading(true);
-    api.get('/suggestions/reels', { params: { limit: 10 } })
-      .then((res) => {
-        const list = Array.isArray(res.data)
-          ? res.data
-          : Array.isArray(res.data?.data) ? res.data.data
-          : Array.isArray(res.data?.reels) ? res.data.reels
-          : [];
-        setSuggestedReels(list.filter((item) => item?._id && item._id !== adId).slice(0, 10));
-      })
-      .catch(() => setSuggestedReels([]))
-      .finally(() => setSuggestedReelsLoading(false));
-  }, [adId]);
 
   const toggleLike = async () => {
     if (!userObject || likeLoading) return;
@@ -663,13 +528,13 @@ export default function AdPublicDetail() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+    <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
       <div className="w-10 h-10 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
   if (error || !ad) return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black flex flex-col items-center justify-center gap-4 p-6">
+    <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center gap-4 p-6">
       <p className="text-gray-500 dark:text-gray-400">{error || 'Ad not found.'}</p>
       <button onClick={() => navigate(-1)} className="text-pink-600 font-bold text-sm hover:underline">← Go Back</button>
     </div>
@@ -684,155 +549,248 @@ export default function AdPublicDetail() {
   const vendorAvatar = ad.user_id?.avatar_url || '';
   const vendorId     = ad.user_id?._id || ad.vendor_id?._id;
   const isVerified   = ad.vendor_id?.validated === true;
+  const totalPages   = Math.max(1, Math.ceil(commentsTotal / COMMENTS_PER_PAGE));
 
-  // Gallery items — API uses 'gallery' field (fallback: 'detail')
   const galleryItems = Array.isArray(ad.gallery) && ad.gallery.length > 0
     ? ad.gallery
-    : Array.isArray(ad.detail) && ad.detail.length > 0
-      ? ad.detail
-      : [];
+    : Array.isArray(ad.detail) && ad.detail.length > 0 ? ad.detail : [];
 
   const highlights = [
-    ad.category      && { label: 'Category', value: ad.category,                icon: <Tag size={13} className="text-violet-500" />,     bg: 'bg-violet-50 dark:bg-violet-950/30 border-violet-100 dark:border-violet-900/20' },
-    ad.location      && { label: 'Location', value: ad.location,                icon: <MapPin size={13} className="text-rose-500" />,     bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/20' },
-    ad.ad_type       && { label: 'Type',     value: ad.ad_type.replace('_',' '),icon: <Play size={13} className="text-amber-500" />,      bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/20' },
-    ad.target_language?.length > 0 && { label: 'Language', value: ad.target_language.slice(0,2).join(', '), icon: <Globe size={13} className="text-blue-500" />, bg: 'bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/20' },
-    ad.status        && { label: 'Status',   value: ad.status,                  icon: <BadgeCheck size={13} className="text-emerald-500" />, bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/20' },
+    ad.category  && { label: 'Category', value: ad.category,                      icon: <Tag size={13} className="text-violet-500" />,     bg: 'bg-violet-50 dark:bg-violet-950/30 border-violet-100 dark:border-violet-900/20' },
+    ad.location  && { label: 'Location', value: ad.location,                      icon: <MapPin size={13} className="text-rose-500" />,     bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/20' },
+    ad.ad_type   && { label: 'Type',     value: ad.ad_type.replace('_', ' '),     icon: <Play size={13} className="text-amber-500" />,      bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/20' },
+    ad.target_language?.length > 0 && { label: 'Language', value: ad.target_language.slice(0, 2).join(', '), icon: <Globe size={13} className="text-blue-500" />, bg: 'bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/20' },
+    ad.status    && { label: 'Status',   value: ad.status,                        icon: <BadgeCheck size={13} className="text-emerald-500" />, bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/20' },
   ].filter(Boolean);
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] font-sans">
-
-      {/* ── Top Bar ── */}
-      <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 px-4 py-3">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0">
-          <ArrowLeft size={20} className="text-gray-800 dark:text-white" />
+  /* ── Shared Comments Block ─────────────────────────────────────────────── */
+  const commentsBlock = (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <MessageCircle size={15} className="text-purple-500" />
+          Comments
+          <span className="text-xs font-semibold text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+            {fmt(ad.comments_count || 0)}
+          </span>
+        </p>
+        <button onClick={toggleLike} className="flex items-center gap-1.5 text-sm font-bold">
+          <Heart size={16} className={liked ? 'text-pink-500 fill-pink-500' : 'text-gray-400'} />
+          <span className={liked ? 'text-pink-500' : 'text-gray-500 dark:text-gray-400'}>{fmt(likesCount)}</span>
         </button>
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {vendorAvatar
-            ? <img src={vendorAvatar} className="w-7 h-7 rounded-full object-cover flex-shrink-0" alt={vendorName} />
-            : <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{vendorName[0]}</div>
-          }
-          <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{vendorName}</span>
-          {isVerified && (
-            <span className="w-4 h-4 rounded-full bg-[#0095f6] flex items-center justify-center flex-shrink-0">
-              <BadgeCheck size={9} className="text-white" strokeWidth={3} />
-            </span>
-          )}
-        </div>
-        <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border flex-shrink-0 ${
-          ad.status === 'active'
-            ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30'
-            : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
-        }`}>{ad.status}</span>
       </div>
 
-      {/* ── Main layout ── */}
-      <div className="max-w-5xl mx-auto px-4 py-5 pb-16">
-        <div className="flex flex-col md:flex-row gap-5">
+      {/* List */}
+      {commentsLoading ? (
+        <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
+          <div className="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Loading…</span>
+        </div>
+      ) : comments.length === 0 ? (
+        <div className="text-center py-8 text-gray-400">
+          <MessageCircle size={28} className="mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No comments yet</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {comments.map((c, i) => {
+            const u    = c.user_id || c.user || {};
+            const name = u.full_name || u.username || 'User';
+            const date = c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : '';
+            return (
+              <div key={c._id || i} className="flex gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                <CommentAvatar name={name} url={u.avatar_url || ''} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{name}</span>
+                    <span className="text-[10px] text-gray-400 shrink-0">{date}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                    {c.text || c.content || c.comment || ''}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-          {/* ── LEFT: Video / Image ── */}
-          <div className="flex-shrink-0 w-full md:w-[280px] lg:w-[300px]">
-            {isVideo ? (
-              <VideoPlayer src={videoSrc} thumb={thumbSrc} muted={isMuted} onToggleMute={() => setIsMuted(m => !m)} />
-            ) : imageSrc ? (
-              <div className="rounded-2xl overflow-hidden bg-black shadow-xl" style={{ aspectRatio: '9/16' }}>
-                <img src={imageSrc} alt={ad.ad_title} className="w-full h-full object-cover" />
-              </div>
-            ) : (
-              <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 flex items-center justify-center shadow-xl" style={{ aspectRatio: '9/16' }}>
-                <p className="text-white font-bold text-xl text-center px-6">{vendorName}</p>
-              </div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+          <button onClick={() => setCommentsPage(p => Math.max(1, p - 1))}
+            disabled={commentsPage === 1 || commentsLoading}
+            className="px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+            ← Prev
+          </button>
+          <span className="text-xs text-gray-400">Page {commentsPage} / {totalPages}</span>
+          <button onClick={() => setCommentsPage(p => Math.min(totalPages, p + 1))}
+            disabled={commentsPage === totalPages || commentsLoading}
+            className="px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+            Next →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 font-sans">
+
+      {/* ── Sticky Header ─────────────────────────────────────────── */}
+      <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
+          <button onClick={() => navigate(-1)}
+            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0">
+            <ArrowLeft size={20} className="text-gray-800 dark:text-white" />
+          </button>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {vendorAvatar
+              ? <img src={toAbsoluteUploadUrl(vendorAvatar)} className="w-7 h-7 rounded-full object-cover shrink-0" alt={vendorName} />
+              : <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center text-white text-xs font-bold shrink-0">{vendorName[0]}</div>
+            }
+            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{vendorName}</span>
+            {isVerified && (
+              <span className="w-4 h-4 rounded-full bg-[#0095f6] flex items-center justify-center shrink-0">
+                <BadgeCheck size={9} className="text-white" strokeWidth={3} />
+              </span>
             )}
+          </div>
+          <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border shrink-0 ${
+            ad.status === 'active'
+              ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30'
+              : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+          }`}>{ad.status}</span>
+        </div>
+      </div>
 
-            {/* Engagement */}
-            <div className="flex items-center gap-4 mt-3 px-1">
-              <button
-                onClick={toggleLike}
-                className="flex items-center gap-1.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+      {/* ── Page Body ─────────────────────────────────────────────── */}
+      <div className="max-w-6xl mx-auto lg:px-6 lg:py-6 pb-16">
+        <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
+
+          {/* ════ LEFT / MAIN ═══════════════════════════════════════ */}
+          <div className="space-y-2 lg:space-y-4">
+
+            {/* 1. Hero media */}
+            <div className="flex justify-center bg-gray-100 dark:bg-gray-900 lg:rounded-2xl overflow-hidden py-4 lg:py-6">
+              <div
+                className="rounded-2xl overflow-hidden shadow-xl"
+                style={{ width: isVideo ? 280 : 'auto', maxWidth: '95%' }}
               >
-                <Heart size={18} className={liked ? 'text-red-500 fill-red-500' : ''} />
-                {fmt(likesCount)}
-              </button>
-              <div className="flex items-center gap-1.5 text-sm font-bold text-gray-500 dark:text-gray-400">
-                <MessageCircle size={18} />{fmt(ad.comments_count || 0)}
-              </div>
-              <div className="flex items-center gap-1.5 text-sm font-bold text-gray-500 dark:text-gray-400">
-                <Eye size={18} />{fmt(ad.views_count || 0)}
+                {isVideo ? (
+                  <VideoPlayer src={videoSrc} thumb={thumbSrc} muted={isMuted} onToggleMute={() => setIsMuted(m => !m)} />
+                ) : (imageSrc && !imgError) ? (
+                  <img
+                    src={imageSrc}
+                    alt={ad.ad_title || ''}
+                    className="block max-w-full"
+                    style={{ maxHeight: '70vh', width: 'auto', height: 'auto' }}
+                    onError={() => setImgError(true)}
+                  />
+                ) : (
+                  <div className="w-[280px] flex items-center justify-center py-16 bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600">
+                    <p className="text-white font-bold text-xl text-center px-6">{vendorName}</p>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
 
-          {/* ── RIGHT: Info ── */}
-          <div className="flex-1 min-w-0 space-y-4">
+            {/* 2. Info card */}
+            <div className="bg-white dark:bg-gray-900 lg:rounded-2xl lg:border lg:border-gray-100 lg:dark:border-gray-800 px-4 pt-4 pb-4 lg:p-5">
 
-            {/* Vendor row */}
-            <div className="flex items-center gap-3">
-              <Link to={`/vendor/${vendorId}/public`} className="flex items-center gap-2.5 flex-1 min-w-0">
-                <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md">
-                  {vendorAvatar ? <img src={vendorAvatar} alt={vendorName} className="w-full h-full object-cover" /> : vendorName[0]}
-                </div>
-                <div className="min-w-0">
+              {/* Vendor row */}
+              <div className="flex items-center gap-3 mb-3">
+                <Link to={`/vendor/${vendorId}/public`}
+                  className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center text-white font-bold text-sm">
+                  {vendorAvatar
+                    ? <img src={toAbsoluteUploadUrl(vendorAvatar)} alt={vendorName} className="w-full h-full object-cover" />
+                    : vendorName[0]}
+                </Link>
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-gray-900 dark:text-white text-sm truncate">{vendorName}</span>
+                    <Link to={`/vendor/${vendorId}/public`} className="text-sm font-bold text-gray-900 dark:text-white truncate hover:underline">
+                      {vendorName}
+                    </Link>
                     {isVerified && (
-                      <span className="w-4 h-4 rounded-full bg-[#0095f6] flex items-center justify-center flex-shrink-0">
+                      <span className="w-4 h-4 rounded-full bg-[#0095f6] flex items-center justify-center shrink-0">
                         <BadgeCheck size={9} className="text-white" strokeWidth={3} />
                       </span>
                     )}
                   </div>
                   <span className="text-xs text-gray-400">@{ad.user_id?.username || 'vendor'}</span>
                 </div>
-              </Link>
-              <Link
-                to={`/vendor/${vendorId}/public`}
-                className="flex-shrink-0 text-xs font-bold text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-full hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-              >
-                View Profile
-              </Link>
+                <Link to={`/vendor/${vendorId}/public`}
+                  className="shrink-0 text-xs font-bold text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-full hover:border-gray-300 transition-colors">
+                  View Profile
+                </Link>
+              </div>
+
+              {/* Title */}
+              {ad.ad_title && (
+                <h1 className="text-lg font-extrabold text-gray-900 dark:text-white leading-snug mb-2">{ad.ad_title}</h1>
+              )}
+
+              {/* Description */}
+              {ad.ad_description && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-3">{ad.ad_description}</p>
+              )}
+
+              {/* CTA */}
+              {ad.cta?.type && (
+                <div className="mb-3">
+                  <CtaButton cta={ad.cta} adId={adId} />
+                </div>
+              )}
+
+              {/* Contact chips */}
+              {(ad.cta?.whatsapp_number || ad.cta?.phone_number || ad.cta?.email) && (
+                <div className="flex gap-2 flex-wrap mb-3">
+                  {ad.cta?.whatsapp_number && (
+                    <a href={`https://wa.me/${ad.cta.whatsapp_number.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-bold hover:bg-green-100 transition-colors">
+                      <MessageSquare size={12} /> WhatsApp
+                    </a>
+                  )}
+                  {ad.cta?.phone_number && (
+                    <a href={`tel:${ad.cta.phone_number}`}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 text-xs font-bold hover:bg-blue-100 transition-colors">
+                      <Phone size={12} /> Call
+                    </a>
+                  )}
+                  {ad.cta?.email && (
+                    <a href={`mailto:${ad.cta.email}`}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-400 text-xs font-bold hover:bg-purple-100 transition-colors">
+                      <Mail size={12} /> Email
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Engagement stats */}
+              <div className="flex items-center gap-5 pt-3 border-t border-gray-100 dark:border-gray-800">
+                <button onClick={toggleLike} className="flex items-center gap-1.5 text-sm font-bold transition-colors">
+                  <Heart size={18} className={liked ? 'text-pink-500 fill-pink-500' : 'text-gray-400'} />
+                  <span className={liked ? 'text-pink-500' : 'text-gray-600 dark:text-gray-400'}>{fmt(likesCount)}</span>
+                  <span className="text-xs text-gray-400">likes</span>
+                </button>
+                <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                  <MessageCircle size={18} className="text-purple-400" />
+                  <span className="font-bold text-gray-700 dark:text-gray-300">{fmt(ad.comments_count || 0)}</span>
+                  <span className="text-xs">comments</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                  <Eye size={18} className="text-blue-400" />
+                  <span className="font-bold text-gray-700 dark:text-gray-300">{fmt(ad.views_count || 0)}</span>
+                  <span className="text-xs">views</span>
+                </div>
+              </div>
             </div>
 
-            {/* Ad title */}
-            <h1 className="text-xl font-extrabold text-gray-900 dark:text-white leading-tight">
-              {ad.ad_title}
-            </h1>
-
-            {/* Ad description */}
-            {ad.ad_description && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{ad.ad_description}</p>
-            )}
-
-            {/* CTA */}
-            {ad.cta?.type && <CtaButton cta={ad.cta} adId={adId} />}
-
-            {/* Contact buttons */}
-            {(ad.cta?.whatsapp_number || ad.cta?.phone_number || ad.cta?.email) && (
-              <div className="flex gap-2 flex-wrap">
-                {ad.cta?.whatsapp_number && (
-                  <a href={`https://wa.me/${ad.cta.whatsapp_number.replace(/\D/g,'')}`} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-bold hover:bg-green-100 transition-colors">
-                    <MessageSquare size={12} /> WhatsApp
-                  </a>
-                )}
-                {ad.cta?.phone_number && (
-                  <a href={`tel:${ad.cta.phone_number}`}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 text-xs font-bold hover:bg-blue-100 transition-colors">
-                    <Phone size={12} /> Call
-                  </a>
-                )}
-                {ad.cta?.email && (
-                  <a href={`mailto:${ad.cta.email}`}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-400 text-xs font-bold hover:bg-purple-100 transition-colors">
-                    <Mail size={12} /> Email
-                  </a>
-                )}
-              </div>
-            )}
-
-            {/* Highlights */}
+            {/* 3. Top Highlights */}
             {highlights.length > 0 && (
-              <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Top Highlights</p>
+              <div className="bg-white dark:bg-gray-900 lg:rounded-2xl lg:border lg:border-gray-100 lg:dark:border-gray-800 px-4 py-4 lg:p-5">
+                <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Top Highlights</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {highlights.map((h, i) => (
                     <div key={i} className={`border rounded-xl p-3 flex flex-col gap-1.5 ${h.bg}`}>
@@ -842,69 +800,130 @@ export default function AdPublicDetail() {
                     </div>
                   ))}
                 </div>
+
+                {/* Caption / Hashtags */}
+                {ad.caption && (
+                  <p className="mt-4 text-sm text-gray-700 dark:text-gray-300 leading-relaxed border-t border-gray-100 dark:border-gray-800 pt-3">
+                    {ad.caption.split('\n').slice(0, 4).join('\n')}
+                  </p>
+                )}
+                {ad.hashtags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {ad.hashtags.slice(0, 8).map((h, i) => (
+                      <span key={i} className="text-xs font-semibold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2.5 py-1 rounded-full">
+                        {h.startsWith('#') ? h : `#${h}`}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Caption */}
-            {ad.caption && (
-              <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Caption</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-                  {ad.caption.split('\n').slice(0, 4).join('\n')}
-                </p>
-              </div>
-            )}
-
-            {/* Hashtags */}
-            {ad.hashtags?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {ad.hashtags.slice(0, 8).map((h, i) => (
-                  <span key={i} className="text-xs font-semibold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2.5 py-1 rounded-full">
-                    {h.startsWith('#') ? h : `#${h}`}
+            {/* 4. Gallery */}
+            {galleryItems.length > 0 && (
+              <div className="bg-white dark:bg-gray-900 lg:rounded-2xl lg:border lg:border-gray-100 lg:dark:border-gray-800 px-4 py-4 lg:p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Film size={15} className="text-pink-500" />
+                  <p className="text-sm font-bold text-gray-900 dark:text-white flex-1">Gallery</p>
+                  <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full font-semibold">
+                    {galleryItems.length} items
                   </span>
+                </div>
+                <AdGallerySection items={galleryItems} />
+              </div>
+            )}
+
+            {/* 5. More from vendor — mobile horizontal scroll */}
+            {(vendorAds.length > 0 || vendorAdsLoading) && (
+              <div className="bg-white dark:bg-gray-900 lg:hidden px-4 py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">More from {vendorName}</p>
+                  {vendorId && (
+                    <Link to={`/vendor/${vendorId}/public`}
+                      className="text-xs font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1 hover:underline">
+                      See all <ChevronRight size={13} />
+                    </Link>
+                  )}
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                  {vendorAdsLoading
+                    ? [...Array(5)].map((_, i) => (
+                      <div key={i} className="flex-shrink-0 w-[110px] rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ aspectRatio: '9/16' }} />
+                    ))
+                    : vendorAds.map(va => (
+                      <div key={va._id} className="flex-shrink-0 w-[110px]">
+                        <MiniAdCard ad={va} onClick={(id) => navigate(`/ads/${id}/details`)} />
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* 6. Comments — mobile */}
+            <div className="bg-white dark:bg-gray-900 px-4 py-4 pb-6 lg:rounded-2xl lg:border lg:border-gray-100 lg:dark:border-gray-800 lg:p-5 lg:hidden">
+              {commentsBlock}
+            </div>
+
+          </div>
+
+          {/* ════ RIGHT / SIDEBAR (desktop only) ═══════════════════ */}
+          <div className="hidden lg:flex flex-col gap-4">
+
+            {/* Stats */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+              <p className="text-sm font-bold text-gray-900 dark:text-white mb-4">Engagement</p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { icon: Heart,         label: 'Likes',    value: fmt(likesCount),          cls: 'text-pink-500',   bg: 'bg-pink-50 dark:bg-pink-900/20',   action: toggleLike },
+                  { icon: MessageCircle, label: 'Comments', value: fmt(ad.comments_count||0), cls: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20', action: null },
+                  { icon: Eye,           label: 'Views',    value: fmt(ad.views_count||0),    cls: 'text-blue-500',   bg: 'bg-blue-50 dark:bg-blue-900/20',   action: null },
+                ].map(s => (
+                  <button key={s.label} onClick={s.action || undefined}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl ${s.bg} ${s.action ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}>
+                    <s.icon size={20} className={s.label === 'Likes' && liked ? 'text-pink-500 fill-pink-500' : s.cls} />
+                    <span className={`text-lg font-black ${s.cls}`}>{s.value}</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{s.label}</span>
+                  </button>
                 ))}
               </div>
+            </div>
+
+            {/* More from vendor — desktop grid */}
+            {(vendorAds.length > 0 || vendorAdsLoading) && (
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">More from {vendorName}</p>
+                  {vendorId && (
+                    <Link to={`/vendor/${vendorId}/public`}
+                      className="text-xs font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1 hover:underline">
+                      See all <ChevronRight size={13} />
+                    </Link>
+                  )}
+                </div>
+                {vendorAdsLoading ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ aspectRatio: '9/16' }} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {vendorAds.slice(0, 4).map(va => (
+                      <MiniAdCard key={va._id} ad={va} onClick={(id) => navigate(`/ads/${id}/details`)} />
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
+
+            {/* Comments — desktop */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+              {commentsBlock}
+            </div>
+
           </div>
         </div>
-
-        {/* ── Gallery section (from ad.detail) ────────────────────────────── */}
-        <MobileSuggestedReelsSection
-          reels={suggestedReels}
-          loading={suggestedReelsLoading}
-          onOpenReel={(id) => navigate(`/reels?id=${id}`)}
-        />
-
-        {galleryItems.length > 0 && (
-          <AdGallerySection items={galleryItems} />
-        )}
-
-        {/* ── More from vendor ads grid ── */}
-        {(vendorAds.length > 0 || vendorAdsLoading) && (
-          <div className="hidden md:block mt-8">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-gray-900 dark:text-white">More from {vendorName}</p>
-              {vendorId && (
-                <Link to={`/vendor/${vendorId}/public`} className="flex items-center gap-1 text-xs font-bold text-pink-600 dark:text-pink-400 hover:underline">
-                  See all <ChevronRight size={13} />
-                </Link>
-              )}
-            </div>
-            {vendorAdsLoading ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ aspectRatio: '9/16' }} />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                {vendorAds.map(va => (
-                  <MiniAdCard key={va._id} ad={va} onClick={(id) => navigate(`/ads/${id}/details`)} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
