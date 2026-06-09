@@ -13,6 +13,7 @@ import Promote from './pages/Promote';
 import Ads from './pages/Ads';
 import VendorAds from './pages/VendorAds';
 import AdPublicDetail from './pages/AdPublicDetail';
+import VendorPublicProfile from './pages/VendorPublicProfile';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
@@ -32,7 +33,6 @@ import ChatPage from './pages/ChatPage';
 import Suggestions from './pages/Suggestions';
 import GlobalLoader from './components/GlobalLoader';
 
-import VendorPublicProfile from './pages/VendorPublicProfile';
 import VendorLayout from './components/VendorLayout';
 import VendorDashboard from './pages/vendor-pages/Dashboard';
 import VendorProfile from './pages/vendor-pages/VendorProfile';
@@ -125,8 +125,8 @@ function App() {
             <Route path="/messages"         element={<ChatPage />} />
             <Route path="/suggestions"      element={<Suggestions />} />
             <Route path="/messages/:conversationId" element={<ChatPage />} />
-            <Route path="/vendor/:userId/public" element={<VendorPublicProfile />} />
             <Route path="/ads/:adId/details" element={<AdPublicDetail />} />
+            <Route path="/vendor/:vendorId/public" element={<VendorPublicProfile />} />
 
           </Route>
 

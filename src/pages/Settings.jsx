@@ -391,7 +391,7 @@ const SecurityScreen = ({ onBack, email, userId }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-20">
-      <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center gap-3 z-40">
+      <div className="sticky top-0 bg-white dark:bg-black border-b border-transparent px-4 py-3 flex items-center gap-3 z-40">
         <button onClick={onBack} className="text-gray-800 dark:text-white">
           <ArrowLeft size={22} />
         </button>
@@ -636,7 +636,7 @@ const PrivacyScreen = ({ onBack }) => {
         </div>
       )}
 
-      <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center gap-3 z-40">
+      <div className="sticky top-0 bg-white dark:bg-black border-b border-transparent px-4 py-3 flex items-center gap-3 z-40">
         <button onClick={onBack} className="text-gray-800 dark:text-white">
           <ArrowLeft size={22} />
         </button>
@@ -807,7 +807,7 @@ const PrivacyScreen = ({ onBack }) => {
 const HelpSupportScreen = ({ onBack }) => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-20">
-      <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center gap-3 z-40">
+      <div className="sticky top-0 bg-white dark:bg-black border-b border-transparent px-4 py-3 flex items-center gap-3 z-40">
         <button onClick={onBack} className="text-gray-800 dark:text-white">
           <ArrowLeft size={22} />
         </button>
@@ -921,7 +921,7 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-20">
-      <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex justify-between items-center z-40">
+      <div className="sticky top-0 bg-white dark:bg-black border-b border-transparent px-4 py-3 flex justify-between items-center z-40">
         <Link to="/profile" className="text-gray-800 dark:text-white">
           <ArrowLeft size={24} />
         </Link>

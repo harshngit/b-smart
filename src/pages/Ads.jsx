@@ -1402,7 +1402,7 @@ const Ads = ({ feedMode = 'user' }) => {
     <div className={`flex flex-col dark:bg-black overflow-hidden ${pageHeightClass}`}>
 
       {/* Desktop top bar */}
-      <div className="hidden md:flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800 shrink-0 relative overflow-visible w-full">
+      <div className="hidden md:flex items-center gap-2 px-4 py-2 shrink-0 relative overflow-visible w-full">
         {/* Back button — hidden when search open */}
         <button
           onClick={() => navigate(-1)}

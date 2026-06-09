@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Heart, MessageCircle, Send, MoreHorizontal, Music2,
@@ -94,25 +94,33 @@ const formatTimeAgo = (dateString) => {
 const Caption = ({ text }) => {
   const [expanded, setExpanded] = useState(false);
   if (!text) return null;
-  const words   = text.trim().split(/\s+/);
-  const isLong  = words.length > 5;
-  const preview = isLong ? words.slice(0, 5).join(' ') : text;
+  const isLong  = text.length > 20;
+  const preview = isLong ? text.slice(0, 20) : text;
   return (
-    <p className="text-white text-sm leading-relaxed mb-2">
+    <div
+      className={`text-white text-sm leading-relaxed mb-1 ${expanded ? 'max-h-28 overflow-y-auto' : ''}`}
+      style={{ scrollbarWidth: 'none' }}
+    >
       {expanded || !isLong ? (
         <>
           {text}
           {expanded && isLong && (
-            <button onClick={() => setExpanded(false)} className="text-white/60 ml-1.5 hover:text-white transition-colors text-sm font-semibold">less</button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
+              className="text-white/60 ml-1.5 hover:text-white transition-colors text-sm font-semibold"
+            >less</button>
           )}
         </>
       ) : (
         <>
           {preview}
-          <button onClick={() => setExpanded(true)} className="text-white/60 ml-1 hover:text-white transition-colors font-medium">... more</button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+            className="text-white/60 ml-0.5 hover:text-white transition-colors font-medium"
+          >... more</button>
         </>
       )}
-    </p>
+    </div>
   );
 };
 
@@ -147,10 +155,10 @@ const FollowButton = ({ userId, initialFollowing = false }) => {
     <button
       onClick={handleToggle}
       disabled={loading}
-      className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-all backdrop-blur-sm flex-shrink-0 disabled:opacity-60 ${
+      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all backdrop-blur-sm flex-shrink-0 disabled:opacity-60 ${
         following
-          ? 'border border-white/30 bg-white/10 text-white hover:bg-red-500/20 hover:border-red-400/40'
-          : 'border border-white/40 bg-white/10 text-white hover:bg-white/25'
+          ? 'border border-white/40 bg-white/10 text-white/80'
+          : 'border border-white bg-transparent text-white hover:bg-white/15'
       }`}
     >
       {loading ? <Loader2 size={10} className="animate-spin inline" /> : following ? 'Following' : 'Follow'}
@@ -601,7 +609,7 @@ const Reels = () => {
 
   const { userObject }  = useSelector((state) => state.auth);
   const currentUserId   = userObject?._id || userObject?.id || null;
-  const [walletBalance, setWalletBalance] = useState(
+  const [, setWalletBalance] = useState(
     userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0
   );
 
@@ -787,7 +795,8 @@ const Reels = () => {
     if (commentsOpen) return;
     if (e.key === 'ArrowDown') goToIndex(currentIndex + 1);
     else if (e.key === 'ArrowUp') goToIndex(currentIndex - 1);
-  }, [currentIndex, commentsOpen, goToIndex]);
+    else if (e.key === ' ') { e.preventDefault(); handleVideoTap(currentIndex); }
+  }, [currentIndex, commentsOpen, goToIndex, handleVideoTap]);
 
   useEffect(() => { window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, [handleKeyDown]);
 
@@ -826,13 +835,6 @@ const Reels = () => {
 
   const getVideoUrl    = (reel) => reel.media?.[0]?.fileUrl || null;
   const getThumbnail   = (reel) => reel.media?.[0]?.thumbnail?.fileUrl || reel.user_id?.avatar_url || null;
-  const getAspectClass = (reel) => {
-    const ratio = reel.media?.[0]?.crop?.aspect_ratio || reel.media?.[0]?.aspect_ratio || reel.crop?.aspect_ratio || reel.aspect_ratio;
-    if (ratio === '1:1')  return 'aspect-[1/1]';
-    if (ratio === '16:9') return 'aspect-[16/9]';
-    if (ratio === '4:5')  return 'aspect-[4/5]';
-    return 'aspect-[9/16]';
-  };
 
   const pageHeightClass = 'h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]';
 
@@ -867,15 +869,13 @@ const Reels = () => {
     </div>
   );
 
-  const currentReel   = reels[currentIndex];
-  const currentReelId = currentReel?._id || currentReel?.post_id;
-  const commentCount  = resolveCommentsCount(currentReel);
+  const currentReel = reels[currentIndex];
 
   return (
     <>
       <div className={`w-full ${pageHeightClass} overflow-hidden flex flex-col dark:bg-black bg-white`}>
         {/* ── Top bar ── */}
-        <div className="shrink-0 relative flex items-center px-3 py-2 md:px-4 md:py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black overflow-visible w-full">
+        <div className="shrink-0 relative flex items-center px-3 py-2 md:px-4 md:py-2 bg-white dark:bg-black overflow-visible w-full">
           <button onClick={() => navigate(-1)} className={`p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1 shrink-0 transition-all duration-300 ${searchOpen ? 'opacity-0 w-0 overflow-hidden mr-0 p-0' : 'opacity-100'}`}>
             <ChevronLeft size={16} />
           </button>
@@ -1080,35 +1080,52 @@ const Reels = () => {
                       <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 55%, rgba(0,0,0,0.85) 100%)' }} />
 
                       {videoUrl && !hasError && isCurrent && !isProcessing && (
-                        <button onClick={() => setIsMuted(m => !m)} className="absolute bottom-[18px] md:bottom-8 right-[55px] md:right-4 bg-black/50 p-2 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-20">
+                        <button onClick={() => setIsMuted(m => !m)} className="absolute bottom-[10px] md:bottom-4 right-3 bg-black/50 p-1.5 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-20">
                           {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                         </button>
                       )}
 
                       {isCurrent && (
-                        <div className="md:hidden absolute right-3 bottom-[18px] z-30">
+                        <div className="md:hidden absolute right-3 bottom-[155px] z-30">
                           <ActionButtons reel={reel} mobile onLike={handleLike} onComment={() => { setCurrentIndex(index); setCommentsOpen(true); }} onShare={handleShare} onSave={handleSave} onMore={handleReelMore} />
                         </div>
                       )}
 
-                      <div className="absolute bottom-0 left-0 z-20 px-4 pb-8 pr-16" style={{ maxWidth: 'calc(100% - 56px)' }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Link to={`/profile/${reel.user_id?._id || reel.user_id?.id || reel.user_id}`} className="w-8 h-8 rounded-full border-2 border-white/50 overflow-hidden flex-shrink-0">
+                      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-4">
+                        {/* Row 1: avatar + [username / audio stacked] + Follow */}
+                        <div className="flex items-center gap-2.5 mb-1">
+                          <Link
+                            to={`/profile/${reel.user_id?._id || reel.user_id?.id || reel.user_id}`}
+                            className="w-9 h-9 rounded-full border-2 border-white/60 overflow-hidden flex-shrink-0"
+                          >
                             {reel.user_id?.avatar_url
                               ? <img src={reel.user_id.avatar_url} className="w-full h-full object-cover" alt="user" />
                               : <div className="w-full h-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center"><span className="text-white text-[10px] font-bold">{(reel.user_id?.username || 'U')[0].toUpperCase()}</span></div>
                             }
                           </Link>
-                          <Link to={`/profile/${reel.user_id?._id || reel.user_id?.id || reel.user_id}`} className="font-bold text-white text-sm truncate cursor-pointer hover:underline" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                            {reel.user_id?.username || reel.user_id?.full_name || 'Unknown'}
-                          </Link>
+                          <div className="flex-1 min-w-0">
+                            <Link
+                              to={`/profile/${reel.user_id?._id || reel.user_id?.id || reel.user_id}`}
+                              className="font-bold text-white text-sm block truncate leading-tight hover:underline"
+                              style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}
+                            >
+                              {reel.user_id?.username || reel.user_id?.full_name || 'Unknown'}
+                            </Link>
+                            <div className="flex items-center gap-1 text-white/75 text-xs mt-0.5">
+                              <Music2 size={10} className="flex-shrink-0" />
+                              <span className="truncate" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+                                Original Audio · {reel.user_id?.username || 'unknown'}
+                              </span>
+                            </div>
+                          </div>
                           <FollowButton userId={reel.user_id?._id || reel.user_id?.id || reel.user_id} initialFollowing={reel.is_followed_by_me || false} />
                         </div>
-                        <Caption text={reel.caption} />
-                        {reel.tags?.length > 0 && <p className="text-white/80 text-xs mb-1.5">{reel.tags.map(t => `#${t}`).join(' ')}</p>}
-                        <div className="flex items-center gap-1.5 text-white/90 text-xs mt-1">
-                          <Music2 size={11} className="flex-shrink-0" />
-                          <span className="truncate max-w-[180px]" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>Original Audio · {reel.user_id?.username || 'unknown'}</span>
+                        {/* Row 2: caption — min-h keeps mute button gap consistent when no caption */}
+                        <div className="min-h-[22px]">
+                          <Caption text={reel.caption} />
+                          {reel.tags?.length > 0 && (
+                            <p className="text-white/70 text-xs mt-0.5">{reel.tags.map(t => `#${t}`).join(' ')}</p>
+                          )}
                         </div>
                       </div>
                     </div>
