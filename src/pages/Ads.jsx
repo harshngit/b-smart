@@ -396,7 +396,7 @@ const FollowButton = ({ userId, mobile = false }) => {
 
 // ─── Action Buttons ────────────────────────────────────────────────────────────
 const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile = false, onComment, onMore, onShare }) => (
-  <div className="flex flex-col items-center gap-4">
+  <div className={`flex flex-col items-center ${mobile ? 'gap-2' : 'gap-4'}`}>
     {/* Like */}
     <button onClick={() => toggleLike(ad._id)} className="flex flex-col items-center gap-1">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
@@ -430,7 +430,7 @@ const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile 
         ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
         <Send size={18} className={`-rotate-12 relative left-[-2px] ${mobile ? 'text-white' : 'text-gray-800 dark:text-white'}`} />
       </div>
-      <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>Share</span>
+      {!mobile && <span className="text-xs font-semibold text-gray-700 dark:text-white">Share</span>}
     </button>
 
     {/* Save */}
@@ -441,7 +441,7 @@ const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile 
           ? (mobile ? 'text-black fill-black' : 'text-black fill-black')
           : mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
       </div>
-      <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>Save</span>
+      {!mobile && <span className="text-xs font-semibold text-gray-700 dark:text-white">Save</span>}
     </button>
 
     {/* More */}
@@ -1884,28 +1884,8 @@ const Ads = ({ feedMode = 'user' }) => {
                         </div>
                       )}
 
-                      {/* Mute button — always visible, separate from info rows */}
-                      {isCurrent && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const newMuted = !isMuted;
-                            setIsMuted(newMuted);
-                            const vid = videoRefs.current[currentIndex];
-                            if (vid) {
-                              vid.muted = newMuted;
-                              if (!newMuted && vid.paused) vid.play().catch(() => {});
-                            }
-                          }}
-                          onTouchEnd={e => e.stopPropagation()}
-                          className="absolute bottom-6 right-[72px] z-30 bg-black/50 p-2 rounded-full text-white backdrop-blur-sm hover:bg-black/70 active:scale-90 transition-transform"
-                        >
-                          {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                        </button>
-                      )}
-
                       {/* Bottom info — 3 rows */}
-                      <div className={`absolute bottom-0 left-0 w-full z-20 px-4 pt-3 pb-6 flex flex-col gap-2 transition-all duration-300 ${captionExpandedAdId === a._id ? 'bg-gradient-to-t from-black/95 via-black/80 to-transparent' : ''}`} style={{ paddingRight: '68px' }}>
+                      <div className={`absolute bottom-0 left-0 w-full z-20 pl-4 pr-[60px] md:pr-4 pt-3 pb-6 flex flex-col gap-2 transition-all duration-300 ${captionExpandedAdId === a._id ? 'bg-gradient-to-t from-black/95 via-black/80 to-transparent' : ''}`}>
 
                         {/* Row 1: Company Logo | Company Name (truncated) | Coins Reward | Follow Button */}
                         <div className="flex items-center gap-2 min-w-0">
@@ -1929,35 +1909,51 @@ const Ads = ({ feedMode = 'user' }) => {
                           <FollowButton userId={a.user_id?._id} mobile />
                         </div>
 
-                        {/* Row 2: Ad Category • Ad Description (truncated) */}
-                        {(a.category || a.caption) && (
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            {a.category && (
-                              <span className="text-white/90 text-sm font-semibold shrink-0 bg-white/10 backdrop-blur-sm rounded-full px-2 py-0.5">{a.category}</span>
-                            )}
-                            {a.category && a.caption && (
-                              <span className="text-white text-base font-bold shrink-0">•</span>
-                            )}
-                            {a.caption && (
-                              <CaptionInline
-                                text={a.caption}
-                                isExpanded={captionExpandedAdId === a._id}
-                                onExpand={() => setCaptionExpandedAdId(a._id)}
-                                onCollapse={() => setCaptionExpandedAdId(null)}
-                              />
-                            )}
-                          </div>
-                        )}
+                        {/* Row 2: Ad Category • Ad Description (truncated) + Mute button */}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {a.category && (
+                            <span className="text-white/90 text-sm font-semibold shrink-0 bg-white/10 backdrop-blur-sm rounded-full px-2 py-0.5">{a.category}</span>
+                          )}
+                          {a.category && a.caption && (
+                            <span className="text-white text-base font-bold shrink-0">•</span>
+                          )}
+                          {a.caption && (
+                            <CaptionInline
+                              text={a.caption}
+                              isExpanded={captionExpandedAdId === a._id}
+                              onExpand={() => setCaptionExpandedAdId(a._id)}
+                              onCollapse={() => setCaptionExpandedAdId(null)}
+                            />
+                          )}
+                          {isCurrent && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newMuted = !isMuted;
+                                setIsMuted(newMuted);
+                                const vid = videoRefs.current[currentIndex];
+                                if (vid) {
+                                  vid.muted = newMuted;
+                                  if (!newMuted && vid.paused) vid.play().catch(() => {});
+                                }
+                              }}
+                              onTouchEnd={e => e.stopPropagation()}
+                              className="shrink-0 ml-auto bg-black/50 p-1.5 rounded-full text-white backdrop-blur-sm hover:bg-black/70 active:scale-90 transition-transform"
+                            >
+                              {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                            </button>
+                          )}
+                        </div>
 
                         {/* Row 3: Links only — slide in after 3s, zero height when hidden */}
                         <div
                           className="overflow-hidden transition-all duration-500 ease-out"
-                          style={{ maxHeight: isCurrent && showCtaButtons ? '48px' : '0px', opacity: isCurrent && showCtaButtons ? 1 : 0 }}
+                          style={{ maxHeight: isCurrent && showCtaButtons ? '120px' : '0px', opacity: isCurrent && showCtaButtons ? 1 : 0 }}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <button
                               onClick={() => { trackAdClick(a._id); navigate(`/ads/${a._id}/details`); }}
-                              className="shrink-0 flex items-center justify-center py-1.5 px-3 rounded-xl bg-black/40 backdrop-blur-md border border-white/25 text-white text-xs font-bold hover:bg-black/60 active:scale-95 transition-all"
+                              className="flex-1 min-w-[calc(50%-4px)] flex items-center justify-center py-1.5 px-3 rounded-xl bg-black/40 backdrop-blur-md border border-white/25 text-white text-xs font-bold hover:bg-black/60 active:scale-95 transition-all"
                             >
                               Visit Details
                             </button>
@@ -1972,7 +1968,7 @@ const Ads = ({ feedMode = 'user' }) => {
                               return (
                                 <a href={href} target={cta.type !== 'call_now' ? '_blank' : '_self'} rel="noopener noreferrer"
                                   onClick={() => trackAdClick(a._id)}
-                                  className="shrink-0 flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all">
+                                  className="flex-1 min-w-[calc(50%-4px)] flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all">
                                   {icon}{label}
                                 </a>
                               );
@@ -1983,7 +1979,7 @@ const Ads = ({ feedMode = 'user' }) => {
                               if (!href) return null;
                               return (
                                 <a href={href} target="_blank" rel="noopener noreferrer"
-                                  className="shrink-0 flex items-center gap-1 py-1.5 px-3 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-semibold hover:bg-white/20 transition-colors">
+                                  className="flex-1 min-w-[calc(50%-4px)] flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-semibold hover:bg-white/20 transition-colors">
                                   <ShoppingBag size={11} className="shrink-0" />
                                   <span className="truncate max-w-[80px]">{offer.title}</span>
                                 </a>
@@ -1993,9 +1989,9 @@ const Ads = ({ feedMode = 'user' }) => {
                         </div>
                       </div>
 
-                      {/* Mobile right actions — pinned above bottom nav */}
+                      {/* Mobile right actions — pinned above bottom info */}
                       {isCurrent && (
-                        <div className="md:hidden absolute right-3 bottom-[10px] z-30">
+                        <div className="md:hidden absolute right-3 bottom-[90px] z-30">
                           <ActionButtons
                             ad={a}
                             mobile

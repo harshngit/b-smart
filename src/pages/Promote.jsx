@@ -5,7 +5,7 @@ import {
   Heart, MessageCircle, Send, MoreHorizontal,
   Bookmark, ChevronLeft,
   ShoppingBag, Loader2, UserPlus, UserCheck, X, Trash2,
-  RefreshCw, Search
+  RefreshCw, Search, Volume2, VolumeX
 } from 'lucide-react';
 import promoteReelService from '../services/promoteReelService';
 import Hls from 'hls.js';
@@ -277,27 +277,37 @@ const ActionButtons = ({ promote, likedIds, toggleLike, savedIds, toggleSave, mo
 const Caption = ({ text }) => {
   const [expanded, setExpanded] = useState(false);
   if (!text) return null;
-  const words = text.trim().split(/\s+/);
-  const isLong = words.length > 5;
-  const preview = isLong ? words.slice(0, 5).join(' ') : text;
+  const isLong = text.length > 20;
   return (
-    <p className="text-white text-sm leading-relaxed mb-2">
-      {expanded || !isLong ? (
-        <>{text}{expanded && isLong && <button onClick={() => setExpanded(false)} className="text-white/60 ml-1.5 hover:text-white font-semibold">less</button>}</>
+    <div className="text-white text-sm leading-snug mb-1 min-w-0">
+      {expanded ? (
+        <>
+          {text}
+          <button onClick={(e) => { e.stopPropagation(); setExpanded(false); }} className="text-white/60 ml-1.5 hover:text-white font-semibold text-xs">less</button>
+        </>
       ) : (
-        <>{preview}<button onClick={() => setExpanded(true)} className="text-white/60 ml-1 hover:text-white font-medium">... more</button></>
+        <span className="truncate block">
+          {isLong ? text.slice(0, 20) : text}
+          {isLong && (
+            <button onClick={(e) => { e.stopPropagation(); setExpanded(true); }} className="text-white/60 ml-0.5 hover:text-white font-medium text-xs">...more</button>
+          )}
+        </span>
       )}
-    </p>
+    </div>
   );
 };
 
 // ─── HlsVideo — rewritten to use npm hls.js with optimised buffer config ────
-const HlsVideo = ({ src, thumb, isCurrent, isPaused, processing, onTimeUpdate, onEnded, onClick, onRef }) => {
+const HlsVideo = ({ src, thumb, isCurrent, isPaused, processing, isMuted, onTimeUpdate, onEnded, onClick, onRef }) => {
   const videoRef  = useRef(null);
   const hlsRef    = useRef(null);
-  const readyRef  = useRef(false);          // guards effect logic without causing cascades
+  const readyRef  = useRef(false);
   const [ready, setReady]         = useState(false);
   const [buffering, setBuffering] = useState(true);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = isMuted ?? true;
+  }, [isMuted]);
 
   useEffect(() => {
     if (videoRef.current) onRef?.(videoRef.current);
@@ -337,6 +347,7 @@ const HlsVideo = ({ src, thumb, isCurrent, isPaused, processing, onTimeUpdate, o
       }, { once: true });
     }
     return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src, processing]);
 
   useEffect(() => {
@@ -384,7 +395,7 @@ const HlsVideo = ({ src, thumb, isCurrent, isPaused, processing, onTimeUpdate, o
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-contain"
-        muted={false}
+        muted
         playsInline
         preload="metadata"
         loop
@@ -427,7 +438,7 @@ const ProductCards = ({ products, open }) => {
         return (
           <div key={i}
             className="flex-shrink-0 flex flex-row bg-white rounded-xl overflow-hidden shadow-md"
-            style={{ width: 190 }}
+            style={{ width: 190, height: 80 }}
             onClick={e => e.stopPropagation()}
           >
             {/* Left: square thumbnail with rating badge */}
@@ -473,7 +484,7 @@ const ProductCards = ({ products, open }) => {
 };
 
 // ─── Per-slide bottom overlay (owns productsOpen state) ───────────────────────
-const SlideBottomInfo = ({ p }) => {
+const SlideBottomInfo = ({ p, isMuted, onToggleMute }) => {
   const [productsOpen, setProductsOpen] = useState(true);
   const user = p.user_id || {};
   const username = user.username || user.full_name || 'User';
@@ -481,7 +492,17 @@ const SlideBottomInfo = ({ p }) => {
 
   return (
     <div className="px-4 pt-4 pb-6">
-      {/* User row — avatar + username + Follow inline */}
+      {/* Mute button — top right, above user row */}
+      <div className="flex justify-end mb-1.5">
+        <button
+          onClick={e => { e.stopPropagation(); onToggleMute?.(); }}
+          className="bg-black/50 p-1.5 rounded-full text-white backdrop-blur-sm hover:bg-black/70 active:scale-90 transition-transform"
+        >
+          {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+        </button>
+      </div>
+
+      {/* User row — avatar | username | Follow */}
       <div className="flex items-center gap-2 mb-2">
         {user.avatar_url
           ? <img src={user.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover shrink-0" alt="user" />
@@ -490,13 +511,13 @@ const SlideBottomInfo = ({ p }) => {
         <FollowButton userId={user._id || user.id} mobile />
       </div>
 
-      {/* Caption + Hide Products on the same line */}
-      <div className="flex items-start gap-2 mb-1">
+      {/* Caption + Hide Products */}
+      <div className="flex items-center gap-2 mb-1 min-w-0">
         <div className="flex-1 min-w-0"><Caption text={p.caption} /></div>
         {products.length > 0 && (
           <button
             onClick={e => { e.stopPropagation(); setProductsOpen(v => !v); }}
-            className="flex items-center justify-center gap-1 min-w-[108px] h-7 px-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-full text-[10px] active:scale-95 transition-all shrink-0"
+            className="flex items-center justify-center gap-1 min-w-[100px] h-7 px-2.5 bg-black/30 backdrop-blur-sm border border-white/20 rounded-full text-[10px] active:scale-95 transition-all shrink-0"
           >
             <ShoppingBag size={10} className="text-white" />
             <span className="text-white text-[10px] font-semibold whitespace-nowrap">
@@ -554,6 +575,7 @@ const Promote = () => {
     }
   }, [searchParams, promotes, currentIndex]);
 
+  const [isMuted, setIsMuted] = useState(true);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
   const [progress, setProgress] = useState(0);
@@ -666,6 +688,10 @@ const Promote = () => {
     socketService.on('promote_reel_ready', handler);
     return () => socketService.off('promote_reel_ready', handler);
   }, []);
+
+  useEffect(() => {
+    Object.values(videoRefs.current).forEach(vid => { if (vid) vid.muted = isMuted; });
+  }, [isMuted]);
 
   const progressIntervalRef = useRef(null);
   const actionPanelRef = useRef(null);
@@ -1130,6 +1156,7 @@ const Promote = () => {
                           thumb={thumbSrc}
                           isCurrent={isCurrent}
                           isPaused={isCurrent && isPausedByUser}
+                          isMuted={isMuted}
                           onRef={(el) => { if (el) videoRefs.current[index] = el; }}
                           onTimeUpdate={(pct) => { if (isCurrent) setProgress(pct); }}
                           onEnded={() => {
@@ -1162,8 +1189,8 @@ const Promote = () => {
                       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/80 pointer-events-none" />
 
                       {/* Bottom info — SlideBottomInfo owns productsOpen state */}
-                      <div className="absolute bottom-0 left-0 w-full z-20 flex flex-col justify-end pr-[60px] lg:pr-0">
-                        <SlideBottomInfo p={p} />
+                      <div className="absolute bottom-0 left-0 w-full z-20 flex flex-col justify-end pr-[60px] lg:pr-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                        <SlideBottomInfo p={p} isMuted={isMuted} onToggleMute={() => setIsMuted(m => !m)} />
                       </div>
 
                       {/* Mobile right actions */}

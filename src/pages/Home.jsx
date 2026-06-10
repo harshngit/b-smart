@@ -12,6 +12,7 @@ import StoryRail from '../components/StoryRail';
 import StoryViewer from '../components/StoryViewer';
 import api from '../lib/api';
 import bsmartLogo from '../assets/bsmart.png';
+import bsmartIcon from '../assets/bsmart_logo.png';
 import {
   checkFollowStatus,
   bulkCheckFollowStatus,
@@ -189,11 +190,20 @@ const LocationSelector = ({ className = "" }) => (
 // ── Location Bar — logo + search + location ───────────────────────────────────
 const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults }) => {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => {
+    const handler = (e) => setSidebarOpen(e.detail.isOpen);
+    window.addEventListener('sidebar:toggle', handler);
+    return () => window.removeEventListener('sidebar:toggle', handler);
+  }, []);
   return (
     <div className="hidden md:block fixed top-0 left-0 right-0 h-14 z-[55] bg-white dark:bg-black">
       <div className="h-full flex items-center px-4 gap-4">
-        <div className="shrink-0 flex items-center">
-          <img src={bsmartLogo} alt="b_smart" className="h-[48px] w-auto" />
+        <div className="shrink-0 flex items-center gap-2 w-64 overflow-hidden">
+          <img src={bsmartIcon} alt="bs" className="w-9 h-9 object-contain flex-shrink-0" />
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${sidebarOpen ? 'max-w-[200px] opacity-100' : 'max-w-0 opacity-0'}`}>
+            <img src={bsmartLogo} alt="b_smart" className="h-[70px] w-auto object-contain block" />
+          </div>
         </div>
 
         <div className="flex-1 flex justify-center">

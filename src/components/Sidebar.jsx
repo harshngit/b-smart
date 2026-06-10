@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, ShoppingBag } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
 import bsmartLogo from '../assets/bsmart.png';
+import bsmartIcon from '../assets/bsmart_logo.png';
 import { logoutUser } from '../store/authSlice';
 import {
   setTypingUser,
@@ -164,6 +165,9 @@ const Sidebar = ({ onOpenCreateModal }) => {
     userObject?.vendor?.validated
   );
   const [isHovered, setIsHovered] = useState(false);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('sidebar:toggle', { detail: { isOpen: isHovered } }));
+  }, [isHovered]);
   const [isCreateDropdownOpen, setIsCreateDropdownOpen] = useState(false);
   const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -530,11 +534,10 @@ const Sidebar = ({ onOpenCreateModal }) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="h-16 flex-shrink-0 flex items-center px-4">
-          {isHovered && location.pathname !== '/' ? (
-            <img src={bsmartLogo} alt="b_smart" className="h-[70px] w-auto" />
-          ) : (
-            <></>
+        <div className="h-20 flex-shrink-0 flex items-center px-3 gap-2">
+          <img src={bsmartIcon} alt="bs" className="w-9 h-9 flex-shrink-0 object-contain" />
+          {isHovered && (
+            <img src={bsmartLogo} alt="b_smart" className="h-[70px] w-auto object-contain" />
           )}
         </div>
 
@@ -807,10 +810,10 @@ const Sidebar = ({ onOpenCreateModal }) => {
       {/* ── Instagram-style Search Panel (desktop only, member only) ── */}
       {showSearch && !isVendor && (
         <>
-          <div className="hidden md:block fixed inset-0 z-[45]" onClick={closeSidebarSearch} />
+          <div className="hidden md:block fixed inset-x-0 top-14 bottom-0 z-[45]" onClick={closeSidebarSearch} />
           <div
             ref={sidebarSearchRef}
-            className="hidden md:flex flex-col fixed top-0 left-20 h-screen w-[400px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl"
+            className="hidden md:flex flex-col fixed top-14 left-20 h-[calc(100vh-3.5rem)] w-[400px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl"
             style={{ animation: 'slideInSearch 0.22s cubic-bezier(0.4,0,0.2,1)' }}
           >
             {/* Header */}

@@ -98,7 +98,7 @@ const Caption = ({ text }) => {
   const preview = isLong ? text.slice(0, 20) : text;
   return (
     <div
-      className={`text-white text-sm leading-relaxed mb-1 ${expanded ? 'max-h-28 overflow-y-auto' : ''}`}
+      className={`text-white text-sm leading-relaxed mb-1 w-[300px] ${expanded ? 'max-h-28 overflow-y-auto' : ''}`}
       style={{ scrollbarWidth: 'none' }}
     >
       {expanded || !isLong ? (
@@ -177,7 +177,7 @@ const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSav
   const initial       = (reel?.user_id?.username || reel?.user_id?.full_name || 'U')[0]?.toUpperCase();
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className={`flex flex-col items-center ${mobile ? 'gap-2' : 'gap-4'}`}>
       <button onClick={() => reelId && onLike?.(reelId, isLiked)} className="flex flex-col items-center gap-1">
         <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
           ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
@@ -199,7 +199,7 @@ const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSav
           ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
           <Send size={18} className={`-rotate-12 relative left-[-2px] ${mobile ? 'text-white' : 'text-gray-800 dark:text-white'}`} />
         </div>
-        <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>Share</span>
+        {!mobile && <span className="text-xs font-semibold text-gray-700 dark:text-white">Share</span>}
       </button>
 
       <button onClick={() => reelId && onSave?.(reelId, isSaved)} className="flex flex-col items-center gap-1">
@@ -207,7 +207,7 @@ const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSav
           ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
           <Bookmark size={20} className={isSaved ? (mobile ? 'text-black fill-black' : 'text-black fill-black') : mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
         </div>
-        <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>Save</span>
+        {!mobile && <span className="text-xs font-semibold text-gray-700 dark:text-white">Save</span>}
       </button>
 
       <button onClick={() => onMore?.(reel)} className="flex flex-col items-center gap-1">
@@ -242,6 +242,11 @@ const ReelVideo = ({ src, isHls, processing, poster, isCurrent, isMuted, onError
     setRef(index, videoRef.current);
     return () => setRef(index, null);
   }, [index, setRef]);
+
+  // React's `muted` prop doesn't update reactively — set the DOM property directly
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = isMuted;
+  }, [isMuted]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -320,7 +325,7 @@ const ReelVideo = ({ src, isHls, processing, poster, isCurrent, isMuted, onError
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-contain"
         loop
-        muted={isMuted}
+        muted
         playsInline
         onError={onError}
         onTimeUpdate={onTimeUpdate}
@@ -1080,18 +1085,18 @@ const Reels = () => {
                       <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 55%, rgba(0,0,0,0.85) 100%)' }} />
 
                       {videoUrl && !hasError && isCurrent && !isProcessing && (
-                        <button onClick={() => setIsMuted(m => !m)} className="absolute bottom-[10px] md:bottom-4 right-3 bg-black/50 p-1.5 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-20">
+                        <button onClick={(e) => { e.stopPropagation(); setIsMuted(m => !m); }} className="absolute bottom-[10px] md:bottom-4 right-3 bg-black/50 p-1.5 rounded-full text-white backdrop-blur-sm hover:bg-black/70 z-30">
                           {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                         </button>
                       )}
 
                       {isCurrent && (
-                        <div className="md:hidden absolute right-3 bottom-[155px] z-30">
+                        <div className="md:hidden absolute right-3 bottom-[90px] z-30">
                           <ActionButtons reel={reel} mobile onLike={handleLike} onComment={() => { setCurrentIndex(index); setCommentsOpen(true); }} onShare={handleShare} onSave={handleSave} onMore={handleReelMore} />
                         </div>
                       )}
 
-                      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-4">
+                      <div className="absolute bottom-0 left-0 right-0 z-20 pl-4 pr-[60px] md:pr-4 pb-4">
                         {/* Row 1: avatar + [username / audio stacked] + Follow */}
                         <div className="flex items-center gap-2.5 mb-1">
                           <Link
@@ -1121,7 +1126,7 @@ const Reels = () => {
                           <FollowButton userId={reel.user_id?._id || reel.user_id?.id || reel.user_id} initialFollowing={reel.is_followed_by_me || false} />
                         </div>
                         {/* Row 2: caption — min-h keeps mute button gap consistent when no caption */}
-                        <div className="min-h-[22px]">
+                        <div className="min-h-[22px] w-[300px]">
                           <Caption text={reel.caption} />
                           {reel.tags?.length > 0 && (
                             <p className="text-white/70 text-xs mt-0.5">{reel.tags.map(t => `#${t}`).join(' ')}</p>

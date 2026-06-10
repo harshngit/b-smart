@@ -3,13 +3,16 @@ import { Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Home, Plus, Target, User, LayoutDashboard, FileText,
-  Clapperboard, Settings, Megaphone, X, Coins, Search
+  Clapperboard, Settings, Megaphone, X, Coins, Search, MessageCircle
 } from 'lucide-react';
 
 const BottomNav = ({ onOpenCreateModal }) => {
   const location = useLocation();
   const { userObject } = useSelector((state) => state.auth);
   const isVendor = userObject?.role === 'vendor';
+  const chatUnreadCount = useSelector((state) =>
+    Object.values(state.chat?.unreadCounts || {}).reduce((sum, n) => sum + Number(n || 0), 0)
+  );
   const isVendorValidated = Boolean(
     userObject?.vendor_validated ??
     userObject?.validated ??
@@ -26,7 +29,8 @@ const BottomNav = ({ onOpenCreateModal }) => {
   const activeColor   = 'text-[#fa3f5e]';
   const inactiveColor = 'text-gray-500 dark:text-gray-400';
 
-  const hideBottomNav = ['/create-ad'].includes(location.pathname) || location.pathname.startsWith('/messages');
+  // Hide on create-ad and individual chat pages, but show on the messages list
+  const hideBottomNav = ['/create-ad'].includes(location.pathname) || location.pathname.startsWith('/messages/');
   if (hideBottomNav) return null;
 
   // Vendor: 3 left | FAB center | 3 right
@@ -40,13 +44,15 @@ const BottomNav = ({ onOpenCreateModal }) => {
     { icon: User,            path: '/vendor/profile',        label: 'Profile'   },
   ];
 
-  // Member: 2 left | FAB center | 2 right
+  // Member: 3 left | FAB center | 3 right
   const memberNav = [
-    { icon: Home,         path: '/',        label: 'Home'    },
-    { icon: Target,       path: '/ads',     label: 'Ads'     },
+    { icon: Home,          path: '/',         label: 'Home'     },
+    { icon: Target,        path: '/ads',      label: 'Ads'      },
+    { icon: Clapperboard,  path: '/reels',    label: 'Reels'    },
     null,
-    { icon: Clapperboard, path: '/reels',   label: 'Reels'   },
-    { icon: Search,       path: '/search',  label: 'Search'  },
+    { icon: Megaphone,     path: '/promote',  label: 'Promote'  },
+    { icon: MessageCircle, path: '/messages', label: 'Messages' },
+    { icon: Search,        path: '/search',   label: 'Search'   },
   ];
 
   const navItems = isVendor ? vendorNav : memberNav;
@@ -77,15 +83,23 @@ const BottomNav = ({ onOpenCreateModal }) => {
               </div>
             );
           }
+          const active = isActive(item.path);
           return (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center gap-0.5 flex-1 py-1 min-w-0 ${isActive(item.path) ? activeColor : inactiveColor}`}
+              className={`flex flex-col items-center gap-0.5 flex-1 py-1 min-w-0 ${active ? activeColor : inactiveColor}`}
             >
-              <item.icon size={isVendor ? 21 : 25} strokeWidth={isActive(item.path) ? 2.5 : 2} />
+              <div className="relative">
+                <item.icon size={isVendor ? 21 : 22} strokeWidth={active ? 2.5 : 2} />
+                {item.label === 'Messages' && chatUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-red-500 text-white text-[8px] font-black flex items-center justify-center leading-none">
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
+              </div>
               {isVendor && (
-                <span className={`text-[8.5px] font-semibold leading-none truncate w-full text-center px-0.5 ${isActive(item.path) ? 'text-[#fa3f5e]' : 'text-gray-400 dark:text-gray-500'}`}>
+                <span className={`text-[8.5px] font-semibold leading-none truncate w-full text-center px-0.5 ${active ? 'text-[#fa3f5e]' : 'text-gray-400 dark:text-gray-500'}`}>
                   {item.label}
                 </span>
               )}
