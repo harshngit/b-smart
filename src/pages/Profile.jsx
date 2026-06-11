@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, Wallet, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Twitter, Play, Image, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Play, Image, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -401,7 +401,7 @@ const Profile = () => {
     const dispatch = useDispatch();
     const { userId } = useParams();
     const { userObject: currentUser } = useSelector((state) => state.auth);
-    const walletBalance = useSelector((state) => state.wallet?.balance ?? 0);
+
 
     const [profileUser, setProfileUser] = useState(null);
     const isOwnProfile = !userId || (currentUser && (userId === currentUser.id || userId === currentUser._id));
@@ -1790,18 +1790,6 @@ const Profile = () => {
 
                     <VendorBusinessCard />
 
-                    {/* Floating Wallet */}
-                    <div className="mt-auto pt-6">
-                        <Link to="/wallet" className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 rounded-full border border-gray-100 dark:border-gray-800 p-1 pr-4 hover:scale-[1.02] transition-transform">
-                            <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white shadow">
-                                <Wallet size={16} />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[9px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Balance</span>
-                                <span className="text-sm font-bold text-gray-900 dark:text-white">{walletBalance} Coins</span>
-                            </div>
-                        </Link>
-                    </div>
                 </div>
 
                 {/* ── Right Panel: tabs + scrollable grid ─────────────────────── */}

@@ -1001,7 +1001,6 @@ const Ads = ({ feedMode = 'user' }) => {
       const res = await fetch(`${BASE_URL}/api/ads/${adId}/view`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ user: { id: currentUserId ? String(currentUserId) : undefined } }),
       });
 
       let resData = {};
@@ -1033,7 +1032,7 @@ const Ads = ({ feedMode = 'user' }) => {
       console.error('[view] tracking failed:', err);
       viewedIdsRef.current.delete(key);
     }
-  }, [currentUserId, refreshWallet]);
+  }, [refreshWallet]);
 
   // tracks ad _id strings that have already received a view API call (never double-fires)
   const viewFiredForAdId = useRef(new Set());

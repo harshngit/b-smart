@@ -36,7 +36,7 @@ const VendorLayout = () => {
         <TopBar />
 
         {/* Full width container for vendor dashboard pages */}
-        <div className="pt-16 md:pt-16 w-full px-4 md:px-8 pb-20 md:pb-4">
+        <div className="pt-16 md:pt-0 w-full px-4 md:px-8 pb-20 md:pb-4">
           <Outlet context={{ handleOpenCreateModal }} />
         </div>
       </div>
