@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import EmojiPicker from 'emoji-picker-react';
 import {
   X, Heart, MessageCircle, Send, Bookmark, MoreHorizontal,
   Smile, ChevronLeft, ChevronRight, Trash2,
@@ -517,6 +518,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
 
   const currentUserId = userObject?._id || userObject?.id || null;
   const isPostOwner = !isAd && currentUserId && userId && String(currentUserId) === String(userId);
+  const turnOffCommenting = !!(post?.turn_off_commenting || post?.engagement_controls?.turn_off_commenting);
 
   // Like/save state
   const [isLiked, setIsLiked] = useState(false);
@@ -539,6 +541,8 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef(null);
 
   // ── Init on open ────────────────────────────────────────────────────────────
 
@@ -615,6 +619,15 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
       fetchComments(initialPost._id || initialPost.id);
     }
   }, [isOpen, initialPost, currentUserId, isAd, isTweet, fetchComments]);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handler = (e) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) setShowEmojiPicker(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showEmojiPicker]);
 
   // Sync like/save state with feed (PostCard)
   useEffect(() => {
@@ -750,12 +763,14 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
   // ── Save post ───────────────────────────────────────────────────────────────
   const handleSave = () => {
     if (!postId || isTweet) return;
-    const newSaved = !isSaved;
+    const was = isSaved;
+    const newSaved = !was;
     setIsSaved(newSaved);
     window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: newSaved } }));
-    api.post(`/posts/${postId}/${isSaved ? 'unsave' : 'save'}`).catch(() => {
-      setIsSaved(isSaved);
-      window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: isSaved } }));
+    const base = isAd ? `/saved/ads/${postId}` : `/saved/posts/${postId}`;
+    api.post(was ? `${base}/unsave` : base).catch(() => {
+      setIsSaved(was);
+      window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: was } }));
     });
   };
 
@@ -961,7 +976,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
             )}
 
             {/* Comments */}
-            {loadingComments ? (
+            {!turnOffCommenting && (loadingComments ? (
               <div className="flex justify-center py-4">
                 <Loader2 size={24} className="animate-spin text-gray-400" />
               </div>
@@ -986,7 +1001,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                 <MessageCircle size={32} className="mb-2 opacity-40" />
                 <p>No comments yet. Be the first!</p>
               </div>
-            )}
+            ))}
           </div>
 
           {/* Footer: actions + comment input */}
@@ -997,9 +1012,11 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
                   <button onClick={handleLike} className="hover:opacity-50 transition-opacity active:scale-90">
                     <Heart size={24} className={isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900 dark:text-white'} />
                   </button>
-                  <button className="hover:opacity-50 transition-opacity">
-                    <MessageCircle size={24} className="text-gray-900 dark:text-white" />
-                  </button>
+                  {!turnOffCommenting && (
+                    <button className="hover:opacity-50 transition-opacity">
+                      <MessageCircle size={24} className="text-gray-900 dark:text-white" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => { if (canShareInChat) setShowShareModal(true); }}
@@ -1029,7 +1046,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
             </div>
 
             {/* Reply banner */}
-            {replyTo && (
+            {!turnOffCommenting && replyTo && (
               <div className="px-3 md:px-4 py-2 bg-gray-50 dark:bg-gray-900 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                 <span>Replying to <span className="font-semibold text-blue-500">@{replyTo.username}</span></span>
                 <button onClick={() => setReplyTo(null)}><X size={14} /></button>
@@ -1037,22 +1054,38 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
             )}
 
             {/* Comment input */}
-            <form onSubmit={handlePostComment} className="border-t border-gray-100 dark:border-gray-800 p-3 md:p-4 flex items-center gap-3">
-              <button type="button" className="text-gray-900 dark:text-white hover:opacity-50 shrink-0">
-                <Smile size={24} />
-              </button>
-              <input
-                type="text"
-                placeholder={replyTo ? `Reply to @${replyTo.username}...` : 'Add a comment...'}
-                className="flex-1 text-sm outline-none text-gray-900 dark:text-white bg-transparent placeholder-gray-400 dark:placeholder-gray-500"
-                value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-              />
-              <button type="submit" disabled={!newComment.trim()}
-                className={`text-blue-500 font-semibold text-sm shrink-0 ${!newComment.trim() ? 'opacity-40' : 'hover:text-blue-700'}`}>
-                Post
-              </button>
-            </form>
+            {!turnOffCommenting && (
+              <form onSubmit={handlePostComment} className="border-t border-gray-100 dark:border-gray-800 p-3 md:p-4 flex items-center gap-3">
+                <div className="relative shrink-0" ref={emojiPickerRef}>
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-full left-0 mb-2 z-50">
+                      <EmojiPicker
+                        theme="auto"
+                        onEmojiClick={(ed) => setNewComment(prev => prev + ed.emoji)}
+                        lazyLoadEmojis
+                        skinTonesDisabled
+                        previewConfig={{ showPreview: false }}
+                      />
+                    </div>
+                  )}
+                  <button type="button" onClick={() => setShowEmojiPicker(v => !v)}
+                    className="text-gray-900 dark:text-white hover:opacity-50">
+                    <Smile size={24} />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder={replyTo ? `Reply to @${replyTo.username}...` : 'Add a comment...'}
+                  className="flex-1 text-sm outline-none text-gray-900 dark:text-white bg-transparent placeholder-gray-400 dark:placeholder-gray-500"
+                  value={newComment}
+                  onChange={e => setNewComment(e.target.value)}
+                />
+                <button type="submit" disabled={!newComment.trim()}
+                  className={`text-blue-500 font-semibold text-sm shrink-0 ${!newComment.trim() ? 'opacity-40' : 'hover:text-blue-700'}`}>
+                  Post
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>

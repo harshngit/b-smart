@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import {
-  Heart, MessageCircle, Send, MoreHorizontal,
+  Heart, MessageCircle, Send, MoreHorizontal, Bookmark,
   ChevronLeft, ChevronRight, Volume2, VolumeX,
   ShoppingBag, Zap, UserPlus, UserCheck, Loader2
 } from 'lucide-react';
@@ -18,6 +18,11 @@ import Avatar from './Avatar';
 import ShareContentModal from './ShareContentModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
+
+const authHeaders = () => {
+  const token = localStorage.getItem('token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+};
 
 const fmt = (n = 0) => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -334,6 +339,7 @@ const PromoteCard = ({ item, onOpenDetail }) => {
   const [isLiked, setIsLiked] = useState(item?.is_liked_by_me || false);
   const [likeCount, setLikeCount] = useState(item?.likes_count ?? (Array.isArray(item?.likes) ? item.likes.length : 0));
   const [likeLoading, setLikeLoading] = useState(false);
+  const [isSaved, setIsSaved] = useState(item?.is_saved_by_me || false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [productsOpen, setProductsOpen] = useState(true);
 
@@ -349,6 +355,19 @@ const PromoteCard = ({ item, onOpenDetail }) => {
   const products = Array.isArray(item?.products) ? item.products : [];
   const createdAt = item?.createdAt || item?.created_at;
 
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    if (!currentUserId || !id) return;
+    const was = isSaved;
+    setIsSaved(!was);
+    try {
+      const base = `${BASE_URL}/api/saved/promote-reels/${id}`;
+      await fetch(was ? `${base}/unsave` : base, { method: 'POST', headers: authHeaders() });
+    } catch {
+      setIsSaved(was);
+    }
+  };
 
   const handleLike = async (e) => {
     e.stopPropagation();
@@ -454,9 +473,14 @@ const PromoteCard = ({ item, onOpenDetail }) => {
               <Send size={24} className="text-black dark:text-white" />
             </button>
           </div>
-          {authorId && userObject && String(currentUserId) !== String(authorId) && (
-            <FollowButton targetUserId={String(authorId)} />
-          )}
+          <div className="flex items-center gap-3">
+            <button onClick={handleSave} className="active:scale-90 transition-transform" aria-label={isSaved ? 'Unsave' : 'Save'}>
+              <Bookmark size={24} className={`transition-all duration-200 ${isSaved ? 'fill-black text-black dark:fill-white dark:text-white' : 'text-black dark:text-white'}`} />
+            </button>
+            {authorId && userObject && String(currentUserId) !== String(authorId) && (
+              <FollowButton targetUserId={String(authorId)} />
+            )}
+          </div>
         </div>
 
         {/* Like count */}

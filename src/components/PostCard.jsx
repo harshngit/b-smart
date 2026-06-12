@@ -709,6 +709,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   const isOwner    = !!(viewerId && userId && String(viewerId) === String(userId));
   const contentText = getContentText(post);
   const commentsCount = getCommentsCount(post);
+  const turnOffCommenting = !!(post?.turn_off_commenting || post?.engagement_controls?.turn_off_commenting);
 
   const mediaItems = post.media?.length > 0
     ? post.media
@@ -842,13 +843,14 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
   // ── Save handler ──────────────────────────────────────────────────────────
   const handleSave = async (e) => {
     e.stopPropagation();
-    if (!userObject || !postId || isAd || isTweet) return;
+    if (!userObject || !postId || isTweet) return;
     const was = isSaved;
     const newSaved = !was;
     setIsSaved(newSaved);
     window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: newSaved } }));
     try {
-      await api.post(`/posts/${postId}/${was ? 'unsave' : 'save'}`);
+      const base = isAd ? `/saved/ads/${postId}` : `/saved/posts/${postId}`;
+      await api.post(was ? `${base}/unsave` : base);
     } catch {
       setIsSaved(was);
       window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: was } }));
@@ -963,9 +965,11 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
               <button onClick={handleLike} className="active:scale-90 transition-transform opacity-85 hover:opacity-100" aria-label="Like">
                 <Heart size={20} className={isLiked ? 'fill-red-500 text-red-500' : ''} />
               </button>
-              <button onClick={() => onCommentClick?.(post)} className="active:scale-90 transition-transform opacity-85 hover:opacity-100" aria-label="Reply">
-                <MessageCircle size={20} />
-              </button>
+              {!turnOffCommenting && (
+                <button onClick={() => onCommentClick?.(post)} className="active:scale-90 transition-transform opacity-85 hover:opacity-100" aria-label="Reply">
+                  <MessageCircle size={20} />
+                </button>
+              )}
               
               <button
                 onClick={() => { if (canShareInChat) setShowShareModal(true); }}
@@ -980,9 +984,13 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
               <span className="cursor-default">
                 {fmt(likeCount)} {likeCount === 1 ? 'like' : 'likes'}
               </span>
-              <button onClick={() => onCommentClick?.(post)} className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
-                {fmt(commentsCount)} {commentsCount === 1 ? 'comment' : 'comments'}
-              </button>
+              {!turnOffCommenting ? (
+                <button onClick={() => onCommentClick?.(post)} className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                  {fmt(commentsCount)} {commentsCount === 1 ? 'comment' : 'comments'}
+                </button>
+              ) : (
+                <span>{fmt(commentsCount)} {commentsCount === 1 ? 'comment' : 'comments'}</span>
+              )}
             </div>
           </div>
         </div>
@@ -1131,9 +1139,11 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
             </button>
 
             {/* Comment */}
-            <button onClick={() => onCommentClick?.(post)} className="hover:opacity-60 transition-opacity" aria-label="Comment">
-              <MessageCircle size={24} className="text-black dark:text-white" />
-            </button>
+            {!turnOffCommenting && (
+              <button onClick={() => onCommentClick?.(post)} className="hover:opacity-60 transition-opacity" aria-label="Comment">
+                <MessageCircle size={24} className="text-black dark:text-white" />
+              </button>
+            )}
 
             {/* Share */}
             <button
@@ -1152,7 +1162,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
             )}
             {/* Save */}
             {!isTweet && (
-              <button onClick={isAd ? (e) => { e.stopPropagation(); setIsSaved(s => !s); } : handleSave}
+              <button onClick={handleSave}
                 className="active:scale-90 transition-transform" aria-label={isSaved ? 'Unsave' : 'Save'}>
                 <Bookmark size={24} className={`transition-all duration-200 ${isSaved ? 'fill-black text-black dark:fill-white dark:text-white' : 'text-black dark:text-white'}`} />
               </button>
@@ -1205,7 +1215,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
         )}
 
         {/* Comments link */}
-        {commentsCount > 0 && (
+        {commentsCount > 0 && !turnOffCommenting && (
           <button onClick={() => onCommentClick?.(post)}
             className="block text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 mb-1 mt-0.5 transition-colors">
             View all {fmt(commentsCount)} comments

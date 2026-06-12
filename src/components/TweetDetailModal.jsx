@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import EmojiPicker from 'emoji-picker-react';
 import {
   X, Heart, MessageCircle, Send, MoreHorizontal,
   Smile, ChevronLeft, ChevronRight, Loader2, UserPlus, UserCheck
@@ -183,6 +184,8 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef(null);
 
   const tweetId = tweet?._id || tweet?.id;
   const author = tweet?.author || tweet?.user || {};
@@ -191,6 +194,7 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
   const avatar = author.avatar_url || '';
   const userId = author._id || author.id;
   const isOwner = currentUserId && String(userId) === String(currentUserId);
+  const turnOffCommenting = !!(tweet?.turn_off_commenting || tweet?.engagement_controls?.turn_off_commenting);
   const profilePath = `/profile/${username}`;
   const contentText = tweet?.content || tweet?.caption || '';
 
@@ -218,6 +222,15 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handler = (e) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) setShowEmojiPicker(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showEmojiPicker]);
 
   // Sync like state with feed (PostCard)
   useEffect(() => {
@@ -321,7 +334,7 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
                 </div>
               </div>
             )}
-            {loadingComments ? (
+            {!turnOffCommenting && (loadingComments ? (
               <div className="flex justify-center py-4"><Loader2 size={24} className="animate-spin text-gray-400"/></div>
             ) : comments.length > 0 ? (
               comments.map(comment => (
@@ -332,7 +345,7 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
                 <MessageCircle size={32} className="mb-2 opacity-40"/>
                 <p>No comments yet. Be the first!</p>
               </div>
-            )}
+            ))}
           </div>
 
           {/* Footer */}
@@ -343,7 +356,7 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
                   <button onClick={handleLike} className="hover:opacity-50 transition-opacity active:scale-90">
                     <Heart size={24} className={isLiked?'fill-red-500 text-red-500':'text-gray-900 dark:text-white'}/>
                   </button>
-                  <button className="hover:opacity-50 transition-opacity"><MessageCircle size={24} className="text-gray-900 dark:text-white"/></button>
+                  {!turnOffCommenting && <button className="hover:opacity-50 transition-opacity"><MessageCircle size={24} className="text-gray-900 dark:text-white"/></button>}
                   <button onClick={() => setShowShareModal(true)} className="hover:opacity-50 transition-opacity"><Send size={24} className="text-gray-900 dark:text-white"/></button>
                 </div>
                 <div className="flex items-center gap-3">
@@ -353,19 +366,37 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
               <div className="font-semibold text-sm text-gray-900 dark:text-white mb-1">{fmt(likeCount)} likes</div>
               <div className="text-[10px] text-gray-400 uppercase tracking-wide">{formatDateFull(tweet.createdAt||tweet.created_at)}</div>
             </div>
-            {replyTo && (
+            {!turnOffCommenting && replyTo && (
               <div className="px-3 md:px-4 py-2 bg-gray-50 dark:bg-gray-900 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                 <span>Replying to <span className="font-semibold text-blue-500">@{replyTo.username}</span></span>
                 <button onClick={() => setReplyTo(null)}><X size={14}/></button>
               </div>
             )}
-            <form onSubmit={handlePostComment} className="border-t border-gray-100 dark:border-gray-800 p-3 md:p-4 flex items-center gap-3">
-              <button type="button" className="text-gray-900 dark:text-white hover:opacity-50 shrink-0"><Smile size={24}/></button>
-              <input type="text" placeholder={replyTo ? `Reply to @${replyTo.username}...` : 'Add a comment...'} className="flex-1 text-sm outline-none text-gray-900 dark:text-white bg-transparent placeholder-gray-400 dark:placeholder-gray-500" value={newComment} onChange={e => setNewComment(e.target.value)} disabled={postingComment}/>
-              <button type="submit" disabled={!newComment.trim()||postingComment} className={`text-blue-500 font-semibold text-sm shrink-0 ${!newComment.trim()||postingComment?'opacity-40':'hover:text-blue-700'}`}>
-                {postingComment ? <Loader2 size={16} className="animate-spin"/> : 'Post'}
-              </button>
-            </form>
+            {!turnOffCommenting && (
+              <form onSubmit={handlePostComment} className="border-t border-gray-100 dark:border-gray-800 p-3 md:p-4 flex items-center gap-3">
+                <div className="relative shrink-0" ref={emojiPickerRef}>
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-full left-0 mb-2 z-50">
+                      <EmojiPicker
+                        theme="auto"
+                        onEmojiClick={(ed) => setNewComment(prev => prev + ed.emoji)}
+                        lazyLoadEmojis
+                        skinTonesDisabled
+                        previewConfig={{ showPreview: false }}
+                      />
+                    </div>
+                  )}
+                  <button type="button" onClick={() => setShowEmojiPicker(v => !v)}
+                    className="text-gray-900 dark:text-white hover:opacity-50">
+                    <Smile size={24} />
+                  </button>
+                </div>
+                <input type="text" placeholder={replyTo ? `Reply to @${replyTo.username}...` : 'Add a comment...'} className="flex-1 text-sm outline-none text-gray-900 dark:text-white bg-transparent placeholder-gray-400 dark:placeholder-gray-500" value={newComment} onChange={e => setNewComment(e.target.value)} disabled={postingComment}/>
+                <button type="submit" disabled={!newComment.trim()||postingComment} className={`text-blue-500 font-semibold text-sm shrink-0 ${!newComment.trim()||postingComment?'opacity-40':'hover:text-blue-700'}`}>
+                  {postingComment ? <Loader2 size={16} className="animate-spin"/> : 'Post'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>

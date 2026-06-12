@@ -3180,7 +3180,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                     </button>
                     <div ref={emojiPickerRef} className="relative">
                       {showEmojiPicker && (
-                        <div className="absolute bottom-full left-0 mb-3 z-[80]">
+                        <div className="absolute bottom-5 left-0 mb-3 z-[80]">
                           <EmojiPicker
                             theme={mode === 'dark' ? 'dark' : 'light'}
                             onEmojiClick={handleEmojiClick}
@@ -3481,19 +3481,21 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   placeholder="Write a caption..."
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
                   maxLength={2200}
                 />
                 <div className="flex items-center justify-between mt-2">
                   <div className="relative">
                     <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><Smile size={20} /></button>
                     {showEmojiPicker && (
-                      <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 p-2 w-64 z-50">
-                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 px-1">Most popular</div>
-                        <div className="grid grid-cols-7 gap-1">
-                          {POPULAR_EMOJIS.map(emoji => (
-                            <button key={emoji} onClick={() => handleEmojiClick(emoji)} className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 dark:hover:bg-gray-700 rounded">{emoji}</button>
-                          ))}
-                        </div>
+                      <div className="absolute top-full -mt-24 left-0 z-50">
+                        <EmojiPicker
+                          theme={mode === 'dark' ? 'dark' : 'light'}
+                          onEmojiClick={handleEmojiClick}
+                          lazyLoadEmojis
+                          skinTonesDisabled
+                          previewConfig={{ showPreview: false }}
+                        />
                       </div>
                     )}
                   </div>

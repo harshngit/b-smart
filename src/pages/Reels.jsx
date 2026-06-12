@@ -175,6 +175,7 @@ const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSav
   const isSaved       = !!reel?.is_saved_by_me;
   const avatarUrl     = reel?.user_id?.avatar_url;
   const initial       = (reel?.user_id?.username || reel?.user_id?.full_name || 'U')[0]?.toUpperCase();
+  const turnOffCommenting = !!(reel?.turn_off_commenting || reel?.engagement_controls?.turn_off_commenting);
 
   return (
     <div className={`flex flex-col items-center ${mobile ? 'gap-2' : 'gap-4'}`}>
@@ -186,13 +187,15 @@ const ActionButtons = ({ reel, mobile = false, onLike, onComment, onShare, onSav
         <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>{formatCount(likesCount)}</span>
       </button>
 
-      <button onClick={() => onComment?.(reel)} className="flex flex-col items-center gap-1">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
-          ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-          <MessageCircle size={20} className={mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
-        </div>
-        <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>{formatCount(commentsCount)}</span>
-      </button>
+      {!turnOffCommenting && (
+        <button onClick={() => onComment?.(reel)} className="flex flex-col items-center gap-1">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
+            ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+            <MessageCircle size={20} className={mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
+          </div>
+          <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>{formatCount(commentsCount)}</span>
+        </button>
+      )}
 
       <button onClick={() => onShare?.(reel)} className="flex flex-col items-center gap-1">
         <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
@@ -830,7 +833,8 @@ const Reels = () => {
   };
 
   const handleSave = async (reelId, isSaved) => {
-    const endpoint = isSaved ? `${BASE_URL}/posts/${reelId}/unsave` : `${BASE_URL}/posts/${reelId}/save`;
+    const base = `${BASE_URL}/saved/posts/${reelId}`;
+    const endpoint = isSaved ? `${base}/unsave` : base;
     setReels(prev => prev.map(r => (r._id || r.post_id) === reelId ? { ...r, is_saved_by_me: !isSaved } : r));
     try { await fetch(endpoint, { method: 'POST', headers: authHeaders() }); }
     catch { setReels(prev => prev.map(r => (r._id || r.post_id) === reelId ? { ...r, is_saved_by_me: isSaved } : r)); }

@@ -749,6 +749,7 @@ const Home = () => {
   };
 
   const handleCommentClick = (item) => {
+    if (item?.turn_off_commenting || item?.engagement_controls?.turn_off_commenting) return;
     if (item.item_type === 'tweet') {
       setSelectedTweet(item);
       setSelectedItem(null); // Ensure PostDetailModal is closed

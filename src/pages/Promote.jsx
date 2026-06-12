@@ -231,13 +231,15 @@ const ActionButtons = ({ promote, likedIds, toggleLike, savedIds, toggleSave, mo
       <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>{fmt(promote.likes_count)}</span>
     </button>
 
-    <button onClick={() => onComment && onComment(promote)} className="flex flex-col items-center gap-1">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
-        ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-        <MessageCircle size={20} className={mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
-      </div>
-      <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>{fmt(promote.comments_count)}</span>
-    </button>
+    {!(promote?.turn_off_commenting || promote?.engagement_controls?.turn_off_commenting) && (
+      <button onClick={() => onComment && onComment(promote)} className="flex flex-col items-center gap-1">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
+          ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+          <MessageCircle size={20} className={mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
+        </div>
+        <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>{fmt(promote.comments_count)}</span>
+      </button>
+    )}
 
     <button className="flex flex-col items-center gap-1">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
@@ -725,6 +727,7 @@ const Promote = () => {
         setCurrentIndex(0);
         setProgress(0);
         setLikedIds(new Set(items.filter(p => p.is_liked_by_me).map(p => p._id)));
+        setSavedIds(new Set(items.filter(p => p.is_saved_by_me).map(p => p._id)));
       }
       setHasMore(items.length === 10);
     } catch (err) {
@@ -838,9 +841,18 @@ const Promote = () => {
     }
   }, [likedIds]);
 
-  const toggleSave = useCallback((id) => {
-    setSavedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  }, []);
+  const toggleSave = useCallback(async (id) => {
+    const wasSaved = savedIds.has(id);
+    setSavedIds(prev => { const s = new Set(prev); wasSaved ? s.delete(id) : s.add(id); return s; });
+    setPromotes(prev => prev.map(p => p._id === id ? { ...p, is_saved_by_me: !wasSaved } : p));
+    try {
+      const base = `${BASE_URL}/api/saved/promote-reels/${id}`;
+      await fetch(wasSaved ? `${base}/unsave` : base, { method: 'POST', headers: authHeaders() });
+    } catch {
+      setSavedIds(prev => { const s = new Set(prev); wasSaved ? s.add(id) : s.delete(id); return s; });
+      setPromotes(prev => prev.map(p => p._id === id ? { ...p, is_saved_by_me: wasSaved } : p));
+    }
+  }, [savedIds]);
 
   // ── Comments (mirrors Ads.jsx) ────────────────────────────────────────────────
   const loadReplies = useCallback(async (commentId) => {

@@ -414,15 +414,17 @@ const ActionButtons = ({ ad, likedIds, toggleLike, savedIds, toggleSave, mobile 
   
 
     {/* Comment */}
-    <button onClick={() => onComment && onComment(ad)} className="flex flex-col items-center gap-1">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
-        ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-        <MessageCircle size={20} className={mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
-      </div>
-      <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>
-        {fmt(ad.comments_count)}
-      </span>
-    </button>
+    {!(ad?.turn_off_commenting || ad?.engagement_controls?.turn_off_commenting) && (
+      <button onClick={() => onComment && onComment(ad)} className="flex flex-col items-center gap-1">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
+          ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+          <MessageCircle size={20} className={mobile ? 'text-white' : 'text-gray-800 dark:text-white'} />
+        </div>
+        <span className={`text-xs font-semibold ${mobile ? 'text-white' : 'text-gray-700 dark:text-white'}`}>
+          {fmt(ad.comments_count)}
+        </span>
+      </button>
+    )}
 
     {/* Share */}
     <button onClick={() => onShare?.(ad)} className="flex flex-col items-center gap-1">
@@ -894,6 +896,7 @@ const Ads = ({ feedMode = 'user' }) => {
         setCurrentIndex(0);
         setProgress(0);
         setLikedIds(new Set(enriched.filter(a => a.is_liked_by_me).map(a => a._id)));
+        setSavedIds(new Set(enriched.filter(a => a.is_saved_by_me).map(a => a._id)));
         return;
       }
       throw new Error(`HTTP ${lastStatus || 0}`);
@@ -1230,9 +1233,18 @@ const Ads = ({ feedMode = 'user' }) => {
 
   // ── Dislike ───────────────────────────────────────────────────────────────────
 
-  const toggleSave = useCallback((adId) => {
-    setSavedIds(prev => { const s = new Set(prev); s.has(adId) ? s.delete(adId) : s.add(adId); return s; });
-  }, []);
+  const toggleSave = useCallback(async (adId) => {
+    const wasSaved = savedIds.has(adId);
+    setSavedIds(prev => { const s = new Set(prev); wasSaved ? s.delete(adId) : s.add(adId); return s; });
+    setAds(prev => prev.map(a => a._id === adId ? { ...a, is_saved_by_me: !wasSaved } : a));
+    try {
+      const base = `/saved/ads/${adId}`;
+      await api.post(wasSaved ? `${base}/unsave` : base);
+    } catch {
+      setSavedIds(prev => { const s = new Set(prev); wasSaved ? s.add(adId) : s.delete(adId); return s; });
+      setAds(prev => prev.map(a => a._id === adId ? { ...a, is_saved_by_me: wasSaved } : a));
+    }
+  }, [savedIds]);
 
   // ── Ad Click Tracking ─────────────────────────────────────────────────────────
   // Fires POST /api/ads/{id}/click when user clicks the vendor name/profile.
