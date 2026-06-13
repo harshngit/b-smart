@@ -799,6 +799,22 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
     return () => window.removeEventListener('bsmart:post-state', handler);
   }, [postId]);
 
+  // For ads: fetch fresh is_saved_by_me / is_liked_by_me from the detail endpoint
+  // (the feed API may not return correct saved state for ads)
+  useEffect(() => {
+    if (!isAd || !postId) return;
+    api.get(`/ads/${postId}`)
+      .then(({ data }) => {
+        const ad = data?.ad || data?.data || data;
+        if (ad?.is_saved_by_me !== undefined) setIsSaved(ad.is_saved_by_me);
+        if (ad?.is_liked_by_me !== undefined) setIsLiked(ad.is_liked_by_me);
+        const freshCount = ad?.likes_count ?? (Array.isArray(ad?.likes) ? ad.likes.length : undefined);
+        if (freshCount !== undefined) setLikeCount(freshCount);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId]);
+
   // ── Like handler ──────────────────────────────────────────────────────────
   const handleLike = async () => {
     if (!userObject) return;

@@ -622,7 +622,13 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
             if (ad?.is_liked_by_me !== undefined) setIsLiked(ad.is_liked_by_me);
             const freshCount = getLikeCount(ad);
             if (freshCount !== undefined) setLikeCount(freshCount);
-            if (ad?.is_saved_by_me !== undefined) setIsSaved(ad.is_saved_by_me);
+            if (ad?.is_saved_by_me !== undefined) {
+              setIsSaved(ad.is_saved_by_me);
+              // Sync PostCard in the feed so its bookmark icon matches
+              window.dispatchEvent(new CustomEvent('bsmart:post-state', {
+                detail: { postId: String(initialPost._id), isSaved: ad.is_saved_by_me },
+              }));
+            }
           })
           .catch(() => {});
       }

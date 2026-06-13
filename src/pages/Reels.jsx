@@ -780,13 +780,37 @@ const Reels = () => {
           } catch { /* keep null */ }
         }
 
+        // Bulk follow check for reel authors
+        let followingSet = new Set();
+        const authorIds = [...new Set(
+          reelsList.map(r => {
+            const a = r.user_id;
+            return typeof a === 'string' ? a : (a?._id || a?.id || '');
+          }).filter(Boolean)
+        )];
+        if (authorIds.length > 0) {
+          try {
+            const { data: followData } = await api.post('/follows/status/bulk', { userIds: authorIds });
+            const statuses = normalizeApiArray(followData);
+            followingSet = new Set(
+              statuses.filter(s => Boolean(s?.isFollowing)).map(s => String(s?.userId || ''))
+            );
+          } catch { /* keep empty */ }
+        }
+
         setReels(
-          reelsList.map(r => ({
-            ...r,
-            is_saved_by_me: savedIds
-              ? savedIds.has(String(r._id || r.post_id || ''))
-              : !!(r.is_saved_by_me),
-          }))
+          reelsList.map(r => {
+            const authorId = typeof r.user_id === 'string' ? r.user_id : (r.user_id?._id || r.user_id?.id || '');
+            return {
+              ...r,
+              is_saved_by_me: savedIds
+                ? savedIds.has(String(r._id || r.post_id || ''))
+                : !!(r.is_saved_by_me),
+              is_author_followed_by_me: authorId
+                ? followingSet.has(String(authorId))
+                : !!(r.is_author_followed_by_me || r.is_followed_by_me),
+            };
+          })
         );
       } catch (err) { setError(err.message); }
       finally { setLoading(false); }
@@ -1161,7 +1185,7 @@ const Reels = () => {
                               </span>
                             </div>
                           </div>
-                          <FollowButton userId={reel.user_id?._id || reel.user_id?.id || reel.user_id} initialFollowing={reel.is_followed_by_me || false} />
+                          <FollowButton userId={reel.user_id?._id || reel.user_id?.id || reel.user_id} initialFollowing={reel.is_author_followed_by_me ?? reel.is_followed_by_me ?? false} />
                         </div>
                         {/* Row 2: caption — min-h keeps mute button gap consistent when no caption */}
                         <div className="min-h-[22px] w-[300px]">

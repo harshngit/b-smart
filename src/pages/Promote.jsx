@@ -190,9 +190,10 @@ const CommentsContent = ({ comments, replies, expandedComments, onToggleReplies,
 );
 
 // ─── Follow Button ─────────────────────────────────────────────────────────────
-const FollowButton = ({ userId, mobile = false }) => {
-  const [followed, setFollowed] = useState(false);
+const FollowButton = ({ userId, mobile = false, initialFollowing = false }) => {
+  const [followed, setFollowed] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
+  useEffect(() => { setFollowed(initialFollowing); }, [initialFollowing]);
   const toggle = async (e) => {
     e.stopPropagation();
     if (loading || !userId) return;
@@ -510,7 +511,7 @@ const SlideBottomInfo = ({ p, isMuted, onToggleMute }) => {
           ? <img src={user.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover shrink-0" alt="user" />
           : <div className="w-8 h-8 rounded-full border border-white/30 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shrink-0">{username[0]}</div>}
         <span className="font-bold text-white text-sm truncate flex-1">{username}</span>
-        <FollowButton userId={user._id || user.id} mobile />
+        <FollowButton userId={user._id || user.id} mobile initialFollowing={p.is_author_followed_by_me || false} />
       </div>
 
       {/* Caption + Hide Products */}
@@ -722,12 +723,68 @@ const Promote = () => {
       const items = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
       if (append) {
         setPromotes(prev => [...prev, ...items]);
+        // Merge any saved items from the new page into the existing Set
+        setSavedIds(prev => {
+          const updated = new Set(prev);
+          items.filter(p => p.is_saved_by_me).forEach(p => updated.add(p._id));
+          return updated;
+        });
       } else {
-        setPromotes(items);
+        // Fetch saved promote-reel IDs from dedicated endpoint (same pattern as Home.jsx)
+        let savedSet = null;
+        try {
+          const savedRes = await fetch(`${BASE_URL}/api/saved/promote-reels`, { headers: authHeaders() });
+          if (savedRes.ok) {
+            const savedData = await savedRes.json();
+            const rawSaved = Array.isArray(savedData)
+              ? savedData
+              : (savedData?.data ?? savedData?.savedPromoteReels ?? savedData?.saved_promote_reels ?? savedData?.promote_reels ?? null);
+            if (Array.isArray(rawSaved)) {
+              savedSet = new Set(
+                rawSaved.map(i => String(i.promote_reel?._id || i.promote_reel_id || i._id || i.id || '')).filter(Boolean)
+              );
+            }
+          }
+        } catch { /* savedSet stays null → use fallback */ }
+
+        // Bulk follow check for promote reel authors
+        let followingSet = new Set();
+        const promoteAuthorIds = [...new Set(
+          items.map(p => {
+            const a = p.user_id;
+            return typeof a === 'string' ? a : (a?._id || a?.id || '');
+          }).filter(Boolean)
+        )];
+        if (promoteAuthorIds.length > 0) {
+          try {
+            const fRes = await fetch(`${BASE_URL}/api/follows/status/bulk`, {
+              method: 'POST', headers: authHeaders(), body: JSON.stringify({ userIds: promoteAuthorIds }),
+            });
+            if (fRes.ok) {
+              const followData = await fRes.json();
+              const statuses = Array.isArray(followData) ? followData : (followData?.data ?? []);
+              followingSet = new Set(
+                statuses.filter(s => Boolean(s?.isFollowing)).map(s => String(s?.userId || ''))
+              );
+            }
+          } catch { /* keep empty */ }
+        }
+
+        const enriched = items.map(p => {
+          const a = p.user_id;
+          const authorId = typeof a === 'string' ? a : (a?._id || a?.id || '');
+          return {
+            ...p,
+            is_saved_by_me: savedSet ? savedSet.has(String(p._id || '')) : !!(p.is_saved_by_me),
+            is_author_followed_by_me: authorId ? followingSet.has(String(authorId)) : !!(p.is_author_followed_by_me),
+          };
+        });
+
+        setPromotes(enriched);
         setCurrentIndex(0);
         setProgress(0);
-        setLikedIds(new Set(items.filter(p => p.is_liked_by_me).map(p => p._id)));
-        setSavedIds(new Set(items.filter(p => p.is_saved_by_me).map(p => p._id)));
+        setLikedIds(new Set(enriched.filter(p => p.is_liked_by_me).map(p => p._id)));
+        setSavedIds(savedSet ?? new Set(enriched.filter(p => p.is_saved_by_me).map(p => p._id)));
       }
       setHasMore(items.length === 10);
     } catch (err) {

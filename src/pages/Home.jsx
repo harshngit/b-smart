@@ -30,11 +30,27 @@ const normalizeApiArray = (value) => {
   const candidates = [
     value.data, value?.data?.data, value.posts, value.feed, value.items,
     value.results, value.ads, value.users, value.reels,
+    // saved posts
     value.saved, value.savedPosts, value.saved_posts, value.savedItems, value.saved_items,
-    value.savedReels, value.saved_reels, value.savedAds, value.saved_ads,
+    // saved reels
+    value.savedReels, value.saved_reels,
+    // saved ads
+    value.savedAds, value.saved_ads,
+    // saved promote reels (all naming conventions)
+    value.savedPromoteReels, value.saved_promote_reels,
+    value.promote_reels, value.promoteReels,
+    value.promotedReels, value.promoted_reels,
+    value.savePromoteReels, value.save_promote_reels,
+    // data.* variants
     value?.data?.posts, value?.data?.feed, value?.data?.items, value?.data?.results,
     value?.data?.ads, value?.data?.users, value?.data?.reels,
-    value?.data?.saved, value?.data?.savedPosts, value?.data?.saved_posts, value?.data?.savedItems,
+    value?.data?.saved,
+    value?.data?.savedPosts, value?.data?.saved_posts,
+    value?.data?.savedItems, value?.data?.saved_items,
+    value?.data?.savedReels, value?.data?.saved_reels,
+    value?.data?.savedAds, value?.data?.saved_ads,
+    value?.data?.savedPromoteReels, value?.data?.saved_promote_reels,
+    value?.data?.promote_reels, value?.data?.promoteReels,
     value?.data?.data?.posts, value?.data?.data?.feed, value?.data?.data?.items,
     value?.data?.data?.results, value?.data?.data?.ads,
   ];
@@ -724,28 +740,54 @@ const Home = () => {
     } catch { return []; }
   }, []);
 
-  // Returns a Set of saved IDs, or null if the endpoint failed (caller falls back to item.is_saved_by_me)
+  // Returns a Set of saved IDs, or null when format is unknown (caller falls back to item.is_saved_by_me).
+  // Returning null is intentional: an empty Set is truthy and suppresses the fallback.
   const fetchSavedPostIds = useCallback(async () => {
     try {
       const { data } = await api.get('/saved/posts');
-      const items = normalizeApiArray(data);
-      return new Set(items.map(i => String(i.post?._id || i.post_id || i._id || i.id || '')).filter(Boolean));
+      if (!data) return null;
+      const arr = Array.isArray(data) ? data
+        : Array.isArray(data.data) ? data.data
+        : Array.isArray(data.savedPosts) ? data.savedPosts
+        : Array.isArray(data.saved_posts) ? data.saved_posts
+        : Array.isArray(data.posts) ? data.posts
+        : Array.isArray(data.saved) ? data.saved
+        : null;
+      if (arr === null) return null;
+      return new Set(arr.map(i => String(i.post?._id || i.post_id || i._id || i.id || '')).filter(Boolean));
     } catch { return null; }
   }, []);
 
   const fetchSavedPromoteReelIds = useCallback(async () => {
     try {
       const { data } = await api.get('/saved/promote-reels');
-      const items = normalizeApiArray(data);
-      return new Set(items.map(i => String(i.promote_reel?._id || i.promote_reel_id || i._id || i.id || '')).filter(Boolean));
+      if (!data) return null;
+      const arr = Array.isArray(data) ? data
+        : Array.isArray(data.data) ? data.data
+        : Array.isArray(data.savedPromoteReels) ? data.savedPromoteReels
+        : Array.isArray(data.saved_promote_reels) ? data.saved_promote_reels
+        : Array.isArray(data.promote_reels) ? data.promote_reels
+        : Array.isArray(data.promoteReels) ? data.promoteReels
+        : Array.isArray(data.saved) ? data.saved
+        : null;
+      if (arr === null) return null;
+      return new Set(arr.map(i => String(i.promote_reel?._id || i.promote_reel_id || i._id || i.id || '')).filter(Boolean));
     } catch { return null; }
   }, []);
 
   const fetchSavedAdIds = useCallback(async () => {
     try {
       const { data } = await api.get('/saved/ads');
-      const items = normalizeApiArray(data);
-      return new Set(items.map(i => String(i.ad?._id || i.ad_id || i._id || i.id || '')).filter(Boolean));
+      if (!data) return null;
+      const arr = Array.isArray(data) ? data
+        : Array.isArray(data.data) ? data.data
+        : Array.isArray(data.savedAds) ? data.savedAds
+        : Array.isArray(data.saved_ads) ? data.saved_ads
+        : Array.isArray(data.ads) ? data.ads
+        : Array.isArray(data.saved) ? data.saved
+        : null;
+      if (arr === null) return null;
+      return new Set(arr.map(i => String(i.ad?._id || i.ad_id || i._id || i.id || '')).filter(Boolean));
     } catch { return null; }
   }, []);
 

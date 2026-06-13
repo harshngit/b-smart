@@ -345,9 +345,10 @@ const mediaUrl = (ad) => {
 
 
 // ─── Follow Button ─────────────────────────────────────────────────────────────
-const FollowButton = ({ userId, mobile = false }) => {
-  const [followed, setFollowed] = useState(false);
+const FollowButton = ({ userId, mobile = false, initialFollowing = false }) => {
+  const [followed, setFollowed] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
+  useEffect(() => { setFollowed(initialFollowing); }, [initialFollowing]);
 
   const toggle = async (e) => {
     e.stopPropagation();
@@ -886,17 +887,61 @@ const Ads = ({ feedMode = 'user' }) => {
                   comments_count: fresh.comments_count ?? ad.comments_count ?? 0,
                   views_count: fresh.views_count ?? ad.views_count ?? 0,
                   is_liked_by_me: fresh.is_liked_by_me ?? ad.is_liked_by_me ?? false,
+                  is_saved_by_me: fresh.is_saved_by_me ?? ad.is_saved_by_me ?? false,
                 };
               }
             } catch { /* use original */ }
             return ad;
           })
         );
-        setAds(enriched);
+        // Bulk follow check for ad authors
+        let followingSet = new Set();
+        const adAuthorIds = [...new Set(
+          enriched.map(a => {
+            const author = a.user_id;
+            return typeof author === 'string' ? author : (author?._id || author?.id || '');
+          }).filter(Boolean)
+        )];
+        if (adAuthorIds.length > 0) {
+          try {
+            const fRes = await fetch(`${BASE_URL}/api/follows/status/bulk`, {
+              method: 'POST', headers: authHeaders(), body: JSON.stringify({ userIds: adAuthorIds }),
+            });
+            if (fRes.ok) {
+              const followData = await fRes.json();
+              const statuses = Array.isArray(followData) ? followData : (followData?.data ?? []);
+              followingSet = new Set(
+                statuses.filter(s => Boolean(s?.isFollowing)).map(s => String(s?.userId || ''))
+              );
+            }
+          } catch { /* keep empty */ }
+        }
+
+        const enrichedWithFollow = enriched.map(a => {
+          const author = a.user_id;
+          const authorId = typeof author === 'string' ? author : (author?._id || author?.id || '');
+          return { ...a, is_author_followed_by_me: authorId ? followingSet.has(String(authorId)) : !!(a.is_author_followed_by_me) };
+        });
+
+        setAds(enrichedWithFollow);
         setCurrentIndex(0);
         setProgress(0);
-        setLikedIds(new Set(enriched.filter(a => a.is_liked_by_me).map(a => a._id)));
-        setSavedIds(new Set(enriched.filter(a => a.is_saved_by_me).map(a => a._id)));
+        setLikedIds(new Set(enrichedWithFollow.filter(a => a.is_liked_by_me).map(a => a._id)));
+
+        // Fetch saved ad IDs from dedicated endpoint (same pattern as Home.jsx)
+        let savedSet = null;
+        try {
+          const { data: savedData } = await api.get('/saved/ads');
+          const rawSaved = Array.isArray(savedData)
+            ? savedData
+            : (savedData?.data ?? savedData?.savedAds ?? savedData?.saved_ads ?? savedData?.ads ?? null);
+          if (Array.isArray(rawSaved)) {
+            savedSet = new Set(
+              rawSaved.map(i => String(i.ad?._id || i.ad_id || i._id || i.id || '')).filter(Boolean)
+            );
+          }
+        } catch { /* savedSet stays null → use fallback */ }
+        setSavedIds(savedSet ?? new Set(enrichedWithFollow.filter(a => a.is_saved_by_me).map(a => a._id)));
         return;
       }
       throw new Error(`HTTP ${lastStatus || 0}`);
@@ -1917,7 +1962,7 @@ const Ads = ({ feedMode = 'user' }) => {
                               <CoinIcon size={11} /><span className="text-amber-300 text-[10px] font-bold">{fmt(a.total_budget_coins)}</span>
                             </div>
                           )}
-                          <FollowButton userId={a.user_id?._id} mobile />
+                          <FollowButton userId={a.user_id?._id} mobile initialFollowing={a.is_author_followed_by_me || false} />
                         </div>
 
                         {/* Row 2: Ad Category • Ad Description (truncated) + Mute button */}

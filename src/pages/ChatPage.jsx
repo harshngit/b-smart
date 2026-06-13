@@ -1730,6 +1730,7 @@ export default function ChatPage() {
     const senderName = String(message?.sender?._id || message?.sender) === String(currentUserId) ? 'You' : getUserName(sender);
     setReplyTo({ messageId: message._id, text: message.text || 'Attachment', senderName, senderId: message?.sender?._id || message?.sender });
     setReactionPickerFor(null); setContextMenu(null);
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const handleReact = (message) => {
@@ -1952,7 +1953,7 @@ export default function ChatPage() {
         {hasReplyContent(message.replyTo) ? (
           <div className={`mb-1 rounded-2xl border px-3 py-2 text-xs ${mine ? 'bg-[#672ec3] border-white/10' : 'bg-gray-200/50 dark:bg-[#1a1a1a] border-gray-300 dark:border-white/10'}`}>
             <p className={`mb-1 font-semibold ${mine ? 'text-white/80' : 'text-gray-900 dark:text-white/80'}`}>
-              {String(message.replyTo.senderId) === String(currentUserId) ? 'You replied' : `${message.replyTo.senderName || 'User'} replied`}
+              {mine ? 'You replied' : `${getUserName(sender) || message.replyTo.senderName || 'User'} replied`}
             </p>
             <p className={`line-clamp-2 ${mine ? 'text-white/70' : 'text-gray-600 dark:text-white/70'}`}>{message.replyTo.text || 'Attachment'}</p>
           </div>
@@ -2990,6 +2991,7 @@ export default function ChatPage() {
               const senderName = String(contextMenu.message?.sender?._id || contextMenu.message?.sender) === String(currentUserId) ? 'You' : getUserName(sender);
               setReplyTo({ messageId: contextMenu.message._id, text: contextMenu.message.text || 'Attachment', senderName, senderId: contextMenu.message?.sender?._id || contextMenu.message?.sender });
               setContextMenu(null);
+              setTimeout(() => inputRef.current?.focus(), 50);
             }}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition hover:bg-gray-50 dark:hover:bg-white/5"
           >
