@@ -265,25 +265,24 @@ const CardMedia = ({ item }) => {
 };
 
 // ── Follow Button — exact copy of PostCard's FollowButton ─────────────────────
-const FollowButton = ({ targetUserId }) => {
+const FollowButton = ({ targetUserId, defaultFollowState = 'not_following' }) => {
   const { userObject } = useSelector(s => s.auth);
-  const [followState, setFollowState] = useState('not_following');
+  const [followState, setFollowState] = useState(defaultFollowState);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { setFollowState(defaultFollowState); }, [defaultFollowState]);
 
   useEffect(() => {
     let isMounted = true;
     const loadStatus = async () => {
-      if (!userObject || !targetUserId || String(userObject._id || userObject.id) === String(targetUserId)) {
-        if (isMounted) setFollowState('not_following');
-        return;
-      }
+      if (!userObject || !targetUserId || String(userObject._id || userObject.id) === String(targetUserId)) return;
       try {
         const status = await checkFollowStatus(targetUserId);
         if (!isMounted) return;
         if (status?.isFollowing || status?.status === 'following') setFollowState('following');
         else if (status?.isPending || status?.requestPending || status?.requested || status?.status === 'pending') setFollowState('requested');
         else setFollowState('not_following');
-      } catch { if (isMounted) setFollowState('not_following'); }
+      } catch { /* keep current state on API error */ }
     };
     loadStatus();
     return () => { isMounted = false; };
@@ -320,10 +319,10 @@ const FollowButton = ({ targetUserId }) => {
 
   return (
     <button onClick={handleClick} disabled={loading}
-      className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''} ${
+      className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border-2 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''} ${
         isFollowing || isRequested
-          ? 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
-          : 'border-gray-900 dark:border-white text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10'
+          ? 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-400'
+          : 'border-white text-black dark:text-white bg-white dark:bg-transparent dark:border-white hover:bg-gray-100 dark:hover:bg-white/10'
       }`}>
       {loading ? <Loader2 size={11} className="animate-spin" /> : isFollowing ? <UserCheck size={11} /> : <UserPlus size={11} />}
       <span>{isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}</span>
@@ -474,12 +473,12 @@ const PromoteCard = ({ item, onOpenDetail }) => {
             </button>
           </div>
           <div className="flex items-center gap-3">
+            {authorId && userObject && String(currentUserId) !== String(authorId) && (
+              <FollowButton targetUserId={String(authorId)} defaultFollowState={item.is_author_followed_by_me ? 'following' : 'not_following'} />
+            )}
             <button onClick={handleSave} className="active:scale-90 transition-transform" aria-label={isSaved ? 'Unsave' : 'Save'}>
               <Bookmark size={24} className={`transition-all duration-200 ${isSaved ? 'fill-black text-black dark:fill-white dark:text-white' : 'text-black dark:text-white'}`} />
             </button>
-            {authorId && userObject && String(currentUserId) !== String(authorId) && (
-              <FollowButton targetUserId={String(authorId)} />
-            )}
           </div>
         </div>
 

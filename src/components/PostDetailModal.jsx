@@ -604,7 +604,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
       setIsDisliked(false);
       setIsSaved(initialPost.is_saved_by_me || false);
 
-      // Fetch fresh post data + comments
+      // Fetch fresh post/ad data + comments
       if (!isAd && initialPost._id) {
         api.get(`${isTweet ? '/tweets' : '/posts'}/${initialPost._id}`)
           .then(({ data }) => {
@@ -613,6 +613,16 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
             const freshCount = getLikeCount(data);
             if (freshCount !== undefined) setLikeCount(freshCount);
             if (data.is_saved_by_me !== undefined) setIsSaved(data.is_saved_by_me);
+          })
+          .catch(() => {});
+      } else if (isAd && initialPost._id) {
+        api.get(`/ads/${initialPost._id}`)
+          .then(({ data }) => {
+            const ad = data?.ad || data?.data || data;
+            if (ad?.is_liked_by_me !== undefined) setIsLiked(ad.is_liked_by_me);
+            const freshCount = getLikeCount(ad);
+            if (freshCount !== undefined) setLikeCount(freshCount);
+            if (ad?.is_saved_by_me !== undefined) setIsSaved(ad.is_saved_by_me);
           })
           .catch(() => {});
       }
@@ -768,7 +778,8 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose }) => {
     setIsSaved(newSaved);
     window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: newSaved } }));
     const base = isAd ? `/saved/ads/${postId}` : `/saved/posts/${postId}`;
-    api.post(was ? `${base}/unsave` : base).catch(() => {
+    api.post(was ? `${base}/unsave` : base).catch((err) => {
+      if (err?.response?.status === 409) return; // already in target state; keep optimistic update
       setIsSaved(was);
       window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: was } }));
     });

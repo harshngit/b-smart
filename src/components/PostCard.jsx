@@ -155,18 +155,17 @@ const PeopleTagsOverlay = ({ tags }) => {
 };
 
 // ─── Follow Button ─────────────────────────────────────────────────────────────
-const FollowButton = ({ targetUserId }) => {
+const FollowButton = ({ targetUserId, defaultFollowState = 'not_following' }) => {
   const { userObject } = useSelector(s => s.auth);
-  const [followState, setFollowState] = useState('not_following');
+  const [followState, setFollowState] = useState(defaultFollowState);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { setFollowState(defaultFollowState); }, [defaultFollowState]);
 
   useEffect(() => {
     let isMounted = true;
     const loadStatus = async () => {
-      if (!userObject || !targetUserId || String(userObject._id || userObject.id) === String(targetUserId)) {
-        if (isMounted) setFollowState('not_following');
-        return;
-      }
+      if (!userObject || !targetUserId || String(userObject._id || userObject.id) === String(targetUserId)) return;
       try {
         const status = await checkFollowStatus(targetUserId);
         if (!isMounted) return;
@@ -177,9 +176,7 @@ const FollowButton = ({ targetUserId }) => {
         } else {
           setFollowState('not_following');
         }
-      } catch {
-        if (isMounted) setFollowState('not_following');
-      }
+      } catch { /* keep current state on API error */ }
     };
     loadStatus();
     return () => { isMounted = false; };
@@ -851,7 +848,8 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
     try {
       const base = isAd ? `/saved/ads/${postId}` : `/saved/posts/${postId}`;
       await api.post(was ? `${base}/unsave` : base);
-    } catch {
+    } catch (err) {
+      if (err?.response?.status === 409) return; // 409 = already in target state; keep optimistic update
       setIsSaved(was);
       window.dispatchEvent(new CustomEvent('bsmart:post-state', { detail: { postId: String(postId), isSaved: was } }));
     }
@@ -1158,7 +1156,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
           <div className="flex items-center gap-3">
             {/* Follow — for non-owner posts/reels AND for ads */}
             {!isOwner && userId && userObject && (
-              <FollowButton targetUserId={String(userId)} />
+              <FollowButton targetUserId={String(userId)} defaultFollowState={post.is_author_followed_by_me ? 'following' : 'not_following'} />
             )}
             {/* Save */}
             {!isTweet && (

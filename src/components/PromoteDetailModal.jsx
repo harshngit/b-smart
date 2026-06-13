@@ -4,7 +4,7 @@ import {
   X, Heart, MessageCircle, Send, MoreHorizontal,
   Smile, ChevronLeft, ChevronRight, Trash2,
   Volume2, VolumeX, UserPlus, UserCheck, ShoppingBag,
-  Loader2, Zap
+  Loader2, Zap, Bookmark
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
@@ -397,6 +397,7 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [likeLoading, setLikeLoading] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [comments, setComments] = useState([]);
   const [replies, setReplies] = useState({});
   const [expandedComments, setExpandedComments] = useState({});
@@ -443,11 +444,20 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
       setNewComment(''); setReplyTo(null); setReplies({}); setExpandedComments({});
       setIsLiked(initialItem.is_liked_by_me || false);
       setLikeCount(initialItem.likes_count ?? (Array.isArray(initialItem.likes) ? initialItem.likes.length : 0));
+      setIsSaved(initialItem.is_saved_by_me || false);
       const rid = initialItem._id || initialItem.promote_reel_id;
       if (rid) {
-        // Normalize response — some API wrappers return { data: item }
         promoteReelService.getPromoteReelById(rid)
-          .then(res => { const normalized = res?.data || res; if (normalized?._id) setItem(normalized); })
+          .then(res => {
+            const normalized = res?.data || res;
+            if (normalized?._id) {
+              setItem(normalized);
+              if (normalized.is_saved_by_me !== undefined) setIsSaved(normalized.is_saved_by_me);
+              if (normalized.is_liked_by_me !== undefined) setIsLiked(normalized.is_liked_by_me);
+              const freshCount = normalized.likes_count ?? (Array.isArray(normalized.likes) ? normalized.likes.length : undefined);
+              if (freshCount !== undefined) setLikeCount(freshCount);
+            }
+          })
           .catch(() => { /* ignore */ });
         fetchComments(rid);
       }
@@ -541,6 +551,19 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
       setLikeLoading(false);
     }
   };
+  const handleSave = async () => {
+    if (!userObject || !id) return;
+    const was = isSaved;
+    setIsSaved(!was);
+    try {
+      const base = `/saved/promote-reels/${id}`;
+      await api.post(was ? `${base}/unsave` : base);
+    } catch (err) {
+      if (err?.response?.status === 409) return; // already in target state; keep optimistic update
+      setIsSaved(was);
+    }
+  };
+
   const handleDelete = async () => {
     setIsDeleting(true);
     try { await promoteReelService.deletePromoteReel(id); await new Promise(r => setTimeout(r, 800)); onClose(); window.location.reload(); }
@@ -718,6 +741,9 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
                 </div>
                 <div className="flex items-center gap-3">
                   {!isOwner && authorId && userObject && <FollowButton targetUserId={String(authorId)} />}
+                  <button onClick={handleSave} className="active:scale-90 transition-transform" aria-label={isSaved ? 'Unsave' : 'Save'}>
+                    <Bookmark size={24} className={`transition-all duration-200 ${isSaved ? 'fill-black text-black dark:fill-white dark:text-white' : 'text-gray-900 dark:text-white'}`} />
+                  </button>
                 </div>
               </div>
               <div className="font-semibold text-sm text-gray-900 dark:text-white mb-1">{fmt(likeCount)} likes</div>

@@ -34,11 +34,22 @@ const normalizeApiArray = (value) => {
     value.feed,
     value.items,
     value.results,
+    value.saved,
+    value.savedPosts,
+    value.saved_posts,
+    value.savedItems,
+    value.saved_items,
+    value.savedReels,
+    value.saved_reels,
     value?.data?.posts,
     value?.data?.reels,
     value?.data?.feed,
     value?.data?.items,
     value?.data?.results,
+    value?.data?.saved,
+    value?.data?.savedPosts,
+    value?.data?.saved_posts,
+    value?.data?.savedItems,
     value?.data?.data?.posts,
     value?.data?.data?.reels,
     value?.data?.data?.feed,
@@ -750,10 +761,33 @@ const Reels = () => {
     const fetchReels = async () => {
       try {
         setLoading(true); setError(null);
-        const res  = await fetch(`${BASE_URL}/posts/reels`, { headers: authHeaders() });
-        if (!res.ok) throw new Error('Failed to fetch reels');
-        const data = await res.json();
-        setReels(normalizeApiArray(data));
+        const [reelsRes, savedRes] = await Promise.all([
+          fetch(`${BASE_URL}/posts/reels`, { headers: authHeaders() }),
+          fetch(`${BASE_URL}/saved/posts`, { headers: authHeaders() }).catch(() => null),
+        ]);
+        if (!reelsRes.ok) throw new Error('Failed to fetch reels');
+        const data = await reelsRes.json();
+        const reelsList = normalizeApiArray(data);
+
+        let savedIds = null;
+        if (savedRes && savedRes.ok) {
+          try {
+            const savedData = await savedRes.json();
+            const savedItems = normalizeApiArray(savedData);
+            savedIds = new Set(
+              savedItems.map(i => String(i.post?._id || i.post_id || i._id || i.id || '')).filter(Boolean)
+            );
+          } catch { /* keep null */ }
+        }
+
+        setReels(
+          reelsList.map(r => ({
+            ...r,
+            is_saved_by_me: savedIds
+              ? savedIds.has(String(r._id || r.post_id || ''))
+              : !!(r.is_saved_by_me),
+          }))
+        );
       } catch (err) { setError(err.message); }
       finally { setLoading(false); }
     };

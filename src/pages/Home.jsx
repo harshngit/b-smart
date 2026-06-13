@@ -30,8 +30,11 @@ const normalizeApiArray = (value) => {
   const candidates = [
     value.data, value?.data?.data, value.posts, value.feed, value.items,
     value.results, value.ads, value.users, value.reels,
+    value.saved, value.savedPosts, value.saved_posts, value.savedItems, value.saved_items,
+    value.savedReels, value.saved_reels, value.savedAds, value.saved_ads,
     value?.data?.posts, value?.data?.feed, value?.data?.items, value?.data?.results,
     value?.data?.ads, value?.data?.users, value?.data?.reels,
+    value?.data?.saved, value?.data?.savedPosts, value?.data?.saved_posts, value?.data?.savedItems,
     value?.data?.data?.posts, value?.data?.data?.feed, value?.data?.data?.items,
     value?.data?.data?.results, value?.data?.data?.ads,
   ];
@@ -721,19 +724,89 @@ const Home = () => {
     } catch { return []; }
   }, []);
 
+  // Returns a Set of saved IDs, or null if the endpoint failed (caller falls back to item.is_saved_by_me)
+  const fetchSavedPostIds = useCallback(async () => {
+    try {
+      const { data } = await api.get('/saved/posts');
+      const items = normalizeApiArray(data);
+      return new Set(items.map(i => String(i.post?._id || i.post_id || i._id || i.id || '')).filter(Boolean));
+    } catch { return null; }
+  }, []);
+
+  const fetchSavedPromoteReelIds = useCallback(async () => {
+    try {
+      const { data } = await api.get('/saved/promote-reels');
+      const items = normalizeApiArray(data);
+      return new Set(items.map(i => String(i.promote_reel?._id || i.promote_reel_id || i._id || i.id || '')).filter(Boolean));
+    } catch { return null; }
+  }, []);
+
+  const fetchSavedAdIds = useCallback(async () => {
+    try {
+      const { data } = await api.get('/saved/ads');
+      const items = normalizeApiArray(data);
+      return new Set(items.map(i => String(i.ad?._id || i.ad_id || i._id || i.id || '')).filter(Boolean));
+    } catch { return null; }
+  }, []);
+
   const loadFeed = useCallback(async () => {
     setLoading(true);
-    const [fetchedPosts, fetchedUsers] = await Promise.all([
+    const [fetchedPosts, fetchedUsers, savedPostIds, savedPromoteIds, savedAdIds] = await Promise.all([
       fetchPosts(),
       fetchSuggestedUsers(),
+      fetchSavedPostIds(),
+      fetchSavedPromoteReelIds(),
+      fetchSavedAdIds(),
     ]);
     const viewerId = userObject?._id || userObject?.id;
     const visiblePosts = await filterPrivateItemsForViewer(fetchedPosts, viewerId);
-    setPosts(visiblePosts);
+
+    // Bulk follow check — one request for all unique authors in the feed
+    let followingSet = new Set();
+    if (viewerId && visiblePosts.length > 0) {
+      const authorIds = [...new Set(
+        visiblePosts.map(item => {
+          const a = item.user_id || item.user || item.author;
+          const id = typeof a === 'string' ? a : (a?._id || a?.id || '');
+          return id && id !== String(viewerId) ? String(id) : '';
+        }).filter(Boolean)
+      )];
+      if (authorIds.length > 0) {
+        try {
+          const statuses = await bulkCheckFollowStatus(authorIds);
+          followingSet = new Set(
+            normalizeApiArray(statuses)
+              .filter(s => Boolean(s?.isFollowing))
+              .map(s => String(s?.userId || ''))
+          );
+        } catch { /* keep empty set */ }
+      }
+    }
+
+    const enriched = visiblePosts.map(item => {
+      const itemId = String(item._id || item.id || '');
+      const a = item.user_id || item.user || item.author;
+      const authorId = String(typeof a === 'string' ? a : (a?._id || a?.id || ''));
+      const isAuthorFollowed = authorId && authorId !== 'undefined'
+        ? followingSet.has(authorId)
+        : !!(item.is_author_followed_by_me);
+
+      let isSaved;
+      if (item.item_type === 'promote_reel') {
+        isSaved = savedPromoteIds ? savedPromoteIds.has(itemId) : !!(item.is_saved_by_me);
+      } else if (item.item_type === 'ad') {
+        isSaved = savedAdIds ? savedAdIds.has(itemId) : !!(item.is_saved_by_me);
+      } else {
+        isSaved = savedPostIds ? savedPostIds.has(itemId) : !!(item.is_saved_by_me);
+      }
+
+      return { ...item, is_saved_by_me: isSaved, is_author_followed_by_me: isAuthorFollowed };
+    });
+    setPosts(enriched);
     setSuggestedUsers(fetchedUsers);
-    setFeed(injectSuggestionCard(visiblePosts, fetchedUsers));
+    setFeed(injectSuggestionCard(enriched, fetchedUsers));
     setLoading(false);
-  }, [fetchPosts, fetchSuggestedUsers, userObject]);
+  }, [fetchPosts, fetchSuggestedUsers, fetchSavedPostIds, fetchSavedPromoteReelIds, fetchSavedAdIds, userObject]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
   useEffect(() => {
