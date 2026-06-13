@@ -24,6 +24,9 @@ import VerifyOtp from './pages/VerifyOtp';
 import EditProfile from './pages/EditProfile';
 import WalletDetails from './pages/WalletDetails';
 import MobilePostDetail from './pages/MobilePostDetail';
+import MobileAdsDetail from './pages/MobileAdsDetail';
+import MobilePromoteDetail from './pages/MobilePromoteDetail';
+import MobileTweetDetail from './pages/MobileTweetDetail';
 import AuthCallback from './pages/AuthCallback';
 import Notifications from './pages/Notifications';
 import VendorNotifications from './pages/vendor-pages/VendorNotifications';
@@ -148,6 +151,21 @@ function App() {
           <Route path="/post/:postId" element={
             <ProtectedRoute>
               <MobilePostDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/ad/:adId" element={
+            <ProtectedRoute>
+              <MobileAdsDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/promote-reel/:promoteReelId" element={
+            <ProtectedRoute>
+              <MobilePromoteDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/tweet/:tweetId" element={
+            <ProtectedRoute>
+              <MobileTweetDetail />
             </ProtectedRoute>
           } />
         </Routes>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Play, Image, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Play, Image, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -401,6 +401,7 @@ const Profile = () => {
     const dispatch = useDispatch();
     const { userId } = useParams();
     const { userObject: currentUser } = useSelector((state) => state.auth);
+    const walletBalance = useSelector((state) => state.wallet.balance);
 
 
     const [profileUser, setProfileUser] = useState(null);
@@ -1413,6 +1414,18 @@ const Profile = () => {
                         </div>
                         {isOwnProfile && (
                             <div className="flex items-center gap-3 text-gray-900 dark:text-white">
+                                <Link
+                                    to="/wallet"
+                                    className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-gray-800 shadow-sm"
+                                    aria-label="Wallet"
+                                >
+                                    <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] flex items-center justify-center text-white flex-shrink-0">
+                                        <Wallet size={11} />
+                                    </div>
+                                    <span className="text-[11px] font-bold text-gray-900 dark:text-white leading-none">
+                                        {walletBalance ?? 0}
+                                    </span>
+                                </Link>
                                 <Link to="/create" aria-label="Create"><Plus size={22} /></Link>
                                 <Link to="/settings" aria-label="Settings"><Settings size={22} /></Link>
                             </div>

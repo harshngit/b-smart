@@ -965,27 +965,59 @@ const Promote = () => {
   };
 
   const handleLikeComment = async (commentId, isLiked) => {
+    setComments(prev => prev.map(c => {
+      if (String(c._id || c.id) !== String(commentId)) return c;
+      return { ...c, is_liked_by_me: !isLiked, likes_count: (c.likes_count ?? 0) + (isLiked ? -1 : 1) };
+    }));
     try {
       if (isLiked) await promoteReelService.unlikeComment(commentId);
       else await promoteReelService.likeComment(commentId);
-      fetchComments(activeCommentId);
-      Object.keys(replies).forEach(k => loadReplies(k));
-    } catch { /* ignore */ }
+    } catch {
+      setComments(prev => prev.map(c => {
+        if (String(c._id || c.id) !== String(commentId)) return c;
+        return { ...c, is_liked_by_me: isLiked, likes_count: (c.likes_count ?? 0) + (isLiked ? 1 : -1) };
+      }));
+    }
   };
 
   const handleLikeReply = async (replyId, isLiked) => {
+    setReplies(prev => {
+      const updated = {};
+      for (const [key, arr] of Object.entries(prev)) {
+        updated[key] = arr.map(r => {
+          if (String(r._id || r.id) !== String(replyId)) return r;
+          return { ...r, is_liked_by_me: !isLiked, likes_count: (r.likes_count ?? 0) + (isLiked ? -1 : 1) };
+        });
+      }
+      return updated;
+    });
     try {
       if (isLiked) await promoteReelService.unlikeComment(replyId);
       else await promoteReelService.likeComment(replyId);
-      Object.keys(replies).forEach(k => loadReplies(k));
-    } catch { /* ignore */ }
+    } catch {
+      setReplies(prev => {
+        const updated = {};
+        for (const [key, arr] of Object.entries(prev)) {
+          updated[key] = arr.map(r => {
+            if (String(r._id || r.id) !== String(replyId)) return r;
+            return { ...r, is_liked_by_me: isLiked, likes_count: (r.likes_count ?? 0) + (isLiked ? 1 : -1) };
+          });
+        }
+        return updated;
+      });
+    }
   };
 
   const handleDeleteReply = async (replyId) => {
-    if (!window.confirm('Delete this reply?')) return;
     try {
       await promoteReelService.deleteComment(replyId);
-      Object.keys(replies).forEach(k => loadReplies(k));
+      setReplies(prev => {
+        const updated = {};
+        for (const [key, arr] of Object.entries(prev)) {
+          updated[key] = arr.filter(r => (r._id || r.id) !== replyId);
+        }
+        return updated;
+      });
     } catch { /* ignore */ }
   };
 
@@ -995,7 +1027,6 @@ const Promote = () => {
   };
 
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Delete this comment?')) return;
     try {
       await promoteReelService.deleteComment(commentId);
       setComments(prev => prev.filter(c => (c._id || c.id) !== commentId));

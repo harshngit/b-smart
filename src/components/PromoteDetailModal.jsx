@@ -483,21 +483,48 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
   };
 
   const handleLikeComment = async (commentId, isLikedArg) => {
+    setComments(prev => prev.map(c => {
+      if (String(c._id || c.id) !== String(commentId)) return c;
+      return { ...c, is_liked_by_me: !isLikedArg, likes_count: (c.likes_count ?? 0) + (isLikedArg ? -1 : 1) };
+    }));
     try {
       if (isLikedArg) await promoteReelService.unlikeComment(commentId);
       else await promoteReelService.likeComment(commentId);
-      fetchComments(id);
-    } catch { /* ignore */ }
+    } catch {
+      setComments(prev => prev.map(c => {
+        if (String(c._id || c.id) !== String(commentId)) return c;
+        return { ...c, is_liked_by_me: isLikedArg, likes_count: (c.likes_count ?? 0) + (isLikedArg ? 1 : -1) };
+      }));
+    }
   };
   const handleLikeReply = async (replyId, isLikedArg) => {
+    setReplies(prev => {
+      const updated = {};
+      for (const [key, arr] of Object.entries(prev)) {
+        updated[key] = arr.map(r => {
+          if (String(r._id || r.id) !== String(replyId)) return r;
+          return { ...r, is_liked_by_me: !isLikedArg, likes_count: (r.likes_count ?? 0) + (isLikedArg ? -1 : 1) };
+        });
+      }
+      return updated;
+    });
     try {
       if (isLikedArg) await promoteReelService.unlikeComment(replyId);
       else await promoteReelService.likeComment(replyId);
-      Object.keys(replies).forEach(key => loadReplies(key));
-    } catch { /* ignore */ }
+    } catch {
+      setReplies(prev => {
+        const updated = {};
+        for (const [key, arr] of Object.entries(prev)) {
+          updated[key] = arr.map(r => {
+            if (String(r._id || r.id) !== String(replyId)) return r;
+            return { ...r, is_liked_by_me: isLikedArg, likes_count: (r.likes_count ?? 0) + (isLikedArg ? 1 : -1) };
+          });
+        }
+        return updated;
+      });
+    }
   };
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Delete this comment?')) return;
     try {
       await promoteReelService.deleteComment(commentId);
       setComments(prev => prev.filter(c => (c._id || c.id) !== commentId));
@@ -505,10 +532,15 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
     } catch { /* ignore */ }
   };
   const handleDeleteReply = async (replyId) => {
-    if (!window.confirm('Delete this reply?')) return;
     try {
       await promoteReelService.deleteComment(replyId);
-      Object.keys(replies).forEach(key => loadReplies(key));
+      setReplies(prev => {
+        const updated = {};
+        for (const [key, arr] of Object.entries(prev)) {
+          updated[key] = arr.filter(r => (r._id || r.id) !== replyId);
+        }
+        return updated;
+      });
     } catch { /* ignore */ }
   };
   const onToggleReplies = (commentId) => {
@@ -660,24 +692,35 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
             )}
 
             {/* Comments */}
-            {!turnOffCommenting && (loadingComments ? (
-              <div className="flex justify-center py-4"><Loader2 size={24} className="animate-spin text-gray-400" /></div>
-            ) : comments.length > 0 ? (
-              comments.map(comment => (
-                <CommentRow key={comment._id || comment.id} comment={comment} replies={replies}
-                  expanded={expandedComments[comment._id || comment.id]}
-                  onToggleReplies={onToggleReplies}
-                  onReply={(u) => setReplyTo({ id: comment._id || comment.id, rootCommentId: comment._id || comment.id, username: u.username })}
-                  onLike={handleLikeComment} onDelete={handleDeleteComment}
-                  onLikeReply={handleLikeReply} onDeleteReply={handleDeleteReply}
-                  currentUserId={currentUserId} />
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-gray-400 text-sm">
-                <MessageCircle size={32} className="mb-2 opacity-40" />
-                <p>No comments yet. Be the first!</p>
-              </div>
-            ))}
+            {!turnOffCommenting && (
+              <>
+                <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <MessageCircle size={15} className="text-gray-500 dark:text-gray-400" />
+                  <span className="font-semibold text-sm text-gray-900 dark:text-white">Comments</span>
+                  <span className="text-sm text-gray-400 font-normal">
+                    ({item.comments_count ?? comments.length})
+                  </span>
+                </div>
+                {loadingComments ? (
+                  <div className="flex justify-center py-4"><Loader2 size={24} className="animate-spin text-gray-400" /></div>
+                ) : comments.length > 0 ? (
+                  comments.map(comment => (
+                    <CommentRow key={comment._id || comment.id} comment={comment} replies={replies}
+                      expanded={expandedComments[comment._id || comment.id]}
+                      onToggleReplies={onToggleReplies}
+                      onReply={(u) => setReplyTo({ id: comment._id || comment.id, rootCommentId: comment._id || comment.id, username: u.username })}
+                      onLike={handleLikeComment} onDelete={handleDeleteComment}
+                      onLikeReply={handleLikeReply} onDeleteReply={handleDeleteReply}
+                      currentUserId={currentUserId} />
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-gray-400 text-sm">
+                    <MessageCircle size={32} className="mb-2 opacity-40" />
+                    <p>No comments yet. Be the first!</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Footer */}

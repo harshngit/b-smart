@@ -7,6 +7,7 @@ import Sidebar from './Sidebar';
 import CreatePostModal from './CreatePostModal';
 import api from '../lib/api';
 import { fetchMe, setUser } from '../store/authSlice';
+import { setWalletBalance } from '../store/walletSlice';
 
 
 const Layout = () => {
@@ -14,7 +15,8 @@ const Layout = () => {
   const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
   const isMessagesPage = location.pathname.startsWith('/messages');
-  const isExcludedPage = ['/promote'].includes(location.pathname) || isMessagesPage;
+  const isProfilePage = location.pathname.startsWith('/profile');
+  const isExcludedPage = ['/promote'].includes(location.pathname) || isMessagesPage || isProfilePage;
   const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
   const showTopBar = !isExcludedPage && !isFullScreenPage;
 
@@ -32,12 +34,14 @@ const Layout = () => {
         data?.data?.balance ??
         null;
       if (bal !== null && bal !== undefined) {
-        setWalletCoins(Math.floor(Number(bal)));
+        const balance = Math.floor(Number(bal));
+        setWalletCoins(balance);
+        dispatch(setWalletBalance(balance));
       }
     } catch {
       // silent — keep last known value
     }
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     const userId = userObject?._id || userObject?.id;

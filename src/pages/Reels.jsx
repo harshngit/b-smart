@@ -436,21 +436,53 @@ const CommentsUI = ({ reel, onClose, userObject }) => {
   };
 
   const handleLikeComment = async (commentId, isLikedByMe) => {
+    setComments(prev => prev.map(c => {
+      if (String(c._id || c.id) !== String(commentId)) return c;
+      return { ...c, is_liked_by_me: !isLikedByMe, likes_count: (c.likes_count || 0) + (isLikedByMe ? -1 : 1) };
+    }));
+    setReplies(prev => {
+      const updated = {};
+      for (const [key, arr] of Object.entries(prev)) {
+        updated[key] = arr.map(r => {
+          if (String(r._id || r.id) !== String(commentId)) return r;
+          return { ...r, is_liked_by_me: !isLikedByMe, likes_count: (r.likes_count || 0) + (isLikedByMe ? -1 : 1) };
+        });
+      }
+      return updated;
+    });
     try {
       if (isLikedByMe) { await commentService.unlikeComment(commentId); }
       else             { await commentService.likeComment(commentId); }
-      fetchComments(reelId);
-      Object.keys(replies).forEach((key) => loadReplies(key));
     } catch (error) {
       console.error('Error liking comment:', error);
+      setComments(prev => prev.map(c => {
+        if (String(c._id || c.id) !== String(commentId)) return c;
+        return { ...c, is_liked_by_me: isLikedByMe, likes_count: (c.likes_count || 0) + (isLikedByMe ? 1 : -1) };
+      }));
+      setReplies(prev => {
+        const updated = {};
+        for (const [key, arr] of Object.entries(prev)) {
+          updated[key] = arr.map(r => {
+            if (String(r._id || r.id) !== String(commentId)) return r;
+            return { ...r, is_liked_by_me: isLikedByMe, likes_count: (r.likes_count || 0) + (isLikedByMe ? 1 : -1) };
+          });
+        }
+        return updated;
+      });
     }
   };
 
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Are you sure you want to delete this comment?')) return;
     try {
       await api.delete(`/comments/${commentId}`);
-      await fetchComments(reelId);
+      setComments(prev => prev.filter(c => (c._id || c.id) !== commentId));
+      setReplies(prev => {
+        const updated = {};
+        for (const [key, arr] of Object.entries(prev)) {
+          updated[key] = arr.filter(r => (r._id || r.id) !== commentId);
+        }
+        return updated;
+      });
     } catch (error) {
       console.error('Error deleting comment:', error);
     }

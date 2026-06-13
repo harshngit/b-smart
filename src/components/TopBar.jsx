@@ -1,8 +1,10 @@
-import React from 'react';
-import { Heart, MessageCircle, Wallet } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Heart, Wallet } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNotificationSocket } from '../hooks/useNotificationSocket';
+import { fetchWallet } from '../store/walletSlice';
+import { fetchUserStory } from '../store/storySlice';
 import bsmartLogo from '../assets/bsmart.png';
 
 const BSmartLogo = () => (
@@ -11,10 +13,29 @@ const BSmartLogo = () => (
 
 const TopBar = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
   const walletBalance = useSelector((state) => state.wallet.balance);
+  const storyMap = useSelector((state) => state.story?.storyMap ?? {});
 
   const { unreadCount } = useNotificationSocket({ limit: 10 });
+
+  const currentUserId = userObject?._id || userObject?.id;
+
+  // Fetch wallet balance and own story on mount
+  useEffect(() => {
+    dispatch(fetchWallet());
+    if (currentUserId) {
+      dispatch(fetchUserStory(currentUserId, {
+        avatarUrl: userObject?.avatar_url || '',
+        username: userObject?.username || '',
+      }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+
+  const ownStory = currentUserId ? storyMap[currentUserId] : null;
+  const hasOwnStory = Boolean(ownStory);
 
   const getInitials = (name) => {
     const raw = (name || '').trim();
@@ -61,18 +82,10 @@ const TopBar = () => {
           )}
         </button>
 
-        {/* Chat → goes to /messages page */}
-        <button
-          onClick={() => navigate('/messages')}
-          className="p-1.5 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-          aria-label="Chat"
-        >
-          <MessageCircle size={22} className="text-black dark:text-white" />
-        </button>
-
         {userObject?.role !== 'vendor' && (
           <Link to="/profile">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] p-[1.5px]">
+            {/* Orange gradient ring only when user has their own active story */}
+            <div className={`w-8 h-8 rounded-full p-[1.5px] ${hasOwnStory ? 'bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]' : 'bg-gray-200 dark:bg-gray-700'}`}>
               <div className="w-full h-full rounded-full bg-white dark:bg-black p-[1px]">
                 {userObject?.avatar_url ? (
                   <img src={userObject.avatar_url} alt={userObject?.username || 'Profile'} className="w-full h-full rounded-full object-cover" />

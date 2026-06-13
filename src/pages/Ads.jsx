@@ -1393,38 +1393,62 @@ const Ads = ({ feedMode = 'user' }) => {
     }
   };
 
-  // handleLikeComment — identical to PostDetailModal
   const handleLikeComment = async (commentId, isLiked) => {
+    setComments(prev => prev.map(c => {
+      if (String(c._id || c.id) !== String(commentId)) return c;
+      return { ...c, is_liked_by_me: !isLiked, likes_count: (c.likes_count ?? 0) + (isLiked ? -1 : 1) };
+    }));
     try {
-      if (isLiked) {
-        await commentService.unlikeComment(commentId);
-      } else {
-        await commentService.likeComment(commentId);
-      }
-      fetchComments(activeCommentAdId);
-      // Also refresh all currently-loaded replies
-      Object.keys(replies).forEach((key) => loadReplies(key));
-    } catch (e) { console.error(e); }
+      if (isLiked) await commentService.unlikeComment(commentId);
+      else await commentService.likeComment(commentId);
+    } catch (e) {
+      console.error(e);
+      setComments(prev => prev.map(c => {
+        if (String(c._id || c.id) !== String(commentId)) return c;
+        return { ...c, is_liked_by_me: isLiked, likes_count: (c.likes_count ?? 0) + (isLiked ? 1 : -1) };
+      }));
+    }
   };
 
-  // handleLikeReply — identical to PostDetailModal
   const handleLikeReply = async (replyId, isLikedReply) => {
-    try {
-      if (isLikedReply) {
-        await commentService.unlikeComment(replyId);
-      } else {
-        await commentService.likeComment(replyId);
+    setReplies(prev => {
+      const updated = {};
+      for (const [key, arr] of Object.entries(prev)) {
+        updated[key] = arr.map(r => {
+          if (String(r._id || r.id) !== String(replyId)) return r;
+          return { ...r, is_liked_by_me: !isLikedReply, likes_count: (r.likes_count ?? 0) + (isLikedReply ? -1 : 1) };
+        });
       }
-      Object.keys(replies).forEach((key) => loadReplies(key));
-    } catch (e) { console.error(e); }
+      return updated;
+    });
+    try {
+      if (isLikedReply) await commentService.unlikeComment(replyId);
+      else await commentService.likeComment(replyId);
+    } catch (e) {
+      console.error(e);
+      setReplies(prev => {
+        const updated = {};
+        for (const [key, arr] of Object.entries(prev)) {
+          updated[key] = arr.map(r => {
+            if (String(r._id || r.id) !== String(replyId)) return r;
+            return { ...r, is_liked_by_me: isLikedReply, likes_count: (r.likes_count ?? 0) + (isLikedReply ? 1 : -1) };
+          });
+        }
+        return updated;
+      });
+    }
   };
 
-  // handleDeleteReply
   const handleDeleteReply = async (replyId) => {
-    if (!window.confirm('Are you sure you want to delete this reply?')) return;
     try {
       await commentService.deleteComment(replyId);
-      Object.keys(replies).forEach((key) => loadReplies(key));
+      setReplies(prev => {
+        const updated = {};
+        for (const [key, arr] of Object.entries(prev)) {
+          updated[key] = arr.filter(r => (r._id || r.id) !== replyId);
+        }
+        return updated;
+      });
     } catch (e) { console.error('Delete reply error:', e); }
   };
 
@@ -1437,9 +1461,7 @@ const Ads = ({ feedMode = 'user' }) => {
     setExpandedComments((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
   };
 
-  // handleDeleteComment
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Are you sure you want to delete this comment?')) return;
     try {
       await commentService.deleteComment(commentId);
       setComments(prev => prev.filter(c => (c._id || c.id) !== commentId));

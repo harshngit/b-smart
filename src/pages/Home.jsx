@@ -291,65 +291,6 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults
   );
 };
 
-// ── Search bar — sits above StoryRail in the feed column ──────────────────────
-const FeedSearchBar = ({ searchQuery, onSearchChange, searchLoading, searchResults }) => {
-  const navigate = useNavigate();
-  return (
-    <div className="relative px-3 pt-3 pb-2">
-      <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 px-4 py-2.5 rounded-xl border border-transparent focus-within:border-gray-200 dark:focus-within:border-gray-700 transition-all">
-        <Search size={17} className="text-gray-400 shrink-0" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search"
-          className="bg-transparent border-none outline-none text-sm w-full dark:text-white"
-        />
-        {searchLoading && (
-          <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-insta-pink shrink-0" />
-        )}
-      </div>
-
-      {searchQuery.trim() && (
-        <div className="absolute left-3 right-3 top-full mt-1 bg-white dark:bg-[#1c1c1c] rounded-2xl border border-gray-100 dark:border-white/10 shadow-2xl z-[100] max-h-[400px] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
-          {searchLoading && searchResults.users.length === 0 && searchResults.posts.length === 0 && (
-            <div className="p-8 text-center text-gray-400">Searching...</div>
-          )}
-          {!searchLoading && searchResults.users.length === 0 && searchResults.posts.length === 0 && searchResults.reels.length === 0 && (
-            <div className="p-8 text-center text-gray-400">No results found for "{searchQuery}"</div>
-          )}
-          {searchResults.users.length > 0 && (
-            <div className="p-2 border-b border-gray-50 dark:border-white/5">
-              <p className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">People</p>
-              {searchResults.users.map(u => (
-                <button
-                  key={u._id || u.id}
-                  onClick={() => {
-                    const profilePath = u.role === 'vendor' ? `/vendor/${u._id || u.id}/public` : `/profile/${u._id || u.id}`;
-                    navigate(profilePath);
-                    onSearchChange('');
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-left"
-                >
-                  <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 shrink-0">
-                    {u.avatar_url || u.profile_picture
-                      ? <img src={u.avatar_url || u.profile_picture} alt="" className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-400">{(u.username || u.full_name || '?')[0].toUpperCase()}</div>
-                    }
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.full_name || u.username}</p>
-                    {u.username && <p className="text-xs text-gray-500 truncate">@{u.username}</p>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 // ── Skeleton Loader ───────────────────────────────────────────────────────────
 const FeedSkeleton = () => (
@@ -383,10 +324,10 @@ const MobileSuggestedUsersCard = ({ users }) => {
   if (visible.length === 0) return null;
 
   return (
-    <div className="bg-white dark:bg-black border-b border-t border-gray-200 dark:border-gray-800 py-3 mb-0 lg:hidden">
-      <div className="flex items-center justify-between px-4 mb-3">
-        <span className="text-sm font-bold text-gray-900 dark:text-white">Suggested for you</span>
-        <button 
+    <div className="bg-white dark:bg-black border-b border-t border-gray-200 dark:border-gray-800 py-4 mb-0 lg:hidden">
+      <div className="flex items-center justify-between px-4 mb-4">
+        <span className="text-[15px] font-bold text-gray-900 dark:text-white">Suggested for you</span>
+        <button
           onClick={() => navigate('/suggestions')}
           className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors"
         >
@@ -406,27 +347,29 @@ const MobileSuggestedUsersCard = ({ users }) => {
           return (
             <div key={userId || i}
               onClick={() => navigate(`/profile/${userId}`)}
-              className="relative flex-shrink-0 flex flex-col items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl p-3 w-[120px] gap-1.5 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#222] transition-colors">
+              className="relative flex-shrink-0 flex flex-col items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-2xl px-3 pt-4 pb-3 w-[140px] gap-2 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#222] transition-colors">
               {/* Dismiss button */}
               <button
-                className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 z-10"
+                className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 z-10"
                 onClick={(e) => {
                   e.stopPropagation();
                   setDismissed(p => ({ ...p, [i]: true }));
                 }}
               >
-                <X size={9} />
+                <X size={10} />
               </button>
               {/* Avatar */}
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center ring-2 ring-offset-1 ring-pink-300/40">
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center ring-2 ring-offset-1 ring-pink-300/40 shrink-0">
                 {avatar
                   ? <img src={avatar} alt={username} className="w-full h-full object-cover" />
-                  : <span className="text-white font-bold text-sm">{username.slice(0,1).toUpperCase()}</span>
+                  : <span className="text-white font-bold text-lg">{username.slice(0,1).toUpperCase()}</span>
                 }
               </div>
-              <p className="text-[11px] font-bold text-gray-900 dark:text-white text-center truncate w-full">{username}</p>
-              <p className="text-[9px] text-gray-400 text-center truncate w-full">{reason}</p>
-              <div onClick={(e) => e.stopPropagation()}>
+              <div className="w-full text-center min-w-0">
+                <p className="text-[12px] font-bold text-gray-900 dark:text-white truncate">{username}</p>
+                <p className="text-[10px] text-gray-400 truncate mt-0.5">{reason}</p>
+              </div>
+              <div onClick={(e) => e.stopPropagation()} className="w-full">
                 <DesktopFollowButton targetUserId={String(userId || '')} />
               </div>
             </div>
@@ -865,18 +808,18 @@ const Home = () => {
 
   const handleCommentClick = (item) => {
     if (item?.turn_off_commenting || item?.engagement_controls?.turn_off_commenting) return;
-    if (item.item_type === 'tweet') {
-      setSelectedTweet(item);
-      setSelectedItem(null); // Ensure PostDetailModal is closed
-    } else if (window.innerWidth < 768) {
-      if (item.item_type === 'ad') { setSelectedItem(item); }
-      else {
-        const itemId = item._id || item.id;
-        const suffix = item.item_type === 'tweet' ? '?type=tweet' : '';
-        navigate(`/post/${itemId}${suffix}`);
-      }
+    const itemId = item._id || item.id;
+    if (window.innerWidth < 768) {
+      if (item.item_type === 'tweet') navigate(`/tweet/${itemId}`);
+      else if (item.item_type === 'ad') navigate(`/ad/${itemId}`);
+      else navigate(`/post/${itemId}`);
     } else {
-      setSelectedItem(item);
+      if (item.item_type === 'tweet') {
+        setSelectedTweet(item);
+        setSelectedItem(null);
+      } else {
+        setSelectedItem(item);
+      }
     }
   };
 
@@ -935,7 +878,13 @@ const Home = () => {
                     <PromoteCard
                       key={item._id || item.promote_reel_id || `pr-${idx}`}
                       item={item}
-                      onOpenDetail={(pr) => setSelectedPromoteReel(pr)}
+                      onOpenDetail={(pr) => {
+                        if (window.innerWidth < 768) {
+                          navigate(`/promote-reel/${pr._id || pr.id || pr.promote_reel_id}`);
+                        } else {
+                          setSelectedPromoteReel(pr);
+                        }
+                      }}
                     />
                   );
                 }

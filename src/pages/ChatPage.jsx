@@ -2240,10 +2240,9 @@ export default function ChatPage() {
         <aside className={`
           ${activeId ? 'hidden' : 'flex'}
           h-full w-full flex-shrink-0 flex-col
-          bg-[#000000] text-white
+          bg-white dark:bg-black text-gray-900 dark:text-white
           md:flex md:w-[380px]
-          md:bg-gray-50/50 md:text-gray-900
-          md:dark:bg-[#0a0a0a] md:dark:text-white
+          md:bg-gray-50/50 md:dark:bg-[#0a0a0a]
           md:border-r md:border-gray-100 md:dark:border-white/10
         `}>
 
@@ -2253,7 +2252,7 @@ export default function ChatPage() {
               {/* Back arrow */}
               <button
                 onClick={() => navigate('/')}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-900 dark:text-white transition hover:bg-gray-100 dark:hover:bg-white/10"
                 aria-label="Back"
               >
                 <ChevronLeft size={22} strokeWidth={2.5} />
@@ -2261,17 +2260,17 @@ export default function ChatPage() {
 
               {/* Username + dropdown chevron — centered */}
               <button type="button" className="flex items-center gap-1">
-                <span className="text-[17px] font-bold tracking-tight text-white">
+                <span className="text-[17px] font-bold tracking-tight text-gray-900 dark:text-white">
                   {currentUserLabel}
                 </span>
-                <ChevronDown size={16} className="mt-[1px] text-white" strokeWidth={2.5} />
+                <ChevronDown size={16} className="mt-[1px] text-gray-900 dark:text-white" strokeWidth={2.5} />
               </button>
 
               {/* Compose icon */}
               <button
                 type="button"
                 onClick={handleOpenGroupModal}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-900 dark:text-white transition hover:bg-gray-100 dark:hover:bg-white/10"
                 aria-label="Compose"
               >
                 <SquarePen size={20} strokeWidth={2} />
@@ -2302,13 +2301,13 @@ export default function ChatPage() {
 
           {/* ── Mobile search bar ── */}
           <div className={`${isRequestsView ? 'hidden' : 'px-4 pt-2 pb-3 md:hidden'}`}>
-            <div className="flex items-center gap-3 rounded-[12px] bg-[#1c1c1e] px-4 py-2.5 text-sm text-white/50">
-              <Search size={16} className="shrink-0 text-white/40" />
+            <div className="flex items-center gap-3 rounded-[12px] bg-gray-100 dark:bg-[#1c1c1e] px-4 py-2.5 text-sm text-gray-500 dark:text-white/50">
+              <Search size={16} className="shrink-0 text-gray-400 dark:text-white/40" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search"
-                className="w-full bg-transparent text-[15px] outline-none placeholder:text-white/40 text-white"
+                className="w-full bg-transparent text-[15px] outline-none placeholder:text-gray-400 dark:placeholder:text-white/40 text-gray-900 dark:text-white"
               />
             </div>
           </div>
@@ -2328,27 +2327,27 @@ export default function ChatPage() {
                   className="flex flex-col items-center gap-2 shrink-0"
                 >
                   {/* Avatar with gradient ring */}
-                  <div className={`rounded-full p-[2px] ${unread > 0 ? 'bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]' : 'bg-[#333] md:bg-gray-300 dark:md:bg-white/20'}`}>
-                    <div className="relative rounded-full bg-black p-[2px] md:bg-white dark:md:bg-black">
+                  <div className={`rounded-full p-[2px] ${unread > 0 ? 'bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]' : 'bg-gray-200 dark:bg-[#333]'}`}>
+                    <div className="relative rounded-full bg-white dark:bg-black p-[2px]">
                       <Avatar
                         user={user}
                         src={avatar}
                         alt={title}
                         className="h-[56px] w-[56px]"
                       />
-                      <span className="absolute bottom-[2px] right-[2px] h-3.5 w-3.5 rounded-full border-2 border-black bg-[#38d430] md:border-white dark:md:border-black" />
+                      <span className="absolute bottom-[2px] right-[2px] h-3.5 w-3.5 rounded-full border-2 border-white dark:border-black bg-[#38d430]" />
                     </div>
                   </div>
 
                   {/* Username */}
-                  <span className="max-w-[80px] truncate text-[11px] font-medium tracking-[0.02em] text-white/80 md:text-gray-700 md:dark:text-white/80">
+                  <span className="max-w-[80px] truncate text-[11px] font-medium tracking-[0.02em] text-gray-700 dark:text-white/80">
                     {title}
                   </span>
                 </button>
               );
             })}
             {!onlineConversations.length ? (
-              <p className="py-2 text-xs text-white/45 md:text-gray-500 md:dark:text-gray-400">No one is online right now.</p>
+              <p className="py-2 text-xs text-gray-500 dark:text-white/45">No one is online right now.</p>
             ) : null}
           </div>
 
@@ -2408,8 +2407,8 @@ export default function ChatPage() {
                   }}
                   className={`flex items-center gap-1.5 text-[15px] font-bold transition md:text-[15px] ${
                     conversationType === tab.key
-                      ? 'text-white md:text-gray-900 md:dark:text-white'
-                      : 'text-white/55 hover:text-white md:text-gray-500 md:hover:text-gray-700 md:dark:text-gray-400 md:dark:hover:text-white'
+                      ? 'text-gray-900 dark:text-white'
+                      : 'text-gray-500 dark:text-white/55 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   {tab.label}
@@ -2431,12 +2430,12 @@ export default function ChatPage() {
                   <button
                     type="button"
                     onClick={() => { setConversationType('normal'); dispatch(setActiveConversation(null)); dispatch(setMessages([])); navigate('/messages'); }}
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-gray-900 dark:text-white transition hover:bg-gray-100 dark:hover:bg-white/10"
                     aria-label="Back to messages"
                   >
                     <ChevronLeft size={22} strokeWidth={2.5} />
                   </button>
-                  <p className="text-[26px] font-bold tracking-tight text-white">Message requests</p>
+                  <p className="text-[26px] font-bold tracking-tight text-gray-900 dark:text-white">Message requests</p>
                 </div>
               </div>
 
@@ -2457,18 +2456,18 @@ export default function ChatPage() {
               <div className="px-4 py-4 md:px-5">
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between rounded-[18px] bg-white/5 px-4 py-4 text-left transition hover:bg-white/[0.08] md:bg-white md:hover:bg-gray-50 dark:md:bg-[#111111] dark:md:hover:bg-[#151515]"
+                  className="flex w-full items-center justify-between rounded-[18px] bg-gray-50 dark:bg-white/5 px-4 py-4 text-left transition hover:bg-gray-100 dark:hover:bg-white/[0.08] md:bg-white md:hover:bg-gray-50 md:dark:bg-[#111111] md:dark:hover:bg-[#151515]"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 md:bg-gray-100 dark:md:bg-white/5">
-                      <UserMinus size={22} className="text-white/80 md:text-gray-500 dark:md:text-gray-300" />
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 md:bg-gray-100 md:dark:bg-white/5">
+                      <UserMinus size={22} className="text-gray-500 dark:text-white/80 md:dark:text-gray-300" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-white md:text-gray-900 dark:md:text-white">Hidden requests</p>
-                      <p className="mt-1 text-xs text-white/45 md:text-gray-500 dark:md:text-gray-400">Restricted chats appear here.</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">Hidden requests</p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-white/45">Restricted chats appear here.</p>
                     </div>
                   </div>
-                  <ChevronLeft size={18} className="rotate-180 text-white/60 md:text-gray-400" />
+                  <ChevronLeft size={18} className="rotate-180 text-gray-400 dark:text-white/60" />
                 </button>
               </div>
             </>
@@ -2479,10 +2478,10 @@ export default function ChatPage() {
               <div className="space-y-1 px-2 pt-2">
                 {Array.from({ length: 7 }).map((_, index) => (
                   <div key={index} className="flex animate-pulse items-center gap-3 rounded-2xl px-3 py-3">
-                    <div className="h-[54px] w-[54px] rounded-full bg-white/10 md:bg-gray-200 md:dark:bg-[#1f1f1f]" />
+                    <div className="h-[54px] w-[54px] rounded-full bg-gray-200 dark:bg-[#1f1f1f]" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3 w-1/3 rounded bg-white/10 md:bg-gray-200 md:dark:bg-[#1f1f1f]" />
-                      <div className="h-3 w-2/3 rounded bg-white/5 md:bg-gray-100 md:dark:bg-[#161616]" />
+                      <div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-[#1f1f1f]" />
+                      <div className="h-3 w-2/3 rounded bg-gray-100 dark:bg-[#161616]" />
                     </div>
                   </div>
                 ))}
@@ -2506,8 +2505,8 @@ export default function ChatPage() {
                     onClick={() => setConversationAsActive(conversation)}
                     className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all
                       ${active
-                        ? 'bg-white/5 md:bg-white md:shadow-sm md:border md:border-gray-100 md:dark:bg-[#141414] md:dark:border-white/5'
-                        : 'hover:bg-white/[0.04] md:hover:bg-white/70 md:dark:hover:bg-[#111111] border border-transparent'
+                        ? 'bg-gray-100 dark:bg-white/5 md:bg-white md:shadow-sm md:border md:border-gray-100 md:dark:bg-[#141414] md:dark:border-white/5'
+                        : 'hover:bg-gray-50 dark:hover:bg-white/[0.04] md:hover:bg-white/70 border border-transparent'
                       }
                     `}
                   >
@@ -2528,18 +2527,18 @@ export default function ChatPage() {
                         />
                       )}
                       {!conversation?.isGroup && onlineUserIds.includes(String(getUserId(user))) ? (
-                        <span className="absolute bottom-1 right-1 h-3.5 w-3.5 rounded-full border-2 border-black bg-[#38d430] md:border-white dark:md:border-[#0a0a0a]" />
+                        <span className="absolute bottom-1 right-1 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#0a0a0a] bg-[#38d430]" />
                       ) : null}
                     </div>
 
                     {/* Text content */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
-                        <p className={`min-w-0 truncate text-[14.5px] leading-snug md:text-[15px] md:text-gray-900 md:dark:text-white
-                          ${unread > 0 ? 'font-bold text-white' : 'font-semibold text-white/90'}`}>
+                        <p className={`min-w-0 truncate text-[14.5px] leading-snug
+                          ${unread > 0 ? 'font-bold text-gray-900 dark:text-white' : 'font-semibold text-gray-700 dark:text-white/90'}`}>
                           {title}
                         </p>
-                        <span className="shrink-0 pt-0.5 text-[12px] text-white/40 md:text-gray-400">
+                        <span className="shrink-0 pt-0.5 text-[12px] text-gray-400 dark:text-white/40">
                           {timeText}
                         </span>
                         {isRequest ? (
@@ -2555,21 +2554,21 @@ export default function ChatPage() {
                       <div className="mt-1 flex items-center gap-1.5 pr-2">
                         {unread > 0 ? (
                           <>
-                            <p className="truncate text-[13px] font-semibold text-white md:text-gray-900 md:dark:text-white">
+                            <p className="truncate text-[13px] font-semibold text-gray-900 dark:text-white">
                               {previewText}
                             </p>
-                            <span className="shrink-0 text-[13px] text-white/30">·</span>
-                            <span className="shrink-0 text-[12px] text-white/40">
+                            <span className="shrink-0 text-[13px] text-gray-300 dark:text-white/30">·</span>
+                            <span className="shrink-0 text-[12px] text-gray-400 dark:text-white/40">
                               {formatAgo(conversation.lastMessageAt)}
                             </span>
                           </>
                         ) : (
                           <>
-                            <p className={`truncate text-[13px] ${isTyping ? 'font-semibold text-[#4f6bff]' : 'text-white/50 md:text-gray-500 md:dark:text-gray-400'}`}>
+                            <p className={`truncate text-[13px] ${isTyping ? 'font-semibold text-[#4f6bff]' : 'text-gray-500 dark:text-white/50'}`}>
                               {previewText}
                             </p>
-                            <span className="shrink-0 text-[13px] text-white/25 md:text-gray-400">·</span>
-                            <span className="shrink-0 text-[12px] text-white/40 md:text-gray-400">
+                            <span className="shrink-0 text-[13px] text-gray-300 dark:text-white/25">·</span>
+                            <span className="shrink-0 text-[12px] text-gray-400 dark:text-white/40">
                               {formatAgo(conversation.lastMessageAt)}
                             </span>
                           </>
@@ -2586,7 +2585,7 @@ export default function ChatPage() {
               })
             ) : (
               <div className="px-5 py-6">
-                <p className="text-sm text-white/55 md:text-gray-500 dark:md:text-gray-400">
+                <p className="text-sm text-gray-500 dark:text-white/55">
                   {isRequestsView
                     ? "Chats will appear here after you send or receive a message request."
                     : 'No conversations found.'}
@@ -2595,10 +2594,10 @@ export default function ChatPage() {
             )}
           </div>
           {isRequestsView ? (
-            <div className="border-t border-white/10 px-5 py-4 text-center md:border-gray-100 md:dark:border-white/10">
+            <div className="border-t border-gray-100 dark:border-white/10 px-5 py-4 text-center">
               <button
                 type="button"
-                className="text-sm font-semibold text-red-400 transition hover:text-red-300 md:text-red-500 md:hover:text-red-600"
+                className="text-sm font-semibold text-red-500 transition hover:text-red-600"
               >
                 Delete all {requestCount}
               </button>

@@ -273,12 +273,21 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
   };
 
   const handleLikeComment = async (commentId, like) => {
-    try { like ? await tweetCommentService.unlikeComment(commentId) : await tweetCommentService.likeComment(commentId); fetchComments(tweetId); }
-    catch (e) { console.error(e); }
+    setComments(prev => prev.map(c => {
+      if (String(c._id || c.id) !== String(commentId)) return c;
+      return { ...c, is_liked_by_me: !like, likes_count: (c.likes_count ?? 0) + (like ? -1 : 1) };
+    }));
+    try { like ? await tweetCommentService.unlikeComment(commentId) : await tweetCommentService.likeComment(commentId); }
+    catch (e) {
+      console.error(e);
+      setComments(prev => prev.map(c => {
+        if (String(c._id || c.id) !== String(commentId)) return c;
+        return { ...c, is_liked_by_me: like, likes_count: (c.likes_count ?? 0) + (like ? 1 : -1) };
+      }));
+    }
   };
 
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Delete this comment?')) return;
     try { await tweetCommentService.deleteComment(commentId); setComments(prev => prev.filter(c => (c._id||c.id) !== commentId)); }
     catch (e) { console.error(e); }
   };
@@ -334,18 +343,29 @@ const TweetDetailModal = ({ tweet: initialTweet, isOpen, onClose }) => {
                 </div>
               </div>
             )}
-            {!turnOffCommenting && (loadingComments ? (
-              <div className="flex justify-center py-4"><Loader2 size={24} className="animate-spin text-gray-400"/></div>
-            ) : comments.length > 0 ? (
-              comments.map(comment => (
-                <CommentRow key={comment._id||comment.id} comment={comment} onLike={handleLikeComment} onDelete={handleDeleteComment} onReply={(u) => setReplyTo({id:comment._id||comment.id, username:u.username})} currentUserId={currentUserId}/>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-gray-400 text-sm">
-                <MessageCircle size={32} className="mb-2 opacity-40"/>
-                <p>No comments yet. Be the first!</p>
-              </div>
-            ))}
+            {!turnOffCommenting && (
+              <>
+                <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <MessageCircle size={15} className="text-gray-500 dark:text-gray-400" />
+                  <span className="font-semibold text-sm text-gray-900 dark:text-white">Comments</span>
+                  <span className="text-sm text-gray-400 font-normal">
+                    ({tweet?.commentsCount ?? tweet?.comments_count ?? comments.length})
+                  </span>
+                </div>
+                {loadingComments ? (
+                  <div className="flex justify-center py-4"><Loader2 size={24} className="animate-spin text-gray-400"/></div>
+                ) : comments.length > 0 ? (
+                  comments.map(comment => (
+                    <CommentRow key={comment._id||comment.id} comment={comment} onLike={handleLikeComment} onDelete={handleDeleteComment} onReply={(u) => setReplyTo({id:comment._id||comment.id, username:u.username})} currentUserId={currentUserId}/>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-gray-400 text-sm">
+                    <MessageCircle size={32} className="mb-2 opacity-40"/>
+                    <p>No comments yet. Be the first!</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Footer */}

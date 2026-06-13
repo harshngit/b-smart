@@ -6,7 +6,7 @@ import EmojiPicker from 'emoji-picker-react';
 import promoteReelService from '../services/promoteReelService';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone,
   MousePointerClick, Target, Smartphone, Monitor, Calendar, Link2, Phone, Mail, MessageSquare,
-  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, FileText, Ellipsis, Pencil,
+  TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, Pencil,
   ShoppingBag, Trash2, Volume2, VolumeX, Play, Pause
 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
@@ -3092,19 +3092,19 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           </div>
         ) : postType === 'tweet' ? (
           <div className="flex-1 bg-white dark:bg-[#111111] text-gray-900 dark:text-white flex flex-col">
-            <div className="md:hidden flex items-center justify-between px-5 pt-4 pb-5 border-b border-gray-200 dark:border-white/10">
-              <button onClick={handleClose} className="text-gray-900 dark:text-white">
-                <X size={34} strokeWidth={2.2} />
+            <div className="md:hidden flex items-center justify-between px-4 pt-3 pb-3 border-b border-gray-200 dark:border-white/10">
+              <button onClick={handleClose} className="text-gray-900 dark:text-white p-1">
+                <X size={22} strokeWidth={2.2} />
               </button>
-              <h2 className="text-[20px] font-bold tracking-[-0.02em]">New thread</h2>
-              <div className="flex items-center gap-4">
-                <button type="button" className="text-gray-700 dark:text-white/95">
-                  <FileText size={32} strokeWidth={2.1} />
-                </button>
-                <button type="button" className="text-gray-700 dark:text-white/95">
-                  <Ellipsis size={32} strokeWidth={2.1} />
-                </button>
-              </div>
+              <h2 className="text-[16px] font-semibold tracking-tight dark:text-white">New Tweet</h2>
+              <button
+                type="button"
+                onClick={() => handleNextStep('publish')}
+                disabled={isSubmitting || (!caption.trim() && media.length === 0)}
+                className="px-4 py-1.5 rounded-full bg-black dark:bg-white text-white dark:text-black text-[13px] font-bold disabled:opacity-40 transition-opacity"
+              >
+                {isSubmitting ? 'Posting…' : 'Post'}
+              </button>
             </div>
 
             <div className="flex-1 px-5 py-5 pb-5 flex flex-col">
@@ -3121,15 +3121,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col">
-                  <div className="flex items-center gap-2 text-sm mb-2">
-                    <span className="font-semibold text-gray-900 dark:text-white">{userObject?.username || 'User'}</span>
-                    <span className="text-gray-400 dark:text-white/35">›</span>
-                    <span className="text-gray-400 dark:text-white/35">Add a topic</span>
-                  </div>
+                  <span className="font-semibold text-[14px] mb-2 text-gray-900 dark:text-white">{userObject?.username || 'User'}</span>
 
                   <textarea
-                    className="w-full flex-1 min-h-[160px] resize-none bg-transparent outline-none text-[14px] leading-6 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
-                    placeholder="What's new?"
+                    className="w-full flex-1 min-h-[160px] resize-none bg-transparent outline-none text-[15px] leading-6 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
+                    placeholder="What's on your mind?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
                   />
@@ -3217,30 +3213,11 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 </div>
 
                 <div className="flex-1 min-w-0 pt-1 flex flex-col">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-bold text-[14px] truncate">{userObject?.username || 'User'}</span>
-                      <ChevronRight size={16} className="text-gray-400 dark:text-white/35 shrink-0" />
-                      <span className="text-gray-400 dark:text-white/35 text-[14px] truncate">Community or topic</span>
-                    </div>
-                    {(caption.trim() || media.length > 0) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCaption('');
-                          setMedia([]);
-                          setCurrentIndex(0);
-                        }}
-                        className="text-gray-500 dark:text-white/35 shrink-0"
-                      >
-                        <X size={24} />
-                      </button>
-                    )}
-                  </div>
+                  <span className="font-bold text-[14px] text-gray-900 dark:text-white">{userObject?.username || 'User'}</span>
 
                   <textarea
-                    className="mt-2 w-full flex-1 min-h-[140px] resize-none bg-transparent outline-none text-[14px] leading-[1.6] tracking-[-0.01em] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
-                    placeholder="What's new?"
+                    className="mt-2 w-full flex-1 min-h-[140px] resize-none bg-transparent outline-none text-[15px] leading-[1.6] tracking-[-0.01em] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35"
+                    placeholder="What's on your mind?"
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
                   />

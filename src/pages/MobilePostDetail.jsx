@@ -192,18 +192,39 @@ const MobilePostDetail = () => {
     };
 
     const handleLikeComment = async (commentId, isLikedByMe) => {
-        try {
-            if (isLikedByMe) {
-                await activeCommentService.unlikeComment(commentId);
-            } else {
-                await activeCommentService.likeComment(commentId);
+        setComments(prev => prev.map(c => {
+            if (String(c._id || c.id) !== String(commentId)) return c;
+            return { ...c, is_liked_by_me: !isLikedByMe, likes_count: (c.likes_count || 0) + (isLikedByMe ? -1 : 1) };
+        }));
+        setReplies(prev => {
+            const updated = {};
+            for (const [key, arr] of Object.entries(prev)) {
+                updated[key] = arr.map(r => {
+                    if (String(r._id || r.id) !== String(commentId)) return r;
+                    return { ...r, is_liked_by_me: !isLikedByMe, likes_count: (r.likes_count || 0) + (isLikedByMe ? -1 : 1) };
+                });
             }
-            // Refresh to update counts/status
-            fetchComments();
-            // If it's a reply, refresh replies
-            Object.keys(replies).forEach(key => loadReplies(key));
+            return updated;
+        });
+        try {
+            if (isLikedByMe) await activeCommentService.unlikeComment(commentId);
+            else await activeCommentService.likeComment(commentId);
         } catch (error) {
             console.error('Error liking comment:', error);
+            setComments(prev => prev.map(c => {
+                if (String(c._id || c.id) !== String(commentId)) return c;
+                return { ...c, is_liked_by_me: isLikedByMe, likes_count: (c.likes_count || 0) + (isLikedByMe ? 1 : -1) };
+            }));
+            setReplies(prev => {
+                const updated = {};
+                for (const [key, arr] of Object.entries(prev)) {
+                    updated[key] = arr.map(r => {
+                        if (String(r._id || r.id) !== String(commentId)) return r;
+                        return { ...r, is_liked_by_me: isLikedByMe, likes_count: (r.likes_count || 0) + (isLikedByMe ? 1 : -1) };
+                    });
+                }
+                return updated;
+            });
         }
     };
 
@@ -287,7 +308,6 @@ const MobilePostDetail = () => {
     };
 
     const handleDeleteComment = async (commentId) => {
-        if (!window.confirm('Are you sure you want to delete this comment?')) return;
         try {
             if (isTweet) {
                 await tweetCommentService.deleteComment(commentId);
