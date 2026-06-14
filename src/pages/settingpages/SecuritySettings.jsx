@@ -6,7 +6,7 @@ import { fetchMe, logoutUser } from '../../store/authSlice';
 import {
   ArrowLeft, Lock, ShieldCheck, KeyRound, Mail, Eye, EyeOff,
   CheckCircle2, AlertCircle, X, RefreshCw, Smartphone, Loader2,
-  ChevronRight, Monitor, Clock, LogOut, Trash2, MessageSquare,
+  ChevronRight, Monitor, Clock, LogOut, Trash2, MessageSquare, Pencil,
 } from 'lucide-react';
 
 const BASE = 'https://api.bebsmart.in';
@@ -288,6 +288,9 @@ const SecuritySettings = () => {
   const userEmail = userObject?.email || '';
   const userId = userObject?._id || userObject?.id;
 
+  const [isEditing, setIsEditing] = useState(false);
+  const savedMethod = useRef('email');
+
   // 2FA state
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [twoFAMethod, setTwoFAMethod] = useState('email'); // 'email' | 'sms'
@@ -318,9 +321,25 @@ const SecuritySettings = () => {
   useEffect(() => {
     api.get('/auth/me').then(res => {
       setTwoFAEnabled(!!res.data?.twoFA?.enabled);
-      setTwoFAMethod(res.data?.twoFA?.method || 'email');
+      const m = res.data?.twoFA?.method || 'email';
+      setTwoFAMethod(m);
+      savedMethod.current = m;
     }).catch(() => {});
   }, []);
+
+  const handleCancelEdit = () => {
+    setTwoFAMethod(savedMethod.current);
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      await api.put(`/users/${userId}`, { twoFA: { method: twoFAMethod } });
+      savedMethod.current = twoFAMethod;
+      showToast('Security settings saved.');
+    } catch { showToast('Failed to save settings.', 'error'); }
+    setIsEditing(false);
+  };
 
   const loadSessions = async () => {
     if (showActivity) { setShowActivity(false); return; }
@@ -410,12 +429,36 @@ const SecuritySettings = () => {
       )}
 
       {/* Header */}
-      <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center gap-3 z-40">
+      <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center justify-between z-40">
         <Link to="/settings" className="text-gray-800 dark:text-white p-1"><ArrowLeft size={22} /></Link>
         <h1 className="text-base font-semibold dark:text-white">Security</h1>
+
+        {!isEditing ? (
+          <button onClick={() => setIsEditing(true)}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+            <Pencil size={13} /> Edit
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button onClick={handleCancelEdit}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+              <X size={13} /> Cancel
+            </button>
+            <button onClick={handleSaveEdit}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#fa3f5e] text-white text-sm font-bold min-w-[60px] justify-center">
+              <Check size={13} /> Save
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="max-w-2xl mx-auto px-4 pt-5 space-y-5">
+
+        {isEditing && (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#fa3f5e]/8 border border-[#fa3f5e]/20 text-[#fa3f5e] text-xs font-semibold">
+            <Pencil size={12} /> Editing — tap Save when you're done
+          </div>
+        )}
 
         {/* ── Password ───────────────────────────────────── */}
         <div>
@@ -510,27 +553,31 @@ const SecuritySettings = () => {
 
             {/* 2FA method selection */}
             <div className="px-4 py-3 space-y-2">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Authentication Method</p>
+              <p className={`text-[11px] font-bold uppercase tracking-widest mb-2 ${isEditing ? 'text-[#fa3f5e]' : 'text-gray-400 dark:text-gray-500'}`}>
+                Authentication Method {!isEditing && <span className="normal-case font-normal text-gray-400">— tap Edit to change</span>}
+              </p>
 
               {[
                 { key: 'email', label: 'Email OTP', sublabel: `Code sent to ${userEmail || 'your email'}`, icon: Mail, available: true },
                 { key: 'sms', label: 'SMS OTP', sublabel: 'Code sent to your mobile number', icon: MessageSquare, available: true },
                 { key: 'app', label: 'Authenticator App', sublabel: 'Coming soon — Google/Microsoft Authenticator', icon: Smartphone, available: false },
               ].map(({ key, label, sublabel, icon: Icon, available }) => (
-                <button key={key} disabled={!available || !twoFAEnabled}
-                  onClick={() => available && twoFAEnabled && setTwoFAMethod(key)}
+                <button key={key} disabled={!available || !twoFAEnabled || !isEditing}
+                  onClick={() => available && twoFAEnabled && isEditing && setTwoFAMethod(key)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${
                     twoFAMethod === key && twoFAEnabled
                       ? 'border-[#fa3f5e] bg-[#fa3f5e]/5'
-                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}>
+                      : isEditing
+                      ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      : 'border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30'
+                  } disabled:cursor-not-allowed ${(!isEditing && twoFAMethod !== key) ? 'opacity-50' : ''}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                     twoFAMethod === key && twoFAEnabled ? 'bg-[#fa3f5e]/10 text-[#fa3f5e]' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
                   }`}>
                     <Icon size={15} />
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
+                    <p className={`text-sm font-medium ${isEditing || twoFAMethod === key ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>{label}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{sublabel}</p>
                   </div>
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${

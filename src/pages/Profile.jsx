@@ -1519,7 +1519,7 @@ const Profile = () => {
                         <div className="mb-4 flex items-center gap-2 w-full">
                                     {isOwnProfile ? (
                                         <>
-                                            <Link to="/edit-profile" className="basis-[40%] shrink-0 h-9 inline-flex items-center justify-center bg-gradient-to-r from-orange-400 via-orange-500 to-pink-600 text-white text-sm font-bold rounded-xl shadow-md hover:opacity-95 transition-opacity">
+                                            <Link to="/settings/account" className="basis-[40%] shrink-0 h-9 inline-flex items-center justify-center bg-gradient-to-r from-orange-400 via-orange-500 to-pink-600 text-white text-sm font-bold rounded-xl shadow-md hover:opacity-95 transition-opacity">
                                                 Edit profile
                                             </Link>
                                             <button type="button" onClick={handleShareProfile} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
@@ -1690,7 +1690,7 @@ const Profile = () => {
                     <div className="flex items-center justify-center gap-2 mb-5 flex-wrap">
                         {isOwnProfile ? (
                             <>
-                                <Link to="/edit-profile" className="px-5 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-xl text-sm shadow-md hover:opacity-90 transition-opacity">
+                                <Link to="/settings/account" className="px-5 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-xl text-sm shadow-md hover:opacity-90 transition-opacity">
                                     Edit profile
                                 </Link>
                                 <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Share">
