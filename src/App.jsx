@@ -27,6 +27,10 @@ import MobilePostDetail from './pages/MobilePostDetail';
 import MobileAdsDetail from './pages/MobileAdsDetail';
 import MobilePromoteDetail from './pages/MobilePromoteDetail';
 import MobileTweetDetail from './pages/MobileTweetDetail';
+import AccountSettings from './pages/settingpages/AccountSettings';
+import PrivacySettings from './pages/settingpages/PrivacySettings';
+import SecuritySettings from './pages/settingpages/SecuritySettings';
+import HelpSettings from './pages/settingpages/HelpSettings';
 import AuthCallback from './pages/AuthCallback';
 import Notifications from './pages/Notifications';
 import VendorNotifications from './pages/vendor-pages/VendorNotifications';
@@ -122,7 +126,11 @@ function App() {
             <Route path="/profile/:userId"  element={<Profile />} />
             <Route path="/edit-profile"     element={<EditProfile />} />
             <Route path="/wallet"           element={<WalletDetails />} />
-            <Route path="/settings"         element={<Settings />} />
+            <Route path="/settings"                element={<Settings />} />
+            <Route path="/settings/account"        element={<AccountSettings />} />
+            <Route path="/settings/privacy"        element={<PrivacySettings />} />
+            <Route path="/settings/security"       element={<SecuritySettings />} />
+            <Route path="/settings/help"           element={<HelpSettings />} />
             <Route path="/notifications"    element={<Notifications />} />
             <Route path="/search"           element={<Search />} />
             <Route path="/messages"         element={<ChatPage />} />
