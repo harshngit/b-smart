@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, ShoppingBag } from 'lucide-react';
+import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, ShoppingBag, LogOut } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
 import bsmartLogo from '../assets/bsmart.png';
 import bsmartIcon from '../assets/bsmart_logo.png';
@@ -790,9 +790,18 @@ const Sidebar = ({ onOpenCreateModal }) => {
                   {mode === 'dark' && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
                 </button>
                 {!isVendor && (
-                  <Link to="/settings" className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200" onClick={() => setIsMoreDropdownOpen(false)}>
-                    <Target size={18} /> Settings
-                  </Link>
+                  <>
+                    <Link to="/settings" className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200" onClick={() => setIsMoreDropdownOpen(false)}>
+                      <Target size={18} /> Settings
+                    </Link>
+                    <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
+                    <button
+                      onClick={() => { setIsMoreDropdownOpen(false); dispatch(logoutUser()); navigate('/login'); }}
+                      className="w-full text-left px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-sm font-medium text-red-500 dark:text-red-400 transition-colors"
+                    >
+                      <LogOut size={18} /> Log Out
+                    </button>
+                  </>
                 )}
               </div>
             )}

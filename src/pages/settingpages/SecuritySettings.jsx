@@ -6,7 +6,7 @@ import { fetchMe, logoutUser } from '../../store/authSlice';
 import {
   ArrowLeft, Lock, ShieldCheck, KeyRound, Mail, Eye, EyeOff,
   CheckCircle2, AlertCircle, X, RefreshCw, Smartphone, Loader2,
-  ChevronRight, Monitor, Clock, LogOut, Trash2, MessageSquare, Pencil,
+  ChevronRight, Monitor, Clock, LogOut, Trash2, MessageSquare, Pencil, Check,
 } from 'lucide-react';
 
 const BASE = 'https://api.bebsmart.in';
@@ -72,7 +72,8 @@ const AlertBanner = ({ type, msg }) => {
 };
 
 /* ───────────────────────── 2FA modal ───────────────────────── */
-const TwoFAModal = ({ mode, email, userId, onClose, onDone }) => {
+const TwoFAModal = ({ mode, method, email, phone, userId, onClose, onDone }) => {
+  const isSms = method === 'sms';
   const [step, setStep] = useState(1);
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -91,10 +92,14 @@ const TwoFAModal = ({ mode, email, userId, onClose, onDone }) => {
     setError(''); setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${BASE}/api/email/send-otp`, {
+      const endpoint = isSms ? `${BASE}/api/sms/send-otp` : `${BASE}/api/email/send-otp`;
+      const body = isSms
+        ? { phone, purpose: 'two_factor' }
+        : { email, purpose: 'two_factor' };
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ email, purpose: 'two_factor' }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || 'Failed to send OTP');
@@ -108,14 +113,18 @@ const TwoFAModal = ({ mode, email, userId, onClose, onDone }) => {
     setError(''); setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${BASE}/api/email/verify-otp`, {
+      const endpoint = isSms ? `${BASE}/api/sms/verify-otp` : `${BASE}/api/email/verify-otp`;
+      const body = isSms
+        ? { phone, otp, purpose: 'two_factor' }
+        : { email, otp, purpose: 'two_factor' };
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ email, otp, purpose: 'two_factor' }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || 'Invalid OTP');
-      await api.put(`/users/${userId}`, { twoFA: { enabled: mode === 'enable' } }, {
+      await api.put(`/users/${userId}`, { twoFA: { enabled: mode === 'enable', method } }, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       setSuccess(mode === 'enable' ? '2FA enabled!' : '2FA disabled!');
@@ -124,17 +133,21 @@ const TwoFAModal = ({ mode, email, userId, onClose, onDone }) => {
     finally { setLoading(false); }
   };
 
+  const maskedTarget = isSms
+    ? (phone ? phone.slice(0, -4).replace(/\d/g, '•') + phone.slice(-4) : 'your phone')
+    : email;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-xs bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 p-5 relative">
         <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"><X size={16} /></button>
         <div className="flex items-center gap-2.5 mb-4">
           <div className={`p-2 rounded-xl ${mode === 'enable' ? 'bg-green-50 dark:bg-green-900/20 text-green-600' : 'bg-red-50 dark:bg-red-900/20 text-red-500'}`}>
-            <ShieldCheck size={18} />
+            {isSms ? <MessageSquare size={18} /> : <ShieldCheck size={18} />}
           </div>
           <div>
             <p className="font-bold text-sm text-gray-900 dark:text-white">{mode === 'enable' ? 'Enable 2FA' : 'Disable 2FA'}</p>
-            <p className="text-xs text-gray-500">{email}</p>
+            <p className="text-xs text-gray-500">{isSms ? 'via SMS' : 'via Email'} · {maskedTarget}</p>
           </div>
         </div>
         <AlertBanner type="success" msg={success} />
@@ -142,17 +155,23 @@ const TwoFAModal = ({ mode, email, userId, onClose, onDone }) => {
         {step === 1 && (
           <>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              {mode === 'enable' ? 'A code will be sent to your email to confirm enabling 2FA.' : 'Verify your identity before disabling 2FA.'}
+              {mode === 'enable'
+                ? `A verification code will be sent to your ${isSms ? 'phone number' : 'email'} to confirm enabling 2FA.`
+                : `Verify your identity via ${isSms ? 'SMS' : 'email'} before disabling 2FA.`}
             </p>
             <button onClick={sendOtp} disabled={loading}
               className="w-full py-2.5 rounded-xl bg-[#fa3f5e] text-white font-bold text-sm hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : <><Mail size={14} /> Send Code</>}
+              {loading
+                ? <><Loader2 size={14} className="animate-spin" /> Sending…</>
+                : isSms ? <><MessageSquare size={14} /> Send SMS Code</> : <><Mail size={14} /> Send Email Code</>}
             </button>
           </>
         )}
         {step === 2 && (
           <>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 text-center">Enter the 6-digit code sent to your email</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 text-center">
+              Enter the 6-digit code sent to your {isSms ? 'phone' : 'email'}
+            </p>
             <div className="mb-4"><OtpInput value={otp} onChange={setOtp} /></div>
             <button onClick={verifyOtp} disabled={loading || otp.length < 6}
               className="w-full py-2.5 rounded-xl bg-[#fa3f5e] text-white font-bold text-sm hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2 mb-2">
@@ -286,6 +305,7 @@ const SecuritySettings = () => {
   const navigate = useNavigate();
   const { userObject } = useSelector((state) => state.auth);
   const userEmail = userObject?.email || '';
+  const userPhone = userObject?.phone || userObject?.phone_number || userObject?.mobile || '';
   const userId = userObject?._id || userObject?.id;
 
   const [isEditing, setIsEditing] = useState(false);
@@ -389,12 +409,25 @@ const SecuritySettings = () => {
     setLogoutAllLoading(true);
     try {
       await api.post('/auth/logout-all');
-      dispatch(logoutUser());
-      navigate('/login');
+      setConfirmLogoutAll(false);
+      showToast('Logged out from all other devices.');
+      // reload sessions list to reflect changes
+      setShowActivity(false);
+      setSessions([]);
     } catch {
       showToast('Failed to logout from all devices.', 'error');
       setConfirmLogoutAll(false);
     } finally { setLogoutAllLoading(false); }
+  };
+
+  const handleRemoveSession = async (sessionId) => {
+    try {
+      await api.delete(`/auth/sessions/${sessionId}`);
+      setSessions(prev => prev.filter(s => (s._id || s.id) !== sessionId));
+      showToast('Session removed.');
+    } catch {
+      showToast('Failed to remove session.', 'error');
+    }
   };
 
   const handleLogoutCurrent = () => {
@@ -559,7 +592,7 @@ const SecuritySettings = () => {
 
               {[
                 { key: 'email', label: 'Email OTP', sublabel: `Code sent to ${userEmail || 'your email'}`, icon: Mail, available: true },
-                { key: 'sms', label: 'SMS OTP', sublabel: 'Code sent to your mobile number', icon: MessageSquare, available: true },
+                { key: 'sms', label: 'SMS OTP', sublabel: userPhone ? `Code sent to ${userPhone.slice(0, -4).replace(/\d/g, '•')}${userPhone.slice(-4)}` : 'No phone number added', icon: MessageSquare, available: !!userPhone },
                 { key: 'app', label: 'Authenticator App', sublabel: 'Coming soon — Google/Microsoft Authenticator', icon: Smartphone, available: false },
               ].map(({ key, label, sublabel, icon: Icon, available }) => (
                 <button key={key} disabled={!available || !twoFAEnabled || !isEditing}
@@ -593,6 +626,12 @@ const SecuritySettings = () => {
               <div className="mx-4 mb-3 flex items-center gap-2 p-2.5 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30">
                 <ShieldCheck size={13} className="text-green-600 shrink-0" />
                 <p className="text-xs text-green-700 dark:text-green-400">2FA active — a code will be required at each login.</p>
+              </div>
+            )}
+            {twoFAMethod === 'sms' && !userPhone && (
+              <div className="mx-4 mb-3 flex items-center gap-2 p-2.5 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30">
+                <AlertCircle size={13} className="text-orange-500 shrink-0" />
+                <p className="text-xs text-orange-700 dark:text-orange-400">No phone number on your account. Add one in Profile settings to use SMS OTP.</p>
               </div>
             )}
           </div>
@@ -631,21 +670,37 @@ const SecuritySettings = () => {
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {sessions.map((s, i) => (
-                      <div key={s._id || i} className="flex items-start gap-3 px-4 py-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${s.is_current ? 'bg-green-50 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'}`}>
-                          <Monitor size={16} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">{s.device || s.user_agent || 'Unknown Device'}</p>
-                            {s.is_current && <span className="text-[10px] font-bold bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400 px-1.5 py-0.5 rounded-full">Current</span>}
+                    {sessions.map((s, i) => {
+                      const sessionId = s._id || s.id;
+                      const isCurrent = s.isCurrent || s.is_current || false;
+                      const deviceName = s.deviceName || s.device || s.user_agent || 'Unknown Device';
+                      const deviceType = s.deviceType || s.device_type || 'desktop';
+                      const location = s.location || '';
+                      const ip = s.ip || '';
+                      const lastActive = s.lastActive || s.last_active || s.created_at;
+                      const DeviceIcon = deviceType === 'mobile' || deviceType === 'tablet' ? Smartphone : Monitor;
+                      return (
+                        <div key={sessionId || i} className="flex items-start gap-3 px-4 py-3">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${isCurrent ? 'bg-green-50 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'}`}>
+                            <DeviceIcon size={16} />
                           </div>
-                          <p className="text-xs text-gray-500">{s.location || s.ip || '—'}</p>
-                          <p className="text-xs text-gray-400">{formatDate(s.last_active || s.created_at)}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">{deviceName}</p>
+                              {isCurrent && <span className="text-[10px] font-bold bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400 px-1.5 py-0.5 rounded-full">Current</span>}
+                            </div>
+                            <p className="text-xs text-gray-500">{[location, ip].filter(Boolean).join(' · ') || '—'}</p>
+                            <p className="text-xs text-gray-400">{formatDate(lastActive)}</p>
+                          </div>
+                          {!isCurrent && sessionId && (
+                            <button onClick={() => handleRemoveSession(sessionId)}
+                              className="flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+                              <X size={14} />
+                            </button>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -675,19 +730,26 @@ const SecuritySettings = () => {
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {loginHistory.slice(0, 10).map((h, i) => (
-                      <div key={h._id || i} className="flex items-start gap-3 px-4 py-3">
-                        <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${h.status === 'success' ? 'bg-green-500' : 'bg-red-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-900 dark:text-white font-medium">{h.device || 'Unknown Device'}</p>
-                          <p className="text-xs text-gray-500">{h.ip || '—'} · {h.location || '—'}</p>
-                          <p className="text-xs text-gray-400">{formatDate(h.created_at || h.timestamp)}</p>
+                    {loginHistory.slice(0, 20).map((h, i) => {
+                      const deviceName = h.deviceName || h.device || 'Unknown Device';
+                      const ip = h.ip || '—';
+                      const location = h.location || '';
+                      const timestamp = h.loginAt || h.created_at || h.timestamp;
+                      const ok = h.status === 'success' || h.status === 'ok';
+                      return (
+                        <div key={h._id || i} className="flex items-start gap-3 px-4 py-3">
+                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${ok ? 'bg-green-500' : 'bg-red-400'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-900 dark:text-white font-medium">{deviceName}</p>
+                            <p className="text-xs text-gray-500">{[ip, location].filter(v => v && v !== '—').join(' · ') || ip}</p>
+                            <p className="text-xs text-gray-400">{formatDate(timestamp)}</p>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${ok ? 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
+                            {ok ? 'OK' : 'Failed'}
+                          </span>
                         </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${h.status === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
-                          {h.status === 'success' ? 'OK' : 'Failed'}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -730,7 +792,7 @@ const SecuritySettings = () => {
 
       {/* Modals */}
       {twoFAModal && (
-        <TwoFAModal mode={twoFAModal} email={userEmail} userId={userId}
+        <TwoFAModal mode={twoFAModal} method={twoFAMethod} email={userEmail} phone={userPhone} userId={userId}
           onClose={() => setTwoFAModal(null)}
           onDone={async (enabled) => {
             setTwoFAEnabled(enabled);

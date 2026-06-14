@@ -26,7 +26,8 @@ const AuthCallback = () => {
 
         try {
           const response = await api.get('/auth/me');
-          dispatch(setUser(response.data));
+          const user = response.data?.user || response.data?.data || response.data;
+          dispatch(setUser(user));
           navigate('/');
         } catch (error) {
           console.error('Error fetching user details:', error);

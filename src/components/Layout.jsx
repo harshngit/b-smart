@@ -20,6 +20,13 @@ const Layout = () => {
   const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
   const showTopBar = !isExcludedPage && !isFullScreenPage;
 
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  useEffect(() => {
+    const handler = (e) => setSidebarExpanded(e.detail?.isOpen ?? false);
+    window.addEventListener('sidebar:toggle', handler);
+    return () => window.removeEventListener('sidebar:toggle', handler);
+  }, []);
+
   const [walletCoins, setWalletCoins] = useState(null);
 
   // Direct /wallet/me call — also syncs Redux so TopBar stays live
@@ -229,7 +236,7 @@ const Layout = () => {
     <div className={`flex min-h-screen bg-gray-50 dark:bg-black md:pb-0 ${isFullScreenPage ? 'pb-0' : 'pb-16'}`}>
       <Sidebar onOpenCreateModal={handleOpenCreateModal} />
 
-<div className="flex-1 min-h-screen transition-all duration-300 md:ml-20">
+<div className={`flex-1 min-h-screen transition-all duration-300 ${sidebarExpanded ? 'md:ml-64' : 'md:ml-20'}`}>
         {showTopBar && <TopBar />}
 
         <div className={`
