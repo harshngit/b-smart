@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Play, Image, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -301,7 +301,7 @@ const InterestsModal = ({ isOpen, onClose, currentInterests = [], categories = A
     );
 };
 
-const InterestedSection = ({ isDesktop = false, interests = [], isOwnProfile = false, onAdd }) => {
+const InterestedSection = ({ isDesktop: _isDesktop = false, interests = [], isOwnProfile = false, onAdd }) => {
     const scrollRef = useRef(null);
 
     const scroll = (direction) => {
@@ -412,6 +412,7 @@ const Profile = () => {
     const [userTweets, setUserTweets] = useState([]);
     const [userPromoteReels, setUserPromoteReels] = useState([]);
     const [loadingPosts, setLoadingPosts] = useState(true);
+    const [privacyRestricted, setPrivacyRestricted] = useState({ posts: false, pulse: false });
     const [selectedPost, setSelectedPost] = useState(null);
     const [selectedTweet, setSelectedTweet] = useState(null);
     const [selectedPromoteReel, setSelectedPromoteReel] = useState(null);
@@ -421,7 +422,7 @@ const Profile = () => {
     const [savingInterests, setSavingInterests] = useState(false);
     const [userInterests, setUserInterests] = useState([]);
     const [availableCategories, setAvailableCategories] = useState(AD_CATEGORIES_FALLBACK);
-    const [loadingInterests, setLoadingInterests] = useState(false);
+    const [, setLoadingInterests] = useState(false);
     const [showAddImageModal, setShowAddImageModal] = useState(false);
     const [showInterestsSection, setShowInterestsSection] = useState(false);
 
@@ -442,6 +443,7 @@ const Profile = () => {
     const [notificationEnabled, setNotificationEnabled] = useState(false);
     const [notifLoading, setNotifLoading] = useState(false);
     const [isBioExpanded, setIsBioExpanded] = useState(false);
+    const [isPrivacyBlocked, setIsPrivacyBlocked] = useState(false);
     const userOptionsMenuRef = useRef(null);
 
     // Close user options menu when clicking outside
@@ -473,7 +475,20 @@ const Profile = () => {
     // Derived: is the profile private and content hidden from current user?
     const isProfilePrivate = Boolean(profileUser?.isPrivate);
     const isFollowing = followState === 'following';
-    const contentLocked = isProfilePrivate && !isOwnProfile && !isFollowing;
+    const contentLocked = (isProfilePrivate && !isOwnProfile && !isFollowing) || (isPrivacyBlocked && !isOwnProfile);
+
+    // Messaging button visibility — respects target user's messaging_privacy setting
+    const canMessage = !isOwnProfile && (() => {
+        const mp = profileUser?.messaging_privacy;
+        if (mp === 'nobody') return false;
+        if (mp === 'followers_only') return isFollowing;
+        return true;
+    })();
+
+    // Follow button visibility — hidden when target user has disabled follow requests
+    // Still shown when already following (so the viewer can unfollow)
+    const allowFollowRequests = profileUser?.follow_settings?.allow_follow_requests ?? profileUser?.allow_follow_requests ?? true;
+    const canFollow = !isOwnProfile && (followState === 'following' || allowFollowRequests);
 
     // ── Fetch profile user ──────────────────────────────────────────────────
     useEffect(() => {
@@ -484,7 +499,21 @@ const Profile = () => {
                 try {
                     const response = await api.get(`/users/${userId}`);
                     setProfileUser(response.data?.user || response.data);
+                    setIsPrivacyBlocked(false);
                 } catch (error) {
+                    // Any 403 from the profile endpoint means privacy-blocked — skip Supabase fallback
+                    if (error?.response?.status === 403) {
+                        setIsPrivacyBlocked(true);
+                        const minUser = error?.response?.data?.user || {};
+                        setProfileUser({
+                            _id: minUser._id || userId,
+                            username: minUser.username || '',
+                            full_name: minUser.full_name || '',
+                            avatar_url: minUser.avatar_url || '',
+                            isPrivate: true,
+                        });
+                        return;
+                    }
                     console.error('Error fetching user profile:', error);
                     try {
                         const { data, error: supError } = await supabase
@@ -626,24 +655,17 @@ const Profile = () => {
             if (contentLocked) { setLoadingPosts(false); return; }
             try {
                 setLoadingPosts(true);
-                const response = await api.get(`/users/${profileUserId}/posts`);
-                const data = response.data || {};
-                // New API returns { posts, promote_reels, tweets }
-                if (data.posts !== undefined) {
-                    setUserPosts(data.posts || []);
-                    setUserTweets(data.tweets || []);
-                    setUserPromoteReels(data.promote_reels || []);
-                } else {
-                    // Fallback: old flat array format
-                    setUserPosts(Array.isArray(data) ? data : []);
-                }
+                const response = await api.get(`/users/${profileUserId}/profile-content`);
+                const body = response.data || {};
+                // profile-content respects privacy settings
+                const restricted = body.privacy_restricted || { posts: false, pulse: false };
+                setPrivacyRestricted(restricted);
+                const content = body.data || {};
+                setUserPosts(content.posts || []);
+                setUserTweets(content.tweets || []);
+                setUserPromoteReels(content.promote_reels || []);
             } catch (error) {
                 console.error('Error fetching posts:', error);
-                try {
-                    const { data, error: supError } = await supabase
-                        .from('posts').select('*').eq('user_id', profileUserId).order('created_at', { ascending: false });
-                    if (!supError) setUserPosts(data || []);
-                } catch (e) { console.error(e); }
             } finally {
                 setLoadingPosts(false);
             }
@@ -706,7 +728,7 @@ const Profile = () => {
             }
         };
         fetchVendorInfo();
-    }, [profileUser?._id, profileUser?.id, profileUser?.role]); // eslint-disable-line
+    }, [profileUser?._id, profileUser?.id, profileUser?.role]);
 
     // ── Follow status: also detect 'requested' state ────────────────────────
     useEffect(() => {
@@ -995,11 +1017,27 @@ const Profile = () => {
     };
 
     if (!profileUser) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
-            </div>
-        );
+        // 403 was received but profileUser wasn't set yet — show wall immediately, no spinner
+        if (isPrivacyBlocked) {
+            return (
+                <div className="min-h-screen bg-white dark:bg-black flex flex-col">
+                    <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-100 dark:border-gray-800">
+                        <button onClick={() => navigate(-1)} className="p-1 text-gray-800 dark:text-white">
+                            <ArrowLeft size={22} />
+                        </button>
+                        <span className="text-base font-semibold text-gray-900 dark:text-white">Profile</span>
+                    </div>
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 px-8 text-center">
+                        <div className="w-[72px] h-[72px] rounded-full border-[2.5px] border-gray-900 dark:border-gray-100 flex items-center justify-center mb-5">
+                            <Lock size={30} className="text-gray-900 dark:text-gray-100" />
+                        </div>
+                        <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">This Account is Private</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[230px] leading-relaxed">Follow this account to see their photos and videos.</p>
+                    </div>
+                </div>
+            );
+        }
+        return null;
     }
 
     // ── Follow button label & style ──────────────────────────────────────────
@@ -1062,15 +1100,50 @@ const Profile = () => {
           ];
 
     // ── Private Profile Wall ──────────────────────────────────────────────────
-    const PrivateProfileWall = () => (
-        <div className="flex flex-col items-center justify-center py-16 px-8 text-center bg-white dark:bg-black">
-            <div className="w-16 h-16 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center mb-4">
-                <Lock size={28} className="text-gray-400 dark:text-gray-500" />
+    const PrivateProfileWall = () => {
+        const isPending = followState === 'requested';
+        return (
+            <div className="relative w-full" style={{ minHeight: '420px' }}>
+                {/* Greyed-out placeholder grid in background */}
+                <div className="absolute inset-0 grid grid-cols-3 gap-0.5 overflow-hidden">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                        <div key={i} className="bg-gray-100 dark:bg-gray-900" />
+                    ))}
+                </div>
+
+                {/* Frosted-glass overlay with lock message */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 dark:bg-black/75 backdrop-blur-sm px-8 text-center">
+                    {/* Top divider line */}
+                    <div className="absolute top-0 left-0 right-0 h-px bg-gray-200 dark:bg-gray-700" />
+
+                    {/* Icon */}
+                    <div className={`w-[68px] h-[68px] rounded-full border-[2.5px] flex items-center justify-center mb-4 shadow-sm ${
+                        isPending
+                            ? 'border-orange-400 bg-orange-50/90 dark:bg-orange-900/30'
+                            : 'border-gray-800 dark:border-gray-200 bg-white/80 dark:bg-black/80'
+                    }`}>
+                        {isPending
+                            ? <Clock size={28} className="text-orange-500" />
+                            : <Lock size={28} className="text-gray-900 dark:text-gray-100" />
+                        }
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-[17px] font-bold text-gray-900 dark:text-white mb-2 leading-tight">
+                        {isPending ? 'Request Sent' : 'This Account is Private'}
+                    </h3>
+
+                    {/* Subtitle */}
+                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-[240px]">
+                        {isPending
+                            ? 'Your follow request is pending. Once approved you\'ll be able to see their posts.'
+                            : 'Follow this account to see their photos and videos.'
+                        }
+                    </p>
+                </div>
             </div>
-            <h3 className="font-semibold text-base text-gray-900 dark:text-white mb-1">This profile is private</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Follow to see their photos and videos.</p>
-        </div>
-    );
+        );
+    };
 
     // ── Vendor Business Info Card ─────────────────────────────────────────────
     const VendorBusinessCard = () => {
@@ -1108,21 +1181,30 @@ const Profile = () => {
         );
     };
 
+    const PrivacyRestrictedPlaceholder = ({ message = 'This content is private.' }) => (
+        <div className="flex flex-col items-center justify-center py-16 px-8 text-center bg-white dark:bg-black w-full">
+            <div className="w-14 h-14 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center mb-4">
+                <Lock size={24} className="text-gray-400 dark:text-gray-500" />
+            </div>
+            <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">{message}</p>
+        </div>
+    );
+
     const renderContent = () => {
-        if (activeTab === null) return null;
         if (contentLocked) return <PrivateProfileWall />;
+        if (activeTab === null) return null;
         if (activeTab === 'ads') return <AdsGrid />;
-        if (activeTab === 'tweets') return <TweetsGrid />;
-        if (activeTab === 'promote_reels') return <PromoteReelsGrid />;
-        return <PostGrid />;
+        if (activeTab === 'tweets') return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Tweets are private." /> : <TweetsGrid />;
+        if (activeTab === 'promote_reels') return privacyRestricted.pulse ? <PrivacyRestrictedPlaceholder message="Reels are private." /> : <PromoteReelsGrid />;
+        return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Posts are private." /> : <PostGrid />;
     };
     const renderContentMobile = () => {
-        if (activeTab === null) return null;
         if (contentLocked) return <PrivateProfileWall />;
+        if (activeTab === null) return null;
         if (activeTab === 'ads') return <AdsGrid containerClass="" />;
-        if (activeTab === 'tweets') return <TweetsGrid containerClass="" />;
-        if (activeTab === 'promote_reels') return <PromoteReelsGrid containerClass="" />;
-        return <PostGrid containerClass="" />;
+        if (activeTab === 'tweets') return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Tweets are private." /> : <TweetsGrid containerClass="" />;
+        if (activeTab === 'promote_reels') return privacyRestricted.pulse ? <PrivacyRestrictedPlaceholder message="Reels are private." /> : <PromoteReelsGrid containerClass="" />;
+        return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Posts are private." /> : <PostGrid containerClass="" />;
     };
 
     const AdsGrid = ({ containerClass = '' }) => (
@@ -1480,7 +1562,7 @@ const Profile = () => {
                                             : undefined;
                                     const content = (
                                         <>
-                                            <div className="text-[28px] font-semibold leading-none text-gray-900 dark:text-white">{fmt(val)}</div>
+                                            <div className="text-[28px] font-semibold leading-none text-gray-900 dark:text-white">{isPrivacyBlocked ? '—' : fmt(val)}</div>
                                             <div className="mt-1 text-[12px] font-medium text-gray-500 dark:text-gray-400">{label}</div>
                                         </>
                                     );
@@ -1530,16 +1612,20 @@ const Profile = () => {
                                                 aria-label="View interests">
                                                 <Star size={18} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                             </button>
-                                            <button type="button" onClick={handleOpenMessages} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
-                                                <MessageCircle size={18} />
-                                            </button>
+                                            {canMessage && (
+                                                <button type="button" onClick={handleOpenMessages} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
+                                                    <MessageCircle size={18} />
+                                                </button>
+                                            )}
                                         </>
                                     ) : (
                                         <>
-                                            <button onClick={handleFollow} disabled={followLoading}
-                                                className={`basis-[40%] shrink-0 h-9 px-4 text-sm font-bold rounded-xl flex items-center justify-center gap-1 transition-all ${followState === 'following' || followState === 'requested' ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700' : 'bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-md'}`}>
-                                                {getFollowButtonLabel()}
-                                            </button>
+                                            {canFollow && (
+                                                <button onClick={handleFollow} disabled={followLoading}
+                                                    className={`basis-[40%] shrink-0 h-9 px-4 text-sm font-bold rounded-xl flex items-center justify-center gap-1 transition-all ${followState === 'following' || followState === 'requested' ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700' : 'bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-md'}`}>
+                                                    {getFollowButtonLabel()}
+                                                </button>
+                                            )}
                                             <button type="button" onClick={handleShareProfile} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Share profile">
                                                 <Share2 size={18} />
                                             </button>
@@ -1548,9 +1634,11 @@ const Profile = () => {
                                                 aria-label="View interests">
                                                 <Star size={18} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                             </button>
-                                            <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
-                                                <MessageCircle size={18} />
-                                            </button>
+                                            {canMessage && (
+                                                <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
+                                                    <MessageCircle size={18} />
+                                                </button>
+                                            )}
 
                                             <div className="relative" ref={userOptionsMenuRef}>
                                                 <button 
@@ -1708,18 +1796,22 @@ const Profile = () => {
                             </>
                         ) : (
                             <>
-                                <button onClick={handleFollow} disabled={followLoading} className={getFollowButtonClass('md')}>
-                                    {getFollowButtonLabel()}
-                                </button>
+                                {canFollow && (
+                                    <button onClick={handleFollow} disabled={followLoading} className={getFollowButtonClass('md')}>
+                                        {getFollowButtonLabel()}
+                                    </button>
+                                )}
                                 <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Share">
                                     <Share2 size={17} />
                                 </button>
                                 <button type="button" onClick={handleStarClick} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="View interests">
                                     <Star size={17} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                 </button>
-                                <button type="button" onClick={handleOpenMessages} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Message">
-                                    <MessageCircle size={17} />
-                                </button>
+                                {canMessage && (
+                                    <button type="button" onClick={handleOpenMessages} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Message">
+                                        <MessageCircle size={17} />
+                                    </button>
+                                )}
                                 <div className="relative" ref={userOptionsMenuRef}>
                                     <button type="button" onClick={() => setShowUserOptionsMenu(v => !v)} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <MoreHorizontal size={18} />
@@ -1744,15 +1836,15 @@ const Profile = () => {
                     {/* Stats */}
                     <div className="flex items-center justify-center gap-6 mb-5 text-sm">
                         <span className="text-center">
-                            <span className="block font-bold text-gray-900 dark:text-white text-base">{fmt(profileUser.posts_count ?? userPosts.length)}</span>
+                            <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.posts_count ?? userPosts.length)}</span>
                             <span className="text-gray-500 dark:text-gray-400">posts</span>
                         </span>
-                        <button type="button" onClick={() => setFollowersModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
-                            <span className="block font-bold text-gray-900 dark:text-white text-base">{fmt(profileUser.followers_count || 0)}</span>
+                        <button type="button" onClick={() => !isPrivacyBlocked && setFollowersModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
+                            <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.followers_count || 0)}</span>
                             <span className="text-gray-500 dark:text-gray-400">followers</span>
                         </button>
-                        <button type="button" onClick={() => setFollowingModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
-                            <span className="block font-bold text-gray-900 dark:text-white text-base">{fmt(profileUser.following_count || 0)}</span>
+                        <button type="button" onClick={() => !isPrivacyBlocked && setFollowingModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
+                            <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.following_count || 0)}</span>
                             <span className="text-gray-500 dark:text-gray-400">following</span>
                         </button>
                     </div>

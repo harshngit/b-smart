@@ -272,7 +272,7 @@ export default function SearchPage() {
       if (res.ok) {
         const data = await res.json();
         const r = data.results || {};
-        const users = r.users || [];
+        const users = (r.users || []).filter(u => u?.search_discovery?.allow_search_by_username !== false);
         const posts = r.posts || [];
         const reels = r.reels || [];
 

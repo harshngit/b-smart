@@ -439,7 +439,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
         const data = await res.json();
         const r = data.results || {};
         setSidebarSearchResults({
-          users: (r.users || []).slice(0, uLimit),
+          users: (r.users || []).filter(u => u?.search_discovery?.allow_search_by_username !== false).slice(0, uLimit),
           posts: (r.posts || []).slice(0, pLimit),
           reels: (r.reels || []).slice(0, rLimit),
         });

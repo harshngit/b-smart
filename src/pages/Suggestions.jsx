@@ -112,7 +112,8 @@ const Suggestions = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          setUsers(Array.isArray(data) ? data : data.data || []);
+          const all = Array.isArray(data) ? data : data.data || [];
+          setUsers(all.filter(u => u?.search_discovery?.appear_in_suggestions !== false));
         }
       } catch (e) {
         console.error('Error fetching suggestions:', e);

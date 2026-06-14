@@ -962,6 +962,21 @@ export default function ChatPage() {
   const activeConversationTitle = getConversationTitle(activeConversation, currentUserId);
   const activeConversationSubtitle = getConversationSubtitle(activeConversation, currentUserId, onlineUserIds);
   const activeConversationCanSend = canSendInConversation(activeConversation, currentUserId);
+
+  // Messaging privacy — check if the other user allows messages from the current viewer
+  const messagingPrivacyBlocked = !activeConversation?.isGroup && (() => {
+    const mp = otherUser?.messaging_privacy;
+    if (!mp || mp === 'everyone') return false;
+    if (mp === 'nobody') return true;
+    if (mp === 'followers_only') {
+      const participants = activeConversation?.participants || [];
+      const otherParticipantObj = participants.find(
+        (p) => String(getUserId(p)) === String(otherUserId)
+      );
+      return !(otherParticipantObj?.isFollowing ?? false);
+    }
+    return false;
+  })();
   const activeConversationIsRequestForMe = isConversationRequestForMe(activeConversation, currentUserId);
   const activeConversationIsGroupAdmin = String(activeConversation?.groupAdmin?._id || activeConversation?.groupAdmin || '') === String(currentUserId);
   const isRequestsView = conversationType === 'requests';
@@ -1096,7 +1111,8 @@ export default function ChatPage() {
 
     try {
       const response = await chatService.getOnlineUsers(targetIds);
-      setOnlineUserIds(Array.isArray(response?.onlineUserIds) ? response.onlineUserIds.map(String) : []);
+      const ids = Array.isArray(response?.onlineUserIds) ? response.onlineUserIds.map(String) : [];
+      setOnlineUserIds(ids);
     } catch (error) {
       console.error('Failed to load online users:', error);
     }
@@ -1454,7 +1470,7 @@ export default function ChatPage() {
   };
 
   const handleSend = async (customPayload = null) => {
-    if (!activeConversation?._id || !currentUserId || sending || !activeConversationCanSend) return;
+    if (!activeConversation?._id || !currentUserId || sending || !activeConversationCanSend || messagingPrivacyBlocked) return;
     const payload = customPayload || { text: input.trim(), mediaUrl: '', mediaType: 'none', replyTo };
     if (!payload.text && !payload.mediaUrl) return;
     setSending(true);
@@ -1472,7 +1488,7 @@ export default function ChatPage() {
 
   const handleFile = async (event) => {
     const files = Array.from(event.target.files || []);
-    if (!files.length || !activeConversation?._id || !currentUserId || !activeConversationCanSend) return;
+    if (!files.length || !activeConversation?._id || !currentUserId || !activeConversationCanSend || messagingPrivacyBlocked) return;
     setUploading(true);
     try {
       const uploaded = await chatService.uploadChatMedia(activeConversation._id, files);
@@ -1502,7 +1518,7 @@ export default function ChatPage() {
   };
 
   const handleVoiceSend = async (audioBlob, duration) => {
-    if (!activeConversation?._id || !activeConversationCanSend) return;
+    if (!activeConversation?._id || !activeConversationCanSend || messagingPrivacyBlocked) return;
     try {
       const created = await chatService.uploadVoiceMessage(activeConversation._id, audioBlob, duration);
       if (created?._id) {
@@ -2225,7 +2241,9 @@ export default function ChatPage() {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
       const mine = String(message?.sender?._id || message?.sender) === String(currentUserId);
-      if (mine && !message?.isDeleted && hasUserSeenMessage(message, otherUserId)) return message._id;
+      if (mine && !message?.isDeleted && hasUserSeenMessage(message, otherUserId)) {
+        return message._id;
+      }
     }
     return null;
   }, [currentUserId, messages, otherUserId]);
@@ -2818,7 +2836,8 @@ export default function ChatPage() {
                       const samePrev = previous && String(previous?.sender?._id || previous?.sender) === String(message?.sender?._id || message?.sender);
                       const sameNext = next && String(next?.sender?._id || next?.sender) === String(message?.sender?._id || message?.sender);
                       const showAvatar = !mine && !sameNext;
-                      const showSeen = mine && message._id === latestSeenOwnMessageId;
+                      const otherUserShowsReadReceipts = otherUser?.activity_status?.show_read_receipts !== false && otherUser?.show_read_receipts !== false;
+                      const showSeen = mine && message._id === latestSeenOwnMessageId && otherUserShowsReadReceipts;
                       const reactionBadge = getReactionBadge(message, currentUserId);
                       const senderUserId = getUserId(senderUser);
 
@@ -2902,7 +2921,13 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {!activeConversationCanSend ? (
+              {messagingPrivacyBlocked ? (
+                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 text-xs font-medium text-gray-500 dark:border-white/10 dark:bg-[#050505] dark:text-gray-400 text-center">
+                  {otherUser?.messaging_privacy === 'nobody'
+                    ? `${getUserName(otherUser)} doesn't accept direct messages.`
+                    : `${getUserName(otherUser)} only accepts messages from their followers.`}
+                </div>
+              ) : !activeConversationCanSend ? (
                 <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 text-xs font-medium text-gray-500 dark:border-white/10 dark:bg-[#050505] dark:text-gray-400">
                   You can view this request, but you cannot reply until you accept it.
                 </div>
@@ -2938,13 +2963,13 @@ export default function ChatPage() {
                         <input
                           ref={inputRef}
                           value={input}
-                          disabled={!activeConversationCanSend}
+                          disabled={!activeConversationCanSend || messagingPrivacyBlocked}
                           onChange={(event) => handleInputChange(event.target.value)}
                           onKeyDown={(event) => {
                             if (event.key === 'Escape' && showEmojiPicker) { setShowEmojiPicker(false); return; }
                             if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleSend(); }
                           }}
-                          placeholder={activeConversationCanSend ? 'Message...' : 'Accept request to reply'}
+                          placeholder={messagingPrivacyBlocked ? 'Messaging is disabled' : activeConversationCanSend ? 'Message...' : 'Accept request to reply'}
                           className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-white min-w-0 px-1"
                         />
                         <button onClick={() => fileInputRef.current?.click()} disabled={uploading || !activeConversationCanSend} className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"><ImagePlus size={20} /></button>
