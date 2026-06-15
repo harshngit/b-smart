@@ -239,7 +239,7 @@ export default function Notifications() {
         </div>
 
         {/* Filter chips */}
-        {/* <div className="flex gap-2 overflow-x-auto px-4 pb-3 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto px-4 pb-3 scrollbar-hide">
           {FILTER_TABS.map(tab => (
             <button
               key={tab.key}
@@ -258,7 +258,7 @@ export default function Notifications() {
               )}
             </button>
           ))}
-        </div> */}
+        </div>
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, UserCog, Shield, Lock, Bell, ChevronRight } from 'lucide-react';
+import { ArrowLeft, UserCog, Shield, Lock, Bell, ChevronRight, MessageSquare, LayoutGrid, Wallet, UserX } from 'lucide-react';
 
 const SETTINGS_ITEMS = [
   {
@@ -37,6 +37,42 @@ const SETTINGS_ITEMS = [
     to: '/notifications',
     iconBg: 'bg-purple-50 dark:bg-gray-800',
     iconColor: 'text-purple-500',
+  },
+  {
+    key: 'messaging',
+    label: 'Messaging',
+    subLabel: 'Auto download images, videos & documents',
+    icon: MessageSquare,
+    to: '/settings/messaging',
+    iconBg: 'bg-teal-50 dark:bg-gray-800',
+    iconColor: 'text-teal-500',
+  },
+  {
+    key: 'content',
+    label: 'Content Preferences',
+    subLabel: 'Feed interests, topics & video playback',
+    icon: LayoutGrid,
+    to: '/settings/content',
+    iconBg: 'bg-indigo-50 dark:bg-gray-800',
+    iconColor: 'text-indigo-500',
+  },
+  {
+    key: 'wallet',
+    label: 'Rewards & Wallet',
+    subLabel: 'Coins, transactions & wallet history',
+    icon: Wallet,
+    to: '/wallet',
+    iconBg: 'bg-orange-50 dark:bg-gray-800',
+    iconColor: 'text-orange-500',
+  },
+  {
+    key: 'blocked',
+    label: 'Blocked & Restricted',
+    subLabel: 'Blocked, restricted & muted accounts',
+    icon: UserX,
+    to: '/settings/blocked',
+    iconBg: 'bg-red-50 dark:bg-gray-800',
+    iconColor: 'text-red-500',
   },
 ];
 
