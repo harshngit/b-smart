@@ -914,6 +914,7 @@ export default function ChatPage() {
   const fetchConversationsPromiseRef = useRef(null);
   const activatingConversationRef = useRef({ conversationId: '', promise: null });
   const fetchedSharedReelIdsRef = useRef(new Set());
+  const autoDownloadImagesRef = useRef(false);
 
   const [search, setSearch] = useState('');
   const [input, setInput] = useState('');
@@ -1217,6 +1218,28 @@ export default function ChatPage() {
           messagesRef.current = seenMessages;
           dispatch(setMessages(seenMessages));
         } catch (error) { console.error('Failed to auto-mark seen:', error); }
+
+        // Auto-download incoming image if the setting is enabled
+        if (
+          autoDownloadImagesRef.current &&
+          message.mediaUrl &&
+          message.mediaType !== 'audio' &&
+          !isVideoUrl(message.mediaUrl)
+        ) {
+          fetch(message.mediaUrl)
+            .then(r => r.blob())
+            .then(blob => {
+              const objectUrl = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = objectUrl;
+              a.download = message.mediaUrl.split('/').pop().split('?')[0] || 'image';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(objectUrl);
+            })
+            .catch(err => console.error('Auto-download failed:', err));
+        }
       }
       return;
     }
@@ -1395,6 +1418,16 @@ export default function ChatPage() {
       window.removeEventListener('keydown', handleEscape);
     };
   }, [showEmojiPicker]);
+
+  // Load messaging settings and keep the ref in sync
+  useEffect(() => {
+    api.get('/settings/messaging')
+      .then(res => {
+        const d = res.data?.settings || res.data || {};
+        autoDownloadImagesRef.current = Boolean(d.auto_download_images ?? true);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const missingReelIds = [];

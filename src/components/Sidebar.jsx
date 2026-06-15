@@ -819,10 +819,14 @@ const Sidebar = ({ onOpenCreateModal }) => {
       {/* ── Instagram-style Search Panel (desktop only, member only) ── */}
       {showSearch && !isVendor && (
         <>
-          <div className="hidden md:block fixed inset-x-0 top-14 bottom-0 z-[45]" onClick={closeSidebarSearch} />
+          {/* Backdrop — starts below LocationBar on Home, full-screen elsewhere */}
+          <div
+            className={`hidden md:block fixed inset-x-0 bottom-0 z-[45] ${location.pathname === '/' ? 'top-14' : 'top-0'}`}
+            onClick={closeSidebarSearch}
+          />
           <div
             ref={sidebarSearchRef}
-            className="hidden md:flex flex-col fixed top-14 left-20 h-[calc(100vh-3.5rem)] w-[400px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl"
+            className={`hidden md:flex flex-col fixed left-20 w-[400px] bg-white dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 z-[46] shadow-2xl ${location.pathname === '/' ? 'top-14 h-[calc(100vh-3.5rem)]' : 'top-0 h-screen'}`}
             style={{ animation: 'slideInSearch 0.22s cubic-bezier(0.4,0,0.2,1)' }}
           >
             {/* Header */}

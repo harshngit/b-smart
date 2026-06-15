@@ -169,7 +169,7 @@ const Field = ({ label, children }) => (
   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
     <label className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">{label}</label>
     <div className="mt-1.5">{children}</div>
-  </div>
+  </div>  
 );
 
 const SectionTitle = ({ title }) => (

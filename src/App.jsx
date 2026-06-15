@@ -31,6 +31,14 @@ import AccountSettings from './pages/settingpages/AccountSettings';
 import PrivacySettings from './pages/settingpages/PrivacySettings';
 import SecuritySettings from './pages/settingpages/SecuritySettings';
 import HelpSettings from './pages/settingpages/HelpSettings';
+import MessagingSettings from './pages/settingpages/MessagingSettings';
+import ContentSettings from './pages/settingpages/ContentSettings';
+import BlockedSettings from './pages/settingpages/BlockedSettings';
+import AppearanceSettings from './pages/settingpages/AppearanceSettings';
+import StorageSettings from './pages/settingpages/StorageSettings';
+import LegalSettings from './pages/settingpages/LegalSettings';
+import AboutSettings from './pages/settingpages/AboutSettings';
+import AccountActionsSettings from './pages/settingpages/AccountActionsSettings';
 import AuthCallback from './pages/AuthCallback';
 import Notifications from './pages/Notifications';
 import VendorNotifications from './pages/vendor-pages/VendorNotifications';
@@ -131,6 +139,14 @@ function App() {
             <Route path="/settings/privacy"        element={<PrivacySettings />} />
             <Route path="/settings/security"       element={<SecuritySettings />} />
             <Route path="/settings/help"           element={<HelpSettings />} />
+            <Route path="/settings/messaging"        element={<MessagingSettings />} />
+            <Route path="/settings/content"        element={<ContentSettings />} />
+            <Route path="/settings/blocked"        element={<BlockedSettings />} />
+            <Route path="/settings/appearance"     element={<AppearanceSettings />} />
+            <Route path="/settings/storage"        element={<StorageSettings />} />
+            <Route path="/settings/legal"          element={<LegalSettings />} />
+            <Route path="/settings/about"          element={<AboutSettings />} />
+            <Route path="/settings/account-actions" element={<AccountActionsSettings />} />
             <Route path="/notifications"    element={<Notifications />} />
             <Route path="/search"           element={<Search />} />
             <Route path="/messages"         element={<ChatPage />} />
