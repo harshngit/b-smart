@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Heart, MessageCircle, Send, MoreHorizontal, Music2,
   Volume2, VolumeX, Bookmark, Loader2, X, Trash2, ChevronLeft,
-  Search
+  Search, UserPlus, UserCheck
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import Hls from 'hls.js';
@@ -166,13 +166,14 @@ const FollowButton = ({ userId, initialFollowing = false }) => {
     <button
       onClick={handleToggle}
       disabled={loading}
-      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all backdrop-blur-sm flex-shrink-0 disabled:opacity-60 ${
-        following
-          ? 'border border-white/40 bg-white/10 text-white/80'
-          : 'border border-white bg-transparent text-white hover:bg-white/15'
-      }`}
+      className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-1 min-w-[108px] h-7 px-3 rounded-full text-[10px] font-semibold transition-all
+        ${following
+          ? 'border border-white/40 bg-white/20 text-white backdrop-blur-sm'
+          : 'border border-white/40 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20'
+        } ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
-      {loading ? <Loader2 size={10} className="animate-spin inline" /> : following ? 'Following' : 'Follow'}
+      {loading ? <Loader2 size={10} className="animate-spin" /> : following ? <UserCheck size={11} /> : <UserPlus size={11} />}
+      <span>{following ? 'Following' : 'Follow'}</span>
     </button>
   );
 };

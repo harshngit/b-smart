@@ -376,7 +376,7 @@ const FollowButton = ({ userId, mobile = false, initialFollowing = false }) => {
     <button
       onClick={toggle}
       disabled={loading}
-      className={`shrink-0 whitespace-nowrap flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all
+      className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-1 min-w-[108px] h-7 px-3 rounded-full text-[10px] font-semibold transition-all
         ${followed
           ? mobile
             ? 'border border-white/40 bg-white/20 text-white backdrop-blur-sm'

@@ -44,9 +44,9 @@ const SETTINGS_GROUPS = [
       {
         key: 'notifications',
         label: 'Notifications',
-        subLabel: 'Manage your notifications',
+        subLabel: 'Manage your notification preferences',
         icon: Bell,
-        to: '/notifications',
+        to: '/settings/notifications',
         iconBg: 'bg-purple-50 dark:bg-gray-800',
         iconColor: 'text-purple-500',
       },

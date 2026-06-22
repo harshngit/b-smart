@@ -39,6 +39,7 @@ import StorageSettings from './pages/settingpages/StorageSettings';
 import LegalSettings from './pages/settingpages/LegalSettings';
 import AboutSettings from './pages/settingpages/AboutSettings';
 import AccountActionsSettings from './pages/settingpages/AccountActionsSettings';
+import NotificationSettings from './pages/settingpages/NotificationSettings';
 import AuthCallback from './pages/AuthCallback';
 import Notifications from './pages/Notifications';
 import VendorNotifications from './pages/vendor-pages/VendorNotifications';
@@ -142,6 +143,7 @@ function App() {
             <Route path="/settings/messaging"        element={<MessagingSettings />} />
             <Route path="/settings/content"        element={<ContentSettings />} />
             <Route path="/settings/blocked"        element={<BlockedSettings />} />
+            <Route path="/settings/notifications"   element={<NotificationSettings />} />
             <Route path="/settings/appearance"     element={<AppearanceSettings />} />
             <Route path="/settings/storage"        element={<StorageSettings />} />
             <Route path="/settings/legal"          element={<LegalSettings />} />
