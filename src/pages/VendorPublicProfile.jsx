@@ -551,10 +551,10 @@ export default function VendorPublicProfile() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 font-sans max-w-[1100px] mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 font-sans">
 
-      {/* Back button */}
-      <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+      {/* Back button — desktop only */}
+      <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none hidden sm:block">
         <div className="max-w-[1100px] mx-auto px-4 pt-3 pointer-events-auto">
           <button
             onClick={() => navigate(-1)}
@@ -565,48 +565,52 @@ export default function VendorPublicProfile() {
         </div>
       </div>
 
-      {/* Cover */}
-      <div className="relative w-full" style={{ height: 200 }}>
-        {coverImages.length > 0 ? (
-          <Swiper
-            modules={[Autoplay, Pagination]}
-            autoplay={{ delay: 4500, disableOnInteraction: false }}
-            pagination={{ clickable: true }}
-            loop={coverImages.length > 1}
-            className="w-full h-full"
-          >
-            {coverImages.map((url, i) => (
-              <SwiperSlide key={i}>
-                <img src={url} alt={`Cover ${i + 1}`} className="w-full h-full object-cover" />
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent pointer-events-none" />
+      {/* Cover + Avatar — avatar sits on the cover image */}
+      <div className="relative lg:w-[1050px] lg:mx-auto w-[77%] h-[160px] sm:h-[220px] overflow-visible">
+        <div className="w-full h-full overflow-hidden">
+          {coverImages.length > 0 ? (
+            <Swiper
+              modules={[Autoplay, Pagination]}
+              autoplay={{ delay: 4500, disableOnInteraction: false }}
+              pagination={{ clickable: true }}
+              loop={coverImages.length > 1}
+              className="!w-full !h-full"
+              style={{ width: '100%', height: '100%' }}
+            >
+              {coverImages.map((url, i) => (
+                <SwiperSlide key={i} className="!w-full !h-full">
+                  <img src={url} alt={`Cover ${i + 1}`} className="block w-full h-full object-cover" />
+                </SwiperSlide>
+              ))}
+            </Swiper>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none z-[1]" />
+        </div>
+
+        {/* Avatar — positioned at bottom of cover, overlapping into profile area */}
+        <div className="absolute bottom-0 left-4 sm:left-6 translate-y-1/2 z-10">
+          <div className="w-[76px] h-[76px] sm:w-[90px] sm:h-[90px] rounded-full border-[3px] sm:border-4 border-white dark:border-gray-900 overflow-hidden bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center shadow-xl">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={businessName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white font-black text-2xl sm:text-3xl select-none">{businessName[0]}</span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Profile header */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
-        <div className="max-w-2xl mx-auto lg:max-w-4xl px-4">
+      <div className="bg-white lg:max-w-[1050px] lg:mx-auto px-4 sm:px-6 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+        <div className="px-4 max-w-4xl mx-auto">
 
-          {/* Avatar row — avatar on left, info beside it */}
-          <div className="flex items-start gap-3 sm:gap-4 pt-3 pb-4">
-            {/* Avatar — pulled up into the cover */}
-            <div className="w-[72px] h-[72px] sm:w-[88px] sm:h-[88px] -mt-10 sm:-mt-12 rounded-full border-[3px] sm:border-4 border-white dark:border-gray-900 overflow-hidden bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center flex-shrink-0 shadow-xl">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={businessName} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-white font-black text-2xl sm:text-3xl select-none">{businessName[0]}</span>
-              )}
-            </div>
-
-            {/* Info beside avatar */}
-            <div className="flex-1 min-w-0 pt-1">
+          {/* Spacer for avatar overlap + follow button row */}
+          <div className="flex items-start justify-between pt-11 sm:pt-14 pb-3">
+            <div className="flex-1 min-w-0">
               {/* Name + verified */}
               <div className="flex items-center gap-1.5 mb-0.5">
-                <h1 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white leading-tight truncate">{businessName}</h1>
+                <h1 className="text-[15px] sm:text-lg font-extrabold text-gray-900 dark:text-white leading-tight truncate">{businessName}</h1>
                 {isVerified && (
                   <span className="w-[18px] h-[18px] sm:w-5 sm:h-5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
                     <BadgeCheck size={11} className="text-white" strokeWidth={3} />
@@ -615,13 +619,13 @@ export default function VendorPublicProfile() {
               </div>
 
               {/* Username + category */}
-              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mb-1.5">
                 <AtSign size={11} className="text-gray-400" />
                 <span className="font-medium">@{profile.user_id?.username || 'vendor'}</span>
                 {profile.business_details?.industry_category && (
                   <>
-                    <span className="text-gray-300 dark:text-gray-700 hidden sm:inline">·</span>
-                    <span className="items-center gap-1 hidden sm:flex">
+                    <span className="text-gray-300 dark:text-gray-700">·</span>
+                    <span className="flex items-center gap-1">
                       <Tag size={11} />
                       {profile.business_details.industry_category}
                     </span>
@@ -629,16 +633,16 @@ export default function VendorPublicProfile() {
                 )}
               </div>
 
-              {/* Nature */}
+              {/* Nature — desktop only */}
               {profile.business_details?.business_nature && (
-                <div className="items-center gap-1.5 mb-1.5 hidden sm:flex">
+                <div className="hidden sm:flex items-center gap-1.5 mb-1.5">
                   <Building2 size={12} className="text-gray-400" />
                   <span className="text-xs text-gray-500 dark:text-gray-400">{profile.business_details.business_nature}</span>
                 </div>
               )}
 
-              {/* Stats + Follow inline */}
-              <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+              {/* Stats */}
+              <div className="flex items-center gap-3 sm:gap-4">
                 {[
                   { count: followerCount, label: 'followers' },
                   { count: followingCount, label: 'following' },
@@ -649,50 +653,54 @@ export default function VendorPublicProfile() {
                     <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium">{stat.label}</span>
                   </div>
                 ))}
-                <button
-                  onClick={toggleFollow}
-                  disabled={followLoading}
-                  className={`ml-auto flex items-center gap-1.5 px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold text-[11px] sm:text-xs transition-all duration-200 active:scale-[0.96] ${
-                    followed
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-red-50 hover:text-red-500 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-800'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
-                >
-                  {followed ? <UserCheck size={13} /> : <UserPlus size={13} />}
-                  {followed ? 'Following' : 'Follow'}
-                </button>
               </div>
             </div>
+
+            {/* Follow button */}
+            <button
+              onClick={toggleFollow}
+              disabled={followLoading}
+              className={`flex items-center gap-1.5 px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold text-[11px] sm:text-xs transition-all duration-200 active:scale-[0.96] flex-shrink-0 ml-3 ${
+                followed
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-red-50 hover:text-red-500 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-800'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {followed ? <UserCheck size={13} /> : <UserPlus size={13} />}
+              {followed ? 'Following' : 'Follow'}
+            </button>
           </div>
         </div>
 
-        {/* Tab bar */}
-        <div className="overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-          <div className="flex min-w-max max-w-2xl lg:max-w-4xl mx-auto px-4 border-t border-gray-100 dark:border-gray-800">
-            {TABS.map((tab) => {
-              const IconComponent = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-bold tracking-wide whitespace-nowrap border-b-2 transition-all duration-200 ${
-                    isActive
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                      : 'border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-                  }`}
-                >
-                  <IconComponent size={14} className={isActive ? '' : 'opacity-70'} />
-                  {tab.label}
-                </button>
-              );
-            })}
+        {/* Tabs — horizontal scroll */}
+        <div className="border-t border-gray-100 dark:border-gray-800">
+          <div className="max-w-[65%] lg:mx-auto overflow-x-scroll" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex w-[64%] px-2 sm:px-4">
+              {TABS.map((tab) => {
+                const IconComponent = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-3 text-[11px] sm:text-xs font-bold whitespace-nowrap border-b-2 transition-all duration-200 ${
+                      isActive
+                        ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                        : 'border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    <IconComponent size={13} className={isActive ? '' : 'opacity-70'} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Tab content */}
-      <div className="max-w-2xl lg:max-w-4xl mx-auto pb-10">
+      <div className="lg:max-w-[1050px] lg:mx-auto max-w-[64%] pb-10">
         {renderTabContent()}
       </div>
 
