@@ -1543,7 +1543,7 @@ const Profile = () => {
     };
 
     return (
-        <div className="min-h-screen bg-white dark:bg-black md:bg-gray-50 md:dark:bg-black overflow-x-hidden">
+        <div className="min-h-screen bg-white dark:bg-black md:bg-gray-50 md:dark:bg-black overflow-x-hidden max-w-[1100px] mx-auto">
             {rewardToast && (
                 <div className={`fixed top-20 right-4 z-[80] rounded-xl border px-4 py-3 text-sm font-semibold shadow-lg animate-in fade-in slide-in-from-right-4 duration-300 ${
                     rewardToast.type === 'success'

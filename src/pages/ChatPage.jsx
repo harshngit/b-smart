@@ -2282,7 +2282,7 @@ export default function ChatPage() {
   }, [currentUserId, messages, otherUserId]);
 
   return (
-    <div className="h-[100dvh] bg-white dark:bg-black text-gray-900 dark:text-white md:h-screen">
+    <div className="h-[100dvh] bg-white dark:bg-black text-gray-900 dark:text-white md:h-screen max-w-[1100px] mx-auto">
       <div className="flex h-full">
 
         {/* ═══════════════════════════════════════════════════════════

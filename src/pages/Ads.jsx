@@ -1477,7 +1477,7 @@ const Ads = ({ feedMode = 'user' }) => {
   if (feedMode === 'user' && isVendorUser) return <Navigate to="/vendor-ads" replace />;
 
   return (
-    <div className={`flex flex-col dark:bg-black overflow-hidden ${pageHeightClass}`}>
+    <div className={`flex flex-col dark:bg-black overflow-hidden max-w-[1100px] mx-auto ${pageHeightClass}`}>
 
       {/* Desktop top bar */}
       <div className="hidden md:flex items-center gap-2 px-4 py-2 shrink-0 relative overflow-visible w-full">

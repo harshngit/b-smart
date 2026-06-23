@@ -792,7 +792,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
                 {!isVendor && (
                   <>
                     <Link to="/settings" className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200" onClick={() => setIsMoreDropdownOpen(false)}>
-                      <Target size={18} /> Settings
+                      <Settings size={18} /> Settings
                     </Link>
                     <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
                     <button

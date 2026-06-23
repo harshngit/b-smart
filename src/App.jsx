@@ -135,20 +135,21 @@ function App() {
             <Route path="/profile/:userId"  element={<Profile />} />
             <Route path="/edit-profile"     element={<EditProfile />} />
             <Route path="/wallet"           element={<WalletDetails />} />
-            <Route path="/settings"                element={<Settings />} />
-            <Route path="/settings/account"        element={<AccountSettings />} />
-            <Route path="/settings/privacy"        element={<PrivacySettings />} />
-            <Route path="/settings/security"       element={<SecuritySettings />} />
-            <Route path="/settings/help"           element={<HelpSettings />} />
-            <Route path="/settings/messaging"        element={<MessagingSettings />} />
-            <Route path="/settings/content"        element={<ContentSettings />} />
-            <Route path="/settings/blocked"        element={<BlockedSettings />} />
-            <Route path="/settings/notifications"   element={<NotificationSettings />} />
-            <Route path="/settings/appearance"     element={<AppearanceSettings />} />
-            <Route path="/settings/storage"        element={<StorageSettings />} />
-            <Route path="/settings/legal"          element={<LegalSettings />} />
-            <Route path="/settings/about"          element={<AboutSettings />} />
-            <Route path="/settings/account-actions" element={<AccountActionsSettings />} />
+            <Route path="/settings" element={<Settings />}>
+              <Route path="account"        element={<AccountSettings />} />
+              <Route path="privacy"        element={<PrivacySettings />} />
+              <Route path="security"       element={<SecuritySettings />} />
+              <Route path="help"           element={<HelpSettings />} />
+              <Route path="messaging"      element={<MessagingSettings />} />
+              <Route path="content"        element={<ContentSettings />} />
+              <Route path="blocked"        element={<BlockedSettings />} />
+              <Route path="notifications"  element={<NotificationSettings />} />
+              <Route path="appearance"     element={<AppearanceSettings />} />
+              <Route path="storage"        element={<StorageSettings />} />
+              <Route path="legal"          element={<LegalSettings />} />
+              <Route path="about"          element={<AboutSettings />} />
+              <Route path="account-actions" element={<AccountActionsSettings />} />
+            </Route>
             <Route path="/notifications"    element={<Notifications />} />
             <Route path="/search"           element={<Search />} />
             <Route path="/messages"         element={<ChatPage />} />

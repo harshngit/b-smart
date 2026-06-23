@@ -555,7 +555,7 @@ export default function VendorPublicProfile() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 font-sans">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 font-sans max-w-[1100px] mx-auto">
 
       {/* ── Floating back button ───────────────────────────────────── */}
       <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">

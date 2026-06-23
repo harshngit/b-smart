@@ -7,6 +7,8 @@ const getTopSegment = (pathname) => {
   return seg || '/';
 };
 
+const SKIP_LOADER = new Set(['settings', 'profile', 'wallet', 'notifications', 'search']);
+
 const GlobalLoader = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
@@ -19,7 +21,7 @@ const GlobalLoader = () => {
     const prevSegment = prevSegmentRef.current;
     prevSegmentRef.current = currentSegment;
 
-    if (currentSegment === prevSegment) return;
+    if (currentSegment === prevSegment || SKIP_LOADER.has(currentSegment)) return;
 
     clearTimeout(showTimerRef.current);
     clearTimeout(hideTimerRef.current);

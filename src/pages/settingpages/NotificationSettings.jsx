@@ -96,7 +96,7 @@ const NotificationSettings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black pb-24">
+    <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1100px] mx-auto">
 
       <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center justify-between z-40">
         <Link to="/settings" className="text-gray-800 dark:text-white p-1">

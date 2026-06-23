@@ -824,7 +824,7 @@ const Home = () => {
   };
 
   return (
-    <div className="relative md:pt-14 bg-white dark:bg-black overflow-x-hidden">
+    <div className="relative md:pt-14 bg-white dark:bg-black overflow-x-hidden max-w-[1100px] mx-auto">
 
       <LocationBar
         searchQuery={searchQuery}

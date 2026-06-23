@@ -213,7 +213,7 @@ export default function Notifications() {
   };
 
   return (
-    <div className="min-h-screen max-w-[700px] mx-auto px-4 py-8 bg-white dark:bg-black">
+    <div className="min-h-screen max-w-[1100px] mx-auto px-4 py-8 bg-white dark:bg-black">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="sticky top-[56px] md:top-0 z-20 bg-white/95 dark:bg-black/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-900">
         <div className="flex items-center justify-between px-4 pt-4 pb-3">

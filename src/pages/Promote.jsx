@@ -1038,7 +1038,7 @@ const Promote = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className={`flex flex-col dark:bg-black overflow-hidden ${pageHeightClass}`}>
+    <div className={`flex flex-col dark:bg-black overflow-hidden max-w-[1100px] mx-auto ${pageHeightClass}`}>
        <div className="shrink-0 relative flex items-center px-3 py-2 md:px-4 md:py-2 bg-white dark:bg-black overflow-visible w-full">
                 <button onClick={() => navigate(-1)} className={`p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1 shrink-0 transition-all duration-300 ${searchOpen ? 'opacity-0 w-0 overflow-hidden mr-0 p-0' : 'opacity-100'}`}>
                   <ChevronLeft size={22} />
