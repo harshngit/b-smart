@@ -934,7 +934,17 @@ const Reels = () => {
   const handleShare = (reel) => setShareReel(reel || null);
 
   const getVideoUrl    = (reel) => reel.media?.[0]?.fileUrl || null;
-  const getThumbnail   = (reel) => reel.media?.[0]?.thumbnail?.fileUrl || reel.user_id?.avatar_url || null;
+  const getThumbnail   = (reel) => {
+    const m = reel.media?.[0];
+    if (!m) return reel.user_id?.avatar_url || null;
+    const t = m.thumbnail;
+    if (Array.isArray(t)) return t[0]?.fileUrl || t[0]?.fileName || null;
+    if (t && typeof t === 'object') return t.fileUrl || t.fileName || null;
+    if (typeof t === 'string') return t;
+    if (Array.isArray(m.thumbnails)) return m.thumbnails[0]?.fileUrl || m.thumbnails[0]?.fileName || null;
+    if (typeof m.thumbnail_url === 'string') return m.thumbnail_url;
+    return reel.user_id?.avatar_url || null;
+  };
 
   const pageHeightClass = 'h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]';
 
@@ -1132,7 +1142,7 @@ const Reels = () => {
                 {reels.map((reel, index) => {
                   const reelId    = reel._id || reel.post_id;
                   const videoUrl  = getVideoUrl(reel);
-                  const thumbnail = getThumbnail(reel);
+                  const thumbnail = normalizeAssetUrl(getThumbnail(reel));
                   const hasError  = videoErrors[reelId];
                   const isCurrent = index === currentIndex;
                   const isHls     = reel.media?.[0]?.hls     ?? false;

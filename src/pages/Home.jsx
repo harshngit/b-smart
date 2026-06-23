@@ -396,7 +396,11 @@ const MobileSuggestedReelsCard = ({ reels }) => {
       <div className="flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {reels.map((reel, i) => {
           const media = reel.media?.[0];
-          const thumb = normalizeAssetUrl(media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url || media?.fileUrl || media?.fileName);
+          const rawThumb = media?.thumbnail;
+          const thumb = normalizeAssetUrl(
+            (Array.isArray(rawThumb) ? (rawThumb[0]?.fileUrl || rawThumb[0]?.fileName) : (rawThumb && typeof rawThumb === 'object') ? (rawThumb.fileUrl || rawThumb.fileName) : typeof rawThumb === 'string' ? rawThumb : null)
+            || media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url || media?.fileUrl || media?.fileName
+          );
           const username = reel.user_id?.username || reel.user_id?.full_name || 'reel';
           const avatar = normalizeAssetUrl(reel.user_id?.avatar_url);
           const caption = reel.caption || username;

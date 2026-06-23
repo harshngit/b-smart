@@ -327,9 +327,11 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
 
   const getThumbnailUrl = (item) => {
     if (!item) return null;
-    if (Array.isArray(item.thumbnails) && item.thumbnails[0]?.fileUrl) return item.thumbnails[0].fileUrl;
-    if (Array.isArray(item.thumbnail) && item.thumbnail[0]?.fileUrl) return item.thumbnail[0].fileUrl;
+    if (Array.isArray(item.thumbnails) && (item.thumbnails[0]?.fileUrl || item.thumbnails[0]?.fileName)) return item.thumbnails[0].fileUrl || item.thumbnails[0].fileName;
+    if (Array.isArray(item.thumbnail) && (item.thumbnail[0]?.fileUrl || item.thumbnail[0]?.fileName)) return item.thumbnail[0].fileUrl || item.thumbnail[0].fileName;
+    if (item.thumbnail && typeof item.thumbnail === 'object' && !Array.isArray(item.thumbnail)) return item.thumbnail.fileUrl || item.thumbnail.fileName || null;
     if (typeof item.thumbnail === 'string') return item.thumbnail;
+    if (typeof item.thumbnail_url === 'string') return item.thumbnail_url;
     if (typeof item.poster === 'string') return item.poster;
     return null;
   };
@@ -352,7 +354,7 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
     return { start, end };
   };
 
-  const thumbnailUrl = getThumbnailUrl(currentItem);
+  const thumbnailUrl = toAbsoluteUrl(getThumbnailUrl(currentItem)) || null;
   const { start: trimStart, end: trimEnd } = getVideoTiming(currentItem);
   const showThumb = thumbnailUrl && !videoReady;
 
