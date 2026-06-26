@@ -6,6 +6,7 @@ import { Autoplay, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/pagination';
 import api from '../lib/api';
+import { checkFollowStatus, followUser, unfollowUser, FOLLOW_STATUS_CHANGED_EVENT } from '../services/followService';
 import {
   ArrowLeft, BadgeCheck, MapPin, Globe, Phone, Mail,
   UserPlus, UserCheck, Heart, Eye, Play, ShoppingBag, Film,
@@ -114,8 +115,9 @@ export default function VendorPublicProfile() {
   const [adsLoading, setAdsLoading] = useState(false);
   const [adsFetched, setAdsFetched] = useState(false);
 
-  const [followed, setFollowed]         = useState(false);
+  const [followState, setFollowState]     = useState('not_following');
   const [followLoading, setFollowLoading] = useState(false);
+  const followed = followState === 'following';
 
   useEffect(() => {
     if (!vendorId) return;
@@ -124,7 +126,6 @@ export default function VendorPublicProfile() {
       .then(res => {
         const data = res.data?.vendor || res.data?.data || res.data;
         setProfile(data);
-        setFollowed(data?.is_following || false);
       })
       .catch(() => setError('Could not load vendor profile.'))
       .finally(() => setLoading(false));
@@ -160,19 +161,53 @@ export default function VendorPublicProfile() {
     });
   }, [ads]);
 
+  // Check follow status using the proper follow service
+  useEffect(() => {
+    if (!profile || !userObject) return;
+    const userId = profile.user_id?._id || profile.user_id?.id || profile._id;
+    if (!userId) return;
+    checkFollowStatus(userId)
+      .then(status => {
+        if (status?.isFollowing || status?.status === 'following') {
+          setFollowState('following');
+        } else if (status?.isPending || status?.requestPending || status?.requested || status?.status === 'pending') {
+          setFollowState('requested');
+        } else {
+          setFollowState('not_following');
+        }
+      })
+      .catch(() => setFollowState('not_following'));
+  }, [profile, userObject]);
+
+  // Listen for follow status changes from other pages
+  useEffect(() => {
+    if (!profile) return;
+    const userId = profile.user_id?._id || profile.user_id?.id || profile._id;
+    if (!userId) return;
+    const handler = (e) => {
+      if (String(e.detail?.userId) === String(userId)) {
+        setFollowState(e.detail.state || 'not_following');
+      }
+    };
+    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+  }, [profile]);
+
   const toggleFollow = async () => {
     if (!userObject || followLoading) return;
-    const wasFollowed = followed;
+    const userId = profile.user_id?._id || profile.user_id?.id || profile._id;
+    if (!userId) return;
+    const prevState = followState;
     setFollowLoading(true);
-    setFollowed(!wasFollowed);
+    setFollowState(followed ? 'not_following' : 'following');
     try {
-      if (wasFollowed) {
-        await api.delete(`/vendor/${vendorId}/follow`);
+      if (followed) {
+        await unfollowUser(userId);
       } else {
-        await api.post(`/vendor/${vendorId}/follow`);
+        await followUser(userId);
       }
     } catch {
-      setFollowed(wasFollowed);
+      setFollowState(prevState);
     } finally {
       setFollowLoading(false);
     }
@@ -566,7 +601,7 @@ export default function VendorPublicProfile() {
       </div>
 
       {/* Cover + Avatar — avatar sits on the cover image */}
-      <div className="relative lg:w-[1050px] lg:mx-auto w-[77%] h-[160px] sm:h-[220px] overflow-visible">
+      <div className="relative w-[73%] mx-auto h-[160px] sm:h-[220px] overflow-visible">
         <div className="w-full h-full overflow-hidden">
           {coverImages.length > 0 ? (
             <Swiper
@@ -602,7 +637,7 @@ export default function VendorPublicProfile() {
       </div>
 
       {/* Profile header */}
-      <div className="bg-white lg:max-w-[1050px] lg:mx-auto px-4 sm:px-6 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
         <div className="px-4 max-w-4xl mx-auto">
 
           {/* Spacer for avatar overlap + follow button row */}
@@ -674,8 +709,8 @@ export default function VendorPublicProfile() {
 
         {/* Tabs — horizontal scroll */}
         <div className="border-t border-gray-100 dark:border-gray-800">
-          <div className="max-w-[65%] lg:mx-auto overflow-x-scroll" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-            <div className="flex w-[64%] px-2 sm:px-4">
+          <div className="overflow-x-auto max-w-4xl mx-auto" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex px-2 sm:px-4">
               {TABS.map((tab) => {
                 const IconComponent = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -700,7 +735,7 @@ export default function VendorPublicProfile() {
       </div>
 
       {/* Tab content */}
-      <div className="lg:max-w-[1050px] lg:mx-auto max-w-[64%] pb-10">
+      <div className="max-w-4xl mx-auto pb-10">
         {renderTabContent()}
       </div>
 
