@@ -120,7 +120,7 @@ const CardMedia = ({ item }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [videoReady, setVideoReady] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [userPaused, setUserPaused] = useState(false);
 
   const videoRef = useRef(null);

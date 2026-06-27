@@ -666,7 +666,9 @@ const Profile = () => {
                 const restricted = body.privacy_restricted || { posts: false, pulse: false };
                 setPrivacyRestricted(restricted);
                 const content = body.data || {};
-                setUserPosts(content.posts || []);
+                const reels = (content.reels || []).map(r => ({ ...r, type: r.type || 'reel' }));
+                const posts = content.posts || [];
+                setUserPosts([...posts, ...reels]);
                 setUserTweets(content.tweets || []);
                 setUserPromoteReels(content.promote_reels || []);
             } catch (error) {
@@ -972,12 +974,24 @@ const Profile = () => {
     const getPostThumbnail = (post) => {
         const media = post.media?.[0];
         if (!media) return 'https://via.placeholder.com/300';
-        if (media.type === 'video' && media.thumbnails?.length > 0) {
-            const thumbFile = media.thumbnails[0].fileName;
-            const baseUrl = media.fileUrl?.split('/uploads/')[0];
-            if (baseUrl && thumbFile) return `${baseUrl}/uploads/${thumbFile}`;
+        const isVideo = media.type === 'video' || media.media_type === 'video' || post.type === 'reel';
+        if (isVideo) {
+            const rawThumb = media.thumbnail;
+            const thumbFromArr = Array.isArray(rawThumb) ? (rawThumb[0]?.fileUrl || rawThumb[0]?.fileName) : null;
+            const thumbFromObj = rawThumb && typeof rawThumb === 'object' && !Array.isArray(rawThumb) ? (rawThumb.fileUrl || rawThumb.fileName) : null;
+            const thumbFromStr = typeof rawThumb === 'string' ? rawThumb : null;
+            const thumbFromThumbnails = media.thumbnails?.[0]?.fileUrl || media.thumbnails?.[0]?.fileName;
+            const thumbUrl = thumbFromArr || thumbFromObj || thumbFromStr || thumbFromThumbnails || media.thumbnail_url;
+            if (thumbUrl) {
+                if (thumbUrl.startsWith('http')) return thumbUrl;
+                return `${BASE_URL}/uploads/${thumbUrl}`;
+            }
         }
-        return media.fileUrl || media.image || 'https://via.placeholder.com/300';
+        if (media.fileUrl) {
+            if (media.fileUrl.startsWith('http')) return media.fileUrl;
+            return `${BASE_URL}/uploads/${media.fileUrl}`;
+        }
+        return media.image || 'https://via.placeholder.com/300';
     };
 
     const getAdThumbnail = (ad) => {
@@ -995,6 +1009,10 @@ const Profile = () => {
 
     const handlePostClick = (post) => {
         const id = post._id || post.id;
+        if (post.type === 'reel') {
+            navigate(`/reels?id=${id}`);
+            return;
+        }
         if (window.innerWidth < 768 && id) navigate(`/post/${id}`);
         else setSelectedPost(post);
     };

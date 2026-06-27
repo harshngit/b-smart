@@ -397,10 +397,28 @@ const MobileSuggestedReelsCard = ({ reels }) => {
         {reels.map((reel, i) => {
           const media = reel.media?.[0];
           const rawThumb = media?.thumbnail;
-          const thumb = normalizeAssetUrl(
-            (Array.isArray(rawThumb) ? (rawThumb[0]?.fileUrl || rawThumb[0]?.fileName) : (rawThumb && typeof rawThumb === 'object') ? (rawThumb.fileUrl || rawThumb.fileName) : typeof rawThumb === 'string' ? rawThumb : null)
-            || media?.thumbnails?.[0]?.fileUrl || media?.thumbnails?.[0]?.fileName || media?.thumbnail_url || media?.fileUrl || media?.fileName
-          );
+          
+          let rawUrl = null;
+          // Try all possible fileUrl paths FIRST (direct full URLs)
+          if (Array.isArray(rawThumb) && rawThumb[0]?.fileUrl) rawUrl = rawThumb[0].fileUrl;
+          else if (rawThumb && typeof rawThumb === 'object' && !Array.isArray(rawThumb) && rawThumb.fileUrl) rawUrl = rawThumb.fileUrl;
+          else if (Array.isArray(media?.thumbnails) && media.thumbnails[0]?.fileUrl) rawUrl = media.thumbnails[0].fileUrl;
+          else if (media?.thumbnail_url) rawUrl = media.thumbnail_url;
+          else if (media?.fileUrl) rawUrl = media.fileUrl;
+          // Now fallback to fileName only if no fileUrl found
+          else if (Array.isArray(rawThumb) && rawThumb[0]?.fileName) rawUrl = rawThumb[0].fileName;
+          else if (rawThumb && typeof rawThumb === 'object' && !Array.isArray(rawThumb) && rawThumb.fileName) rawUrl = rawThumb.fileName;
+          else if (Array.isArray(media?.thumbnails) && media.thumbnails[0]?.fileName) rawUrl = media.thumbnails[0].fileName;
+          else if (media?.fileName) rawUrl = media.fileName;
+          else if (typeof rawThumb === 'string') rawUrl = rawThumb;
+
+          // Normalize only if it's NOT already a full URL (starts with http/https)
+          let thumb;
+          if (rawUrl && /^https?:\/\//i.test(String(rawUrl))) {
+            thumb = String(rawUrl).replace(/^http:\/\//i, 'https://'); // just fix http to https
+          } else {
+            thumb = normalizeAssetUrl(rawUrl);
+          }
           const username = reel.user_id?.username || reel.user_id?.full_name || 'reel';
           const avatar = normalizeAssetUrl(reel.user_id?.avatar_url);
           const caption = reel.caption || username;
