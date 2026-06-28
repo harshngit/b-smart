@@ -186,7 +186,7 @@ const DesktopFollowButton = ({ targetUserId }) => {
       type="button"
       onClick={handleClick}
       disabled={loading}
-      className="min-w-[56px] text-right text-xs font-semibold text-[#3b82f6] hover:text-[#1d4ed8] dark:text-[#60a5fa] dark:hover:text-white transition-colors disabled:opacity-50"
+      className="min-w-[56px] text-center text-xs font-semibold text-[#3b82f6] hover:text-[#1d4ed8] dark:text-[#60a5fa] dark:hover:text-white transition-colors disabled:opacity-50"
     >
       {loading ? '...' : followState === 'following' ? 'Following' : followState === 'requested' ? 'Requested' : 'Follow'}
     </button>
@@ -359,7 +359,7 @@ const MobileSuggestedUsersCard = ({ users }) => {
                 <X size={10} />
               </button>
               {/* Avatar */}
-              <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center ring-2 ring-offset-1 ring-pink-300/40 shrink-0">
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center shrink-0">
                 {avatar
                   ? <img src={avatar} alt={username} className="w-full h-full object-cover" />
                   : <span className="text-white font-bold text-lg">{username.slice(0,1).toUpperCase()}</span>
@@ -369,7 +369,7 @@ const MobileSuggestedUsersCard = ({ users }) => {
                 <p className="text-[12px] font-bold text-gray-900 dark:text-white truncate">{username}</p>
                 <p className="text-[10px] text-gray-400 truncate mt-0.5">{reason}</p>
               </div>
-              <div onClick={(e) => e.stopPropagation()} className="w-full">
+              <div onClick={(e) => e.stopPropagation()} className="w-full text-center">
                 <DesktopFollowButton targetUserId={String(userId || '')} />
               </div>
             </div>
