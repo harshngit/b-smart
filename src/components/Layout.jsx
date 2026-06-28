@@ -84,31 +84,7 @@ const Layout = () => {
     setProfileSetupForm(initialSetupState);
   }, [initialSetupState]);
 
-  // Check if profile still needs setup (gender OR age OR any address field missing)
-  const needsProfileSetup = useMemo(() => {
-    if (!userObject) return false;
-    const g = (userObject?.gender || '').toString().toLowerCase();
-    const age = userObject?.age;
-    const a = userObject?.address || {};
-    const addressLine1 = a.address_line1 || a.addressLine1 || '';
-    const pincode = a.pincode || '';
-    const city = a.city || '';
-    const state = a.state || '';
-    const country = a.country || '';
-    return !g || !age || !addressLine1 || !pincode || !city || !state || !country;
-  }, [userObject]);
-
-  // Show modal on login if profile is incomplete and not dismissed this session
-  useEffect(() => {
-    if (!userObject) return;
-    if (!needsProfileSetup) {
-      setShowProfileSetup(false);
-      return;
-    }
-    const key = userId ? `profile_setup_dismissed_${userId}` : 'profile_setup_dismissed';
-    const dismissed = sessionStorage.getItem(key) === '1';
-    if (!dismissed) setShowProfileSetup(true);
-  }, [needsProfileSetup, userId, userObject]);
+  // Profile setup popup disabled — users complete their profile via Settings > Account
 
   const closeProfileSetup = useCallback(() => {
     const key = userId ? `profile_setup_dismissed_${userId}` : 'profile_setup_dismissed';

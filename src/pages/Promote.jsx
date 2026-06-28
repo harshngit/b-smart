@@ -488,10 +488,17 @@ const ProductCards = ({ products, open }) => {
 
 // ─── Per-slide bottom overlay (owns productsOpen state) ───────────────────────
 const SlideBottomInfo = ({ p, isMuted, onToggleMute }) => {
+  const navigate = useNavigate();
   const [productsOpen, setProductsOpen] = useState(true);
   const user = p.user_id || {};
+  const userId = user._id || user.id;
   const username = user.username || user.full_name || 'User';
   const products = Array.isArray(p.products) ? p.products : [];
+
+  const goToProfile = (e) => {
+    e.stopPropagation();
+    if (userId) navigate(`/profile/${userId}`);
+  };
 
   return (
     <div className="px-4 pt-4 pb-6">
@@ -507,11 +514,13 @@ const SlideBottomInfo = ({ p, isMuted, onToggleMute }) => {
 
       {/* User row — avatar | username | Follow */}
       <div className="flex items-center gap-2 mb-2">
-        {user.avatar_url
-          ? <img src={user.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover shrink-0" alt="user" />
-          : <div className="w-8 h-8 rounded-full border border-white/30 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shrink-0">{username[0]}</div>}
-        <span className="font-bold text-white text-sm truncate flex-1">{username}</span>
-        <FollowButton userId={user._id || user.id} mobile initialFollowing={p.is_author_followed_by_me || false} />
+        <button onClick={goToProfile} className="shrink-0">
+          {user.avatar_url
+            ? <img src={user.avatar_url} className="w-8 h-8 rounded-full border border-white/30 object-cover" alt="user" />
+            : <div className="w-8 h-8 rounded-full border border-white/30 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">{username[0]}</div>}
+        </button>
+        <button onClick={goToProfile} className="font-bold text-white text-sm truncate flex-1 text-left hover:underline">{username}</button>
+        <FollowButton userId={userId} mobile initialFollowing={p.is_author_followed_by_me || false} />
       </div>
 
       {/* Caption + Hide Products */}

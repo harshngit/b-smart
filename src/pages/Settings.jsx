@@ -132,10 +132,10 @@ const Settings = () => {
       </div>
 
       {/* ── Desktop: side-by-side master-detail ── */}
-      <div className="hidden md:flex h-screen bg-gray-50 dark:bg-black max-w-[1100px] mx-auto">
+      <div className="hidden md:flex h-screen bg-gray-50 dark:bg-black max-w-[1300px] ml-auto">
 
         {/* Left Nav Panel */}
-        <div className="w-[300px] shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
+        <div className="w-[30%] shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
           <div className="shrink-0 px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
             <Link to="/profile" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
               <ArrowLeft size={20} />

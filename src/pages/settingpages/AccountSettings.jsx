@@ -414,8 +414,15 @@ const AccountSettings = () => {
               </Field>
 
               <Field label="Date of Birth">
-                <input className={ic} type={isEditing ? 'date' : 'text'} readOnly={!isEditing}
-                  value={form.date_of_birth || (isEditing ? '' : '—')} onChange={e => upd('date_of_birth', e.target.value)} />
+                {isEditing ? (
+                  <input className={ic} type="date"
+                    value={form.date_of_birth} onChange={e => upd('date_of_birth', e.target.value)} />
+                ) : (
+                  <input className={ic} type="text" readOnly
+                    value={form.date_of_birth
+                      ? new Date(form.date_of_birth + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : '—'} />
+                )}
               </Field>
 
               <Field label="Gender">

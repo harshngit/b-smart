@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Bell, Heart, MessageCircle, UserPlus, AtSign, Megaphone, ShoppingBag, Loader2, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  ArrowLeft, Bell, Heart, MessageCircle, UserPlus, AtSign,
+  Megaphone, ShoppingBag, Loader2, Check, AlertCircle, RefreshCw,
+  Reply, Tag, Share2, UserCheck, Send, Mail
+} from 'lucide-react';
 import api from '../../lib/api';
 
 const SectionTitle = ({ title }) => (
@@ -16,38 +20,49 @@ const Toggle = ({ on, onChange, disabled }) => (
 );
 
 const DEFAULT_PREFS = {
-  push_enabled: true,
+  push_notifications: true,
   likes: true,
   comments: true,
-  follows: true,
+  replies: true,
   mentions: true,
-  direct_messages: true,
-  promotions: false,
-  product_updates: true,
+  tags: true,
+  shares: true,
+  new_followers: true,
+  follow_requests: true,
+  new_messages: true,
+  message_requests: true,
 };
 
 const SECTIONS = [
   {
     title: 'General',
     rows: [
-      { key: 'push_enabled', label: 'Push Notifications', sublabel: 'Receive push notifications on this device', icon: Bell, iconBg: 'bg-purple-50 dark:bg-gray-800', iconColor: 'text-purple-500' },
+      { key: 'push_notifications', label: 'Push Notifications', sublabel: 'Receive push notifications on this device', icon: Bell, iconBg: 'bg-purple-50 dark:bg-purple-900/20', iconColor: 'text-purple-500' },
     ],
   },
   {
-    title: 'Interactions',
+    title: 'Posts & Comments',
     rows: [
-      { key: 'likes', label: 'Likes', sublabel: 'Someone likes your post or comment', icon: Heart, iconBg: 'bg-red-50 dark:bg-gray-800', iconColor: 'text-red-500' },
-      { key: 'comments', label: 'Comments', sublabel: 'Someone comments on your post', icon: MessageCircle, iconBg: 'bg-blue-50 dark:bg-gray-800', iconColor: 'text-blue-500' },
-      { key: 'follows', label: 'New Followers', sublabel: 'Someone follows you or sends a request', icon: UserPlus, iconBg: 'bg-green-50 dark:bg-gray-800', iconColor: 'text-green-500' },
-      { key: 'mentions', label: 'Mentions', sublabel: 'Someone mentions you in a post or comment', icon: AtSign, iconBg: 'bg-orange-50 dark:bg-gray-800', iconColor: 'text-orange-500' },
-      { key: 'direct_messages', label: 'Direct Messages', sublabel: 'Someone sends you a message', icon: MessageCircle, iconBg: 'bg-teal-50 dark:bg-gray-800', iconColor: 'text-teal-500' },
+      { key: 'likes', label: 'Likes', sublabel: 'Someone likes your post or comment', icon: Heart, iconBg: 'bg-red-50 dark:bg-red-900/20', iconColor: 'text-red-500' },
+      { key: 'comments', label: 'Comments', sublabel: 'Someone comments on your post', icon: MessageCircle, iconBg: 'bg-blue-50 dark:bg-blue-900/20', iconColor: 'text-blue-500' },
+      { key: 'replies', label: 'Replies', sublabel: 'Someone replies to your comment', icon: Reply, iconBg: 'bg-cyan-50 dark:bg-cyan-900/20', iconColor: 'text-cyan-500' },
+      { key: 'mentions', label: 'Mentions', sublabel: 'Someone mentions you in a post or comment', icon: AtSign, iconBg: 'bg-orange-50 dark:bg-orange-900/20', iconColor: 'text-orange-500' },
+      { key: 'tags', label: 'Tags', sublabel: 'Someone tags you in a post or photo', icon: Tag, iconBg: 'bg-amber-50 dark:bg-amber-900/20', iconColor: 'text-amber-500' },
+      { key: 'shares', label: 'Shares', sublabel: 'Someone shares your post', icon: Share2, iconBg: 'bg-violet-50 dark:bg-violet-900/20', iconColor: 'text-violet-500' },
     ],
   },
   {
-    title: 'From bSmart',
+    title: 'Followers',
     rows: [
-      { key: 'promotions', label: 'Promotions & Offers', sublabel: 'Deals, rewards, and special offers', icon: Megaphone, iconBg: 'bg-pink-50 dark:bg-gray-800', iconColor: 'text-pink-500' },
-      { key: 'product_updates', label: 'Product Updates', sublabel: 'New features and app improvements', icon: ShoppingBag, iconBg: 'bg-indigo-50 dark:bg-gray-800', iconColor: 'text-indigo-500' },
+      { key: 'new_followers', label: 'New Followers', sublabel: 'Someone follows you', icon: UserPlus, iconBg: 'bg-green-50 dark:bg-green-900/20', iconColor: 'text-green-500' },
+      { key: 'follow_requests', label: 'Follow Requests', sublabel: 'Someone sends you a follow request', icon: UserCheck, iconBg: 'bg-emerald-50 dark:bg-emerald-900/20', iconColor: 'text-emerald-500' },
+    ],
+  },
+  {
+    title: 'Messages',
+    rows: [
+      { key: 'new_messages', label: 'New Messages', sublabel: 'Someone sends you a direct message', icon: Send, iconBg: 'bg-teal-50 dark:bg-teal-900/20', iconColor: 'text-teal-500' },
+      { key: 'message_requests', label: 'Message Requests', sublabel: 'Message requests from people you don\'t follow', icon: Mail, iconBg: 'bg-indigo-50 dark:bg-indigo-900/20', iconColor: 'text-indigo-500' },
     ],
   },
 ];
@@ -83,7 +98,7 @@ const NotificationSettings = () => {
     setSavingKey(key);
     try {
       const res = await api.patch('/settings/notifications', { [key]: checked });
-      const saved = res.data?.settings || {};
+      const saved = res.data?.settings || res.data || {};
       if (Object.keys(saved).length > 0) setPrefs(p => ({ ...p, ...saved }));
       setSavedKey(key);
       setTimeout(() => setSavedKey(null), 2000);
@@ -95,14 +110,17 @@ const NotificationSettings = () => {
     }
   };
 
+  const enabledCount = Object.values(prefs).filter(Boolean).length;
+  const totalCount = Object.keys(prefs).length;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1100px] mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-black pb-24">
 
       <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center justify-between z-40">
         <Link to="/settings" className="text-gray-800 dark:text-white p-1">
           <ArrowLeft size={22} />
         </Link>
-        <h1 className="text-base font-semibold dark:text-white">Notification Settings</h1>
+        <h1 className="text-base font-semibold dark:text-white">Notifications</h1>
         <button
           onClick={fetchPrefs}
           disabled={pageLoading}
@@ -139,44 +157,55 @@ const NotificationSettings = () => {
             </button>
           </div>
         ) : (
-          SECTIONS.map(({ title, rows }) => (
-            <div key={title}>
-              <SectionTitle title={title} />
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-                {rows.map(({ key, label, sublabel, icon: Icon, iconBg, iconColor }) => (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-gray-800 last:border-0"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-                        <Icon size={16} className={iconColor} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sublabel}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {savingKey === key && <Loader2 size={13} className="animate-spin text-gray-400" />}
-                      {savedKey === key && savingKey !== key && <Check size={13} className="text-green-500" />}
-                      <Toggle
-                        on={prefs[key]}
-                        disabled={savingKey === key}
-                        onChange={e => handleToggle(key, e.target.checked)}
-                      />
-                    </div>
-                  </div>
-                ))}
+          <>
+            {/* Summary */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#fa3f5e]/10 flex items-center justify-center shrink-0">
+                <Bell size={18} className="text-[#fa3f5e]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{enabledCount} of {totalCount} enabled</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Manage what notifications you receive</p>
               </div>
             </div>
-          ))
-        )}
 
-        {!pageLoading && !pageError && (
-          <p className="text-xs text-gray-400 dark:text-gray-500 px-1">
-            Changes are saved automatically. You can also manage per-user notification preferences from their profile.
-          </p>
+            {SECTIONS.map(({ title, rows }) => (
+              <div key={title}>
+                <SectionTitle title={title} />
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+                  {rows.map(({ key, label, sublabel, icon: Icon, iconBg, iconColor }) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-gray-800 last:border-0"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+                          <Icon size={16} className={iconColor} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sublabel}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {savingKey === key && <Loader2 size={13} className="animate-spin text-gray-400" />}
+                        {savedKey === key && savingKey !== key && <Check size={13} className="text-green-500" />}
+                        <Toggle
+                          on={prefs[key]}
+                          disabled={savingKey === key}
+                          onChange={e => handleToggle(key, e.target.checked)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <p className="text-xs text-gray-400 dark:text-gray-500 px-1">
+              Changes are saved automatically. You can also manage per-user notification preferences from their profile.
+            </p>
+          </>
         )}
       </div>
     </div>

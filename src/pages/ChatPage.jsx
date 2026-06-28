@@ -990,9 +990,20 @@ export default function ChatPage() {
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
 
   const filteredConversations = useMemo(() => {
+    const withoutSelf = conversations.filter((conversation) => {
+      if (conversation?.isGroup) return true;
+      const participants = conversation?.participants || [];
+      if (participants.length <= 1) {
+        const onlyId = String(participants[0]?._id || participants[0]?.id || '');
+        if (onlyId === String(currentUserId)) return false;
+      }
+      const other = otherParticipant(conversation, currentUserId);
+      const otherId = String(other?._id || other?.id || '');
+      return otherId !== String(currentUserId);
+    });
     const query = search.trim().toLowerCase();
-    if (!query) return conversations;
-    return conversations.filter((conversation) => {
+    if (!query) return withoutSelf;
+    return withoutSelf.filter((conversation) => {
       const other = otherParticipant(conversation, currentUserId);
       return [
         getConversationTitle(conversation, currentUserId),
@@ -1452,7 +1463,8 @@ export default function ChatPage() {
           const reel = data?.data || data?.reel || data;
           const media0 = reel?.media?.[0] || {};
           const previewUrl =
-            media0?.thumbnail?.fileUrl
+            (Array.isArray(media0?.thumbnail) ? media0.thumbnail[0]?.fileUrl : null)
+            || media0?.thumbnail?.fileUrl
             || media0?.thumbnails?.[0]?.fileUrl
             || media0?.fileUrl
             || '';
@@ -2282,7 +2294,7 @@ export default function ChatPage() {
   }, [currentUserId, messages, otherUserId]);
 
   return (
-    <div className="h-[100dvh] bg-white dark:bg-black text-gray-900 dark:text-white md:h-screen max-w-[1100px] mx-auto">
+    <div className="h-[100dvh] bg-white dark:bg-black text-gray-900 dark:text-white md:h-screen max-w-[1300px] ml-auto">
       <div className="flex h-full">
 
         {/* ═══════════════════════════════════════════════════════════
@@ -2292,7 +2304,7 @@ export default function ChatPage() {
           ${activeId ? 'hidden' : 'flex'}
           h-full w-full flex-shrink-0 flex-col
           bg-white dark:bg-black text-gray-900 dark:text-white
-          md:flex md:w-[380px]
+          md:flex md:w-[40%]
           md:bg-gray-50/50 md:dark:bg-[#0a0a0a]
           md:border-r md:border-gray-100 md:dark:border-white/10
         `}>

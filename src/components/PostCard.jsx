@@ -303,14 +303,25 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
   const [videoReady, setVideoReady]     = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [videoBuffering, setVideoBuffering] = useState(true);
-  const [isMuted, setIsMuted]           = useState(false);
-  // userPaused: true when the user manually tapped to pause — prevents IntersectionObserver
-  // from auto-resuming until they scroll away and back
+  const [isMuted, setIsMuted]           = useState(() => {
+    const saved = window.__bsmart_feed_muted;
+    return saved === undefined ? false : saved;
+  });
   const [userPaused, setUserPaused]     = useState(false);
 
   const videoRef      = useRef(null);
   const containerRef  = useRef(null);
   const isVisibleRef  = useRef(false);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const muted = e.detail?.muted ?? false;
+      setIsMuted(muted);
+      if (videoRef.current) videoRef.current.muted = muted;
+    };
+    window.addEventListener('bsmart:mute-sync', handler);
+    return () => window.removeEventListener('bsmart:mute-sync', handler);
+  }, []);
 
   const fixUrl = (u) => u ? String(u).replace(/^http:\/\//i, 'https://') : '';
 
@@ -421,8 +432,11 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
   };
   const toggleMute = (e) => {
     e.stopPropagation();
-    if (videoRef.current) videoRef.current.muted = !isMuted;
-    setIsMuted(m => !m);
+    const newMuted = !isMuted;
+    if (videoRef.current) videoRef.current.muted = newMuted;
+    setIsMuted(newMuted);
+    window.__bsmart_feed_muted = newMuted;
+    window.dispatchEvent(new CustomEvent('bsmart:mute-sync', { detail: { muted: newMuted } }));
   };
   const togglePlayPause = (e) => {
     e.stopPropagation();
