@@ -1,5 +1,5 @@
 /**
- * Notifications.jsx — Instagram-style notification feed
+ * Notifications.jsx — bSmart-style notification feed
  */
 
 import { useState, useCallback } from "react";

@@ -816,7 +816,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
         </div>
       </div>
 
-      {/* ── Instagram-style Search Panel (desktop only, member only) ── */}
+      {/* ── bSmart-style Search Panel (desktop only, member only) ── */}
       {showSearch && !isVendor && (
         <>
           {/* Backdrop — starts below LocationBar on Home, full-screen elsewhere */}

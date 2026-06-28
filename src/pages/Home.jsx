@@ -315,7 +315,7 @@ const FeedSkeleton = () => (
   </div>
 );
 
-// ── Mobile Suggested Users Card (horizontal scroll, Instagram-style) ──────────
+// ── Mobile Suggested Users Card (horizontal scroll, bSmart-style) ──────────
 const MobileSuggestedUsersCard = ({ users }) => {
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState({});

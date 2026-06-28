@@ -2298,7 +2298,7 @@ export default function ChatPage() {
       <div className="flex h-full">
 
         {/* ═══════════════════════════════════════════════════════════
-            SIDEBAR — Mobile: Instagram dark style | Desktop: unchanged
+            SIDEBAR — Mobile: bSmart dark style | Desktop: unchanged
             ═══════════════════════════════════════════════════════════ */}
         <aside className={`
           ${activeId ? 'hidden' : 'flex'}
@@ -2806,7 +2806,7 @@ export default function ChatPage() {
                         @{otherUser?.username || getUserName(otherUser).toLowerCase().replace(/\s+/g, '_')}
                       </p>
                       <p className="mt-1 w-full text-sm text-gray-500 dark:text-gray-400">
-                        {otherUser?.username || getUserName(otherUser)} · Instagram
+                        {otherUser?.username || getUserName(otherUser)} · bSmart
                       </p>
                       <Link
                         to={`/profile/${otherUserId}`}
