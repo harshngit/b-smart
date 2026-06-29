@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, UserCog, Shield, Lock, Bell, ChevronRight,
   MessageSquare, LayoutGrid, Wallet, UserX,
-  Palette, HardDrive, HelpCircle, Scale, Info, LogOut,
+  Palette, HardDrive, HelpCircle, Scale, Info, LogOut, Bookmark,
 } from 'lucide-react';
 
 const SETTINGS_GROUPS = [
@@ -28,6 +28,7 @@ const SETTINGS_GROUPS = [
     group: 'Storage & Activity',
     items: [
       { key: 'wallet',  label: 'Rewards & Wallet',      subLabel: 'Coins, transactions & wallet history', icon: Wallet,    to: '/wallet',            iconBg: 'bg-orange-50 dark:bg-gray-800', iconColor: 'text-orange-500', external: true },
+      { key: 'saved',   label: 'Saved',                   subLabel: 'Posts, reels, ads & promoted reels',    icon: Bookmark,  to: '/settings/saved',   iconBg: 'bg-amber-50 dark:bg-gray-800', iconColor: 'text-amber-500' },
       { key: 'storage', label: 'Storage & Data',         subLabel: 'Cache, data usage & storage breakdown', icon: HardDrive, to: '/settings/storage', iconBg: 'bg-green-50 dark:bg-gray-800', iconColor: 'text-green-500' },
       { key: 'blocked', label: 'Blocked & Restricted',   subLabel: 'Blocked, restricted & muted accounts', icon: UserX,     to: '/settings/blocked', iconBg: 'bg-red-50 dark:bg-gray-800', iconColor: 'text-red-500' },
     ],

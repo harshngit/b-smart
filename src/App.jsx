@@ -40,6 +40,7 @@ import LegalSettings from './pages/settingpages/LegalSettings';
 import AboutSettings from './pages/settingpages/AboutSettings';
 import AccountActionsSettings from './pages/settingpages/AccountActionsSettings';
 import NotificationSettings from './pages/settingpages/NotificationSettings';
+import SavedPosts from './pages/settingpages/SavedPosts';
 import AuthCallback from './pages/AuthCallback';
 import Notifications from './pages/Notifications';
 import VendorNotifications from './pages/vendor-pages/VendorNotifications';
@@ -148,6 +149,7 @@ function App() {
               <Route path="storage"        element={<StorageSettings />} />
               <Route path="legal"          element={<LegalSettings />} />
               <Route path="about"          element={<AboutSettings />} />
+              <Route path="saved"           element={<SavedPosts />} />
               <Route path="account-actions" element={<AccountActionsSettings />} />
             </Route>
             <Route path="/notifications"    element={<Notifications />} />
