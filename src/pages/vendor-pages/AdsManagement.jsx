@@ -313,14 +313,14 @@ export default function AdsManagement() {
         {ad.status === "pending" && (
           <button onClick={() => handleDeleteAd(ad.id)}
             className={`${btn} hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 disabled:opacity-50`}
-            title="Delete (only allowed for Pending ads)" disabled={isBusy("delete")}>
+            title="Delete (only allowed for Pending Spotlights)" disabled={isBusy("delete")}>
             <Trash2 className="w-4 h-4" />
           </button>
         )}
         {ad.status !== "pending" && (
           <button
             className={`${btn} text-gray-300 dark:text-gray-700 cursor-not-allowed`}
-            title={`Cannot delete ${ad.status} ads — only Pending ads can be deleted`}
+            title={`Cannot delete ${ad.status} Spotlights — only Pending Spotlights can be deleted`}
             disabled>
             <Trash2 className="w-4 h-4" />
           </button>
@@ -349,7 +349,7 @@ export default function AdsManagement() {
           <div>
             <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-1">
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-red-500 to-pink-600">
-                Ads Management
+                Spotlights Management
               </span>
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">Manage and track your advertising campaigns.</p>
@@ -358,14 +358,14 @@ export default function AdsManagement() {
             onClick={handleCreateAd}
             className="self-start sm:self-auto flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-pink-500/20 whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" /> Create Ad
+            <Plus className="w-4 h-4" /> Create Spotlight
           </button>
         </div>
 
         {/* ── Summary Stats ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {[
-            { label: "Total Ads",     value: summaryStats.total,                       color: "text-gray-900 dark:text-white",     bg: "bg-white dark:bg-gray-900" },
+            { label: "Total Spotlights", value: summaryStats.total,                       color: "text-gray-900 dark:text-white",     bg: "bg-white dark:bg-gray-900" },
             { label: "Active",        value: summaryStats.active,                      color: "text-green-600 dark:text-green-400",bg: "bg-white dark:bg-gray-900" },
             { label: "Total Budget",  value: `${summaryStats.totalBudget.toLocaleString()} 🪙`, color: "text-amber-600 dark:text-amber-400", bg: "bg-white dark:bg-gray-900" },
             { label: "Total Spent",   value: `${summaryStats.totalSpent.toLocaleString()} 🪙`,  color: "text-red-500 dark:text-red-400",    bg: "bg-white dark:bg-gray-900" },
@@ -443,7 +443,7 @@ export default function AdsManagement() {
 
               {/* Ad Type filter */}
               <div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-2">Ad Type</div>
+                <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-2">Spotlight Type</div>
                 <div className="flex flex-wrap gap-2">
                   {["All", "banner", "video", "carousel", "sponsored_post"].map(t => (
                     <button key={t} onClick={() => setFilterAdType(t)}
@@ -493,7 +493,7 @@ export default function AdsManagement() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
-                    <th className="p-4 pl-6 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ad</th>
+                    <th className="p-4 pl-6 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Spotlight</th>
                     <th className="p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Type / CTA</th>
                     <th className="p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Category</th>
                     <th className="p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Targeting</th>
@@ -674,7 +674,7 @@ export default function AdsManagement() {
                 <p className="text-gray-500 dark:text-gray-400 mt-1">Try adjusting your filters or search query.</p>
                 <button onClick={handleCreateAd}
                   className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity">
-                  <Plus className="w-4 h-4" /> Create your first ad
+                  <Plus className="w-4 h-4" /> Create your first Spotlight
                 </button>
               </div>
             )}
@@ -689,8 +689,8 @@ export default function AdsManagement() {
                 <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                   <Trash2 className="w-6 h-6 text-red-500" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Delete this ad?</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone. The ad and all its data will be permanently removed.</p>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Delete this Spotlight?</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone. The Spotlight and all its data will be permanently removed.</p>
               </div>
               <div className="flex gap-3">
                 <button
@@ -728,7 +728,7 @@ export default function AdsManagement() {
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Complete your profile first</h3>
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center leading-relaxed">
                 Your profile is <span className="font-bold text-orange-500">{Math.round(Number(profileCompletion || 0))}%</span> complete.
-                You need above <span className="font-bold text-pink-600">80%</span> to upload ads.
+                You need above <span className="font-bold text-pink-600">80%</span> to upload Spotlights.
               </p>
               <div className="flex justify-center">
                 <button onClick={() => setShowProfileGatePopup(false)} className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 text-white font-medium hover:opacity-90 transition-opacity">OK</button>
@@ -741,7 +741,7 @@ export default function AdsManagement() {
             <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center">Upgrade your package</h3>
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 text-center leading-relaxed">
-                Your package allows <span className="font-bold text-pink-600">{activePackageAdsLimit}</span> ads, and you have <span className="font-bold text-orange-500">{ads.length}</span>. Upgrade to create more.
+                Your package allows <span className="font-bold text-pink-600">{activePackageAdsLimit}</span> Spotlights, and you have <span className="font-bold text-orange-500">{ads.length}</span>. Upgrade to create more.
               </p>
               <div className="flex justify-center">
                 <button onClick={() => setShowAdLimitPopup(false)} className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 text-white font-medium hover:opacity-90 transition-opacity">OK</button>

@@ -221,7 +221,7 @@ const TransactionRow = ({ tx }) => (
             </div>
           )}
           {tx.ad?.title && (
-            <div className="text-xs text-pink-500 mt-0.5 truncate max-w-[180px]">Ad: {tx.ad.title}</div>
+            <div className="text-xs text-pink-500 mt-0.5 truncate max-w-[180px]">Spotlight: {tx.ad.title}</div>
           )}
         </div>
       </div>
@@ -405,7 +405,7 @@ export default function VendorDashboard() {
               </span>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-              Ad Dashboard
+              Spotlight Dashboard
             </h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
               {vendorName} · Wallet & Performance Overview
@@ -425,7 +425,7 @@ export default function VendorDashboard() {
               className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white font-semibold rounded-xl px-6 py-3 text-sm flex items-center gap-2 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 hover:-translate-y-0.5 transition-all"
             >
               <span className="text-lg leading-none">+</span>
-              Create New Ad
+              Create New Spotlight
             </button>
           </div>
         </div>
@@ -453,7 +453,7 @@ export default function VendorDashboard() {
                       Complete your vendor profile - {profilePct}% done
                     </span>
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                      A complete profile is required for account verification and to start running ads.
+                      A complete profile is required for account verification and to start running Spotlights.
                     </p>
                   </div>
                   <button
@@ -524,7 +524,7 @@ export default function VendorDashboard() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-4xl md:text-3xl font-bold leading-none">{adsRemainingText}</div>
-                <div className="text-sm mt-1 font-medium text-white/80">Ads Remain</div>
+                <div className="text-sm mt-1 font-medium text-white/80">Spotlights Remain</div>
               </div>
               <div>
                 <div className="text-4xl md:text-3xl font-bold leading-none">{daysLeftText}</div>
@@ -537,7 +537,7 @@ export default function VendorDashboard() {
             className="bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white border-transparent shadow-lg shadow-pink-500/20"
             badge="Running"
             title={`${activeAdsCount}`}
-            subtitle="Active Ads"
+            subtitle="Active Spotlights"
             secondaryBadge="Running"
             footer="View"
             loading={dashboardLoading}
@@ -547,11 +547,11 @@ export default function VendorDashboard() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <div className="text-2xl font-bold leading-none">{totalAdsCount}</div>
-                <div className="mt-1 text-white/80">Total Ads</div>
+                <div className="mt-1 text-white/80">Total Spotlights</div>
               </div>
               <div>
                 <div className="text-2xl font-bold leading-none">{inactiveAdsCount}</div>
-                <div className="mt-1 text-white/80">Inactive Ads</div>
+                <div className="mt-1 text-white/80">Inactive Spotlights</div>
               </div>
             </div>
           </DashboardInfoCard>
@@ -606,7 +606,7 @@ export default function VendorDashboard() {
           <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Most Popular Ads</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Most Popular Spotlights</h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{popularAds.length} items</p>
               </div>
               <span className="text-xs font-semibold text-pink-600 dark:text-pink-400">View --&gt;</span>
@@ -616,7 +616,7 @@ export default function VendorDashboard() {
               {dashboardLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Loading ads...</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Loading Spotlights...</span>
                 </div>
               ) : popularAds.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">

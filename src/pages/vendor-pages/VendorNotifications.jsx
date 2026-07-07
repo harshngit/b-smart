@@ -34,18 +34,18 @@ const fmt = (n) => Number(n || 0).toLocaleString("en-IN");
 // ─── Vendor-specific type config ──────────────────────────────────────────────
 const TYPE_CONFIG = {
   // Ad lifecycle
-  ad_approved:  { icon: BadgeCheck,    bg: "bg-green-100 dark:bg-green-900/30",   color: "text-green-600",   label: "Ad Approved",  accent: "border-l-green-500"  },
-  ad_rejected:  { icon: XCircle,       bg: "bg-red-100 dark:bg-red-900/30",       color: "text-red-600",     label: "Ad Rejected",  accent: "border-l-red-500"    },
-  ad_submitted: { icon: Megaphone,     bg: "bg-blue-100 dark:bg-blue-900/30",     color: "text-blue-600",    label: "Ad Submitted", accent: "border-l-blue-400"   },
-  ad_expired:   { icon: XCircle,       bg: "bg-gray-100 dark:bg-gray-800",        color: "text-gray-500",    label: "Ad Expired",   accent: "border-l-gray-400"   },
+  ad_approved:  { icon: BadgeCheck,    bg: "bg-green-100 dark:bg-green-900/30",   color: "text-green-600",   label: "Spotlight Approved",  accent: "border-l-green-500"  },
+  ad_rejected:  { icon: XCircle,       bg: "bg-red-100 dark:bg-red-900/30",       color: "text-red-600",     label: "Spotlight Rejected",  accent: "border-l-red-500"    },
+  ad_submitted: { icon: Megaphone,     bg: "bg-blue-100 dark:bg-blue-900/30",     color: "text-blue-600",    label: "Spotlight Submitted", accent: "border-l-blue-400"   },
+  ad_expired:   { icon: XCircle,       bg: "bg-gray-100 dark:bg-gray-800",        color: "text-gray-500",    label: "Spotlight Expired",   accent: "border-l-gray-400"   },
   // Engagement on ads
-  ad_like:      { icon: Heart,         bg: "bg-pink-100 dark:bg-pink-900/30",     color: "text-pink-500",    label: "Ad Like",      accent: "border-l-pink-400"   },
-  ad_comment:   { icon: MessageCircle, bg: "bg-orange-100 dark:bg-orange-900/30", color: "text-orange-500",  label: "Ad Comment",   accent: "border-l-orange-400" },
-  ad_view:      { icon: Target,        bg: "bg-sky-100 dark:bg-sky-900/30",       color: "text-sky-500",     label: "Ad View",      accent: "border-l-sky-400"    },
+  ad_like:      { icon: Heart,         bg: "bg-pink-100 dark:bg-pink-900/30",     color: "text-pink-500",    label: "Spotlight Like",      accent: "border-l-pink-400"   },
+  ad_comment:   { icon: MessageCircle, bg: "bg-orange-100 dark:bg-orange-900/30", color: "text-orange-500",  label: "Spotlight Comment",   accent: "border-l-orange-400" },
+  ad_view:      { icon: Target,        bg: "bg-sky-100 dark:bg-sky-900/30",       color: "text-sky-500",     label: "Spotlight View",      accent: "border-l-sky-400"    },
   // Wallet
   wallet_credit:{ icon: TrendingUp,    bg: "bg-emerald-100 dark:bg-emerald-900/30",color:"text-emerald-600", label: "Wallet Credit",accent: "border-l-emerald-500"},
   wallet_debit: { icon: TrendingDown,  bg: "bg-rose-100 dark:bg-rose-900/30",     color: "text-rose-600",    label: "Wallet Debit", accent: "border-l-rose-500"   },
-  ad_spend:     { icon: Receipt,       bg: "bg-amber-100 dark:bg-amber-900/30",   color: "text-amber-600",   label: "Ad Spend",     accent: "border-l-amber-400"  },
+  ad_spend:     { icon: Receipt,       bg: "bg-amber-100 dark:bg-amber-900/30",   color: "text-amber-600",   label: "Spotlight Spend",     accent: "border-l-amber-400"  },
   refund:       { icon: Wallet,        bg: "bg-teal-100 dark:bg-teal-900/30",     color: "text-teal-600",    label: "Refund",       accent: "border-l-teal-400"   },
   // General
   follow:       { icon: UserPlus,      bg: "bg-pink-100 dark:bg-pink-900/30",     color: "text-pink-600",    label: "Follow",       accent: "border-l-pink-400"   },

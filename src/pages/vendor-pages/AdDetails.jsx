@@ -268,7 +268,7 @@ const VendorAdCard = ({ ad, onClick }) => {
   const media = ad.media?.[0];
   const thumb = getVendorAdThumbnail(ad);
   const isVideo = media?.media_type === "video";
-  const title = ad.ad_title || ad.caption || "Untitled Ad";
+  const title = ad.ad_title || ad.caption || "Untitled Spotlight";
 
   return (
     <button
@@ -1893,10 +1893,10 @@ export default function AdDetails() {
         <div className="text-center max-w-md">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Failed to Load</h2>
-          <p className="text-gray-500 mb-6">{error || "Ad not found."}</p>
+          <p className="text-gray-500 mb-6">{error || "Spotlight not found."}</p>
           <button onClick={() => navigate("/vendor/ads-management")}
             className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors">
-            Back to Ads Management
+            Back to Spotlights Management
           </button>
         </div>
       </div>
@@ -1938,7 +1938,7 @@ export default function AdDetails() {
             </button>
             <div>
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{ad.ad_title || ad.caption || "Ad Details"}</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{ad.ad_title || ad.caption || "Spotlight Details"}</h1>
                 <Badge status={status} />
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2 flex-wrap">
@@ -2031,16 +2031,16 @@ export default function AdDetails() {
                 </div>
 
                 {/* Ad Info */}
-                <Card title="Ad Information" icon={Megaphone}>
-                  {ad.ad_title && <InfoRow icon={Megaphone}    label="Ad Title"       value={ad.ad_title} />}
+                <Card title="Spotlight Information" icon={Megaphone}>
+                  {ad.ad_title && <InfoRow icon={Megaphone}    label="Spotlight Title"  value={ad.ad_title} />}
                   {ad.ad_description && <InfoRow icon={Layers}  label="Description"    value={ad.ad_description} />}
                   <InfoRow icon={Hash}        label="Caption"        value={ad.caption}      />
                   <InfoRow icon={Tag}         label="Category"       value={ad.category}     />
                   {ad.sub_category && <InfoRow icon={Tag}      label="Sub-Category"   value={ad.sub_category} />}
                   <InfoRow icon={Film}        label="Content Type"   value={ad.content_type} />
-                  <InfoRow icon={Layers}      label="Ad Type"        value={(ad.ad_type || "—").replace(/_/g, " ")} />
+                  <InfoRow icon={Layers}      label="Spotlight Type"  value={(ad.ad_type || "—").replace(/_/g, " ")} />
                   {ad.ads_type && (
-                    <InfoRow icon={Megaphone} label="Ads Type" value={
+                    <InfoRow icon={Megaphone} label="Spotlight Type" value={
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800">
                         {String(ad.ads_type).replace(/_/g, " ")}
                       </span>

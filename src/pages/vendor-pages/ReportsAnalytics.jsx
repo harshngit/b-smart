@@ -60,13 +60,13 @@ const COLUMNS = {
     ["date", "Date"], ["impressions", "Impressions"], ["clicks", "Clicks"], ["ctr", "CTR", "percent"], ["reach", "Reach"], ["frequency", "Frequency", "decimal"],
   ],
   click: [
-    ["ad_name", "Ad Name"], ["impressions", "Impressions"], ["total_clicks", "Total Clicks"], ["unique_clicks", "Unique Clicks"], ["invalid_clicks", "Invalid Clicks"], ["click_rate", "Click Rate", "percent"], ["cpc", "CPC", "decimal"], ["coins_spent", "Coins Spent"],
+    ["ad_name", "Spotlight Name"], ["impressions", "Impressions"], ["total_clicks", "Total Clicks"], ["unique_clicks", "Unique Clicks"], ["invalid_clicks", "Invalid Clicks"], ["click_rate", "Click Rate", "percent"], ["cpc", "CPC", "decimal"], ["coins_spent", "Coins Spent"],
   ],
   engagement: [
-    ["ad_name", "Ad Name"], ["impressions", "Impressions"], ["likes", "Likes"], ["dislikes", "Dislikes"], ["comments", "Comments"], ["saves", "Saves"], ["engagement_rate", "Engagement Rate", "percent"],
+    ["ad_name", "Spotlight Name"], ["impressions", "Impressions"], ["likes", "Likes"], ["dislikes", "Dislikes"], ["comments", "Comments"], ["saves", "Saves"], ["engagement_rate", "Engagement Rate", "percent"],
   ],
   conversion: [
-    ["ad_name", "Ad Name"], ["conversions", "Conversions"], ["conversion_rate", "Conversion Rate", "percent"], ["cost_per_conversion", "Cost/Conversion", "decimal"], ["roas", "ROAS", "decimal"], ["revenue", "Revenue"], ["total_spend", "Spend"],
+    ["ad_name", "Spotlight Name"], ["conversions", "Conversions"], ["conversion_rate", "Conversion Rate", "percent"], ["cost_per_conversion", "Cost/Conversion", "decimal"], ["roas", "ROAS", "decimal"], ["revenue", "Revenue"], ["total_spend", "Spend"],
   ],
   geographic: [
     ["country", "Country"], ["impressions", "Impressions"], ["clicks", "Clicks"], ["ctr", "CTR", "percent"], ["reach", "Reach"],
@@ -167,9 +167,9 @@ const normalizeRows = (reportId, data) => {
       frequency: r.frequency ?? 0,
     }));
   }
-  if (reportId === "click") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Ad", impressions: r.impressions ?? 0, total_clicks: r.total_clicks ?? 0, unique_clicks: r.unique_clicks ?? 0, invalid_clicks: r.invalid_clicks ?? 0, click_rate: r.click_rate ?? 0, cpc: r.cpc ?? 0, coins_spent: r.coins_spent ?? 0 }));
-  if (reportId === "engagement") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Ad", impressions: r.impressions ?? 0, likes: r.likes ?? 0, dislikes: r.dislikes ?? 0, comments: r.comments ?? 0, saves: r.saves ?? 0, engagement_rate: r.engagement_rate ?? 0 }));
-  if (reportId === "conversion") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Ad", conversions: r.conversions ?? r.unique_clicks ?? 0, conversion_rate: r.conversion_rate ?? 0, cost_per_conversion: r.cost_per_conversion ?? r.cost_per_lead ?? 0, roas: r.roas ?? 0, revenue: r.revenue ?? 0, total_spend: r.total_spend ?? r.spend ?? 0 }));
+  if (reportId === "click") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Spotlight", impressions: r.impressions ?? 0, total_clicks: r.total_clicks ?? 0, unique_clicks: r.unique_clicks ?? 0, invalid_clicks: r.invalid_clicks ?? 0, click_rate: r.click_rate ?? 0, cpc: r.cpc ?? 0, coins_spent: r.coins_spent ?? 0 }));
+  if (reportId === "engagement") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Spotlight", impressions: r.impressions ?? 0, likes: r.likes ?? 0, dislikes: r.dislikes ?? 0, comments: r.comments ?? 0, saves: r.saves ?? 0, engagement_rate: r.engagement_rate ?? 0 }));
+  if (reportId === "conversion") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Spotlight", conversions: r.conversions ?? r.unique_clicks ?? 0, conversion_rate: r.conversion_rate ?? 0, cost_per_conversion: r.cost_per_conversion ?? r.cost_per_lead ?? 0, roas: r.roas ?? 0, revenue: r.revenue ?? 0, total_spend: r.total_spend ?? r.spend ?? 0 }));
   if (reportId === "geographic") return rows.map((r) => ({ country: r.country || r._id || "Unknown", impressions: r.impressions ?? 0, clicks: r.clicks ?? r.total_clicks ?? 0, ctr: r.ctr ?? r.click_rate ?? 0, reach: r.reach ?? 0 }));
   if (reportId === "financial") return Array.isArray(data?.financialRows) ? data.financialRows : [];
   return rows;
@@ -223,7 +223,7 @@ export default function ReportsAnalytics() {
     return next;
   }, [datePreset, startDate, endDate, selectedAd, country, language, gender]);
 
-  const adOptions = useMemo(() => [{ value: "all", label: "All Ads" }, ...ads.map((ad) => ({ value: ad._id, label: ad.caption || ad.title || "Untitled Ad" }))], [ads]);
+  const adOptions = useMemo(() => [{ value: "all", label: "All Spotlights" }, ...ads.map((ad) => ({ value: ad._id, label: ad.caption || ad.title || "Untitled Spotlight" }))], [ads]);
 
   // Reset table page whenever report type or data changes
   React.useEffect(() => { setTablePage(1); }, [selectedReport, rows.length]);
@@ -383,7 +383,7 @@ export default function ReportsAnalytics() {
     }
     if (selectedAd !== "all") {
       const selectedAdLabel = adOptions.find((o) => o.value === selectedAd)?.label || selectedAd;
-      filterParts.push(`Ad: ${selectedAdLabel}`);
+      filterParts.push(`Spotlight: ${selectedAdLabel}`);
     }
     if (country !== "all")  filterParts.push(`Country: ${country}`);
     if (language !== "all") filterParts.push(`Language: ${language}`);
@@ -654,7 +654,7 @@ export default function ReportsAnalytics() {
                   <div><label className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-gray-400">To</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900" /></div>
                 </div>
               ) : null}
-              <div><label className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-gray-400">Ad</label><Select value={selectedAd} onChange={setSelectedAd} options={adOptions} icon={Target} /></div>
+              <div><label className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-gray-400">Spotlight</label><Select value={selectedAd} onChange={setSelectedAd} options={adOptions} icon={Target} /></div>
               <div><label className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-gray-400">Country</label><Select value={country} onChange={setCountry} options={[{ value: "all", label: "All Countries" }, { value: "India", label: "India" }, { value: "United States", label: "United States" }, { value: "United Kingdom", label: "United Kingdom" }, { value: "UAE", label: "UAE" }, { value: "Singapore", label: "Singapore" }]} icon={Globe} /></div>
               <div><label className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-gray-400">Language</label><Select value={language} onChange={setLanguage} options={[{ value: "all", label: "All Languages" }, { value: "English", label: "English" }, { value: "Hindi", label: "Hindi" }, { value: "Tamil", label: "Tamil" }, { value: "Telugu", label: "Telugu" }]} icon={Search} /></div>
               <div><label className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-gray-400">Gender</label><Select value={gender} onChange={setGender} options={[{ value: "all", label: "All Genders" }, { value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }]} icon={Users} /></div>

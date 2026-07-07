@@ -405,7 +405,7 @@ const PurchaseSuccessPopup = ({ pkg, onClose }) => {
               <div className="p-3 rounded-2xl bg-purple-50 dark:bg-purple-900/20 text-center">
                 <Receipt className="w-4 h-4 text-purple-500 mx-auto mb-1" />
                 <div className="text-lg font-black text-purple-700 dark:text-purple-300">{pkg.ads_allowed_max}</div>
-                <div className="text-[10px] text-purple-500 font-semibold uppercase tracking-wide">Ads Allowed</div>
+                <div className="text-[10px] text-purple-500 font-semibold uppercase tracking-wide">Spotlights Allowed</div>
               </div>
             )}
           </div>
@@ -547,7 +547,7 @@ const BuyConfirmModal = ({ pkg, onClose, onSuccess }) => {
                 {pkg.ads_allowed_max > 0 && (
                   <div className="flex items-center gap-1.5 text-sm col-span-2">
                     <Receipt className="w-4 h-4 text-purple-500" />
-                    <span className="text-gray-500 text-xs">Ads allowed:</span>
+                    <span className="text-gray-500 text-xs">Spotlights allowed:</span>
                     <span className="font-bold text-gray-800 dark:text-gray-200">{pkg.ads_allowed_min}–{pkg.ads_allowed_max}</span>
                   </div>
                 )}
@@ -674,7 +674,7 @@ const PackageCard = ({ pkg, onBuy }) => {
           <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 text-sm">
             <Receipt className="w-4 h-4 text-purple-500 flex-shrink-0" />
             <span className="text-gray-600 dark:text-gray-300">
-              <span className="font-bold text-gray-900 dark:text-white">{pkg.ads_allowed_min}–{pkg.ads_allowed_max}</span> ads allowed
+              <span className="font-bold text-gray-900 dark:text-white">{pkg.ads_allowed_min}–{pkg.ads_allowed_max}</span> Spotlights allowed
             </span>
           </div>
         )}
@@ -683,7 +683,7 @@ const PackageCard = ({ pkg, onBuy }) => {
         {isPremium && (
           <div className="flex items-center gap-1.5 mb-3 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800">
             <Sparkles className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
-            <span className="text-xs font-bold text-purple-600 dark:text-purple-400">+ 10 General Ads included</span>
+            <span className="text-xs font-bold text-purple-600 dark:text-purple-400">+ 10 General Spotlights included</span>
           </div>
         )}
 
@@ -883,7 +883,7 @@ const ActivePackageCard = ({ refreshTrigger }) => {
               <div className="p-3 rounded-2xl bg-purple-50 dark:bg-purple-900/20 text-center">
                 <Receipt className="w-4 h-4 text-purple-500 mx-auto mb-1" />
                 <div className="text-base font-black text-purple-700 dark:text-purple-300">{adsMin}–{adsMax}</div>
-                <div className="text-[10px] text-purple-500 font-semibold uppercase tracking-wide">Ads Allowed</div>
+                <div className="text-[10px] text-purple-500 font-semibold uppercase tracking-wide">Spotlights Allowed</div>
               </div>
             )}
 
@@ -891,7 +891,7 @@ const ActivePackageCard = ({ refreshTrigger }) => {
               <div className="p-3 rounded-2xl bg-pink-50 dark:bg-pink-900/20 text-center">
                 <Megaphone className="w-4 h-4 text-pink-500 mx-auto mb-1" />
                 <div className="text-base font-black text-pink-700 dark:text-pink-300">{uploadedAdsCount}/{adsMax}</div>
-                <div className="text-[10px] text-pink-500 font-semibold uppercase tracking-wide">Ads Uploaded</div>
+                <div className="text-[10px] text-pink-500 font-semibold uppercase tracking-wide">Spotlights Uploaded</div>
               </div>
             )}
 
@@ -963,7 +963,7 @@ const ActivePackageCard = ({ refreshTrigger }) => {
         {adsMax > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
             <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-              <span>Ad usage</span>
+              <span>Spotlight usage</span>
               <span className={`font-bold ${adsRemaining === 0 ? "text-red-500" : "text-pink-600 dark:text-pink-400"}`}>
                 {uploadedAdsCount} / {adsMax} used
               </span>
@@ -975,7 +975,7 @@ const ActivePackageCard = ({ refreshTrigger }) => {
               />
             </div>
             <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
-              {adsRemaining === 0 ? "You have reached your package ad limit. Upgrade your package to create more ads." : `${adsRemaining} ad slot${adsRemaining === 1 ? "" : "s"} remaining in your current package.`}
+              {adsRemaining === 0 ? "You have reached your package Spotlight limit. Upgrade your package to create more Spotlights." : `${adsRemaining} Spotlight slot${adsRemaining === 1 ? "" : "s"} remaining in your current package.`}
             </div>
           </div>
         )}

@@ -840,7 +840,7 @@ const PrimaryContact = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Primary Contact Persons</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage who handles communications and ad approvals.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage who handles communications and Spotlight approvals.</p>
         </div>
         <button onClick={() => { setAddError(""); setNewContact({ name:"",email:"",phone:"",position:"",notes:"" }); setAddOpen(true); }}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm hover:opacity-90 transition-all">
@@ -988,7 +988,7 @@ const SalesOfficer = () => {
           </div>
           {/* Informational badges */}
           <div className="flex flex-wrap justify-center gap-2 mt-2">
-            {["Personalized support", "Ad campaign guidance", "Priority access"].map(tag => (
+            {["Personalized support", "Spotlight campaign guidance", "Priority access"].map(tag => (
               <span key={tag} className="flex items-center gap-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-full">
                 <Star size={9} /> {tag}
               </span>
@@ -1088,7 +1088,7 @@ const SalesOfficer = () => {
             <div>
               <p className="text-xs font-bold text-orange-700 dark:text-orange-400">Your dedicated account manager</p>
               <p className="text-xs text-orange-600/80 dark:text-orange-400/70 mt-0.5">
-                Reach out to your sales officer for campaign strategy, ad approvals, and priority support.
+                Reach out to your sales officer for campaign strategy, Spotlight approvals, and priority support.
               </p>
             </div>
           </div>

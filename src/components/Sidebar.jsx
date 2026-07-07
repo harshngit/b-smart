@@ -511,7 +511,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const navItems = isVendor ? [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/vendor/dashboard' },
     { icon: User, label: 'Vendor Profile', path: '/vendor/profile' },
-    { icon: Target, label: 'Ads Management', path: '/vendor/ads-management' },
+    { icon: Target, label: 'Spotlights', path: '/vendor/ads-management' },
     { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
     { icon: FileText, label: 'Reports & Analytics', path: '/vendor/analytics' },
     { icon: CreditCard, label: 'Coins & Billing', path: '/vendor/billing' },
