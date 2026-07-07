@@ -504,8 +504,8 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const searchTabs = [
     { key: 'all',    label: 'All' },
     { key: 'people', label: `People${sidebarSearchQuery ? ` (${results.users.length})` : ''}` },
-    { key: 'posts',  label: `Posts${sidebarSearchQuery ? ` (${results.posts.length})` : ''}` },
-    { key: 'reels',  label: `Reels${sidebarSearchQuery ? ` (${results.reels.length})` : ''}` },
+    { key: 'posts',  label: `Moments${sidebarSearchQuery ? ` (${results.posts.length})` : ''}` },
+    { key: 'reels',  label: `bSparks${sidebarSearchQuery ? ` (${results.reels.length})` : ''}` },
   ];
 
   const navItems = isVendor ? [
@@ -520,10 +520,10 @@ const Sidebar = ({ onOpenCreateModal }) => {
     { icon: Home, label: 'Home', path: '/' },
     { icon: Search, label: 'Search', path: null, action: openSidebarSearch },
     { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
-    { icon: Clapperboard, label: 'Reels', path: '/reels' },
-    { icon: ShoppingBag, label: 'Promote', path: '/promote' },
+    { icon: Clapperboard, label: 'bSparks', path: '/reels' },
+    { icon: ShoppingBag, label: 'Boosts', path: '/promote' },
     { icon: MessageCircle, label: 'Messages', path: '/messages' },
-    { icon: Target, label: 'Ads', path: '/ads' },
+    { icon: Target, label: 'Spotlights', path: '/ads' },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
 
@@ -599,26 +599,26 @@ const Sidebar = ({ onOpenCreateModal }) => {
                             onClick={() => { onOpenCreateModal('post'); setIsCreateDropdownOpen(false); }}
                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                           >
-                            <Image size={18} /> Create Post
+                            <Image size={18} /> Create Moment
                           </button>
                           <button
                             onClick={() => { onOpenCreateModal('tweet'); setIsCreateDropdownOpen(false); }}
                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                           >
-                            <MessageCircle size={18} /> Create Tweet
+                            <MessageCircle size={18} /> Create Buzz
                           </button>
                           <button
                             onClick={() => { onOpenCreateModal('reel'); setIsCreateDropdownOpen(false); }}
                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                           >
-                            <Video size={18} /> Upload Reel
+                            <Video size={18} /> Upload bSpark
                           </button>
                           <button
                             onClick={() => { onOpenCreateModal('promote'); setIsCreateDropdownOpen(false); }}
                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200"
                           >
                             <ShoppingBag size={18} className="text-green-500" />
-                            <span>Promote Reel</span>
+                            <span>Boost Reel</span>
                             <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">NEW</span>
                           </button>
                         </>
@@ -981,7 +981,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
               {/* ── Posts — 2-col grid ── */}
               {filteredPosts.length > 0 && (
                 <div className="pt-1">
-                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Posts · {results.posts.length}</p>
+                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Moments · {results.posts.length}</p>
                   <div className="grid grid-cols-2 gap-1.5 px-3">
                     {filteredPosts.map(post => (
                       <SidebarPostCard key={post._id} post={post} onClick={setSidebarSelectedPost} />
@@ -993,7 +993,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
               {/* ── Reels — 2-col grid with hover-to-play ── */}
               {filteredReels.length > 0 && (
                 <div className="pt-1">
-                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Reels · {results.reels.length}</p>
+                  <p className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">bSparks · {results.reels.length}</p>
                   <div className="grid grid-cols-2 gap-1.5 px-3">
                     {filteredReels.map(reel => (
                       <SidebarReelCard key={reel._id} reel={reel} onClick={(r) => navigate(`/reels?id=${r._id}`)} />

@@ -95,7 +95,7 @@ const TABS = [
   { id: 'About', label: 'About', icon: Info },
   { id: 'Products', label: 'Products', icon: Package },
   { id: 'Gallery', label: 'Gallery', icon: Images },
-  { id: 'Ads', label: 'Ads', icon: Megaphone },
+  { id: 'Ads', label: 'Spotlights', icon: Megaphone },
   { id: 'Events', label: 'Events', icon: Calendar },
   { id: 'Locations', label: 'Locations', icon: MapPinned },
   { id: 'Contact', label: 'Contact', icon: Contact },
@@ -384,8 +384,8 @@ export default function VendorPublicProfile() {
           <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
             <Film size={28} className="text-gray-300 dark:text-gray-600" />
           </div>
-          <p className="text-sm font-medium text-gray-400">No ads yet</p>
-          <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">This vendor hasn't posted any ads</p>
+          <p className="text-sm font-medium text-gray-400">No Spotlights yet</p>
+          <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">This vendor hasn't posted any Spotlights</p>
         </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
@@ -681,7 +681,7 @@ export default function VendorPublicProfile() {
                 {[
                   { count: followerCount, label: 'followers' },
                   { count: followingCount, label: 'following' },
-                  { count: adCount, label: 'ads' },
+                  { count: adCount, label: 'spotlights' },
                 ].map((stat) => (
                   <div key={stat.label} className="flex items-center gap-1">
                     <span className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white tabular-nums">{fmt(stat.count)}</span>

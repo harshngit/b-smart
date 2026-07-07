@@ -194,17 +194,63 @@ const DesktopFollowButton = ({ targetUserId }) => {
 };
 
 // ── Location Selector ────────────────────────────────────────────────────────
-const LocationSelector = ({ className = "" }) => (
-  <div className={`flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg cursor-pointer group hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors w-full ${className}`}>
-    <div className="flex items-center gap-2 flex-1 min-w-0">
-      <div className="p-1.5 bg-white dark:bg-black rounded-full shadow-sm shrink-0">
-        <MapPin size={14} className="text-red-500" />
+const LocationSelector = ({ className = "" }) => {
+  const [locationText, setLocationText] = useState('Detecting location...');
+  const [locLoading, setLocLoading] = useState(true);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationText('Location unavailable');
+      setLocLoading(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await res.json();
+          const addr = data.address || {};
+          const name =
+            addr.suburb ||
+            addr.neighbourhood ||
+            addr.city_district ||
+            addr.town ||
+            addr.city ||
+            addr.county ||
+            (data.display_name || '').split(',')[0].trim() ||
+            'Unknown location';
+          setLocationText(name);
+        } catch {
+          setLocationText('Location unavailable');
+        } finally {
+          setLocLoading(false);
+        }
+      },
+      () => {
+        setLocationText('Location unavailable');
+        setLocLoading(false);
+      },
+      { timeout: 8000, maximumAge: 300000 }
+    );
+  }, []);
+
+  return (
+    <div className={`flex items-center justify-between gap-2 bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg cursor-pointer group hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors w-full ${className}`}>
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="p-1.5 bg-white dark:bg-black rounded-full shadow-sm shrink-0">
+          <MapPin size={14} className={locLoading ? 'text-gray-400 animate-pulse' : 'text-red-500'} />
+        </div>
+        <span className={`text-sm font-bold truncate ${locLoading ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+          {locationText}
+        </span>
       </div>
-      <span className="text-sm font-bold text-gray-900 dark:text-white truncate">Plat No.20, 2nd Floor, Shivaram Nivas, Sri...</span>
+      <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
     </div>
-    <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
-  </div>
-);
+  );
+};
 
 // ── Location Bar — logo + search + location ───────────────────────────────────
 const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults }) => {
@@ -387,7 +433,7 @@ const MobileSuggestedReelsCard = ({ reels }) => {
   return (
     <div className="bg-white dark:bg-[#0d0d0f] border-b border-t border-gray-200 dark:border-gray-800 py-3 mb-0 lg:hidden">
       <div className="flex items-center justify-between px-4 mb-3">
-        <span className="text-sm font-bold text-gray-900 dark:text-white">Suggested reels</span>
+        <span className="text-sm font-bold text-gray-900 dark:text-white">Suggested bSparks</span>
         <button type="button" className="p-1 rounded-full text-gray-400 dark:text-white/80">
           <MoreHorizontal size={18} />
         </button>
@@ -863,7 +909,7 @@ const Home = () => {
               {[
                 { key: 'all', label: 'All' },
                 { key: 'following', label: 'Following' },
-                { key: 'tweets', label: 'Tweets' },
+                { key: 'tweets', label: 'Buzz' },
               ].map((tab) => (
                 <button
                   key={tab.key}

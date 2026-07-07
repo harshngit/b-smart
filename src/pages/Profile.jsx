@@ -1149,13 +1149,13 @@ const Profile = () => {
     const vendorValidated = isVendor ? Boolean(profileUser?.validated ?? vendorInfo?.validated) : false;
 
     const tabConfig = isVendor
-        ? [{ key: 'ads', label: 'Ads', icon: <Megaphone size={22} /> }]
+        ? [{ key: 'ads', label: 'Spotlights', icon: <Megaphone size={22} /> }]
         : [
             { key: 'all',            label: 'All',       icon: <Grid size={22} /> },
-            { key: 'posts',          label: 'Posts',     icon: <Image size={22} /> },
-            { key: 'reels',          label: 'Reels',     icon: <Video size={22} /> },
-            { key: 'tweets',         label: 'Tweets',    icon: <MessageCircle size={22} /> },
-            { key: 'promote_reels',  label: 'Promoted',  icon: <Megaphone size={22} /> },
+            { key: 'posts',          label: 'Moments',   icon: <Image size={22} /> },
+            { key: 'reels',          label: 'bSparks',   icon: <Video size={22} /> },
+            { key: 'tweets',         label: 'Buzz',      icon: <MessageCircle size={22} /> },
+            { key: 'promote_reels',  label: 'Boosts',    icon: <Megaphone size={22} /> },
           ];
 
     // ── Blocked Content Wall ──────────────────────────────────────────────────

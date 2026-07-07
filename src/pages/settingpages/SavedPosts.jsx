@@ -40,10 +40,10 @@ const getItemType = (item) => {
 
 const TABS = [
   { key: 'all', label: 'All', icon: Grid },
-  { key: 'post', label: 'Posts', icon: Image },
-  { key: 'reel', label: 'Reels', icon: Film },
-  { key: 'ad', label: 'Ads', icon: Megaphone },
-  { key: 'promote_reel', label: 'Promoted', icon: ShoppingBag },
+  { key: 'post', label: 'Moments', icon: Image },
+  { key: 'reel', label: 'bSparks', icon: Film },
+  { key: 'ad', label: 'Spotlights', icon: Megaphone },
+  { key: 'promote_reel', label: 'Boosts', icon: ShoppingBag },
 ];
 
 const SavedPosts = () => {
@@ -179,7 +179,7 @@ const SavedPosts = () => {
             </div>
             <p className="text-base font-semibold text-gray-900 dark:text-white">No saved items</p>
             <p className="text-sm text-gray-400">
-              {activeTab === 'all' ? 'Items you save will appear here' : `No saved ${activeTab.replace('_', ' ')}s yet`}
+              {activeTab === 'all' ? 'Items you save will appear here' : `No saved ${{ post: 'Moments', reel: 'bSparks', ad: 'Spotlights', promote_reel: 'Boosts' }[activeTab] || activeTab}s yet`}
             </p>
           </div>
         ) : (

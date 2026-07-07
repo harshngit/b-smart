@@ -41,7 +41,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: 'Posts & Comments',
+    title: 'Moments & Comments',
     rows: [
       { key: 'likes', label: 'Likes', sublabel: 'Someone likes your post or comment', icon: Heart, iconBg: 'bg-red-50 dark:bg-red-900/20', iconColor: 'text-red-500' },
       { key: 'comments', label: 'Comments', sublabel: 'Someone comments on your post', icon: MessageCircle, iconBg: 'bg-blue-50 dark:bg-blue-900/20', iconColor: 'text-blue-500' },

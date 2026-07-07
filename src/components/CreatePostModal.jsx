@@ -1918,7 +1918,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
           {step === 'select' ? (
             <>
               <div className="w-10"></div>
-              <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'tweet' ? 'tweet' : postType === 'reel' ? 'reel' : postType === 'ad' ? 'ad' : postType === 'promote' ? 'promote' : 'post'}</h2>
+              <h2 className="font-semibold text-base text-center dark:text-white flex-1">Create new {postType === 'tweet' ? 'Buzz' : postType === 'reel' ? 'bSpark' : postType === 'ad' ? 'ad' : postType === 'promote' ? 'Boost' : 'Moment'}</h2>
               <button onClick={handleClose} className="text-black dark:text-white md:hidden"><X size={24} /></button>
               <div className="w-10 md:block hidden"></div>
             </>
@@ -1942,7 +1942,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                 </button>
               </div>
               <h2 className="font-semibold text-base text-center dark:text-white flex-1">
-                {step === 'crop' ? 'Step 1 · Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Step 2 · Edit' : step === 'promoteProducts' ? 'Step 3 · Products' : step === 'adDetails' ? 'Step 3 · Ad Details' : step === 'share' && postType === 'ad' ? 'Ad Setup' : step === 'share' && postType === 'promote' ? 'Step 4 · Promote Details' : 'Share'}
+                {step === 'crop' ? 'Step 1 · Crop' : step === 'cover' ? 'Cover' : step === 'edit' ? 'Step 2 · Edit' : step === 'promoteProducts' ? 'Step 3 · Products' : step === 'adDetails' ? 'Step 3 · Ad Details' : step === 'share' && postType === 'ad' ? 'Ad Setup' : step === 'share' && postType === 'promote' ? 'Step 4 · Boost Details' : 'Share'}
               </h2>
               <div className="w-auto min-w-[140px] flex justify-end items-center gap-2">
                   {step === 'share' && postType === 'ad' && (
@@ -1996,7 +1996,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                       className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'post' ? 'bg-white/20' : 'hover:bg-white/10'}`}
                     >
                       <Image size={18} className="text-purple-400" />
-                      <span className="text-xs font-semibold">Post</span>
+                      <span className="text-xs font-semibold">Moment</span>
                     </button>
                     <button
                       onClick={() => {
@@ -2005,21 +2005,21 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                       }}
                       className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'tweet' ? 'bg-white/20' : 'hover:bg-white/10'}`}
                     >
-                      <Image size={18} /> Tweet
+                      <Image size={18} /> Buzz
                     </button>
                     <button
                       onClick={() => setPostType('reel')}
                       className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'reel' ? 'bg-white/20' : 'hover:bg-white/10'}`}
                     >
                       <Video size={18} className="text-pink-400" />
-                      <span className="text-xs font-semibold">Reel</span>
+                      <span className="text-xs font-semibold">bSpark</span>
                     </button>
                     <button
                       onClick={() => setPostType('promote')}
                       className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'promote' ? 'bg-white/20' : 'hover:bg-white/10'}`}
                     >
                       <ShoppingBag size={18} className="text-green-400" />
-                      <span className="text-xs font-semibold">Promote</span>
+                      <span className="text-xs font-semibold">Boost</span>
                     </button>
                   </>
                 )}
@@ -2930,7 +2930,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                       <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Ad Type <span className="text-blue-500">*</span></label>
                       <div className="grid grid-cols-2 gap-3">
                         {[
-                          { value: 'promote', label: 'Promote', icon: '🚀', desc: 'Boost your brand reach' },
+                          { value: 'promote', label: 'Boost', icon: '🚀', desc: 'Boost your brand reach' },
                           { value: 'general', label: 'General', icon: '📋', desc: 'Standard advertisement' },
                         ].map(t => (
                           <button key={t.value} onClick={() => { setAdType(t.value); if (fieldErrors.adType) setFieldErrors(p => ({ ...p, adType: undefined })); }}
@@ -3176,7 +3176,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               <button onClick={handleClose} className="text-gray-900 dark:text-white p-1">
                 <X size={22} strokeWidth={2.2} />
               </button>
-              <h2 className="text-[16px] font-semibold tracking-tight dark:text-white">New Tweet</h2>
+              <h2 className="text-[16px] font-semibold tracking-tight dark:text-white">New Buzz</h2>
               <button
                 type="button"
                 onClick={() => handleNextStep('publish')}
@@ -4147,27 +4147,27 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               <div className="flex flex-col items-center gap-1.5 text-center">
                 <h3 className="text-xl font-bold text-white">
                   {postType === 'tweet'
-                    ? 'Tweet Shared! 🎉'
+                    ? 'Buzz Shared! 🎉'
                     : postType === 'reel'
-                    ? 'Reel Published! 🎉'
+                    ? 'bSpark Published! 🎉'
                     : postType === 'promote'
-                    ? 'Promote Reel Published! 🎉'
+                    ? 'Boost Published! 🎉'
                     : postType === 'ad'
                     ? adSubmitMode === 'draft'
                       ? 'Ad Saved as Draft'
                       : 'Ad Published! 🎉'
-                    : 'Post Shared! 🎉'}
+                    : 'Moment Shared! 🎉'}
                 </h3>
                 <p className="text-sm text-white/50">
                   {postType === 'tweet'
-                    ? 'Your tweet is now live'
+                    ? 'Your Buzz is now live'
                     : postType === 'reel'
-                    ? 'Your reel is now live'
+                    ? 'Your bSpark is now live'
                     : postType === 'ad'
                     ? adSubmitMode === 'draft'
                       ? 'Your ad has been saved and can be published later'
                       : 'Your ad is now submitted for review'
-                    : 'Your post has been shared'}
+                    : 'Your Moment has been shared'}
                 </p>
               </div>
               <div className="w-full h-px" style={{ background: 'linear-gradient(90deg,transparent,#d62976,transparent)' }} />

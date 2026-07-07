@@ -1056,7 +1056,7 @@ const Promote = () => {
                 
                 {!searchOpen && (
                   <div className="absolute left-1/2 -translate-x-1/2 text-gray-900 dark:text-white font-bold text-sm md:text-base">
-                    Promote
+                    Boosts
                   </div>
                 )}
 
@@ -1162,7 +1162,7 @@ const Promote = () => {
             </button>
             <div className="flex items-center gap-1.5">
               <ShoppingBag size={16} className="text-white" />
-              <span className="font-bold text-white text-sm">Promote</span>
+              <span className="font-bold text-white text-sm">Boosts</span>
             </div>
           </div>
 

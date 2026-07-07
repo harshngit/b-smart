@@ -36,7 +36,7 @@ const BottomNav = ({ onOpenCreateModal }) => {
   // Vendor: 3 left | FAB center | 3 right
   const vendorNav = [
     { icon: LayoutDashboard, path: '/vendor/dashboard',      label: 'Dashboard' },
-    { icon: Target,          path: '/vendor/ads-management', label: 'Ads'       },
+    { icon: Target,          path: '/vendor/ads-management', label: 'Spotlights' },
     { icon: FileText,        path: '/vendor/analytics',      label: 'Analytics' },
     null,
     { icon: Coins,           path: '/vendor/billing',  label: 'Coins'     },
@@ -47,10 +47,10 @@ const BottomNav = ({ onOpenCreateModal }) => {
   // Member: 3 left | FAB center | 3 right
   const memberNav = [
     { icon: Home,          path: '/',         label: 'Home'     },
-    { icon: Target,        path: '/ads',      label: 'Ads'      },
-    { icon: Clapperboard,  path: '/reels',    label: 'Reels'    },
+    { icon: Target,        path: '/ads',      label: 'Spotlights' },
+    { icon: Clapperboard,  path: '/reels',    label: 'bSparks'    },
     null,
-    { icon: Megaphone,     path: '/promote',  label: 'Promote'  },
+    { icon: Megaphone,     path: '/promote',  label: 'Boosts'     },
     { icon: MessageCircle, path: '/messages', label: 'Messages' },
     { icon: Search,        path: '/search',   label: 'Search'   },
   ];

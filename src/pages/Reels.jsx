@@ -992,7 +992,7 @@ const Reels = () => {
           </button>
 
           {!searchOpen && (
-            <div className="absolute left-1/2 -translate-x-1/2 text-gray-900 dark:text-white font-bold text-sm md:text-base">Reels</div>
+            <div className="absolute left-1/2 -translate-x-1/2 text-gray-900 dark:text-white font-bold text-sm md:text-base">bSparks</div>
           )}
 
           <div ref={searchContainerRef} className={`transition-all duration-300 ease-in-out shrink-0 ${searchOpen ? 'flex-1 min-w-0' : 'ml-auto'}`}>

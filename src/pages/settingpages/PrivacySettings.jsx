@@ -26,8 +26,8 @@ const VIS_OPTIONS = [
 
 const VISIBILITY_FIELDS = [
   { key: 'profile',        label: 'Profile' },
-  { key: 'posts',          label: 'Posts' },
-  { key: 'stories',        label: 'Stories' },
+  { key: 'posts',          label: 'Moments' },
+  { key: 'stories',        label: 'Glimpses' },
   { key: 'pulse',          label: 'Pulse' },
   { key: 'followers_list', label: 'Followers List' },
   { key: 'following_list', label: 'Following List' },

@@ -1620,7 +1620,7 @@ const Ads = ({ feedMode = 'user' }) => {
                   {/* Ads */}
                   {searchResults.filter(r => r._type === 'ad').length > 0 && (
                     <div>
-                      <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Ads</div>
+                      <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50 dark:border-gray-800">Spotlights</div>
                       {searchResults.filter(r => r._type === 'ad').map(adItem => {
                         const adUser = adItem.user_id || adItem.vendor_id || {};
                         const mediaItem = adItem.media?.[0];
@@ -1852,7 +1852,7 @@ const Ads = ({ feedMode = 'user' }) => {
                   onClick={() => setActiveCategory('All')}
                   className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black rounded-full text-sm font-semibold hover:opacity-80 transition-opacity active:scale-95"
                 >
-                  View All Ads
+                  View All Spotlights
                 </button>
               )}
             </div>

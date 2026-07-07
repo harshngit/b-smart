@@ -316,7 +316,7 @@ const VendorSignup = () => {
 
           <div className="mb-6">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">Create Vendor Account</h2>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Step {step} of 2 · Set up your business profile to run ads.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Step {step} of 2 · Set up your business profile to run Spotlights.</p>
           </div>
 
           <div className="mb-6">
