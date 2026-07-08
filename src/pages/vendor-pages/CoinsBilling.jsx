@@ -1422,44 +1422,78 @@ export default function CoinsBilling() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full text-left table-fixed">
+                <colgroup>
+                  <col style={{ width: "36%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "15%" }} />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                    {["Transaction", "Amount", "Direction", "Status", "Date"].map(h => (
-                      <th key={h} className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">{h}</th>
+                    {["Transaction", "Amount", "Coins", "Direction", "Status", "Date"].map(h => (
+                      <th key={h} className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                  {transactions.slice((txPage - 1) * LIMIT, txPage * LIMIT).map(tx => (
-                    <tr key={tx._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${tx.direction === "credit" ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"}`}>
-                            {tx.direction === "credit"
-                              ? <ArrowDownLeft className="w-4 h-4 text-green-600 dark:text-green-400" />
-                              : <ArrowUpRight className="w-4 h-4 text-red-600 dark:text-red-400" />}
+                  {transactions.slice((txPage - 1) * LIMIT, txPage * LIMIT).map(tx => {
+                    const rupeesAmt = tx.recharge_amount ?? tx.amount_paid ?? tx.meta?.recharge_amount ?? null;
+                    return (
+                      <tr key={tx._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+
+                        {/* Transaction — fixed width, text truncates */}
+                        <td className="px-4 py-3.5 overflow-hidden">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${tx.direction === "credit" ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"}`}>
+                              {tx.direction === "credit"
+                                ? <ArrowDownLeft className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                : <ArrowUpRight className="w-4 h-4 text-red-600 dark:text-red-400" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold text-gray-900 dark:text-white leading-tight truncate">
+                                {tx.label || tx.type || "Transaction"}
+                              </div>
+                              {tx.description && (
+                                <div className="text-xs text-gray-400 mt-0.5 truncate">{tx.description}</div>
+                              )}
+                              {tx.ad?.title && (
+                                <div className="text-xs text-pink-500 mt-0.5 truncate">📢 {tx.ad.title}</div>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">{tx.label || tx.type || "Transaction"}</div>
-                            {tx.description && <div className="text-xs text-gray-400 mt-0.5 max-w-[200px] truncate">{tx.description}</div>}
-                            {tx.ad?.title && <div className="text-xs text-pink-500 mt-0.5">📢 {tx.ad.title}</div>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className={`text-sm font-bold flex items-center gap-0.5 ${tx.direction === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                          {tx.direction === "credit" ? "+" : "−"}<CoinIcon size={13} />{fmt(tx.amount)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5"><DirectionBadge direction={tx.direction} /></td>
-                      <td className="px-5 py-3.5"><StatusBadge status={tx.status} /></td>
-                      <td className="px-5 py-3.5">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(tx.created_at)}</div>
-                        <div className="text-[10px] text-gray-400 dark:text-gray-500">{timeAgo(tx.created_at)}</div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+
+                        {/* Amount in ₹ */}
+                        <td className="px-4 py-3.5">
+              
+                             <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Rs. {tx.amount}</span>
+                            
+                        </td>
+
+                        {/* Coins credited / debited */}
+                        <td className="px-4 py-3.5">
+                          <span className={`text-sm font-bold flex items-center gap-0.5 ${tx.direction === "credit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {tx.direction === "credit" ? "+" : "−"}<CoinIcon size={13} />{fmt(tx.amount)}
+                          </span>
+                        </td>
+
+                        {/* Direction */}
+                        <td className="px-4 py-3.5"><DirectionBadge direction={tx.direction} /></td>
+
+                        {/* Status */}
+                        <td className="px-4 py-3.5"><StatusBadge status={tx.status} /></td>
+
+                        {/* Date */}
+                        <td className="px-4 py-3.5">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{fmtDate(tx.created_at)}</div>
+                          <div className="text-[10px] text-gray-400 dark:text-gray-500">{timeAgo(tx.created_at)}</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

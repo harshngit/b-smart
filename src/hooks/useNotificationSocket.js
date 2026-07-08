@@ -16,23 +16,26 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../lib/api";
 import { emitFollowStatusChanged } from "../services/followService";
 
-const WS_BASE      = (import.meta.env.VITE_WS_URL || "wss://api.bebsmart.in");
+const WS_BASE               = (import.meta.env.VITE_WS_URL || "wss://api.bebsmart.in");
 const ENABLE_NOTIFICATION_WS = import.meta.env.VITE_ENABLE_NOTIFICATION_WS === "true";
-const POLL_INTERVAL = 30_000;   // poll every 30s when WS is down
-const RECONNECT_MS  = 5_000;    // retry WS after 5s
+const POLL_INTERVAL          = 30_000;
+const RECONNECT_MS           = 5_000;
 
-export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } = {}) {
+export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "", filter = "" } = {}) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount,   setUnreadCount]   = useState(0);
   const [total,         setTotal]         = useState(0);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState("");
-  const [wsStatus,      setWsStatus]      = useState("connecting"); // connecting | open | closed | polling
+  const [wsStatus,      setWsStatus]      = useState("connecting");
 
-  const wsRef        = useRef(null);
-  const pollRef      = useRef(null);
-  const mountedRef   = useRef(true);
-  const reconnectRef = useRef(null);
+  const wsRef         = useRef(null);
+  const pollRef       = useRef(null);
+  const mountedRef    = useRef(true);
+  const reconnectRef  = useRef(null);
+  // Always holds the latest fetchRest — lets the polling interval stay current
+  // even when filter/page/limit change without restarting the interval.
+  const fetchRestRef  = useRef(null);
 
   // ── Fetch via REST ─────────────────────────────────────────────────────────
   const fetchRest = useCallback(async () => {
@@ -41,8 +44,16 @@ export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } 
       setLoading(true);
       setError("");
       const params = { page, limit };
-      if (typeFilter === "unread")                    params.isRead = false;
-      else if (typeFilter && typeFilter !== "all")    params.type   = typeFilter;
+
+      if (filter && filter !== "all") {
+        // New vendor API: pass filter= query param directly
+        // e.g. ?filter=approvals, ?filter=engagement, ?filter=unread …
+        params.filter = filter;
+      } else if (typeFilter === "unread") {
+        params.isRead = false;
+      } else if (typeFilter && typeFilter !== "all") {
+        params.type = typeFilter;
+      }
 
       const [listRes, countRes] = await Promise.all([
         api.get("/notifications", { params }),
@@ -50,7 +61,7 @@ export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } 
       ]);
 
       if (!mountedRef.current) return;
-      const raw = Array.isArray(listRes.data) ? listRes.data
+      const raw  = Array.isArray(listRes.data) ? listRes.data
         : listRes.data?.notifications || [];
       const data = typeFilter === "unread" ? raw.filter(n => !n.isRead) : raw;
       setNotifications(data);
@@ -62,18 +73,25 @@ export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } 
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [page, limit, typeFilter]);
+  }, [page, limit, typeFilter, filter]);
 
-  // ── Start polling fallback ─────────────────────────────────────────────────
-  const startPolling = useCallback(() => {
-    if (pollRef.current) return;
-    setWsStatus("polling");
-    pollRef.current = setInterval(fetchRest, POLL_INTERVAL);
-  }, [fetchRest]);
+  // Keep the ref in sync — this runs synchronously before effects, so
+  // the polling interval always calls the latest version.
+  fetchRestRef.current = fetchRest;
 
+  // ── Polling fallback ───────────────────────────────────────────────────────
+  // startPolling / connectWs are stable (no fetchRest in deps) because they
+  // call fetchRestRef.current() instead of a captured closure copy.
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }, []);
+
+  const startPolling = useCallback(() => {
+    if (pollRef.current) return;
+    setWsStatus("polling");
+    // Use the ref so every tick picks up the current filter/page.
+    pollRef.current = setInterval(() => fetchRestRef.current(), POLL_INTERVAL);
+  }, []);                          // stable — no fetchRest dep needed
 
   // ── Connect WebSocket ──────────────────────────────────────────────────────
   const connectWs = useCallback(() => {
@@ -89,15 +107,13 @@ export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } 
       ws.onopen = () => {
         if (!mountedRef.current) return;
         setWsStatus("open");
-        stopPolling(); // WS is live — no need to poll
+        stopPolling();
       };
 
       ws.onmessage = ({ data }) => {
         if (!mountedRef.current) return;
-        try {
-          const msg = JSON.parse(data);
-          handleWsMessage(msg);
-        } catch { /* ignore malformed */ }
+        try { handleWsMessage(JSON.parse(data)); }
+        catch { /* ignore malformed */ }
       };
 
       ws.onerror = () => { /* handled in onclose */ };
@@ -106,14 +122,13 @@ export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } 
         if (!mountedRef.current) return;
         setWsStatus("closed");
         wsRef.current = null;
-        startPolling();                                          // fallback while reconnecting
-        reconnectRef.current = setTimeout(connectWs, RECONNECT_MS); // retry
+        startPolling();
+        reconnectRef.current = setTimeout(connectWs, RECONNECT_MS);
       };
     } catch {
-      startPolling(); // WebSocket API not available (e.g. old browser)
+      startPolling();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startPolling, stopPolling]);
+  }, [startPolling, stopPolling]);  // both stable → connectWs is stable
 
   // ── Handle incoming WS message ─────────────────────────────────────────────
   const handleWsMessage = (msg) => {
@@ -146,10 +161,10 @@ export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } 
     }
   };
 
-  // ── Mount / unmount lifecycle ──────────────────────────────────────────────
+  // ── Mount / unmount ────────────────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
-    fetchRest();
+    fetchRestRef.current();   // initial load via ref (always current)
     connectWs();
     return () => {
       mountedRef.current = false;
@@ -157,9 +172,9 @@ export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } 
       stopPolling();
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [connectWs, stopPolling]); // stable deps — runs only on mount/unmount
 
-  // Re-fetch when pagination or filter changes
+  // Re-fetch when page, limit, typeFilter, or filter change
   useEffect(() => { fetchRest(); }, [fetchRest]);
 
   // ── CRUD actions (optimistic) ──────────────────────────────────────────────
@@ -167,24 +182,26 @@ export function useNotificationSocket({ limit = 20, page = 1, typeFilter = "" } 
     setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
     setUnreadCount(c => Math.max(0, c - 1));
     try { await api.patch(`/notifications/${id}/read`); }
-    catch { fetchRest(); }
-  }, [fetchRest]);
+    catch { fetchRestRef.current(); }
+  }, []);
 
   const markAllRead = useCallback(async () => {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     setUnreadCount(0);
     try { await api.patch("/notifications/mark-all-read"); }
-    catch { fetchRest(); }
-  }, [fetchRest]);
+    catch { fetchRestRef.current(); }
+  }, []);
 
   const deleteNotif = useCallback(async (id) => {
-    const target = notifications.find(n => n._id === id);
-    setNotifications(prev => prev.filter(n => n._id !== id));
+    setNotifications(prev => {
+      const target = prev.find(n => n._id === id);
+      if (target && !target.isRead) setUnreadCount(c => Math.max(0, c - 1));
+      return prev.filter(n => n._id !== id);
+    });
     setTotal(t => Math.max(0, t - 1));
-    if (target && !target.isRead) setUnreadCount(c => Math.max(0, c - 1));
     try { await api.delete(`/notifications/${id}`); }
-    catch { fetchRest(); }
-  }, [notifications, fetchRest]);
+    catch { fetchRestRef.current(); }
+  }, []);
 
   return {
     notifications, unreadCount, total,
