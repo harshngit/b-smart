@@ -3,7 +3,7 @@ import {
   ArrowLeft, ChevronDown, SlidersHorizontal, ArrowUpRight, ShoppingCart,
   CheckCircle2, User, Mail, Phone, Building2, Globe, Coins,
   TrendingUp, TrendingDown, Heart, Eye, MessageCircle, Bookmark,
-  RefreshCw, Loader2, AlertCircle, Sparkles, Wallet
+  RefreshCw, Loader2, AlertCircle, Sparkles, Wallet, Gift
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -246,6 +246,23 @@ const WalletDetails = () => {
             <StatPill label="Transactions"   value={totalTx}                     positive={null}  />
           </div>
         </div>
+
+        {/* ── Redeem Gift Cards button ── */}
+        <button
+          onClick={() => navigate('/gift-cards')}
+          className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border border-orange-200 dark:border-orange-500/20 bg-white dark:bg-[#0f0f0f] hover:bg-orange-50 dark:hover:bg-orange-500/5 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-500/15 flex items-center justify-center flex-shrink-0">
+              <Gift size={18} className="text-orange-500" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">Redeem Gift Cards</p>
+              <p className="text-xs text-gray-400 dark:text-white/40 mt-0.5">Use bCoins to get Amazon, Flipkart & more</p>
+            </div>
+          </div>
+          <ArrowUpRight size={16} className="text-orange-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform flex-shrink-0" />
+        </button>
 
         {/* ── Error banner ── */}
         {error && (
