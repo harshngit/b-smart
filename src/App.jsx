@@ -24,6 +24,7 @@ import VerifyOtp from './pages/VerifyOtp';
 import EditProfile from './pages/EditProfile';
 import WalletDetails from './pages/WalletDetails';
 import GiftCards from './pages/GiftCards';
+import GiftCardOrders from './pages/GiftCardOrders';
 import MobilePostDetail from './pages/MobilePostDetail';
 import MobileAdsDetail from './pages/MobileAdsDetail';
 import MobilePromoteDetail from './pages/MobilePromoteDetail';
@@ -138,6 +139,7 @@ function App() {
             <Route path="/edit-profile"     element={<EditProfile />} />
             <Route path="/wallet"           element={<WalletDetails />} />
             <Route path="/gift-cards"       element={<GiftCards />} />
+            <Route path="/gift-card-orders" element={<GiftCardOrders />} />
             <Route path="/settings" element={<Settings />}>
               <Route path="account"        element={<AccountSettings />} />
               <Route path="privacy"        element={<PrivacySettings />} />

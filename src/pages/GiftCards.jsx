@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ArrowLeft, Search, X, Loader2, AlertCircle, Gift,
-  Coins, ChevronRight, CheckCircle2, Info, ShoppingBag
+  Coins, ChevronRight, CheckCircle2, Info, ShoppingBag,
+  Check, Bell, Mail, MessageCircle, History,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchMe } from '../store/authSlice';
 import api from '../lib/api';
 
 // ─── Fixed categories ─────────────────────────────────────────────────────────
@@ -42,16 +44,185 @@ const DenomChip = ({ denom, selected, onSelect }) => (
   </button>
 );
 
+// ─── Redemption success screen ────────────────────────────────────────────────
+const SUCCESS_ANIM_CSS = `
+  @keyframes confetti-shoot {
+    0%   { transform: translate(0,0) scale(0) rotate(0deg); opacity: 1; }
+    70%  { opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) scale(1.2) rotate(var(--rot)); opacity: 0; }
+  }
+  @keyframes confetti-star {
+    0%   { transform: translate(0,0) scale(0); opacity: 1; }
+    60%  { opacity: 0.9; }
+    100% { transform: translate(var(--tx), var(--ty)) scale(0.8); opacity: 0; }
+  }
+  @keyframes check-bounce {
+    0%   { transform: scale(0) rotate(-15deg); opacity: 0; }
+    55%  { transform: scale(1.3) rotate(6deg);  opacity: 1; }
+    75%  { transform: scale(0.88) rotate(-3deg); }
+    90%  { transform: scale(1.08) rotate(1deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  @keyframes ring-expand {
+    0%   { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(2.4); opacity: 0; }
+  }
+  @keyframes ring-expand2 {
+    0%   { transform: scale(1); opacity: 0.4; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+  @keyframes fade-up {
+    0%   { opacity: 0; transform: translateY(14px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slide-up-fade {
+    0%   { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+`;
+
+const CONFETTI_PARTICLES = [
+  { color: '#facc15', shape: 'circle',  tx: '-85px', ty: '-100px', rot:  '45deg', delay: 80  },
+  { color: '#f472b6', shape: 'circle',  tx:  '85px', ty: '-100px', rot: '-30deg', delay: 120 },
+  { color: '#60a5fa', shape: 'rect',    tx: '-120px',ty: '-30px',  rot:  '60deg', delay: 60  },
+  { color: '#34d399', shape: 'rect',    tx:  '120px',ty: '-30px',  rot: '-50deg', delay: 140 },
+  { color: '#a78bfa', shape: 'circle',  tx: '-75px', ty:  '90px',  rot:  '20deg', delay: 100 },
+  { color: '#fb923c', shape: 'circle',  tx:  '75px', ty:  '90px',  rot: '-40deg', delay: 160 },
+  { color: '#f87171', shape: 'rect',    tx:   '5px', ty: '-130px', rot:  '10deg', delay: 90  },
+  { color: '#22d3ee', shape: 'circle',  tx:  '-5px', ty:  '120px', rot: '-15deg', delay: 110 },
+  { color: '#fde047', shape: 'circle',  tx: '-55px', ty: '-120px', rot:  '35deg', delay: 200 },
+  { color: '#e879f9', shape: 'rect',    tx:  '55px', ty: '-115px', rot: '-60deg', delay: 170 },
+  { color: '#4ade80', shape: 'circle',  tx: '-130px',ty:   '50px', rot:  '50deg', delay: 130 },
+  { color: '#f9a8d4', shape: 'circle',  tx:  '130px',ty:   '50px', rot: '-25deg', delay: 150 },
+  { color: '#fbbf24', shape: 'star',    tx:  '-40px',ty: '-140px', rot:  '70deg', delay: 220 },
+  { color: '#818cf8', shape: 'star',    tx:   '40px',ty: '-140px', rot: '-70deg', delay: 190 },
+  { color: '#2dd4bf', shape: 'circle',  tx: '-100px',ty: '-80px',  rot:  '15deg', delay: 75  },
+  { color: '#fb7185', shape: 'circle',  tx:  '100px',ty: '-80px',  rot: '-35deg', delay: 105 },
+];
+
+const SuccessScreen = ({ card, result, onClose, onHistory }) => (
+  <>
+    <style>{SUCCESS_ANIM_CSS}</style>
+    <div className="flex flex-col items-center px-6 pt-10 pb-6 text-center overflow-y-auto flex-1 relative">
+
+      {/* ── Burst origin: all confetti starts here, at the checkmark center ── */}
+      <div className="relative z-10 mb-4" style={{ marginTop: 8 }}>
+
+        {/* Confetti particles */}
+        {CONFETTI_PARTICLES.map((p, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              top: '50%', left: '50%',
+              '--tx': p.tx, '--ty': p.ty, '--rot': p.rot,
+              width: p.shape === 'rect' ? 10 : 9,
+              height: p.shape === 'rect' ? 5 : 9,
+              borderRadius: p.shape === 'circle' ? '50%' : p.shape === 'star' ? '2px' : '2px',
+              background: p.color,
+              marginTop: -4, marginLeft: -4,
+              animation: `confetti-shoot 0.9s ${p.delay}ms cubic-bezier(.22,1,.36,1) both`,
+              pointerEvents: 'none',
+              zIndex: 20,
+            }}
+          />
+        ))}
+
+        {/* Ripple rings behind circle */}
+        <div className="absolute inset-0 rounded-full bg-green-400/40"
+          style={{ animation: 'ring-expand 0.9s 0.25s ease-out forwards' }} />
+        <div className="absolute inset-0 rounded-full bg-green-400/25"
+          style={{ animation: 'ring-expand2 1.1s 0.45s ease-out forwards' }} />
+
+        {/* Checkmark circle */}
+        <div
+          className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow-2xl shadow-green-500/40 relative z-10"
+          style={{ animation: 'check-bounce 0.65s 0.05s cubic-bezier(.22,1,.36,1) both' }}
+        >
+          <Check size={38} strokeWidth={3.5} className="text-white" />
+        </div>
+      </div>
+
+      {/* Title */}
+      <div style={{ animation: 'fade-up 0.45s 0.55s ease both' }}>
+        <h2 className="text-xl font-black text-gray-900 dark:text-white mb-1">Redemption Successful!</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">You have successfully redeemed</p>
+        <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5 mb-5">
+          {card.title}{result.amount ? ` (₹${Number(result.amount).toLocaleString('en-IN')})` : ''}
+        </p>
+      </div>
+
+      {/* Deducted / New Balance */}
+      <div className="w-full mb-5" style={{ animation: 'slide-up-fade 0.45s 0.7s ease both' }}>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-700">
+            <div className="flex flex-col items-center py-4 px-3 bg-gray-50 dark:bg-white/[0.03]">
+              <span className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">Deducted</span>
+              <span className="text-base font-black text-gray-900 dark:text-white leading-tight">
+                {Number(result.deducted).toLocaleString('en-IN')}
+              </span>
+              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold">bCoins</span>
+            </div>
+            <div className="flex flex-col items-center py-4 px-3 bg-gray-50 dark:bg-white/[0.03]">
+              <span className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">New Balance</span>
+              <span className={`text-base font-black leading-tight ${result.newBalance < 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
+                {result.newBalance < 0 ? '-' : ''}{Math.abs(Number(result.newBalance)).toLocaleString('en-IN')}
+              </span>
+              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold">bCoins</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Delivery channels */}
+      <div style={{ animation: 'slide-up-fade 0.45s 0.85s ease both' }} className="mb-6 w-full">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+          Your gift card voucher will be delivered<br />within 2 hours via
+        </p>
+        <div className="flex items-start justify-center gap-8">
+          {[{ Ico: Bell, label: 'Notification' }, { Ico: Mail, label: 'Email' }, { Ico: MessageCircle, label: 'In-App Message' }].map((item) => (
+            <div key={item.label} className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-white/[0.04] flex items-center justify-center shadow-sm">
+                <item.Ico size={20} className="text-gray-600 dark:text-gray-400" />
+              </div>
+              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold leading-tight text-center max-w-[56px]">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTAs */}
+      <div className="w-full" style={{ animation: 'slide-up-fade 0.45s 1s ease both' }}>
+        <button
+          onClick={onHistory}
+          className="w-full py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 mb-3"
+        >
+          <History size={16} />
+          View Redemption History
+        </button>
+        <button onClick={onClose} className="text-sm font-semibold text-orange-500 hover:text-orange-600 transition-colors py-1">
+          Back to Redeem
+        </button>
+      </div>
+
+    </div>
+  </>
+);
+
 // ─── Detail modal — slides up from bottom, slides down on close ───────────────
 const GiftCardDetail = ({ card, balance, onClose }) => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   const [selected,  setSelected]  = useState(card.denominations?.[0] || null);
   const [buying,    setBuying]    = useState(false);
-  const [done,      setDone]      = useState(false);
+  const [result,    setResult]    = useState(null); // null → detail, object → success
   const [errMsg,    setErrMsg]    = useState('');
   const [showTerms, setShowTerms] = useState(false);
-  // animation state: false = hidden (translate-y-full), true = visible (translate-y-0)
   const [visible,   setVisible]   = useState(false);
   const [imgError,  setImgError]  = useState(false);
+  // Track whether a purchase completed — safe to read from any stale closure
+  const purchasedRef = useRef(false);
 
   const canAfford = selected ? balance >= selected.bcoins : false;
 
@@ -61,7 +232,7 @@ const GiftCardDetail = ({ card, balance, onClose }) => {
     return () => cancelAnimationFrame(id);
   }, []);
 
-  // Escape key
+  // Escape key — uses ref so it always sees the latest purchased state
   useEffect(() => {
     const h = (e) => { if (e.key === 'Escape') handleClose(); };
     document.addEventListener('keydown', h);
@@ -69,22 +240,31 @@ const GiftCardDetail = ({ card, balance, onClose }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Slide DOWN then unmount
+  // Slide DOWN — wallet refresh fires AFTER modal is gone, not during success screen
   const handleClose = () => {
     setVisible(false);
-    setTimeout(onClose, 320);
+    setTimeout(() => {
+      onClose();
+      if (purchasedRef.current) dispatch(fetchMe());
+    }, 320);
   };
 
+  // Click Redeem → API → success screen (no Redux dispatch here — nothing touches the modal)
   const handleBuy = async () => {
     if (!selected || !canAfford) return;
     setBuying(true);
     setErrMsg('');
     try {
-      await api.post('/gift-cards/redeem', {
+      const res = await api.post('/gift-card-orders', {
         gift_card_id: card._id,
-        denomination_id: selected._id,
+        bcoins: selected.bcoins,
       });
-      setDone(true);
+      purchasedRef.current = true;
+      setResult({
+        deducted:   selected.bcoins,
+        newBalance: res.data?.new_balance ?? res.data?.wallet?.balance ?? (balance - selected.bcoins),
+        amount:     selected.amount,
+      });
     } catch (e) {
       setErrMsg(e?.response?.data?.message || 'Redemption failed. Please try again.');
     } finally {
@@ -94,19 +274,39 @@ const GiftCardDetail = ({ card, balance, onClose }) => {
 
   const hasImage = card.media?.url && !imgError;
 
+  // ── Inner content — switches to success screen after redemption ──
+  const sheetContent = result ? (
+    <SuccessScreen
+      card={card}
+      result={result}
+      onClose={handleClose}
+      onHistory={() => { handleClose(); setTimeout(() => navigate('/gift-card-orders'), 350); }}
+    />
+  ) : (
+    <>
+      <div className="flex-1 overflow-y-auto px-5 pt-4 pb-2">
+        <ModalBody
+          card={card} selected={selected} setSelected={setSelected}
+          canAfford={canAfford} balance={balance}
+          showTerms={showTerms} setShowTerms={setShowTerms}
+          errMsg={errMsg}
+        />
+      </div>
+      <ModalFooter
+        selected={selected} canAfford={canAfford} buying={buying}
+        onBuy={handleBuy}
+      />
+    </>
+  );
+
   return (
     <>
-      {/* ── Backdrop — fades in/out ── */}
+      {/* ── Backdrop ── */}
       <div
         onClick={handleClose}
         className="fixed inset-0 z-[80] transition-all duration-300"
         style={{ background: visible ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0)', backdropFilter: visible ? 'blur(4px)' : 'none' }}
       />
-
-      {/* ─────────────────────────────────────────────────────────────────────
-          MOBILE / TABLET  →  bottom sheet slides up from bottom
-          DESKTOP (md+)    →  centered two-column dialog
-      ───────────────────────────────────────────────────────────────────── */}
 
       {/* ── Mobile bottom sheet ── */}
       <div
@@ -114,50 +314,27 @@ const GiftCardDetail = ({ card, balance, onClose }) => {
           transition-transform duration-300 ease-out will-change-transform
           ${visible ? 'translate-y-0' : 'translate-y-full'}`}
       >
-        {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
         </div>
 
-        {/* Card image — compact, never empty black */}
-        {hasImage && (
+        {/* Image — only when not on success screen */}
+        {!result && hasImage && (
           <div className="w-full flex-shrink-0 overflow-hidden" style={{ maxHeight: 180 }}>
-            <img
-              src={card.media.url}
-              alt={card.title}
-              onError={() => setImgError(true)}
-              className="w-full object-contain"
-              style={{ maxHeight: 180, background: '#111' }}
-            />
+            <img src={card.media.url} alt={card.title} onError={() => setImgError(true)}
+              className="w-full object-contain" style={{ maxHeight: 180, background: '#111' }} />
           </div>
         )}
 
         {/* Close button */}
-        <button
-          onClick={handleClose}
+        <button onClick={handleClose}
           className={`absolute z-10 w-8 h-8 rounded-full flex items-center justify-center transition-colors
-            ${hasImage
-              ? 'top-5 right-4 bg-black/40 hover:bg-black/60'
-              : 'top-3 right-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+            ${!result && hasImage ? 'top-5 right-4 bg-black/40 hover:bg-black/60' : 'top-3 right-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
         >
-          <X size={14} className={hasImage ? 'text-white' : 'text-gray-600 dark:text-gray-300'} />
+          <X size={14} className={!result && hasImage ? 'text-white' : 'text-gray-600 dark:text-gray-300'} />
         </button>
 
-        {/* Scrollable detail content */}
-        <div className="flex-1 overflow-y-auto px-5 pt-4 pb-2">
-          <ModalBody
-            card={card} selected={selected} setSelected={setSelected}
-            canAfford={canAfford} balance={balance}
-            showTerms={showTerms} setShowTerms={setShowTerms}
-            errMsg={errMsg} done={done}
-          />
-        </div>
-
-        {/* CTA */}
-        <ModalFooter
-          selected={selected} canAfford={canAfford} buying={buying} done={done}
-          onBuy={handleBuy} onClose={handleClose}
-        />
+        {sheetContent}
       </div>
 
       {/* ── Desktop centered dialog ── */}
@@ -168,54 +345,58 @@ const GiftCardDetail = ({ card, balance, onClose }) => {
         style={{ pointerEvents: visible ? 'auto' : 'none' }}
       >
         <div
-          className="relative w-full max-w-3xl bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl flex flex-row max-h-[88vh] overflow-hidden"
+          className={`relative bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl overflow-hidden max-h-[88vh]
+            ${result ? 'w-full max-w-sm flex flex-col' : 'w-full max-w-3xl flex flex-row'}`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Left: image panel */}
-          <div className="w-72 lg:w-80 flex-shrink-0 bg-gray-950 flex items-center justify-center relative rounded-l-2xl overflow-hidden">
-            {hasImage ? (
-              <img
-                src={card.media.url}
-                alt={card.title}
-                onError={() => setImgError(true)}
-                className="w-full h-full object-contain p-4"
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-3 py-12">
-                <Gift size={52} className="text-orange-400" />
-                <span className="text-white/40 text-sm text-center px-4">{card.title}</span>
-              </div>
-            )}
-            {card.vendor && (
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-4">
-                <span className="text-xs font-bold text-orange-400 uppercase tracking-widest">{card.vendor}</span>
-              </div>
-            )}
-          </div>
+          {/* Image panel — only in detail view */}
+          {!result && (
+            <div className="w-72 lg:w-80 flex-shrink-0 bg-gray-950 flex items-center justify-center relative rounded-l-2xl overflow-hidden">
+              {hasImage ? (
+                <img src={card.media.url} alt={card.title} onError={() => setImgError(true)}
+                  className="w-full h-full object-contain p-4" />
+              ) : (
+                <div className="flex flex-col items-center gap-3 py-12">
+                  <Gift size={52} className="text-orange-400" />
+                  <span className="text-white/40 text-sm text-center px-4">{card.title}</span>
+                </div>
+              )}
+              {card.vendor && (
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-4">
+                  <span className="text-xs font-bold text-orange-400 uppercase tracking-widest">{card.vendor}</span>
+                </div>
+              )}
+            </div>
+          )}
 
-          {/* Right: scrollable */}
+          {/* Right / full panel */}
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            {/* Close */}
-            <button
-              onClick={handleClose}
+            <button onClick={handleClose}
               className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
             >
               <X size={14} className="text-gray-600 dark:text-gray-300" />
             </button>
 
-            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-2">
-              <ModalBody
-                card={card} selected={selected} setSelected={setSelected}
-                canAfford={canAfford} balance={balance}
-                showTerms={showTerms} setShowTerms={setShowTerms}
-                errMsg={errMsg} done={done}
+            {result ? (
+              <SuccessScreen
+                card={card} result={result}
+                onClose={handleClose}
+                onHistory={() => { handleClose(); setTimeout(() => navigate('/gift-card-orders'), 350); }}
               />
-            </div>
+            ) : (
+              <>
+                <div className="flex-1 overflow-y-auto px-6 pt-6 pb-2">
+                  <ModalBody
+                    card={card} selected={selected} setSelected={setSelected}
+                    canAfford={canAfford} balance={balance}
+                    showTerms={showTerms} setShowTerms={setShowTerms}
+                    errMsg={errMsg}
+                  />
+                </div>
+                <ModalFooter selected={selected} canAfford={canAfford} buying={buying} onBuy={handleBuy} />
 
-            <ModalFooter
-              selected={selected} canAfford={canAfford} buying={buying} done={done}
-              onBuy={handleBuy} onClose={handleClose}
-            />
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -442,7 +623,7 @@ export default function GiftCards() {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] max-w-[1100px] mx-auto pb-36">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] lg:max-w-[1100px]  lg:mx-auto w-[85%] pb-36">
 
         {/* ── Sticky header ── */}
         <div className="sticky top-0 z-20 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-sm border-b border-gray-100 dark:border-white/[0.06] px-4 pt-3 pb-2">
@@ -497,7 +678,7 @@ export default function GiftCards() {
               placeholder="Search gift cards, brands…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="lg:w-full w-[47%] pl-9 pr-9 py-2.5 rounded-xl bg-gray-100 dark:bg-white/[0.07] border border-transparent focus:border-orange-400 dark:focus:border-orange-500/40 focus:outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/25 transition-all"
+              className="lg:w-full w-[56%] pl-9 pr-9 py-2.5 rounded-xl bg-gray-100 dark:bg-white/[0.07] border border-transparent focus:border-orange-400 dark:focus:border-orange-500/40 focus:outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/25 transition-all"
             />
             {query && (
               <button

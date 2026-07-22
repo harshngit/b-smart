@@ -3,7 +3,7 @@ import {
   ArrowLeft, ChevronDown, SlidersHorizontal, ArrowUpRight, ShoppingCart,
   CheckCircle2, User, Mail, Phone, Building2, Globe, Coins,
   TrendingUp, TrendingDown, Heart, Eye, MessageCircle, Bookmark,
-  RefreshCw, Loader2, AlertCircle, Sparkles, Wallet, Gift
+  RefreshCw, Loader2, AlertCircle, Sparkles, Wallet, Gift, PackageSearch
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -262,6 +262,23 @@ const WalletDetails = () => {
             </div>
           </div>
           <ArrowUpRight size={16} className="text-orange-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform flex-shrink-0" />
+        </button>
+
+        {/* ── My Redemptions button ── */}
+        <button
+          onClick={() => navigate('/gift-card-orders')}
+          className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border border-gray-200 dark:border-white/[0.07] bg-white dark:bg-[#0f0f0f] hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center flex-shrink-0">
+              <PackageSearch size={18} className="text-gray-500 dark:text-gray-400" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">My Redemptions</p>
+              <p className="text-xs text-gray-400 dark:text-white/40 mt-0.5">View your gift card order history</p>
+            </div>
+          </div>
+          <ArrowUpRight size={16} className="text-gray-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform flex-shrink-0" />
         </button>
 
         {/* ── Error banner ── */}
