@@ -387,7 +387,7 @@ export default function GiftCardOrders() {
   const handleCancel = useCallback(async (order) => {
     setIsCancelLoading(true);
     try {
-      await api.patch(`/gift-card-orders/${order._id}`, { status: 'cancelled' });
+      await api.patch(`/gift-card-orders/${order._id}/cancel`, { status: 'cancelled' });
       fetchOrders();
     } catch (e) {
       setError(e?.response?.data?.message || 'Failed to cancel order.');
