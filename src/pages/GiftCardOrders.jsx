@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, Loader2, AlertCircle, Gift, Coins,
   CheckCircle2, Clock, XCircle, RefreshCw, PackageSearch,
+  Eye, X, Copy, Check,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
@@ -28,17 +29,217 @@ const getStatus = (status) =>
     bg: 'bg-gray-50 dark:bg-gray-800', border: 'border-gray-200 dark:border-gray-700', Icon: Clock,
   };
 
-const formatDate = (iso) => {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  }) + ' · ' + new Date(iso).toLocaleTimeString('en-IN', {
-    hour: '2-digit', minute: '2-digit',
-  });
+// ─── Voucher status notes (shown when order isn't completed yet) ──────────────
+const STATUS_NOTE = {
+  pending: {
+    title: 'Under Verification',
+    message: "Your order is under verification. It'll be ready within 2 hours.",
+    Icon: Clock,
+    color: 'text-amber-500',
+    bg: 'bg-amber-50 dark:bg-amber-500/10',
+    border: 'border-amber-200 dark:border-amber-500/20',
+  },
+  processing: {
+    title: 'Still Processing',
+    message: 'Your voucher is being generated. Please check back shortly.',
+    Icon: RefreshCw,
+    color: 'text-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-500/10',
+    border: 'border-blue-200 dark:border-blue-500/20',
+  },
+};
+
+const fieldFallback = (status) =>
+  status === 'pending'    ? 'Under verification — ~2 hrs' :
+  status === 'processing' ? 'Still processing' :
+  '—';
+
+const formatDateOnly = (iso) => {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+// ─── Copyable field row ─────────────────────────────────────────────────────────
+const CopyableRow = ({ label, value, status }) => {
+  const [copied, setCopied] = useState(false);
+  const hasValue = !!value;
+
+  const handleCopy = () => {
+    if (!hasValue) return;
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b last:border-b-0 border-gray-100 dark:border-white/[0.06]">
+      <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">{label}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`text-sm font-bold truncate ${hasValue ? 'text-gray-900 dark:text-white tracking-wide' : 'text-gray-400 dark:text-gray-500 italic font-medium'}`}>
+          {hasValue ? value : fieldFallback(status)}
+        </span>
+        {hasValue && (
+          <button
+            onClick={handleCopy}
+            className="w-6 h-6 flex items-center justify-center rounded-md bg-gray-100 dark:bg-white/[0.08] hover:bg-gray-200 dark:hover:bg-white/20 transition-colors flex-shrink-0"
+          >
+            {copied ? <Check size={11} className="text-green-500" /> : <Copy size={11} className="text-gray-500 dark:text-gray-400" />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Voucher modal body (shared by mobile sheet and desktop dialog) ───────────
+const VoucherModalBody = ({ order }) => {
+  const status = order.status?.toLowerCase();
+  const note = STATUS_NOTE[status];
+  const expiry = formatDateOnly(order.expiry_date);
+
+  return (
+    <>
+      {note && (
+        <div className={`flex items-start gap-2.5 px-4 py-3 rounded-xl border ${note.bg} ${note.border} mb-4`}>
+          <note.Icon size={16} className={`${note.color} flex-shrink-0 mt-0.5 ${status === 'processing' ? 'animate-spin' : ''}`} />
+          <div>
+            <p className={`text-xs font-bold ${note.color}`}>{note.title}</p>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{note.message}</p>
+          </div>
+        </div>
+      )}
+
+      {order.vendor && (
+        <span className="text-xs font-bold text-orange-500 uppercase tracking-widest">{order.vendor}</span>
+      )}
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-snug">{order.title || 'Gift Card'}</h2>
+      {order.amount != null && (
+        <p className="text-lg font-black text-gray-900 dark:text-white mt-1">₹{Number(order.amount).toLocaleString('en-IN')}</p>
+      )}
+
+      <div className="mt-4 rounded-2xl border border-gray-100 dark:border-white/[0.07] overflow-hidden">
+        <CopyableRow label="Voucher Code" value={order.voucher_code} status={status} />
+        <CopyableRow label="PIN" value={order.voucher_pin} status={status} />
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-xs text-gray-400 dark:text-gray-500">Expiry Date</span>
+          <span className={`text-sm font-bold ${expiry ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 italic font-medium'}`}>
+            {expiry || fieldFallback(status)}
+          </span>
+        </div>
+      </div>
+
+      {order.redeem_steps?.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.06] p-4">
+          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">How to Redeem</p>
+          <ul className="space-y-1.5">
+            {order.redeem_steps.map((step, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                <span className="text-orange-400 mt-0.5">•</span>{step}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="h-2" />
+    </>
+  );
+};
+
+// ─── Voucher detail modal — bottom sheet on mobile, centered dialog on desktop ──
+const VoucherDetailModal = ({ order, onClose }) => {
+  const [visible,  setVisible]  = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setVisible(false);
+    setTimeout(onClose, 320);
+  }, [onClose]);
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') handleClose(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [handleClose]);
+
+  const hasImage = order.media?.url && !imgError;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={handleClose}
+        className="fixed inset-0 z-[80] transition-all duration-300"
+        style={{ background: visible ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0)', backdropFilter: visible ? 'blur(4px)' : 'none' }}
+      />
+
+      {/* Mobile bottom sheet */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-[80] md:hidden flex flex-col bg-white dark:bg-[#1c1c1e] rounded-t-3xl shadow-2xl max-h-[88dvh] overflow-hidden
+          transition-transform duration-300 ease-out will-change-transform
+          ${visible ? 'translate-y-0' : 'translate-y-full'}`}
+      >
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+        </div>
+
+        {hasImage && (
+          <div className="w-full flex-shrink-0 overflow-hidden" style={{ maxHeight: 150 }}>
+            <img src={order.media.url} alt={order.title} onError={() => setImgError(true)}
+              className="w-full object-contain" style={{ maxHeight: 150, background: '#111' }} />
+          </div>
+        )}
+
+        <button onClick={handleClose}
+          className={`absolute z-10 w-8 h-8 rounded-full flex items-center justify-center transition-colors
+            ${hasImage ? 'top-5 right-4 bg-black/40 hover:bg-black/60' : 'top-3 right-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+        >
+          <X size={14} className={hasImage ? 'text-white' : 'text-gray-600 dark:text-gray-300'} />
+        </button>
+
+        <div className="flex-1 overflow-y-auto px-5 pt-4 pb-4">
+          <VoucherModalBody order={order} />
+        </div>
+      </div>
+
+      {/* Desktop centered dialog */}
+      <div
+        className={`fixed inset-0 z-[80] hidden md:flex items-center justify-center p-6 transition-all duration-300
+          ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+        style={{ pointerEvents: visible ? 'auto' : 'none' }}
+      >
+        <div
+          className="relative bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl overflow-hidden max-h-[88vh] w-full max-w-md flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button onClick={handleClose}
+            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
+          >
+            <X size={14} className="text-gray-600 dark:text-gray-300" />
+          </button>
+
+          {hasImage && (
+            <div className="w-full bg-gray-950 flex-shrink-0 overflow-hidden" style={{ maxHeight: 160 }}>
+              <img src={order.media.url} alt={order.title} onError={() => setImgError(true)}
+                className="w-full object-contain p-4" style={{ maxHeight: 160 }} />
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-5">
+            <VoucherModalBody order={order} />
+          </div>
+        </div>
+      </div>
+    </>
+  );
 };
 
 // ─── Order card ───────────────────────────────────────────────────────────────
-const OrderCard = ({ order, onCancel, onDelete, isCancelLoading, isDeleteLoading }) => {
+const OrderCard = ({ order, onCancel, onDelete, onView, isCancelLoading, isDeleteLoading }) => {
   const st = getStatus(order.status);
   const StatusIcon = st.Icon;
 
@@ -84,16 +285,24 @@ const OrderCard = ({ order, onCancel, onDelete, isCancelLoading, isDeleteLoading
         {/* Action buttons */}
         <div className="mt-auto pt-2.5">
           {order.status?.toLowerCase() === 'pending' && (
-            <button
-              onClick={() => onCancel(order)}
-              disabled={isCancelLoading}
-              className="w-full py-2.5 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 text-red-500 text-xs font-bold transition-all hover:bg-red-100 dark:hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isCancelLoading ? <Loader2 size={12} className="animate-spin inline mr-1" /> : null}
-              Cancel Order
-            </button>
+            <>
+              <button
+                onClick={() => onCancel(order)}
+                disabled={isCancelLoading}
+                className="w-full py-2.5 rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 text-red-500 text-xs font-bold transition-all hover:bg-red-100 dark:hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCancelLoading ? <Loader2 size={12} className="animate-spin inline mr-1" /> : null}
+                Cancel Order
+              </button>
+              <button
+                onClick={() => onView(order)}
+                className="w-full mt-1.5 text-[11px] text-gray-400 dark:text-gray-500 font-semibold hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                View Status
+              </button>
+            </>
           )}
-          
+
           {order.status?.toLowerCase() === 'cancelled' && (
             <button
               onClick={() => onDelete(order)}
@@ -104,17 +313,25 @@ const OrderCard = ({ order, onCancel, onDelete, isCancelLoading, isDeleteLoading
               Delete
             </button>
           )}
-          
+
           {order.status?.toLowerCase() === 'completed' && (
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">
-              {formatDate(order.createdAt || order.created_at)}
-            </p>
+            <button
+              onClick={() => onView(order)}
+              className="w-full py-2.5 rounded-xl border border-green-200 dark:border-green-500/20 bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-bold transition-all hover:bg-green-100 dark:hover:bg-green-500/20 flex items-center justify-center gap-1.5"
+            >
+              <Eye size={12} />
+              View Voucher
+            </button>
           )}
-          
+
           {order.status?.toLowerCase() === 'processing' && (
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">
-              {formatDate(order.createdAt || order.created_at)}
-            </p>
+            <button
+              onClick={() => onView(order)}
+              className="w-full py-2.5 rounded-xl border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 text-blue-500 text-xs font-bold transition-all hover:bg-blue-100 dark:hover:bg-blue-500/20 flex items-center justify-center gap-1.5"
+            >
+              <Eye size={12} />
+              View Status
+            </button>
           )}
         </div>
       </div>
@@ -149,6 +366,7 @@ export default function GiftCardOrders() {
   const [error,   setError]   = useState('');
   const [isCancelLoading, setIsCancelLoading] = useState(false);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [activeOrder, setActiveOrder] = useState(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -279,6 +497,7 @@ export default function GiftCardOrders() {
                   order={order}
                   onCancel={handleCancel}
                   onDelete={handleDelete}
+                  onView={setActiveOrder}
                   isCancelLoading={isCancelLoading}
                   isDeleteLoading={isDeleteLoading}
                 />
@@ -287,6 +506,10 @@ export default function GiftCardOrders() {
           </>
         )}
       </div>
+
+      {activeOrder && (
+        <VoucherDetailModal order={activeOrder} onClose={() => setActiveOrder(null)} />
+      )}
     </div>
   );
 }
