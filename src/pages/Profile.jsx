@@ -1418,7 +1418,7 @@ const Profile = () => {
 
                             <div className="grid flex-1 grid-cols-3 gap-2 text-center">
                                 {[
-                                    { val: profileUser.posts_count ?? userPosts.length, label: 'posts' },
+                                    { val: profileUser.posts_count ?? userPosts.length, label: 'moments' },
                                     { val: profileUser.followers_count || 0, label: 'followers' },
                                     { val: profileUser.following_count || 0, label: 'following' },
                                 ].map(({ val, label }) => {
@@ -1728,7 +1728,7 @@ const Profile = () => {
                     <div className="flex items-center justify-center gap-6 mb-5 text-sm">
                         <span className="text-center">
                             <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.posts_count ?? userPosts.length)}</span>
-                            <span className="text-gray-500 dark:text-gray-400">posts</span>
+                            <span className="text-gray-500 dark:text-gray-400">moments</span>
                         </span>
                         <button type="button" onClick={() => !isPrivacyBlocked && setFollowersModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
                             <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.followers_count || 0)}</span>
