@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import api from '../../lib/api';
 import { fetchMe } from '../../store/authSlice';
+import CalendarDatePicker from '../../components/CalendarDatePicker';
+import LocationSelector from '../../components/LocationSelector';
 import {
   ArrowLeft, Camera, Loader2, Check, AlertCircle, CheckCircle2,
   Pencil, X, Mail, Phone, RefreshCw,
@@ -17,6 +19,15 @@ const GENDER_OPTIONS = [
 
 const EDIT_CLS = 'w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#fa3f5e]/20 focus:border-[#fa3f5e] placeholder-gray-400 dark:placeholder-gray-600 transition-all';
 const VIEW_CLS = 'w-full px-3.5 py-2.5 rounded-xl text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/50 border border-transparent cursor-default pointer-events-none select-text';
+
+// The location API can return either a plain string or { name, lat, lng } — always
+// resolve down to plain display text so it's safe to store on the form / render.
+const toLocationText = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') return val.name || val.display_name || '';
+  return String(val);
+};
 
 /* ── OTP 6-box input ──────────────────────────────────────────── */
 const OtpInput = ({ value, onChange }) => {
@@ -190,6 +201,9 @@ const AccountSettings = () => {
 
   const [isEditing, setIsEditing] = useState(false);
   const snapshot = useRef(null);
+  const originalUsername = useRef('');
+  const usernameCheckTimer = useRef(null);
+  const [usernameCheck, setUsernameCheck] = useState({ status: 'idle', message: '' }); // idle|checking|available|taken|invalid|error
 
   const [form, setForm] = useState({
     full_name: '', username: '', bio: '', website: '',
@@ -233,7 +247,7 @@ const AccountSettings = () => {
           website: u.website || '',
           date_of_birth: u.date_of_birth ? u.date_of_birth.slice(0, 10) : '',
           gender: u.gender || '',
-          location: u.location || '',
+          location: toLocationText(u.location),
           email: u.email || '',
           phone: u.phone || u.mobile_number || '',
         };
@@ -245,7 +259,7 @@ const AccountSettings = () => {
           full_name: userObject.full_name || '', username: userObject.username || '',
           bio: userObject.bio || '', website: userObject.website || '',
           date_of_birth: userObject.date_of_birth ? userObject.date_of_birth.slice(0, 10) : '',
-          gender: userObject.gender || '', location: userObject.location || '',
+          gender: userObject.gender || '', location: toLocationText(userObject.location),
           email: userObject.email || '',
           phone: userObject.phone || userObject.mobile_number || '',
         };
@@ -257,6 +271,7 @@ const AccountSettings = () => {
       setForm(loadedForm);
       setAvatarUrl(loadedAvatar);
       snapshot.current = { form: loadedForm, avatarUrl: loadedAvatar };
+      originalUsername.current = loadedForm.username;
 
       if (interestsRes.status === 'fulfilled') {
         const d = interestsRes.value.data;
@@ -273,7 +288,37 @@ const AccountSettings = () => {
     }
     setIsEditing(false);
     setError('');
+    setUsernameCheck({ status: 'idle', message: '' });
   };
+
+  // ── Live username availability check ─────────────────────────────
+  useEffect(() => {
+    if (!isEditing) return;
+    const uname = form.username.trim();
+    clearTimeout(usernameCheckTimer.current);
+
+    if (!uname) { setUsernameCheck({ status: 'idle', message: '' }); return; }
+    if (uname === originalUsername.current) { setUsernameCheck({ status: 'idle', message: '' }); return; }
+
+    setUsernameCheck({ status: 'checking', message: '' });
+    usernameCheckTimer.current = setTimeout(async () => {
+      try {
+        const res = await api.post('/users/check/username', { username: uname });
+        setUsernameCheck({
+          status: res.data?.available ? 'available' : 'taken',
+          message: res.data?.message || (res.data?.available ? 'Username is available' : 'Username is already taken'),
+        });
+      } catch (e) {
+        const httpStatus = e?.response?.status;
+        setUsernameCheck({
+          status: httpStatus === 400 ? 'invalid' : httpStatus === 409 ? 'taken' : 'error',
+          message: e?.response?.data?.message || 'Could not verify username. Try again.',
+        });
+      }
+    }, 450);
+
+    return () => clearTimeout(usernameCheckTimer.current);
+  }, [form.username, isEditing]);
 
   const handleAvatarUpload = async (file) => {
     if (!file || !isEditing) return;
@@ -290,11 +335,21 @@ const AccountSettings = () => {
   };
 
   const handleSave = async () => {
+    if (usernameCheck.status === 'taken' || usernameCheck.status === 'invalid') {
+      setError(usernameCheck.message || 'Please choose a different username.');
+      return;
+    }
+    if (usernameCheck.status === 'checking') {
+      setError('Please wait while we verify your username.');
+      return;
+    }
     setSaving(true); setError('');
     try {
       await api.put(`/users/${userId}`, { ...form, avatar_url: avatarUrl });
       await dispatch(fetchMe());
       snapshot.current = { form: { ...form }, avatarUrl };
+      originalUsername.current = form.username;
+      setUsernameCheck({ status: 'idle', message: '' });
       setSaved(true);
       setIsEditing(false);
       setTimeout(() => setSaved(false), 3000);
@@ -313,6 +368,7 @@ const AccountSettings = () => {
   };
 
   const initials = (form.full_name || form.username || 'U').slice(0, 1).toUpperCase();
+  const usernameBlocked = usernameCheck.status === 'taken' || usernameCheck.status === 'invalid' || usernameCheck.status === 'checking';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1100px] mx-auto">
@@ -332,7 +388,7 @@ const AccountSettings = () => {
               className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
               <X size={13} /> Cancel
             </button>
-            <button onClick={handleSave} disabled={saving}
+            <button onClick={handleSave} disabled={saving || usernameBlocked}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#fa3f5e] text-white text-sm font-bold disabled:opacity-60 transition-opacity min-w-[68px] justify-center">
               {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <Check size={13} /> : null}
               {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
@@ -395,9 +451,35 @@ const AccountSettings = () => {
               <Field label="Username">
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">@</span>
-                  <input className={`${ic} pl-7`} placeholder="username" readOnly={!isEditing}
+                  <input className={`${ic} pl-7 pr-9`} placeholder="username" readOnly={!isEditing}
                     value={form.username} onChange={e => upd('username', e.target.value)} />
+                  {isEditing ? (
+                    usernameCheck.status === 'checking' ? (
+                      <Loader2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
+                    ) : usernameCheck.status === 'available' ? (
+                      <CheckCircle2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" />
+                    ) : (usernameCheck.status === 'taken' || usernameCheck.status === 'invalid') ? (
+                      <AlertCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500" />
+                    ) : null
+                  ) : (
+                    form.username && <CheckCircle2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" />
+                  )}
                 </div>
+                {isEditing && usernameCheck.status === 'available' && (
+                  <p className="text-[11px] text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                    <CheckCircle2 size={11} /> {usernameCheck.message}
+                  </p>
+                )}
+                {isEditing && (usernameCheck.status === 'taken' || usernameCheck.status === 'invalid') && (
+                  <p className="text-[11px] text-red-500 dark:text-red-400 mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={11} /> {usernameCheck.message}
+                  </p>
+                )}
+                {isEditing && usernameCheck.status === 'error' && (
+                  <p className="text-[11px] text-amber-500 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={11} /> {usernameCheck.message}
+                  </p>
+                )}
               </Field>
 
               <Field label="Bio">
@@ -415,10 +497,13 @@ const AccountSettings = () => {
 
               <Field label="Date of Birth">
                 {isEditing ? (
-                  <input className={ic} type="date"
-                    value={form.date_of_birth} onChange={e => upd('date_of_birth', e.target.value)} />
+                  <CalendarDatePicker
+                    value={form.date_of_birth}
+                    onChange={(val) => upd('date_of_birth', val)}
+                    placeholder="Select date of birth"
+                  />
                 ) : (
-                  <input className={ic} type="text" readOnly
+                  <input className={VIEW_CLS} type="text" readOnly
                     value={form.date_of_birth
                       ? new Date(form.date_of_birth + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                       : '—'} />
@@ -447,8 +532,18 @@ const AccountSettings = () => {
               </Field>
 
               <Field label="Location">
-                <input className={ic} placeholder="City, Country" readOnly={!isEditing}
-                  value={form.location} onChange={e => upd('location', e.target.value)} />
+                {isEditing ? (
+                  <LocationSelector
+                    value={form.location}
+                    onChange={(name) => upd('location', name)}
+                    autoDetect={false}
+                    persist={false}
+                    alignLeft
+                    placeholder="Add your location"
+                  />
+                ) : (
+                  <input className={VIEW_CLS} type="text" readOnly value={form.location || '—'} />
+                )}
               </Field>
             </div>
           </div>
@@ -536,7 +631,7 @@ const AccountSettings = () => {
 
           {/* Save Button — only when editing */}
           {isEditing && (
-            <button onClick={handleSave} disabled={saving}
+            <button onClick={handleSave} disabled={saving || usernameBlocked}
               className="w-full py-3.5 rounded-2xl bg-[#fa3f5e] text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg shadow-[#fa3f5e]/20">
               {saving
                 ? <><Loader2 size={16} className="animate-spin" /> Saving…</>

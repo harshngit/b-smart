@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -1155,7 +1155,7 @@ const Profile = () => {
             { key: 'posts',          label: 'Moments',   icon: <Image size={22} /> },
             { key: 'reels',          label: 'bSparks',   icon: <Video size={22} /> },
             { key: 'tweets',         label: 'Buzz',      icon: <MessageCircle size={22} /> },
-            { key: 'promote_reels',  label: 'Boosts',    icon: <Megaphone size={22} /> },
+            { key: 'promote_reels',  label: 'Campaigns', icon: <Rocket size={22} /> },
           ];
 
     // ── Blocked Content Wall ──────────────────────────────────────────────────
