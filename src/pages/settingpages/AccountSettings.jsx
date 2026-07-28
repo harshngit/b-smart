@@ -5,6 +5,8 @@ import api from '../../lib/api';
 import { fetchMe } from '../../store/authSlice';
 import CalendarDatePicker from '../../components/CalendarDatePicker';
 import LocationSelector from '../../components/LocationSelector';
+import { InterestsModal, InterestedSection } from '../../components/InterestsPicker';
+import { AD_CATEGORIES_FALLBACK } from '../../constants/interestCategories';
 import {
   ArrowLeft, Camera, Loader2, Check, AlertCircle, CheckCircle2,
   Pencil, X, Mail, Phone, RefreshCw,
@@ -203,6 +205,7 @@ const AccountSettings = () => {
   const snapshot = useRef(null);
   const originalUsername = useRef('');
   const usernameCheckTimer = useRef(null);
+  const locationCoords = useRef({ lat: null, lng: null });
   const [usernameCheck, setUsernameCheck] = useState({ status: 'idle', message: '' }); // idle|checking|available|taken|invalid|error
 
   const [form, setForm] = useState({
@@ -215,7 +218,9 @@ const AccountSettings = () => {
   const [verifyTarget, setVerifyTarget] = useState(null); // 'email' | 'phone'
 
   const [interests, setInterests] = useState([]);
-  const [allInterests, setAllInterests] = useState([]);
+  const [allInterests, setAllInterests] = useState(AD_CATEGORIES_FALLBACK);
+  const [showInterestsModal, setShowInterestsModal] = useState(false);
+  const [savingInterests, setSavingInterests] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -254,6 +259,10 @@ const AccountSettings = () => {
         loadedAvatar = u.avatar_url || '';
         setIsEmailVerified(!!u.is_email_verified);
         setIsPhoneVerified(!!u.is_phone_verified);
+        locationCoords.current = {
+          lat: typeof u.location?.lat === 'number' ? u.location.lat : null,
+          lng: typeof u.location?.lng === 'number' ? u.location.lng : null,
+        };
       } else if (userObject) {
         loadedForm = {
           full_name: userObject.full_name || '', username: userObject.username || '',
@@ -266,6 +275,10 @@ const AccountSettings = () => {
         loadedAvatar = userObject.avatar_url || '';
         setIsEmailVerified(!!userObject.is_email_verified);
         setIsPhoneVerified(!!userObject.is_phone_verified);
+        locationCoords.current = {
+          lat: typeof userObject.location?.lat === 'number' ? userObject.location.lat : null,
+          lng: typeof userObject.location?.lng === 'number' ? userObject.location.lng : null,
+        };
       }
 
       setForm(loadedForm);
@@ -275,8 +288,12 @@ const AccountSettings = () => {
 
       if (interestsRes.status === 'fulfilled') {
         const d = interestsRes.value.data;
-        setInterests(d.interests || d.user_interests || []);
-        setAllInterests(d.all_interests || d.available_interests || []);
+        setInterests(d.ad_interests || d.interests || d.user_interests || []);
+        if (Array.isArray(d.available_categories) && d.available_categories.length > 0) {
+          setAllInterests(d.available_categories);
+        } else if (Array.isArray(d.all_interests) && d.all_interests.length > 0) {
+          setAllInterests(d.all_interests);
+        }
       }
     }).finally(() => setLoading(false));
   }, [userId]);
@@ -345,7 +362,15 @@ const AccountSettings = () => {
     }
     setSaving(true); setError('');
     try {
-      await api.put(`/users/${userId}`, { ...form, avatar_url: avatarUrl });
+      await api.put(`/users/${userId}`, {
+        ...form,
+        avatar_url: avatarUrl,
+        location: {
+          name: form.location,
+          lat: locationCoords.current.lat,
+          lng: locationCoords.current.lng,
+        },
+      });
       await dispatch(fetchMe());
       snapshot.current = { form: { ...form }, avatarUrl };
       originalUsername.current = form.username;
@@ -358,13 +383,18 @@ const AccountSettings = () => {
     } finally { setSaving(false); }
   };
 
-  const toggleInterest = async (name) => {
-    if (!isEditing) return;
-    const isOn = interests.includes(name);
-    const next = isOn ? interests.filter(i => i !== name) : [...interests, name];
-    setInterests(next);
-    try { await api.put(`/users/${userId}/interests`, { interests: next }); }
-    catch { setInterests(interests); }
+  const handleSaveInterests = async (selected) => {
+    setSavingInterests(true);
+    try {
+      const { data } = await api.post(`/users/${userId}/interests`, { interests: selected });
+      setInterests(data.ad_interests || selected);
+      if (Array.isArray(data.available_categories) && data.available_categories.length > 0) {
+        setAllInterests(data.available_categories);
+      }
+      setShowInterestsModal(false);
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Failed to save interests. Try again.');
+    } finally { setSavingInterests(false); }
   };
 
   const initials = (form.full_name || form.username || 'U').slice(0, 1).toUpperCase();
@@ -535,7 +565,13 @@ const AccountSettings = () => {
                 {isEditing ? (
                   <LocationSelector
                     value={form.location}
-                    onChange={(name) => upd('location', name)}
+                    onChange={(name, coords) => {
+                      upd('location', name);
+                      locationCoords.current = {
+                        lat: coords?.lat ?? null,
+                        lng: coords?.lng ?? null,
+                      };
+                    }}
                     autoDetect={false}
                     persist={false}
                     alignLeft
@@ -552,31 +588,11 @@ const AccountSettings = () => {
           <div>
             <SectionTitle title="Interests" />
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
-              {(allInterests.length === 0 && interests.length === 0) ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No interests found.</p>
-              ) : (
-                <>
-                  {isEditing && <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Tap to select or remove interests</p>}
-                  <div className="flex flex-wrap gap-2">
-                    {(allInterests.length > 0 ? allInterests : interests).map((item) => {
-                      const name = typeof item === 'string' ? item : (item.name || item.category || '');
-                      const isOn = interests.some(i => (typeof i === 'string' ? i : i.name || i.category || '') === name);
-                      return (
-                        <button key={name} onClick={() => toggleInterest(name)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                            isOn
-                              ? 'bg-[#fa3f5e] text-white border-[#fa3f5e] shadow-sm'
-                              : isEditing
-                              ? 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-[#fa3f5e] hover:text-[#fa3f5e]'
-                              : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-default'
-                          }`}>
-                          {name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+              <InterestedSection
+                interests={interests}
+                isOwnProfile
+                onAdd={() => setShowInterestsModal(true)}
+              />
             </div>
           </div>
 
@@ -657,6 +673,16 @@ const AccountSettings = () => {
           }}
         />
       )}
+
+      {/* Interests Modal */}
+      <InterestsModal
+        isOpen={showInterestsModal}
+        onClose={() => setShowInterestsModal(false)}
+        currentInterests={interests}
+        categories={allInterests}
+        onSave={handleSaveInterests}
+        saving={savingInterests}
+      />
     </div>
   );
 };

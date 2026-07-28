@@ -11,6 +11,7 @@ import PromoteDetailModal from '../components/PromoteDetailModal';
 import StoryRail from '../components/StoryRail';
 import StoryViewer from '../components/StoryViewer';
 import LocationSelector from '../components/LocationSelector';
+import { getProfilePath } from '../utils/profilePath';
 import api from '../lib/api';
 import bsmartLogo from '../assets/bsmart.png';
 import bsmartIcon from '../assets/bsmart_logo.png';
@@ -335,7 +336,7 @@ const MobileSuggestedUsersCard = ({ users }) => {
             : u.followed_by ? `Followed by ${u.followed_by}` : 'Suggested for you';
           return (
             <div key={userId || i}
-              onClick={() => navigate(`/profile/${userId}`)}
+              onClick={() => navigate(getProfilePath(u))}
               className="relative flex-shrink-0 flex flex-col items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-2xl px-3 pt-4 pb-3 w-[140px] gap-2 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#222] transition-colors">
               {/* Dismiss button */}
               <button
@@ -562,7 +563,7 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
                 <div key={userId || idx} className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => hasStory ? setViewerStory(story) : navigate(`/profile/${userId}`)}
+                    onClick={() => hasStory ? setViewerStory(story) : navigate(getProfilePath(user))}
                     className="flex items-center gap-3 flex-1 min-w-0 text-left"
                   >
                     {/* Avatar — orange gradient ring when user has a story */}
