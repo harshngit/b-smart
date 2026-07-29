@@ -204,6 +204,8 @@ const AccountSettings = () => {
   const [isEditing, setIsEditing] = useState(false);
   const snapshot = useRef(null);
   const originalUsername = useRef('');
+  const originalEmail = useRef('');
+  const originalPhone = useRef('');
   const usernameCheckTimer = useRef(null);
   const locationCoords = useRef({ lat: null, lng: null });
   const [usernameCheck, setUsernameCheck] = useState({ status: 'idle', message: '' }); // idle|checking|available|taken|invalid|error
@@ -259,6 +261,8 @@ const AccountSettings = () => {
         loadedAvatar = u.avatar_url || '';
         setIsEmailVerified(!!u.is_email_verified);
         setIsPhoneVerified(!!u.is_phone_verified);
+        originalEmail.current = loadedForm.email;
+        originalPhone.current = loadedForm.phone;
         locationCoords.current = {
           lat: typeof u.location?.lat === 'number' ? u.location.lat : null,
           lng: typeof u.location?.lng === 'number' ? u.location.lng : null,
@@ -275,6 +279,8 @@ const AccountSettings = () => {
         loadedAvatar = userObject.avatar_url || '';
         setIsEmailVerified(!!userObject.is_email_verified);
         setIsPhoneVerified(!!userObject.is_phone_verified);
+        originalEmail.current = loadedForm.email;
+        originalPhone.current = loadedForm.phone;
         locationCoords.current = {
           lat: typeof userObject.location?.lat === 'number' ? userObject.location.lat : null,
           lng: typeof userObject.location?.lng === 'number' ? userObject.location.lng : null,
@@ -374,6 +380,8 @@ const AccountSettings = () => {
       await dispatch(fetchMe());
       snapshot.current = { form: { ...form }, avatarUrl };
       originalUsername.current = form.username;
+      originalEmail.current = form.email;
+      originalPhone.current = form.phone;
       setUsernameCheck({ status: 'idle', message: '' });
       setSaved(true);
       setIsEditing(false);
@@ -399,6 +407,12 @@ const AccountSettings = () => {
 
   const initials = (form.full_name || form.username || 'U').slice(0, 1).toUpperCase();
   const usernameBlocked = usernameCheck.status === 'taken' || usernameCheck.status === 'invalid' || usernameCheck.status === 'checking';
+  // A previously-verified email/phone stops counting as verified the moment it's
+  // edited to a different value — the old OTP verification doesn't carry over.
+  const emailChanged = isEditing && form.email.trim() !== originalEmail.current.trim();
+  const phoneChanged = isEditing && form.phone.trim() !== originalPhone.current.trim();
+  const emailShowsVerified = isEmailVerified && !emailChanged;
+  const phoneShowsVerified = isPhoneVerified && !phoneChanged;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1100px] mx-auto">
@@ -606,7 +620,7 @@ const AccountSettings = () => {
                 <div className="flex items-center gap-2">
                   <input className={`${ic} flex-1`} placeholder="you@example.com" type="email" readOnly={!isEditing}
                     value={form.email} onChange={e => upd('email', e.target.value)} />
-                  {isEmailVerified ? (
+                  {emailShowsVerified ? (
                     <VerifiedBadge />
                   ) : (
                     <button onClick={() => setVerifyTarget('email')}
@@ -615,9 +629,9 @@ const AccountSettings = () => {
                     </button>
                   )}
                 </div>
-                {!isEmailVerified && (
+                {!emailShowsVerified && (
                   <p className="text-[11px] text-amber-500 dark:text-amber-400 mt-1.5 flex items-center gap-1">
-                    <AlertCircle size={11} /> Email not verified
+                    <AlertCircle size={11} /> {emailChanged ? "You'll need to verify this new email" : 'Email not verified'}
                   </p>
                 )}
               </Field>
@@ -627,7 +641,7 @@ const AccountSettings = () => {
                 <div className="flex items-center gap-2">
                   <input className={`${ic} flex-1`} placeholder="+91 98765 43210" type="tel" readOnly={!isEditing}
                     value={form.phone} onChange={e => upd('phone', e.target.value)} />
-                  {isPhoneVerified ? (
+                  {phoneShowsVerified ? (
                     <VerifiedBadge />
                   ) : (
                     <button onClick={() => setVerifyTarget('phone')}
@@ -636,9 +650,9 @@ const AccountSettings = () => {
                     </button>
                   )}
                 </div>
-                {!isPhoneVerified && (
+                {!phoneShowsVerified && (
                   <p className="text-[11px] text-amber-500 dark:text-amber-400 mt-1.5 flex items-center gap-1">
-                    <AlertCircle size={11} /> Mobile not verified
+                    <AlertCircle size={11} /> {phoneChanged ? "You'll need to verify this new number" : 'Mobile not verified'}
                   </p>
                 )}
               </Field>
@@ -667,8 +681,13 @@ const AccountSettings = () => {
           type={verifyTarget}
           onClose={() => setVerifyTarget(null)}
           onVerified={() => {
-            if (verifyTarget === 'email') setIsEmailVerified(true);
-            else setIsPhoneVerified(true);
+            if (verifyTarget === 'email') {
+              setIsEmailVerified(true);
+              originalEmail.current = form.email;
+            } else {
+              setIsPhoneVerified(true);
+              originalPhone.current = form.phone;
+            }
             setVerifyTarget(null);
           }}
         />
