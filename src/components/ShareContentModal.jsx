@@ -1,4 +1,4 @@
-import { Check, Search, Send, X } from 'lucide-react';
+import { Check, Copy, Search, Send, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { getFollowing } from '../services/followService';
@@ -114,16 +114,23 @@ function ShareTargetAvatar({ target, currentUserId }) {
   return <AvatarCircle src={target.avatar} label={target.label} className="h-full w-full" />;
 }
 
+// Backend only supports sending these content types via DM (chat.controller.js
+// rejects anything else with a 400) — anything outside this list still gets a
+// Copy Link row, it just skips the "send to..." picker.
+const DM_SHARE_SUPPORTED_TYPES = ['post', 'reel', 'ad', 'tweet'];
+
 export default function ShareContentModal({
   isOpen,
   onClose,
   contentType,
   contentId,
+  contentUrl,
 }) {
   const dispatch = useDispatch();
   const { userObject } = useSelector((state) => state.auth);
   const sidebarConversations = useSelector((state) => state.chat?.conversations || []);
   const currentUserId = userObject?._id || userObject?.id || '';
+  const canSendToDm = DM_SHARE_SUPPORTED_TYPES.includes(contentType);
 
   const [followingUsers, setFollowingUsers] = useState([]);
   const [conversations, setConversationList] = useState([]);
@@ -134,9 +141,24 @@ export default function ShareContentModal({
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!linkCopied) return undefined;
+    const timer = setTimeout(() => setLinkCopied(false), 1800);
+    return () => clearTimeout(timer);
+  }, [linkCopied]);
+
+  const handleCopyLink = async () => {
+    if (!contentUrl) return;
+    try {
+      await navigator.clipboard.writeText(contentUrl);
+      setLinkCopied(true);
+    } catch { /* noop */ }
+  };
+
+  useEffect(() => {
+    if (!isOpen || !canSendToDm) return;
     if (!currentUserId) return;
 
     let mounted = true;
@@ -181,7 +203,7 @@ export default function ShareContentModal({
     return () => {
       mounted = false;
     };
-  }, [isOpen, currentUserId, sidebarConversations]);
+  }, [isOpen, canSendToDm, currentUserId, sidebarConversations]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -360,67 +382,91 @@ export default function ShareContentModal({
           <div className="w-10" />
         </div>
 
-        <div className="px-5 pb-3">
-          <div className="flex items-center gap-3 rounded-xl bg-[#252b36] px-4 py-2">
-            <Search size={16} className="text-white/50" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search"
-              className="w-full bg-transparent text-[16px] text-white outline-none placeholder:text-white/50"
-            />
+        {contentUrl ? (
+          <div className="px-5 pb-3">
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex w-full items-center gap-3 rounded-xl bg-[#252b36] px-4 py-3 text-left transition hover:bg-[#2c3341]"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10">
+                {linkCopied ? <Check size={16} className="text-[#38d430]" /> : <Copy size={16} className="text-white/80" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white">{linkCopied ? 'Link copied' : 'Copy link'}</p>
+                <p className="truncate text-xs text-white/50">{contentUrl}</p>
+              </div>
+            </button>
           </div>
-        </div>
+        ) : null}
 
-        <div className="flex-1 overflow-y-auto px-5 py-2">
-          {loadingUsers || loadingConversations ? (
-            <div className="py-10 text-center text-sm text-white/60">Loading...</div>
-          ) : null}
-
-          {!loadingUsers && !loadingConversations && !displayTargets.length ? (
-            <div className="py-10 text-center text-sm text-white/60">No results found.</div>
-          ) : null}
-
-          {!loadingUsers && !loadingConversations && displayTargets.length ? (
-            <div className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 md:grid-cols-5 pb-4">
-              {displayTargets.map((target) => (
-                <button
-                  key={target.key}
-                  type="button"
-                  onClick={() => (target.type === 'conversation' ? toggleConversation(target.id) : toggleUser(target.id))}
-                  className="flex flex-col items-center gap-2 text-center transition hover:opacity-90"
-                >
-                  <div className="relative h-12 w-12 md:h-14 md:w-14">
-                    <ShareTargetAvatar target={target} currentUserId={currentUserId} />
-                    {target.onlineUserId && onlineUserIds.includes(String(target.onlineUserId)) ? (
-                      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#1a1e28] bg-[#38d430]" />
-                    ) : null}
-                    {target.selected ? (
-                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#2a2f9f] text-white ring-2 ring-[#1a1e28]">
-                        <Check size={12} />
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="line-clamp-2 text-xs leading-tight text-white/95">
-                    {target.label}
-                  </p>
-                </button>
-              ))}
+        {canSendToDm ? (
+          <>
+            <div className="px-5 pb-3">
+              <div className="flex items-center gap-3 rounded-xl bg-[#252b36] px-4 py-2">
+                <Search size={16} className="text-white/50" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search"
+                  className="w-full bg-transparent text-[16px] text-white outline-none placeholder:text-white/50"
+                />
+              </div>
             </div>
-          ) : null}
-        </div>
 
-        <div className="border-t border-white/10 px-5 py-3 bg-[#1a1f2a]">
-          <button
-            type="button"
-            disabled={!selectedTotal || submitting}
-            onClick={handleSend}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#4f58ff] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#626afc] disabled:cursor-not-allowed disabled:bg-[#3a3f5d] disabled:text-white/60"
-          >
-            <Send size={14} />
-            {submitting ? 'Sharing...' : `Share (${selectedTotal})`}
-          </button>
-        </div>
+            <div className="flex-1 overflow-y-auto px-5 py-2">
+              {loadingUsers || loadingConversations ? (
+                <div className="py-10 text-center text-sm text-white/60">Loading...</div>
+              ) : null}
+
+              {!loadingUsers && !loadingConversations && !displayTargets.length ? (
+                <div className="py-10 text-center text-sm text-white/60">No results found.</div>
+              ) : null}
+
+              {!loadingUsers && !loadingConversations && displayTargets.length ? (
+                <div className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 md:grid-cols-5 pb-4">
+                  {displayTargets.map((target) => (
+                    <button
+                      key={target.key}
+                      type="button"
+                      onClick={() => (target.type === 'conversation' ? toggleConversation(target.id) : toggleUser(target.id))}
+                      className="flex flex-col items-center gap-2 text-center transition hover:opacity-90"
+                    >
+                      <div className="relative h-12 w-12 md:h-14 md:w-14">
+                        <ShareTargetAvatar target={target} currentUserId={currentUserId} />
+                        {target.onlineUserId && onlineUserIds.includes(String(target.onlineUserId)) ? (
+                          <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#1a1e28] bg-[#38d430]" />
+                        ) : null}
+                        {target.selected ? (
+                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#2a2f9f] text-white ring-2 ring-[#1a1e28]">
+                            <Check size={12} />
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="line-clamp-2 text-xs leading-tight text-white/95">
+                        {target.label}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="border-t border-white/10 px-5 py-3 bg-[#1a1f2a]">
+              <button
+                type="button"
+                disabled={!selectedTotal || submitting}
+                onClick={handleSend}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-[#4f58ff] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#626afc] disabled:cursor-not-allowed disabled:bg-[#3a3f5d] disabled:text-white/60"
+              >
+                <Send size={14} />
+                {submitting ? 'Sharing...' : `Share (${selectedTotal})`}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="pb-2" />
+        )}
       </div>
     </div>
   );

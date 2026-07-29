@@ -12,6 +12,8 @@ import Hls from 'hls.js';
 import socketService from '../services/socketService';
 import Avatar from '../components/Avatar';
 import LocationLink from '../components/LocationLink';
+import ShareContentModal from '../components/ShareContentModal';
+import ContentReportModal from '../components/ContentReportModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 const IMAGE_DURATION = 15;
@@ -34,6 +36,12 @@ const fmt = (n = 0) => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
   return String(n);
+};
+
+// Shareable link — /promote-reel/:id is the dedicated standalone permalink page for a single promote reel.
+const getPromoteShareUrl = (promote) => {
+  const id = promote?._id || promote?.id;
+  return id ? `${window.location.origin}/promote-reel/${id}` : '';
 };
 
 const formatTimeAgo = (d) => {
@@ -223,7 +231,7 @@ const FollowButton = ({ userId, mobile = false, initialFollowing = false }) => {
 };
 
 // ─── Action Buttons ────────────────────────────────────────────────────────────
-const ActionButtons = ({ promote, likedIds, toggleLike, savedIds, toggleSave, mobile = false, onComment, onMore }) => (
+const ActionButtons = ({ promote, likedIds, toggleLike, savedIds, toggleSave, mobile = false, onComment, onMore, onShare }) => (
   <div className="flex flex-col items-center gap-4">
     <button onClick={() => toggleLike(promote._id)} className="flex flex-col items-center gap-1">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
@@ -243,7 +251,7 @@ const ActionButtons = ({ promote, likedIds, toggleLike, savedIds, toggleSave, mo
       </button>
     )}
 
-    <button className="flex flex-col items-center gap-1">
+    <button onClick={() => onShare?.(promote)} className="flex flex-col items-center gap-1">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90
         ${mobile ? 'bg-black/30 backdrop-blur-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
         <Send size={18} className={`-rotate-12 relative left-[-2px] ${mobile ? 'text-white' : 'text-gray-800 dark:text-white'}`} />
@@ -560,7 +568,7 @@ const Promote = () => {
   const currentUserAvatar = userObject?.avatar_url || null;
   const currentUserName = userObject?._full_name || userObject?.username || 'You';
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const pageHeightClass = 'h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]';
 
   useEffect(() => {
@@ -576,17 +584,51 @@ const Promote = () => {
   const [error, setError] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Jump to specific promote reel if ID in URL
+  // Jump to specific promote reel if ID in URL — shared /promote?id=<id> links
+  // only work if the target happens to be within the first loaded page, so
+  // self-fetch it directly when it isn't (matches Ads.jsx/Reels.jsx). The `id`
+  // param is cleared as soon as it's resolved so this effect becomes a no-op
+  // afterward — otherwise it re-fires on every scroll and snaps the user
+  // straight back to the shared reel.
+  const requestedPromoteFetchRef = useRef(null);
   useEffect(() => {
-    const targetId = searchParams.get('id');
-    if (!targetId || !promotes.length) return;
-    const idx = promotes.findIndex(p => String(p._id || p.id) === String(targetId));
-    if (idx !== -1 && idx !== currentIndex) {
+    const targetId = String(searchParams.get('id') || '').trim();
+    if (!targetId) return;
+
+    const idx = promotes.findIndex(p => String(p._id || p.id) === targetId);
+    if (idx >= 0) {
       setCurrentIndex(idx);
       setIsPausedByUser(false);
       setProgress(0);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('id');
+      setSearchParams(nextParams, { replace: true });
+      return;
     }
-  }, [searchParams, promotes, currentIndex]);
+
+    if (loading || requestedPromoteFetchRef.current === targetId) return;
+    requestedPromoteFetchRef.current = targetId;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const fetched = await promoteReelService.getPromoteReelById(targetId);
+        if (cancelled || !fetched?._id) return;
+        setPromotes((prev) => [
+          fetched,
+          ...prev.filter((p) => String(p._id || p.id) !== String(fetched._id)),
+        ]);
+        setCurrentIndex(0);
+        setIsPausedByUser(false);
+        setProgress(0);
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('id');
+        setSearchParams(nextParams, { replace: true });
+      } catch { /* deep link just won't resolve */ }
+    })();
+
+    return () => { cancelled = true; };
+  }, [promotes, searchParams, setSearchParams, loading]);
 
   const [isMuted, setIsMuted] = useState(true);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
@@ -596,6 +638,8 @@ const Promote = () => {
   const [savedIds, setSavedIds] = useState(new Set());
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [sharePromote, setSharePromote] = useState(null);
+  const [reportPromote, setReportPromote] = useState(null);
 
   // Comments state — mirrors Ads.jsx exactly
   const [activeCommentId, setActiveCommentId] = useState(null);
@@ -1306,7 +1350,7 @@ const Promote = () => {
                       {/* Mobile right actions */}
                       {isCurrent && (
                         <div className="md:hidden absolute right-3 bottom-[10px] z-30">
-                          <ActionButtons promote={p} mobile likedIds={likedIds} toggleLike={toggleLike} savedIds={savedIds} toggleSave={toggleSave} onComment={openComments} />
+                          <ActionButtons promote={p} mobile likedIds={likedIds} toggleLike={toggleLike} savedIds={savedIds} toggleSave={toggleSave} onComment={openComments} onShare={setSharePromote} onMore={setReportPromote} />
                         </div>
                       )}
                     </div>
@@ -1319,7 +1363,7 @@ const Promote = () => {
           {/* Desktop right actions */}
           {!loading && !error && promote && (
             <div ref={actionPanelRef} className="hidden md:flex flex-col gap-2 ml-4 justify-end h-full md:h-[85vh] pb-4">
-              <ActionButtons promote={promote} likedIds={likedIds} toggleLike={toggleLike} savedIds={savedIds} toggleSave={toggleSave} onComment={openComments} />
+              <ActionButtons promote={promote} likedIds={likedIds} toggleLike={toggleLike} savedIds={savedIds} toggleSave={toggleSave} onComment={openComments} onShare={setSharePromote} onMore={setReportPromote} />
             </div>
           )}
         </div>
@@ -1372,6 +1416,22 @@ const Promote = () => {
           </div>
         </>
       )}
+
+      <ShareContentModal
+        isOpen={!!sharePromote}
+        onClose={() => setSharePromote(null)}
+        contentType="promote_reel"
+        contentId={sharePromote?._id || sharePromote?.id}
+        contentUrl={getPromoteShareUrl(sharePromote)}
+      />
+
+      <ContentReportModal
+        isOpen={!!reportPromote}
+        onClose={() => setReportPromote(null)}
+        contentType="promote_reel"
+        contentId={reportPromote?._id || reportPromote?.id}
+        contentUrl={getPromoteShareUrl(reportPromote)}
+      />
 
       <style>{`
         @keyframes slideInLeft { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }

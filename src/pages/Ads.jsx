@@ -275,6 +275,12 @@ const fmt = (n = 0) => {
   return String(n);
 };
 
+// Shareable link — AdPublicDetail is the dedicated standalone permalink page for a single ad.
+const getAdShareUrl = (ad) => {
+  const id = ad?._id || ad?.id;
+  return id ? `${window.location.origin}/ads/${id}/details` : '';
+};
+
 const getReplyMetaCount = (comment) => (
   comment.reply_count ??
   comment.replies_count ??
@@ -2271,14 +2277,14 @@ const Ads = ({ feedMode = 'user' }) => {
         contentType="ad"
         contentId={reportAd?._id}
         ownerUsername={reportAd?.vendor_id?.business_name || reportAd?.user_id?.username || ''}
-        contentUrl={`${window.location.origin}/ads`}
+        contentUrl={getAdShareUrl(reportAd)}
       />
       <OwnerContentOptionsModal
         isOpen={!!ownerOptionsAd}
         onClose={() => setOwnerOptionsAd(null)}
         item={ownerOptionsAd}
         contentType="ad"
-        contentUrl={`${window.location.origin}/ads`}
+        contentUrl={getAdShareUrl(ownerOptionsAd)}
         onEdit={() => {
           setEditAd(ownerOptionsAd);
           setOwnerOptionsAd(null);
@@ -2316,6 +2322,7 @@ const Ads = ({ feedMode = 'user' }) => {
         onClose={() => setShareAd(null)}
         contentType="ad"
         contentId={shareAd?._id}
+        contentUrl={getAdShareUrl(shareAd)}
       />
 
       <style>{`

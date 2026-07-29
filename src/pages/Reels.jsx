@@ -73,6 +73,13 @@ const normalizeAssetUrl = (value) => {
   return `${baseUrl}/uploads/${normalized}`;
 };
 
+// Shareable link — Reels.jsx deep-links via the `reel` query param (see the
+// searchParams effect below), so that's the URL shape that actually works.
+const getReelShareUrl = (reel) => {
+  const id = reel?._id || reel?.post_id;
+  return id ? `${window.location.origin}/reels?reel=${id}` : '';
+};
+
 const formatCount = (count) => {
   if (!count && count !== 0) return '0';
   if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
@@ -640,7 +647,7 @@ const CommentsBottomSheet = ({ reel, onClose, userObject }) => (
 // ─── Main Reels Component ─────────────────────────────────────────────────────
 const Reels = () => {
   const navigate       = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [reels,            setReels]            = useState([]);
   const [loading,          setLoading]          = useState(true);
   const [error,            setError]            = useState(null);
@@ -852,16 +859,55 @@ const Reels = () => {
     fetchReels();
   }, []);
 
+  // Shared /reels?reel=<id> links only work if the target reel happens to be
+  // within the first loaded page — self-fetch it directly when it isn't, so a
+  // copied link reliably opens that exact reel in a fresh browser/session.
+  const requestedReelFetchRef = useRef(null);
   useEffect(() => {
     const targetReelId = String(searchParams.get('reel') || '').trim();
-    if (!targetReelId || !reels.length) return;
+    if (!targetReelId) return;
+
     const targetIndex = reels.findIndex((item) => String(item?._id || item?.post_id || '') === targetReelId);
-    if (targetIndex < 0 || targetIndex === currentIndex) return;
-    setCurrentIndex(targetIndex);
-    setCommentsOpen(false);
-    setIsPausedByUser(false);
-    setReelProgress(0);
-  }, [reels, searchParams, currentIndex]);
+    if (targetIndex >= 0) {
+      setCurrentIndex(targetIndex);
+      setCommentsOpen(false);
+      setIsPausedByUser(false);
+      setReelProgress(0);
+      // Drop the param immediately so this effect becomes a no-op afterward —
+      // otherwise it re-fires on every currentIndex change and snaps the user
+      // straight back to this reel the moment they try to scroll away.
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('reel');
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
+
+    if (loading || requestedReelFetchRef.current === targetReelId) return;
+    requestedReelFetchRef.current = targetReelId;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/posts/reels/${targetReelId}`, { headers: authHeaders() });
+        if (!res.ok || cancelled) return;
+        const fetchedReel = await res.json();
+        if (cancelled || !fetchedReel?._id) return;
+        setReels((prev) => [
+          fetchedReel,
+          ...prev.filter((item) => String(item._id || item.post_id || '') !== String(fetchedReel._id)),
+        ]);
+        setCurrentIndex(0);
+        setCommentsOpen(false);
+        setIsPausedByUser(false);
+        setReelProgress(0);
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('reel');
+        setSearchParams(nextParams, { replace: true });
+      } catch { /* deep link just won't resolve */ }
+    })();
+
+    return () => { cancelled = true; };
+  }, [reels, searchParams, setSearchParams, loading]);
 
   useEffect(() => {
     setReelProgress(0);
@@ -1275,13 +1321,13 @@ const Reels = () => {
         </div>
       )}
 
-      <ContentReportModal isOpen={!!reportReel} onClose={() => setReportReel(null)} contentType="reel" contentId={reportReel?._id || reportReel?.post_id} ownerUsername={reportReel?.user_id?.username || reportReel?.user_id?.full_name || ''} contentUrl={reportReel ? `${window.location.origin}/reels/${reportReel._id || reportReel.post_id}` : ''} />
+      <ContentReportModal isOpen={!!reportReel} onClose={() => setReportReel(null)} contentType="reel" contentId={reportReel?._id || reportReel?.post_id} ownerUsername={reportReel?.user_id?.username || reportReel?.user_id?.full_name || ''} contentUrl={getReelShareUrl(reportReel)} />
       <OwnerContentOptionsModal
         isOpen={!!ownerOptionsReel}
         onClose={() => setOwnerOptionsReel(null)}
         item={ownerOptionsReel}
         contentType="reel"
-        contentUrl={ownerOptionsReel ? `${window.location.origin}/reels/${ownerOptionsReel._id || ownerOptionsReel.post_id}` : ''}
+        contentUrl={getReelShareUrl(ownerOptionsReel)}
         onEdit={() => { setEditReel(ownerOptionsReel); setOwnerOptionsReel(null); }}
         onDelete={() => {
           const reelToDelete = ownerOptionsReel;
@@ -1298,7 +1344,7 @@ const Reels = () => {
         }}
       />
       <EditContentModal isOpen={!!editReel} onClose={() => setEditReel(null)} item={editReel} contentType="reel" onSaved={(updated) => { const updatedId = updated?._id || updated?.post_id; setReels((prev) => prev.map((reel) => ((reel._id || reel.post_id) === updatedId ? { ...reel, ...updated } : reel))); }} />
-      <ShareContentModal isOpen={!!shareReel} onClose={() => setShareReel(null)} contentType="reel" contentId={shareReel?._id || shareReel?.post_id} />
+      <ShareContentModal isOpen={!!shareReel} onClose={() => setShareReel(null)} contentType="reel" contentId={shareReel?._id || shareReel?.post_id} contentUrl={getReelShareUrl(shareReel)} />
 
       <style>{`
         @keyframes slideInLeft  { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }

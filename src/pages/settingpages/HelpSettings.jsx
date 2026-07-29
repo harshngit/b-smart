@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   ArrowLeft, Mail, Ticket, MessageSquare, BookOpen, GraduationCap,
-  FileText, Bug, AlertOctagon, UserX, ChevronRight, ChevronDown, ChevronUp,
-  Loader2, Check, Send, X, Search, Phone, Clock, CircleDot, CheckCircle2, Trash2, Plus
+  FileText, Bug, AlertOctagon, ChevronRight, ChevronDown, ChevronUp,
+  Loader2, Check, Send, X, Search, Phone, Clock, CircleDot, CheckCircle2, Trash2, Plus,
+  Film, Image as ImageIcon,
 } from 'lucide-react';
 import api from '../../lib/api';
 
@@ -22,11 +23,13 @@ const Dropdown = ({ value, onChange, options, placeholder = 'Select' }) => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+  const selectedOpt = options.find(opt => (opt.value ?? opt) === value);
+  const displayLabel = selectedOpt ? (selectedOpt.label ?? selectedOpt) : value;
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
-        <span className={value ? 'capitalize' : 'text-gray-400'}>{value || placeholder}</span>
+        <span className={value ? (selectedOpt?.label ? '' : 'capitalize') : 'text-gray-400'}>{displayLabel || placeholder}</span>
         <ChevronDown size={15} className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
@@ -519,27 +522,368 @@ const FAQPanel = () => {
   );
 };
 
+// ── Report a Bug ─────────────────────────────────────────────────────────────
+const APP_VERSION = '1.0.0'; // keep in sync with AboutSettings.jsx
+
+const BUG_CATEGORIES = [
+  { value: 'app_crash',         label: 'App Crash' },
+  { value: 'video_not_playing', label: 'Video Not Playing' },
+  { value: 'login_issue',       label: 'Login Issue' },
+  { value: 'payment_issue',     label: 'Payment Issue' },
+  { value: 'rewards_issue',     label: 'Rewards Issue' },
+  { value: 'upload_issue',      label: 'Upload Issue' },
+  { value: 'ui_problem',        label: 'UI Problem' },
+  { value: 'other',             label: 'Other' },
+];
+
+const BUG_STATUS_CONFIG = {
+  new:         { label: 'New',         color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', icon: CircleDot },
+  in_progress: { label: 'In Progress', color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', icon: Clock },
+  fixed:       { label: 'Fixed',       color: 'text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800', icon: CheckCircle2 },
+  closed:      { label: 'Closed',      color: 'text-gray-500 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700', icon: X },
+};
+
+const BugStatusBadge = ({ status }) => {
+  const cfg = BUG_STATUS_CONFIG[status] || BUG_STATUS_CONFIG.new;
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${cfg.color}`}>
+      <Icon size={10} /> {cfg.label}
+    </span>
+  );
+};
+
+// Which browser is running — used as the "device_model" stand-in on desktop,
+// where there's no physical device model to report.
+const getBrowserLabel = (ua) => {
+  if (/edg\//i.test(ua)) return 'Edge';
+  if (/opr\//i.test(ua) || /opera/i.test(ua)) return 'Opera';
+  if (/chrome\//i.test(ua) && !/edg\//i.test(ua)) return 'Chrome';
+  if (/firefox\//i.test(ua)) return 'Firefox';
+  if (/safari\//i.test(ua) && !/chrome\//i.test(ua)) return 'Safari';
+  return 'Browser';
+};
+
+const WINDOWS_VERSION_LABELS = { '10.0': '10/11', '6.3': '8.1', '6.2': '8', '6.1': '7' };
+
+// Best-effort device/environment capture from the browser — no user input needed.
+// user_id and time of issue don't need to be sent: the backend attaches the
+// authenticated user and a createdAt timestamp automatically.
+const getDeviceInfo = () => {
+  const ua = navigator.userAgent || '';
+  let os_type = '';
+  let os_version = '';
+  let device_model = '';
+
+  if (/android/i.test(ua)) {
+    os_type = 'android';
+    const verMatch = ua.match(/Android\s([\d.]+)/i);
+    if (verMatch) os_version = verMatch[1];
+    const modelMatch = ua.match(/Android[^;]*;\s*([^)]+)\)/i);
+    if (modelMatch) device_model = modelMatch[1].split('Build/')[0].trim();
+  } else if (/iphone|ipad|ipod/i.test(ua)) {
+    os_type = 'ios';
+    const verMatch = ua.match(/OS\s([\d_]+)/i);
+    if (verMatch) os_version = verMatch[1].replace(/_/g, '.');
+    device_model = /ipad/i.test(ua) ? 'iPad' : /ipod/i.test(ua) ? 'iPod' : 'iPhone';
+  } else if (/windows/i.test(ua)) {
+    os_type = 'windows';
+    const verMatch = ua.match(/Windows NT ([\d.]+)/i);
+    os_version = verMatch ? (WINDOWS_VERSION_LABELS[verMatch[1]] || verMatch[1]) : '';
+    device_model = `${getBrowserLabel(ua)} on Windows`;
+  } else if (/mac os x/i.test(ua)) {
+    os_type = 'macos';
+    const verMatch = ua.match(/Mac OS X ([\d_]+)/i);
+    os_version = verMatch ? verMatch[1].replace(/_/g, '.') : '';
+    device_model = `${getBrowserLabel(ua)} on Mac`;
+  } else if (/linux/i.test(ua)) {
+    os_type = 'linux';
+    device_model = `${getBrowserLabel(ua)} on Linux`;
+  } else if (ua) {
+    os_type = 'other';
+    device_model = getBrowserLabel(ua);
+  }
+
+  let network_type = 'other';
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (conn?.type === 'wifi' || conn?.type === 'ethernet') network_type = 'wifi';
+  else if (conn?.type === 'cellular' || /^(2g|3g|4g|slow-2g)$/.test(conn?.effectiveType || '')) network_type = 'mobile_data';
+  else if (!conn && ['windows', 'macos', 'linux'].includes(os_type)) network_type = 'wifi'; // Network Info API isn't in Firefox/Safari — desktops are usually wifi/ethernet
+
+  return { app_version: APP_VERSION, os_type, os_version, device_model, network_type };
+};
+
+// ── Bug report submit form ────────────────────────────────────────────────
+const BugReportForm = ({ onCreated }) => {
+  const [category, setCategory]       = useState('');
+  const [description, setDescription] = useState('');
+  const [attachments, setAttachments] = useState([]); // { id, name, type, url, uploading, error }
+  const [sending, setSending]         = useState(false);
+  const [sent, setSent]               = useState(null); // ticket_id string, or true
+  const [error, setError]             = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleFiles = async (files) => {
+    for (const file of Array.from(files || [])) {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const isVideo = file.type.startsWith('video/');
+      setAttachments(prev => [...prev, { id, name: file.name, type: isVideo ? 'video' : 'image', uploading: true }]);
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await api.post('/upload/post', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        const url = res.data?.media?.url || res.data?.fileUrl || res.data?.url;
+        const type = res.data?.media_type === 'video' ? 'video' : 'image';
+        setAttachments(prev => prev.map(a => a.id === id ? { ...a, uploading: false, url, type } : a));
+      } catch {
+        setAttachments(prev => prev.map(a => a.id === id ? { ...a, uploading: false, error: true } : a));
+      }
+    }
+  };
+
+  const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
+
+  const handleSubmit = async () => {
+    if (!category) { setError('Please select a category.'); return; }
+    if (!description.trim()) { setError('Please describe the issue.'); return; }
+    if (attachments.some(a => a.uploading)) { setError('Please wait for attachments to finish uploading.'); return; }
+    setSending(true); setError('');
+    try {
+      const { data } = await api.post('/bug-reports', {
+        category,
+        description: description.trim(),
+        attachments: attachments.filter(a => a.url).map(a => ({ url: a.url, type: a.type })),
+        ...getDeviceInfo(),
+      });
+      setSent(data?.data?.ticket_id || true);
+      onCreated?.();
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Failed to submit. Try again.');
+    } finally { setSending(false); }
+  };
+
+  if (sent) return (
+    <div className="flex flex-col items-center py-8 gap-3">
+      <div className="w-12 h-12 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center"><Check size={22} className="text-green-500" /></div>
+      <p className="text-sm font-bold text-gray-900 dark:text-white">Report Submitted!</p>
+      {sent !== true && (
+        <p className="text-xs text-gray-400">Ticket ID: <span className="font-mono font-semibold text-gray-600 dark:text-gray-300">{sent}</span></p>
+      )}
+      <button onClick={() => { setSent(null); setCategory(''); setDescription(''); setAttachments([]); }}
+        className="text-xs text-[#fa3f5e] font-semibold">Report Another Issue</button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {error && <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs"><AlertOctagon size={13} /> {error}</div>}
+      <div>
+        <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Category <span className="text-red-400">*</span></label>
+        <Dropdown value={category} onChange={setCategory} options={BUG_CATEGORIES} placeholder="Select issue type" />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Description <span className="text-red-400">*</span></label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Describe what happened…" maxLength={2000} className={`${INPUT_CLS} resize-none`} />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">Attachments (optional)</label>
+        <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden"
+          onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} />
+        <button type="button" onClick={() => fileInputRef.current?.click()}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:border-[#fa3f5e]/40 hover:text-[#fa3f5e] transition-colors">
+          <Plus size={14} /> Add screenshot or screen recording
+        </button>
+        {attachments.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            {attachments.map(a => (
+              <div key={a.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 text-xs">
+                {a.type === 'video' ? <Film size={13} className="text-gray-400 shrink-0" /> : <ImageIcon size={13} className="text-gray-400 shrink-0" />}
+                <span className="flex-1 truncate text-gray-600 dark:text-gray-300">{a.name}</span>
+                {a.uploading ? <Loader2 size={13} className="animate-spin text-gray-400 shrink-0" />
+                  : a.error ? <span className="text-red-400 shrink-0">Failed</span>
+                  : <Check size={13} className="text-green-500 shrink-0" />}
+                <button type="button" onClick={() => removeAttachment(a.id)} className="text-gray-300 hover:text-red-500 shrink-0"><X size={13} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <button onClick={handleSubmit} disabled={sending}
+        className="w-full py-3 rounded-xl bg-[#fa3f5e] text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 hover:opacity-90 transition-opacity">
+        {sending ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : <><Send size={14} /> Submit Report</>}
+      </button>
+    </div>
+  );
+};
+
+// ── Bug reports list + new-form panel (opened as a page, like Contact Support) ──
+const BugReportsPanel = () => {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+
+  const fetchReports = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/bug-reports/my');
+      setReports(data?.data || []);
+    } catch { setReports([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  return (
+    <div className="p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Your Reports ({reports.length})</p>
+        <button onClick={() => setShowForm(f => !f)}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${showForm ? 'bg-gray-200 dark:bg-gray-700 rotate-45' : 'bg-[#fa3f5e] text-white hover:opacity-90'}`}>
+          <Plus size={16} className={showForm ? 'text-gray-600 dark:text-gray-300' : 'text-white'} />
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 shadow-sm">
+          <BugReportForm onCreated={() => { setShowForm(false); fetchReports(); }} />
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
+      ) : reports.length === 0 ? (
+        <div className="text-center py-10">
+          <Bug size={28} className="mx-auto mb-2 text-gray-300 dark:text-gray-700" />
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">No reports yet</p>
+          <p className="text-xs text-gray-400 mt-1">Tap <span className="text-[#fa3f5e] font-bold">+</span> above to report an issue</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {reports.map(r => (
+            <div key={r._id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white capitalize">{(r.category || '').replace(/_/g, ' ')}</p>
+                <BugStatusBadge status={r.status} />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">{r.description}</p>
+              <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                <span className="font-mono">{r.ticket_id}</span>
+                <span>·</span>
+                <span>{timeAgo(r.createdAt)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Report Content — my submitted reports ──────────────────────────────────
+const CONTENT_REPORT_STATUS_CONFIG = {
+  pending:      { label: 'Pending',      color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', icon: CircleDot },
+  reviewed:     { label: 'Reviewed',     color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', icon: Clock },
+  action_taken: { label: 'Action Taken', color: 'text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800', icon: CheckCircle2 },
+  rejected:     { label: 'Rejected',     color: 'text-gray-500 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700', icon: X },
+};
+
+const ContentReportStatusBadge = ({ status }) => {
+  const cfg = CONTENT_REPORT_STATUS_CONFIG[status] || CONTENT_REPORT_STATUS_CONFIG.pending;
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${cfg.color}`}>
+      <Icon size={10} /> {cfg.label}
+    </span>
+  );
+};
+
+// ── Content reports list — opened as a page, like Report a Bug ─────────────
+const ContentReportsPanel = () => {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchReports = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/content-reports/my');
+      setReports(data?.reports || []);
+    } catch { setReports([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  return (
+    <div className="p-5 space-y-4">
+      <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Your Reports ({reports.length})</p>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
+      ) : reports.length === 0 ? (
+        <div className="text-center py-10">
+          <AlertOctagon size={28} className="mx-auto mb-2 text-gray-300 dark:text-gray-700" />
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">No reports yet</p>
+          <p className="text-xs text-gray-400 mt-1">Content you report will show up here</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {reports.map(r => (
+            <div key={r._id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white capitalize">{(r.content_type || '').replace(/_/g, ' ')} · {r.reason}</p>
+                <ContentReportStatusBadge status={r.status} />
+              </div>
+
+              {r.details && <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-2.5">{r.details}</p>}
+
+              {Array.isArray(r.attachments) && r.attachments.length > 0 && (
+                <div className="flex gap-2 mb-2.5 overflow-x-auto">
+                  {r.attachments.map((att, i) => (
+                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
+                      className="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-100 dark:border-gray-800">
+                      {att.type === 'video' ? (
+                        <>
+                          <video src={att.url} className="w-full h-full object-cover" muted />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Film size={16} className="text-white" />
+                          </div>
+                        </>
+                      ) : (
+                        <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {r.action_taken && r.action_taken !== 'none' && (
+                <div className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold text-green-600 dark:text-green-400">
+                  <CheckCircle2 size={12} /> Action taken: {r.action_taken.replace(/_/g, ' ')}
+                </div>
+              )}
+
+              {r.admin_note && (
+                <div className="mb-2.5 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 text-xs text-gray-600 dark:text-gray-300">
+                  <span className="font-semibold text-gray-500 dark:text-gray-400">Admin note: </span>{r.admin_note}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                <span>Reported {timeAgo(r.createdAt)}</span>
+                {r.reviewed_at && <><span>·</span><span>Reviewed {timeAgo(r.reviewed_at)}</span></>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Main Page ─────────────────────────────────────────────────────────────
 const HelpSettings = () => {
   const [activePanel, setActivePanel] = useState(null);
   const [activeQueryId, setActiveQueryId] = useState(null);
-  const [reportLoading, setReportLoading] = useState({});
-  const [reportDone, setReportDone] = useState({});
-
-  const handleReport = async (key) => {
-    setReportLoading(p => ({ ...p, [key]: true }));
-    try { await api.post('/support-queries', { subject: `Report: ${key}`, message: `User reported a ${key} issue`, category: 'other', app_source: 'bsmart' }); }
-    catch { /* silent */ }
-    setReportLoading(p => ({ ...p, [key]: false }));
-    setReportDone(p => ({ ...p, [key]: true }));
-    setTimeout(() => setReportDone(p => { const n = { ...p }; delete n[key]; return n; }), 3000);
-  };
-
-  const REPORTS = [
-    { key: 'bug', icon: Bug, bg: 'bg-orange-50 dark:bg-orange-900/20', color: 'text-orange-500', label: 'Report a Bug', sublabel: 'Found something broken? Let us know' },
-    { key: 'content', icon: AlertOctagon, bg: 'bg-red-50 dark:bg-red-900/20', color: 'text-red-500', label: 'Report Content', sublabel: 'Flag inappropriate or harmful content' },
-    { key: 'user', icon: UserX, bg: 'bg-gray-100 dark:bg-gray-800', color: 'text-gray-500', label: 'Report a User', sublabel: 'Report abusive or suspicious accounts' },
-  ];
 
   // Sub-panel: query detail
   if (activeQueryId) {
@@ -557,9 +901,12 @@ const HelpSettings = () => {
     );
   }
 
-  // Sub-panel: contact, ticket, faq
+  // Sub-panel: contact, bug, content-reports, faq
   if (activePanel) {
-    const panelTitle = activePanel === 'contact' ? 'Contact Support' : 'FAQs';
+    const panelTitle = activePanel === 'contact' ? 'Contact Support'
+      : activePanel === 'bug' ? 'Report a Bug'
+      : activePanel === 'content-reports' ? 'My Content Reports'
+      : 'FAQs';
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black pb-24">
         <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center justify-between z-40">
@@ -571,6 +918,8 @@ const HelpSettings = () => {
           {activePanel === 'contact' && (
             <QueriesWithFormPanel onOpenQuery={(id) => setActiveQueryId(id)} showNameFields={false} />
           )}
+          {activePanel === 'bug' && <BugReportsPanel />}
+          {activePanel === 'content-reports' && <ContentReportsPanel />}
           {activePanel === 'faq' && <FAQPanel />}
         </div>
       </div>
@@ -622,21 +971,10 @@ const HelpSettings = () => {
         <div>
           <SectionTitle title="Reports" />
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-            {REPORTS.map(({ key, icon: Icon, bg, color, label, sublabel }) => (
-              <div key={key} className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-gray-800 last:border-0">
-                <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${bg}`}><Icon size={16} className={color} /></div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sublabel}</p>
-                  </div>
-                </div>
-                <button onClick={() => handleReport(key)} disabled={!!reportLoading[key] || !!reportDone[key]}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all disabled:opacity-60 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
-                  {reportLoading[key] ? <Loader2 size={12} className="animate-spin" /> : reportDone[key] ? <><Check size={12} className="text-green-500" /> Sent</> : 'Report'}
-                </button>
-              </div>
-            ))}
+            <Row icon={Bug} iconBg="bg-orange-50 dark:bg-orange-900/20" iconColor="text-orange-500"
+              label="Report a Bug" sublabel="Found something broken? Let us know" onClick={() => setActivePanel('bug')} />
+            <Row icon={AlertOctagon} iconBg="bg-rose-50 dark:bg-rose-900/20" iconColor="text-rose-500"
+              label="My Content Reports" sublabel="Track posts, reels & ads you've reported" onClick={() => setActivePanel('content-reports')} />
           </div>
           <p className="text-xs text-gray-400 dark:text-gray-500 px-1 mt-2">All reports are reviewed within 24–48 hours.</p>
         </div>

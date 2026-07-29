@@ -16,7 +16,7 @@ const SETTINGS_GROUPS = [
     ],
   },
   {
-    group: 'Preferences',
+    group: 'Preferences', 
     items: [
       { key: 'notifications', label: 'Notifications',        subLabel: 'Manage your notification preferences', icon: Bell,         to: '/settings/notifications', iconBg: 'bg-purple-50 dark:bg-gray-800', iconColor: 'text-purple-500' },
       { key: 'messaging',     label: 'Messaging',            subLabel: 'Auto download images, videos & documents', icon: MessageSquare, to: '/settings/messaging', iconBg: 'bg-teal-50 dark:bg-gray-800', iconColor: 'text-teal-500' },
