@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import api from '../lib/api';
 import authService from '../services/authService';
 import { setUser } from '../store/authSlice';
+import { markNewSignup } from '../utils/tour';
 import { ArrowLeft, User, Mail, Phone, Lock, Sparkles, Eye, EyeOff, ChevronDown, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
 const Signup = () => {
@@ -113,6 +114,7 @@ const Signup = () => {
       const { token, user } = response.data;
       authService.setSession(token);
       dispatch(setUser(user));
+      markNewSignup();
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Something went wrong');
@@ -147,6 +149,7 @@ const Signup = () => {
           try {
             const response = await api.get('/auth/me');
             dispatch(setUser(response.data));
+            markNewSignup();
             navigate('/');
           } catch (err) {
             console.error('Failed to fetch user details:', err);

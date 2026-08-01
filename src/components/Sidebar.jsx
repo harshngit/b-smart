@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, Rocket, LogOut } from 'lucide-react';
+import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, Rocket, LogOut, CirclePlay, Zap } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
 import bsmartLogo from '../assets/bsmart.png';
 import bsmartIcon from '../assets/bsmart_logo.png';
@@ -509,21 +509,21 @@ const Sidebar = ({ onOpenCreateModal }) => {
   ];
 
   const navItems = isVendor ? [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/vendor/dashboard' },
-    { icon: User, label: 'Vendor Profile', path: '/vendor/profile' },
-    { icon: Target, label: 'Spotlights', path: '/vendor/ads-management' },
-    { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
-    { icon: FileText, label: 'Reports & Analytics', path: '/vendor/analytics' },
-    { icon: CreditCard, label: 'Coins & Billing', path: '/vendor/billing' },
-    { icon: Settings, label: 'Settings', path: '/vendor/settings' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/vendor/dashboard', tourId: 'nav-dashboard' },
+    { icon: User, label: 'Vendor Profile', path: '/vendor/profile', tourId: 'nav-vendor-profile' },
+    { icon: CirclePlay, label: 'Spotlights', path: '/vendor/ads-management', tourId: 'nav-spotlights' },
+    { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen), tourId: 'nav-create' },
+    { icon: FileText, label: 'Reports & Analytics', path: '/vendor/analytics', tourId: 'nav-analytics' },
+    { icon: CreditCard, label: 'Coins & Billing', path: '/vendor/billing', tourId: 'nav-billing' },
+    { icon: Settings, label: 'Settings', path: '/vendor/settings', tourId: 'nav-settings' },
   ] : [
-    { icon: Home, label: 'Home', path: '/' },
-    { icon: Search, label: 'Search', path: null, action: openSidebarSearch },
-    { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen) },
-    { icon: Target, label: 'Spotlights', path: '/ads' },
-    { icon: Rocket, label: 'Campaigns', path: '/promote' },
-    { icon: Clapperboard, label: 'bSparks', path: '/reels' },
-    { icon: MessageCircle, label: 'Messages', path: '/messages' },
+    { icon: Home, label: 'Home', path: '/', tourId: 'nav-home' },
+    { icon: Search, label: 'Search', path: null, action: openSidebarSearch, tourId: 'nav-search' },
+    { icon: PlusSquare, label: 'Create', path: null, action: () => setIsCreateDropdownOpen(!isCreateDropdownOpen), tourId: 'nav-create' },
+    { icon: CirclePlay, label: 'Spotlights', path: '/ads', tourId: 'nav-spotlights' },
+    { icon: Rocket, label: 'Campaigns', path: '/promote', tourId: 'nav-campaigns' },
+    { icon: Zap, label: 'bSparks', path: '/reels', tourId: 'nav-bsparks' },
+    { icon: MessageCircle, label: 'Messages', path: '/messages', tourId: 'nav-messages' },
   ];
 
   const profileNavItem = { icon: User, label: 'Profile', path: '/profile' };
@@ -551,7 +551,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
 
             if (item.label === 'Search') {
               return (
-                <div key={item.label} className="relative" ref={sidebarSearchRef}>
+                <div key={item.label} className="relative" ref={sidebarSearchRef} data-tour={item.tourId}>
                   <button
                     onClick={openSidebarSearch}
                     className={`group w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 ${showSearch ? 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white shadow-md' : 'hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-900 dark:text-white'}`}
@@ -573,7 +573,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
 
             if (item.label === 'Create') {
               return (
-                <div key={item.label} className="relative" ref={dropdownRef}>
+                <div key={item.label} className="relative" ref={dropdownRef} data-tour={item.tourId}>
                   <button
                     onClick={item.action}
                     className={`group w-full flex items-center gap-4 p-3 rounded-lg transition-colors duration-200 ${isActive ? 'bg-gradient-to-r from-insta-purple/10 to-insta-orange/10 dark:from-insta-purple/20 dark:to-insta-orange/20' : 'hover:bg-gray-50 dark:hover:bg-gray-900'}`}
@@ -646,6 +646,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
               <Link
                 key={item.label}
                 to={item.path}
+                data-tour={item.tourId}
                 className={`group flex items-center gap-4 p-3 rounded-xl transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white shadow-md' : 'hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-900 dark:text-white'}`}
               >
                 <div className="min-w-[24px] relative">
@@ -668,7 +669,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
           })}
 
           {/* Notifications */}
-          <div className="relative" ref={notificationsRef}>
+          <div className="relative" ref={notificationsRef} data-tour="nav-notifications">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className={`group w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 ${showNotifications ? 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white shadow-md' : 'hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-900 dark:text-white'}`}
@@ -771,6 +772,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
           {!isVendor && (
             <Link
               to={profileNavItem.path}
+              data-tour="nav-profile"
               className={`group flex items-center gap-4 p-3 rounded-xl transition-all duration-200 ${location.pathname.startsWith(profileNavItem.path) ? 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white shadow-md' : 'hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-900 dark:text-white'}`}
             >
               <div className="min-w-[24px] relative">

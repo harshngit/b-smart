@@ -6,7 +6,7 @@ import {
   Download, ArrowDownLeft, ArrowUpRight, RefreshCw,
   CheckCircle2, XCircle, Clock, Loader2, AlertCircle,
   TrendingDown, TrendingUp,
-  Wallet, Sparkles, Megaphone,
+  Wallet, Sparkles, Megaphone, CirclePlay,
   ChevronLeft, ChevronRight, Star, Zap, Crown, Package,
   Tag, BadgeCheck, ChevronDown, ChevronUp, X, Plus, Minus
 } from "lucide-react";
@@ -889,7 +889,7 @@ const ActivePackageCard = ({ refreshTrigger }) => {
 
             {adsMax > 0 && (
               <div className="p-3 rounded-2xl bg-pink-50 dark:bg-pink-900/20 text-center">
-                <Megaphone className="w-4 h-4 text-pink-500 mx-auto mb-1" />
+                <CirclePlay className="w-4 h-4 text-pink-500 mx-auto mb-1" />
                 <div className="text-base font-black text-pink-700 dark:text-pink-300">{uploadedAdsCount}/{adsMax}</div>
                 <div className="text-[10px] text-pink-500 font-semibold uppercase tracking-wide">Spotlights Uploaded</div>
               </div>

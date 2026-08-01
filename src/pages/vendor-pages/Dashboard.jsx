@@ -7,7 +7,7 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   RefreshCw,
-  Megaphone,
+  CirclePlay,
   BarChart2,
   Clock,
   CheckCircle2,
@@ -398,7 +398,7 @@ export default function VendorDashboard() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-tr from-orange-400 via-red-500 to-pink-600 text-white shadow-sm">
-                <Megaphone className="w-4 h-4" />
+                <CirclePlay className="w-4 h-4" />
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 Vendor Portal

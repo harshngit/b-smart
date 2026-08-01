@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import BottomNav from './BottomNav';
 import CreatePostModal from './CreatePostModal';
+import OnboardingTour from './OnboardingTour';
 
 const VendorLayout = () => {
   const { userObject } = useSelector((state) => state.auth);
@@ -70,6 +71,8 @@ const VendorLayout = () => {
           </div>
         </div>
       )}
+
+      <OnboardingTour />
     </div>
   );
 };

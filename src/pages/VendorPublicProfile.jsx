@@ -11,7 +11,7 @@ import {
   ArrowLeft, BadgeCheck, MapPin, Globe, Phone, Mail,
   UserPlus, UserCheck, Heart, Eye, Play, ShoppingBag, Film,
   MessageSquare, Building2, Tag, ChevronRight, Image as ImageIcon,
-  Info, CalendarDays, Package, Images, Megaphone, Calendar,
+  Info, CalendarDays, Package, Images, Calendar, CirclePlay,
   MapPinned, Contact, Users, AtSign, Linkedin, Twitter, Facebook, Instagram
 } from 'lucide-react';
 
@@ -95,7 +95,7 @@ const TABS = [
   { id: 'About', label: 'About', icon: Info },
   { id: 'Products', label: 'Products', icon: Package },
   { id: 'Gallery', label: 'Gallery', icon: Images },
-  { id: 'Ads', label: 'Spotlights', icon: Megaphone },
+  { id: 'Ads', label: 'Spotlights', icon: CirclePlay },
   { id: 'Events', label: 'Events', icon: Calendar },
   { id: 'Locations', label: 'Locations', icon: MapPinned },
   { id: 'Contact', label: 'Contact', icon: Contact },

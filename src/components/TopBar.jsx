@@ -56,6 +56,7 @@ const TopBar = () => {
         {/* Wallet chip */}
         <Link
           to="/wallet"
+          data-tour="wallet"
           className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-gray-800 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] flex items-center justify-center text-white flex-shrink-0">
@@ -69,6 +70,7 @@ const TopBar = () => {
         {/* Notification Heart → goes to /notifications page */}
         <button
           onClick={() => navigate('/notifications')}
+          data-tour="nav-notifications"
           className="relative p-1.5 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
           aria-label="Notifications"
         >
@@ -83,7 +85,7 @@ const TopBar = () => {
         </button>
 
         {userObject?.role !== 'vendor' && (
-          <Link to="/profile">
+          <Link to="/profile" data-tour="nav-profile">
             {/* Orange gradient ring only when user has their own active story */}
             <div className={`w-8 h-8 rounded-full p-[1.5px] ${hasOwnStory ? 'bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]' : 'bg-gray-200 dark:bg-gray-700'}`}>
               <div className="w-full h-full rounded-full bg-white dark:bg-black p-[1px]">

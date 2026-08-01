@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -926,11 +926,11 @@ const Profile = () => {
     const vendorValidated = isVendor ? Boolean(profileUser?.validated ?? vendorInfo?.validated) : false;
 
     const tabConfig = isVendor
-        ? [{ key: 'ads', label: 'Spotlights', icon: <Megaphone size={22} /> }]
+        ? [{ key: 'ads', label: 'Spotlights', icon: <CirclePlay size={22} /> }]
         : [
             { key: 'all',            label: 'All',       icon: <Grid size={22} /> },
             { key: 'posts',          label: 'Moments',   icon: <Image size={22} /> },
-            { key: 'reels',          label: 'bSparks',   icon: <Video size={22} /> },
+            { key: 'reels',          label: 'bSparks',   icon: <Zap size={22} /> },
             { key: 'tweets',         label: 'Buzz',      icon: <MessageCircle size={22} /> },
             { key: 'promote_reels',  label: 'Campaigns', icon: <Rocket size={22} /> },
           ];
@@ -1086,7 +1086,7 @@ const Profile = () => {
             ) : userAds.length === 0 ? (
                 <div className="col-span-3 bg-white dark:bg-black py-14 text-center">
                     <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Megaphone size={30} className="text-gray-300 dark:text-gray-600" />
+                        <CirclePlay size={30} className="text-gray-300 dark:text-gray-600" />
                     </div>
                     <h3 className="font-semibold text-base text-gray-900 dark:text-white mb-1">No Ads Yet</h3>
                     {isOwnProfile && (
@@ -1116,7 +1116,7 @@ const Profile = () => {
                                     <img src={thumb} alt={ad.caption || 'Ad'} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-100 to-pink-100 dark:from-gray-800 dark:to-gray-700">
-                                        <Megaphone size={28} className="text-orange-400 dark:text-gray-500" />
+                                        <CirclePlay size={28} className="text-orange-400 dark:text-gray-500" />
                                     </div>
                                 )}
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-4 text-white font-bold">
@@ -1141,7 +1141,7 @@ const Profile = () => {
                 <div className="col-span-3 bg-white dark:bg-black py-14 text-center">
                     <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
                         {activeTab === 'reels'
-                            ? <Video size={30} className="text-gray-300 dark:text-gray-600" />
+                            ? <Zap size={30} className="text-gray-300 dark:text-gray-600" />
                             : activeTab === 'tweets'
                             ? <MessageCircle size={30} className="text-gray-300 dark:text-gray-600" />
                             : <Grid size={30} className="text-gray-300 dark:text-gray-600" />}

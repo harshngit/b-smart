@@ -5,7 +5,7 @@ import api from "../../lib/api";
 import EditContentModal from "../../components/EditContentModal";
 import {
   Search, Eye, Edit3, Trash2, Pause, Play, Send,
-  Plus, Target, MousePointerClick, Megaphone, Tag,
+  Plus, Target, MousePointerClick, CirclePlay, Tag,
   ChevronDown, X
 } from "lucide-react";
 
@@ -669,7 +669,7 @@ export default function AdsManagement() {
             {/* Empty state */}
             {filteredAds.length === 0 && (
               <div className="p-12 text-center">
-                <Megaphone className="w-12 h-12 mx-auto mb-4 text-gray-200 dark:text-gray-800" />
+                <CirclePlay className="w-12 h-12 mx-auto mb-4 text-gray-200 dark:text-gray-800" />
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">No campaigns found</h3>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">Try adjusting your filters or search query.</p>
                 <button onClick={handleCreateAd}

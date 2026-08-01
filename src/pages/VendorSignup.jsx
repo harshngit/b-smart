@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { markNewSignup } from '../utils/tour';
 import {
   User, Mail, Phone, Lock, Building2, Briefcase, Sparkles,
   CalendarDays, ArrowLeft, ArrowRight, Eye, EyeOff,
@@ -113,6 +114,7 @@ const VendorSignup = () => {
     };
     try {
       await api.post('/auth/register', payload);
+      markNewSignup();
       setCompleted(true); navigate('/login');
     } catch (err) {
       setError(err.response?.data?.message || 'Something went wrong.');

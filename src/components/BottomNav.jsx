@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Home, Plus, Target, User, LayoutDashboard, FileText,
-  Clapperboard, Settings, Rocket, X, Coins, Search, MessageCircle
+  Clapperboard, Settings, Rocket, X, Coins, Search, MessageCircle,
+  CirclePlay, Zap
 } from 'lucide-react';
 
 const BottomNav = ({ onOpenCreateModal }) => {
@@ -35,24 +36,24 @@ const BottomNav = ({ onOpenCreateModal }) => {
 
   // Vendor: 3 left | FAB center | 3 right
   const vendorNav = [
-    { icon: LayoutDashboard, path: '/vendor/dashboard',      label: 'Dashboard' },
-    { icon: Target,          path: '/vendor/ads-management', label: 'Spotlights' },
-    { icon: FileText,        path: '/vendor/analytics',      label: 'Analytics' },
+    { icon: LayoutDashboard, path: '/vendor/dashboard',      label: 'Dashboard', tourId: 'nav-dashboard' },
+    { icon: CirclePlay,      path: '/vendor/ads-management', label: 'Spotlights', tourId: 'nav-spotlights' },
+    { icon: FileText,        path: '/vendor/analytics',      label: 'Analytics', tourId: 'nav-analytics' },
     null,
-    { icon: Coins,           path: '/vendor/billing',  label: 'Coins'     },
-    { icon: Settings,        path: '/vendor/settings',       label: 'Settings'  },
-    { icon: User,            path: '/vendor/profile',        label: 'Profile'   },
+    { icon: Coins,           path: '/vendor/billing',  label: 'Coins', tourId: 'nav-billing' },
+    { icon: Settings,        path: '/vendor/settings',       label: 'Settings', tourId: 'nav-settings' },
+    { icon: User,            path: '/vendor/profile',        label: 'Profile', tourId: 'nav-vendor-profile' },
   ];
 
   // Member: 3 left | FAB center | 3 right
   const memberNav = [
-    { icon: Home,          path: '/',         label: 'Home'     },
-    { icon: Target,        path: '/ads',      label: 'Spotlights' },
-    { icon: Clapperboard,  path: '/reels',    label: 'bSparks'    },
+    { icon: Home,          path: '/',         label: 'Home', tourId: 'nav-home' },
+    { icon: CirclePlay,    path: '/ads',      label: 'Spotlights', tourId: 'nav-spotlights' },
+    { icon: Zap,           path: '/reels',    label: 'bSparks', tourId: 'nav-bsparks' },
     null,
-    { icon: Rocket,        path: '/promote',  label: 'Campaigns'  },
-    { icon: MessageCircle, path: '/messages', label: 'Messages' },
-    { icon: Search,        path: '/search',   label: 'Search'   },
+    { icon: Rocket,        path: '/promote',  label: 'Campaigns', tourId: 'nav-campaigns' },
+    { icon: MessageCircle, path: '/messages', label: 'Messages', tourId: 'nav-messages' },
+    { icon: Search,        path: '/search',   label: 'Search', tourId: 'nav-search' },
   ];
 
   const navItems = isVendor ? vendorNav : memberNav;
@@ -73,7 +74,7 @@ const BottomNav = ({ onOpenCreateModal }) => {
         {navItems.map((item, idx) => {
           if (item === null) {
             return (
-              <div key="fab" className="relative -top-5 flex flex-col items-center flex-shrink-0 mx-0.5">
+              <div key="fab" className="relative -top-5 flex flex-col items-center flex-shrink-0 mx-0.5" data-tour="nav-create">
                 <button
                   onClick={handleCreate}
                   className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-black text-white transform transition-transform active:scale-95 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]"
@@ -88,6 +89,7 @@ const BottomNav = ({ onOpenCreateModal }) => {
             <Link
               key={item.path}
               to={item.path}
+              data-tour={item.tourId}
               className={`flex flex-col items-center gap-0.5 flex-1 py-1 min-w-0 ${active ? activeColor : inactiveColor}`}
             >
               <div className="relative">

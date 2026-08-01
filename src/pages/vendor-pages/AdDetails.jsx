@@ -10,7 +10,7 @@ import {
   Activity, UserCheck, BarChart, PieChart as PieIcon, MapPinned,
   Venus, Mars, Transgender,
   MousePointerClick, Target, Smartphone, Monitor, Calendar,
-  Megaphone, ShieldCheck, TestTube2, CalendarClock, Zap,
+  Megaphone, ShieldCheck, TestTube2, CalendarClock, Zap, CirclePlay,
   Link2, Phone, Mail, MessageSquare, Layers, X, Play
 } from "lucide-react";
 import {
@@ -2031,8 +2031,8 @@ export default function AdDetails() {
                 </div>
 
                 {/* Ad Info */}
-                <Card title="Spotlight Information" icon={Megaphone}>
-                  {ad.ad_title && <InfoRow icon={Megaphone}    label="Spotlight Title"  value={ad.ad_title} />}
+                <Card title="Spotlight Information" icon={CirclePlay}>
+                  {ad.ad_title && <InfoRow icon={CirclePlay}    label="Spotlight Title"  value={ad.ad_title} />}
                   {ad.ad_description && <InfoRow icon={Layers}  label="Description"    value={ad.ad_description} />}
                   <InfoRow icon={Hash}        label="Caption"        value={ad.caption}      />
                   <InfoRow icon={Tag}         label="Category"       value={ad.category}     />

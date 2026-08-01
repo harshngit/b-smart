@@ -5,6 +5,7 @@ import BottomNav from './BottomNav';
 import TopBar from './TopBar';
 import Sidebar from './Sidebar';
 import CreatePostModal from './CreatePostModal';
+import OnboardingTour from './OnboardingTour';
 import api from '../lib/api';
 import { fetchMe, setUser } from '../store/authSlice';
 import { setWalletBalance } from '../store/walletSlice';
@@ -366,6 +367,7 @@ const Layout = () => {
       {!isExcludedPage && (
         <Link
           to="/wallet"
+          data-tour="wallet"
           className="hidden md:flex fixed bottom-8 right-8 z-50 bg-white dark:bg-[#262626] rounded-full shadow-lg p-1 pr-4 items-center gap-2 border border-gray-100 dark:border-gray-800 animate-fade-in hover:scale-105 transition-transform cursor-pointer"
         >
           <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-white">
@@ -389,6 +391,8 @@ const Layout = () => {
           </div>
         </Link>
       )}
+
+      <OnboardingTour />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Grid, Film, Megaphone, Rocket, Heart, Eye, MessageCircle, Play, Image } from 'lucide-react';
+import { ArrowLeft, Loader2, Grid, Rocket, Heart, Eye, MessageCircle, Play, Image, CirclePlay, Zap } from 'lucide-react';
 import api from '../../lib/api';
 import PostDetailModal from '../../components/PostDetailModal';
 import TweetDetailModal from '../../components/TweetDetailModal';
@@ -41,8 +41,8 @@ const getItemType = (item) => {
 const TABS = [
   { key: 'all', label: 'All', icon: Grid },
   { key: 'post', label: 'Moments', icon: Image },
-  { key: 'reel', label: 'bSparks', icon: Film },
-  { key: 'ad', label: 'Spotlights', icon: Megaphone },
+  { key: 'reel', label: 'bSparks', icon: Zap },
+  { key: 'ad', label: 'Spotlights', icon: CirclePlay },
   { key: 'promote_reel', label: 'Campaigns', icon: Rocket },
 ];
 
@@ -218,9 +218,9 @@ const SavedPosts = () => {
                     <img src={thumb} alt="" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-700">
-                      {type === 'ad' ? <Megaphone size={24} className="text-gray-400" />
+                      {type === 'ad' ? <CirclePlay size={24} className="text-gray-400" />
                         : type === 'promote_reel' ? <Rocket size={24} className="text-gray-400" />
-                        : type === 'reel' ? <Film size={24} className="text-gray-400" />
+                        : type === 'reel' ? <Zap size={24} className="text-gray-400" />
                         : <Image size={24} className="text-gray-400" />}
                     </div>
                   )}

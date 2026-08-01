@@ -272,7 +272,7 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults
         </div>
 
         <div className="hidden xl:flex items-center">
-          <div className="w-[300px]">
+          <div className="w-[300px]" data-tour="location">
             <LocationSelector />
           </div>
         </div>
