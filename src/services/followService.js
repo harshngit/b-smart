@@ -5,6 +5,10 @@ export const FOLLOW_STATUS_CHANGED_EVENT = 'bsmart:follow-status-changed';
 export const normalizeFollowStateFromStatus = (status) => {
   if (status?.isFollowing || status?.status === 'following') return 'following';
   if (status?.isPending || status?.requestPending || status?.requested || status?.status === 'pending') return 'requested';
+  // POST /follow against a public account replies { followed: true, alreadyFollowing } —
+  // no isFollowing/status field, since that shape only exists on the private-account
+  // (pending request) branch and on GET /follows/check.
+  if (status?.followed) return 'following';
   return 'not_following';
 };
 
