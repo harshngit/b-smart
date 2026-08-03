@@ -7,7 +7,7 @@ import promoteReelService from '../services/promoteReelService';
 import { Image, Images, Video, X, ArrowLeft, Maximize2, Search, Copy, ZoomIn, Plus, ChevronLeft, ChevronRight, UserPlus, ChevronDown, ChevronUp, Smile, Megaphone, Rocket,
   MousePointerClick, Target, Smartphone, Monitor, Calendar, Link2, Phone, Mail, MessageSquare,
   TestTube2, CalendarClock, Zap, ShieldCheck, Tag, Globe, MapPin, Coins, Pencil,
-  ShoppingBag, Trash2, Volume2, VolumeX, Play, Pause
+  ShoppingBag, Trash2, Volume2, VolumeX, Play, Pause, CloudLightning
 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
@@ -2005,7 +2005,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                       }}
                       className={`flex items-center gap-2 px-3 py-2 rounded-xl ${postType === 'tweet' ? 'bg-white/20' : 'hover:bg-white/10'}`}
                     >
-                      <Image size={18} /> Buzz
+                      <CloudLightning size={18} /> Buzz
                     </button>
                     <button
                       onClick={() => setPostType('reel')}

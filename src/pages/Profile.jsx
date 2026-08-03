@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -931,7 +931,7 @@ const Profile = () => {
             { key: 'all',            label: 'All',       icon: <Grid size={22} /> },
             { key: 'posts',          label: 'Moments',   icon: <Image size={22} /> },
             { key: 'reels',          label: 'bSparks',   icon: <Zap size={22} /> },
-            { key: 'tweets',         label: 'Buzz',      icon: <MessageCircle size={22} /> },
+            { key: 'tweets',         label: 'Buzz',      icon: <CloudLightning size={22} /> },
             { key: 'promote_reels',  label: 'Campaigns', icon: <Rocket size={22} /> },
           ];
 
@@ -1143,7 +1143,7 @@ const Profile = () => {
                         {activeTab === 'reels'
                             ? <Zap size={30} className="text-gray-300 dark:text-gray-600" />
                             : activeTab === 'tweets'
-                            ? <MessageCircle size={30} className="text-gray-300 dark:text-gray-600" />
+                            ? <CloudLightning size={30} className="text-gray-300 dark:text-gray-600" />
                             : <Grid size={30} className="text-gray-300 dark:text-gray-600" />}
                     </div>
                     <h3 className="font-semibold text-base text-gray-900 dark:text-white mb-1">
@@ -1186,7 +1186,7 @@ const Profile = () => {
             ) : userTweets.length === 0 ? (
                 <div className="bg-white dark:bg-black py-14 text-center">
                     <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <MessageCircle size={30} className="text-gray-300 dark:text-gray-600" />
+                        <CloudLightning size={30} className="text-gray-300 dark:text-gray-600" />
                     </div>
                     <h3 className="font-semibold text-base text-gray-900 dark:text-white mb-1">No Tweets Yet</h3>
                     {isOwnProfile && (
