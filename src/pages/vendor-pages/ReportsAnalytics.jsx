@@ -34,7 +34,7 @@ const REPORTS = [
   { id: "engagement", label: "Engagement Report", endpoint: "/reports/engagement", desc: "Likes, shares, comments & interactions", icon: Heart, color: "text-pink-500", bg: "bg-pink-50 dark:bg-pink-900/20" },
   { id: "conversion", label: "Conversion Report", endpoint: "/reports/conversions", desc: "Conversion tracking & ROI insights", icon: Zap, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
   { id: "geographic", label: "Geographic Report", endpoint: "/reports/geographic", desc: "Audience breakdown by location", icon: Globe, color: "text-green-500", bg: "bg-green-50 dark:bg-green-900/20" },
-  { id: "financial", label: "Financial Report", endpoint: "/wallet/vendor/:userId/history", desc: "Spend, budget & billing summary", icon: DollarSign, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-900/20" },
+  { id: "financial", label: "Financial Report", endpoint: "/reports/financial", desc: "Spend, budget & billing summary", icon: DollarSign, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-900/20" },
 ];
 
 const PRESETS = [
@@ -66,13 +66,13 @@ const COLUMNS = {
     ["ad_name", "Spotlight Name"], ["impressions", "Impressions"], ["likes", "Likes"], ["dislikes", "Dislikes"], ["comments", "Comments"], ["saves", "Saves"], ["engagement_rate", "Engagement Rate", "percent"],
   ],
   conversion: [
-    ["ad_name", "Spotlight Name"], ["conversions", "Conversions"], ["conversion_rate", "Conversion Rate", "percent"], ["cost_per_conversion", "Cost/Conversion", "decimal"], ["roas", "ROAS", "decimal"], ["revenue", "Revenue"], ["total_spend", "Spend"],
+    ["ad_name", "Spotlight Name"], ["impressions", "Impressions"], ["total_clicks", "Total Clicks"], ["conversions", "Conversions"], ["conversion_rate", "Conversion Rate", "percent"], ["cost_per_conversion", "Cost/Conversion", "decimal"], ["coins_spent", "Coins Spent"],
   ],
   geographic: [
     ["country", "Country"], ["impressions", "Impressions"], ["clicks", "Clicks"], ["ctr", "CTR", "percent"], ["reach", "Reach"],
   ],
   financial: [
-    ["period", "Period"], ["total_spend", "Total Spend"], ["coins_used", "Coins Used"], ["budget_used", "Budget Used", "percent"], ["cpm", "CPM", "decimal"], ["cost_per_lead", "Cost Per Lead", "decimal"],
+    ["ad_name", "Spotlight Name"], ["total_budget_coins", "Total Budget"], ["total_coins_spent", "Total Spent"], ["remaining_budget_coins", "Remaining"], ["period_coins_spent", "Spent (Period)"],
   ],
 };
 
@@ -145,15 +145,6 @@ const normalizeSummary = (data) => ({
   reach: data?.overview?.reach ?? 0,
 });
 
-const getWeekStart = (value) => {
-  const date = new Date(value);
-  const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const day = normalized.getDay();
-  const diff = normalized.getDate() - day + (day === 0 ? -6 : 1);
-  normalized.setDate(diff);
-  return normalized;
-};
-
 const normalizeRows = (reportId, data) => {
   const rows = Array.isArray(data?.data) ? data.data : Array.isArray(data?.rows) ? data.rows : Array.isArray(data) ? data : [];
   if (reportId === "performance") {
@@ -169,9 +160,9 @@ const normalizeRows = (reportId, data) => {
   }
   if (reportId === "click") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Spotlight", impressions: r.impressions ?? 0, total_clicks: r.total_clicks ?? 0, unique_clicks: r.unique_clicks ?? 0, invalid_clicks: r.invalid_clicks ?? 0, click_rate: r.click_rate ?? 0, cpc: r.cpc ?? 0, coins_spent: r.coins_spent ?? 0 }));
   if (reportId === "engagement") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Spotlight", impressions: r.impressions ?? 0, likes: r.likes ?? 0, dislikes: r.dislikes ?? 0, comments: r.comments ?? 0, saves: r.saves ?? 0, engagement_rate: r.engagement_rate ?? 0 }));
-  if (reportId === "conversion") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Spotlight", conversions: r.conversions ?? r.unique_clicks ?? 0, conversion_rate: r.conversion_rate ?? 0, cost_per_conversion: r.cost_per_conversion ?? r.cost_per_lead ?? 0, roas: r.roas ?? 0, revenue: r.revenue ?? 0, total_spend: r.total_spend ?? r.spend ?? 0 }));
+  if (reportId === "conversion") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Spotlight", impressions: r.impressions ?? 0, total_clicks: r.total_clicks ?? 0, conversions: r.conversions ?? r.unique_clicks ?? 0, conversion_rate: r.conversion_rate ?? 0, cost_per_conversion: r.cost_per_conversion ?? 0, coins_spent: r.coins_spent ?? 0 }));
   if (reportId === "geographic") return rows.map((r) => ({ country: r.country || r._id || "Unknown", impressions: r.impressions ?? 0, clicks: r.clicks ?? r.total_clicks ?? 0, ctr: r.ctr ?? r.click_rate ?? 0, reach: r.reach ?? 0 }));
-  if (reportId === "financial") return Array.isArray(data?.financialRows) ? data.financialRows : [];
+  if (reportId === "financial") return rows.map((r) => ({ ad_name: r.ad_name || r.caption || "Untitled Spotlight", total_budget_coins: r.total_budget_coins ?? 0, total_coins_spent: r.total_coins_spent ?? 0, remaining_budget_coins: r.remaining_budget_coins ?? 0, period_coins_spent: r.period_coins_spent ?? 0 }));
   return rows;
 };
 
@@ -260,79 +251,9 @@ export default function ReportsAnalytics() {
     setReportUnavailable(false);
     setFinancialMeta(null);
     try {
-      let res;
+      const res = await api.get(currentReport.endpoint, { params });
       if (currentReport.id === "financial") {
-        const walletRes = await api.get(`/wallet/vendor/${userObject?._id}/history`, {
-          params: { startDate: params.startDate, endDate: params.endDate, limit: 500, page: 1 },
-        });
-        const transactions = Array.isArray(walletRes.data?.transactions) ? walletRes.data.transactions : [];
-        const debitTransactions = transactions
-          .filter((tx) => tx.direction === "debit")
-          .sort((a, b) => new Date(a.created_at || a.createdAt) - new Date(b.created_at || b.createdAt));
-
-        const grouped = new Map();
-        debitTransactions.forEach((tx) => {
-          const createdAt = tx.created_at || tx.createdAt;
-          if (!createdAt) return;
-          const weekStart = getWeekStart(createdAt);
-          const key = dateStr(weekStart);
-          if (!grouped.has(key)) {
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 6);
-            grouped.set(key, {
-              startDate: dateStr(weekStart),
-              endDate: dateStr(weekEnd),
-              total_spend: 0,
-            });
-          }
-          grouped.get(key).total_spend += Number(tx.amount || 0);
-        });
-
-        const periods = Array.from(grouped.values()).sort((a, b) => a.startDate.localeCompare(b.startDate));
-        const budgetBase = Number(walletRes.data?.summary?.total_credited || 0) || (Number(walletRes.data?.summary?.total_debited || 0) + Number(walletRes.data?.wallet?.balance || 0));
-
-        const financialRows = await Promise.all(periods.map(async (period, index) => {
-          let periodSummary = null;
-          try {
-            const summaryRes = await api.get("/reports/summary", {
-              params: {
-                ...params,
-                startDate: period.startDate,
-                endDate: period.endDate,
-              },
-            });
-            periodSummary = summaryRes.data?.overview || {};
-          } catch {
-            periodSummary = {};
-          }
-          const impressions = Number(periodSummary?.total_impressions || 0);
-          const conversions = Number(periodSummary?.conversions || 0);
-          const spend = Number(period.total_spend || 0);
-          return {
-            period: `Week ${index + 1}`,
-            total_spend: spend,
-            coins_used: spend,
-            budget_used: budgetBase > 0 ? +((spend / budgetBase) * 100).toFixed(2) : 0,
-            cpm: impressions > 0 ? +((spend / impressions) * 1000).toFixed(2) : 0,
-            cost_per_lead: conversions > 0 ? +(spend / conversions).toFixed(2) : 0,
-          };
-        }));
-
-        res = {
-          data: {
-            ...walletRes.data,
-            financialRows,
-          },
-        };
-      } else {
-        res = await api.get(currentReport.endpoint, { params });
-      }
-      if (currentReport.id === "financial") {
-        setFinancialMeta({
-          wallet: res.data?.wallet || null,
-          summary: res.data?.summary || null,
-          user: res.data?.user || null,
-        });
+        setFinancialMeta(res.data?.overview || null);
       }
       setRows(normalizeRows(currentReport.id, res.data));
     } catch (err) {
@@ -342,7 +263,7 @@ export default function ReportsAnalytics() {
     } finally {
       setReportLoading(false);
     }
-  }, [currentReport, params, userObject?._id]);
+  }, [currentReport, params]);
 
   useEffect(() => { fetchAds(); }, [fetchAds]);
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
@@ -723,23 +644,23 @@ export default function ReportsAnalytics() {
                 </div>
             </div>
 
-            {selectedReport === "financial" && financialMeta?.summary ? (
+            {selectedReport === "financial" && financialMeta ? (
               <div className="grid grid-cols-2 gap-3 border-b border-gray-100 bg-gray-50/50 px-5 py-4 dark:border-gray-800 dark:bg-gray-800/30 md:grid-cols-4">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Wallet Balance</div>
-                  <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{fmt(financialMeta.wallet?.balance)}</div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Budget</div>
+                  <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{fmt(financialMeta.total_budget_coins)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Credited</div>
-                  <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{fmt(financialMeta.summary.total_credited)}</div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Coins Used</div>
+                  <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{fmt(financialMeta.coins_used)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Debited</div>
-                  <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{fmt(financialMeta.summary.total_debited)}</div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Remaining Budget</div>
+                  <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{fmt(financialMeta.remaining_budget_coins)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Transactions</div>
-                  <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{fmt(financialMeta.summary.total_transactions)}</div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-gray-400">Spent (Period)</div>
+                  <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{fmt(financialMeta.period_coins_spent)}</div>
                 </div>
               </div>
             ) : null}
