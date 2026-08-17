@@ -415,6 +415,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef(null);
   const emojiPickerRefMobile = useRef(null);
+  const emojiPickerRefSimple = useRef(null);
   const [tags, setTags] = useState([]);
   const [showTagSearch, setShowTagSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1603,16 +1604,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   const fetchUsers = async (query) => {
     setIsSearchingUsers(true);
     try {
-      const { data } = await api.get('https://api.bebsmart.in/api/users');
-      let usersRaw = Array.isArray(data) ? data : (data.users || []);
-      const users = usersRaw.map(item => item.user || item);
-      let filtered = users;
-      if (query && query.trim()) {
-        const q = query.trim().toLowerCase();
-        filtered = users.filter(u => (u.username || '').toLowerCase().includes(q) || (u.full_name || '').toLowerCase().includes(q));
-      }
-      const mapped = filtered.map(u => ({
-        id: u.id, username: u.username, avatar_url: u.avatar_url || '', full_name: u.full_name || ''
+      const { data } = await api.get('/users/tag-list', { params: query?.trim() ? { q: query.trim() } : {} });
+      const users = Array.isArray(data?.data) ? data.data : [];
+      const mapped = users.map(u => ({
+        id: u._id, username: u.username, avatar_url: u.avatar_url || '', full_name: u.full_name || ''
       }));
       setSearchResults(mapped);
     } catch {
@@ -1627,11 +1622,10 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     const loadAll = async () => {
       setIsLoadingAllUsers(true);
       try {
-        const { data } = await api.get('https://api.bebsmart.in/api/users');
-        const usersRaw = Array.isArray(data) ? data : (data.users || []);
-        const users = usersRaw.map(item => item.user || item);
+        const { data } = await api.get('/users/tag-list');
+        const users = Array.isArray(data?.data) ? data.data : [];
         const mapped = users.map(u => ({
-          id: u.id, username: u.username, avatar_url: u.avatar_url || '', full_name: u.full_name || ''
+          id: u._id, username: u.username, avatar_url: u.avatar_url || '', full_name: u.full_name || ''
         }));
         setAllUsers(mapped);
       } catch {
@@ -1685,6 +1679,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     const handlePointerDown = (event) => {
       if (emojiPickerRef.current?.contains(event.target)) return;
       if (emojiPickerRefMobile.current?.contains(event.target)) return;
+      if (emojiPickerRefSimple.current?.contains(event.target)) return;
       setShowEmojiPicker(false);
     };
 
@@ -3542,7 +3537,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                   maxLength={2200}
                 />
                 <div className="flex items-center justify-between mt-2">
-                  <div className="relative">
+                  <div className="relative" ref={emojiPickerRefSimple}>
                     <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><Smile size={20} /></button>
                     {showEmojiPicker && (
                       <div className="absolute top-full -mt-24 left-0 z-50">
