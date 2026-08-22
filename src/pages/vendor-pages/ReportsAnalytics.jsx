@@ -674,17 +674,30 @@ export default function ReportsAnalytics() {
             ) : rows.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-12 text-center"><BarChart2 className="h-8 w-8 text-gray-300" /><p className="text-sm font-semibold text-gray-500 dark:text-gray-300">No data for the selected filters.</p></div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="max-h-[420px] overflow-auto">
                 <table className="w-full text-left">
-                  <thead>
+                  <thead className="sticky top-0 z-10">
                     <tr className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/50">
-                      {(COLUMNS[selectedReport] || []).map((col) => <th key={col[0]} className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">{col[1]}</th>)}
+                      {(COLUMNS[selectedReport] || []).map((col) => <th key={col[0]} className="whitespace-nowrap px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">{col[1]}</th>)}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                     {rows.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE).map((row, idx) => (
                       <tr key={`${selectedReport}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                        {(COLUMNS[selectedReport] || []).map((col) => <td key={col[0]} className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{fmt(row[col[0]], col[2])}</td>)}
+                        {(COLUMNS[selectedReport] || []).map((col, colIdx) => {
+                          const value = fmt(row[col[0]], col[2]);
+                          return (
+                            <td
+                              key={col[0]}
+                              title={colIdx === 0 ? String(value) : undefined}
+                              className={`px-4 py-3 text-sm text-gray-700 dark:text-gray-300 ${
+                                colIdx === 0 ? "max-w-[220px] truncate" : "whitespace-nowrap"
+                              }`}
+                            >
+                              {value}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>

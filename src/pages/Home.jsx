@@ -616,9 +616,18 @@ const Footer = () => (
         <span className="hover:underline cursor-pointer">Terms</span>
         <span className="hover:underline cursor-pointer">Locations</span>
         <span className="hover:underline cursor-pointer">Language</span>
-        <span className="hover:underline cursor-pointer">Meta Verified</span>
       </div>
-      <p className="uppercase tracking-widest font-semibold opacity-80">© 2026 B-Smart from Meta</p>
+      <p className="uppercase tracking-widest font-semibold opacity-80">
+        © 2026 B-Smart from{' '}
+        <a
+          href="https://ruvees.in/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:underline"
+        >
+          Ruvees
+        </a>
+      </p>
     </div>
   </footer>
 );
