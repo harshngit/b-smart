@@ -5,7 +5,9 @@ import api from '../lib/api';
 import authService from '../services/authService';
 import { setUser } from '../store/authSlice';
 import { markNewSignup } from '../utils/tour';
-import { ArrowLeft, User, Mail, Phone, Lock, Sparkles, Eye, EyeOff, ChevronDown, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Lock, Eye, EyeOff, ChevronDown, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import AuthFooter from '../components/AuthFooter';
+import AuthVisualPanel from '../components/AuthVisualPanel';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -177,26 +179,10 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen flex bg-white dark:bg-black lg:h-screen lg:overflow-hidden">
-      {/* Left Side - Visuals (Hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 lg:h-screen lg:sticky lg:top-0 relative bg-insta-gradient overflow-hidden">
-        <div className="absolute inset-0 bg-black/10" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-12 text-center z-10">
-          <div className="w-24 h-24 bg-white/20 backdrop-blur-lg rounded-3xl flex items-center justify-center mb-8 shadow-xl border border-white/30">
-            <Sparkles size={48} className="text-white" />
-          </div>
-          <h1 className="text-4xl font-bold mb-4 tracking-tight">Join the Community</h1>
-          <p className="text-lg text-white/90 max-w-md font-light leading-relaxed">
-            Create an account to start sharing your photos and videos with the people you care about.
-          </p>
-
-          {/* Decorative circles */}
-          <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
-          <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-purple-900/20 rounded-full blur-3xl" />
-        </div>
-      </div>
+      <AuthVisualPanel />
 
       {/* Right Side - Form (scrollable on desktop) */}
-      <div className="w-full lg:w-1/2 lg:h-screen lg:overflow-y-auto flex flex-col justify-start px-6 sm:px-12 xl:px-24 bg-white dark:bg-black py-12">
+      <div className="w-full lg:w-[40%] lg:h-screen lg:overflow-y-auto flex flex-col justify-start px-6 sm:px-12 xl:px-24 bg-white dark:bg-black py-12">
         <div className="max-w-md w-full mx-auto">
           <div className="mb-8">
             {/* <Link to="/" className="inline-flex items-center text-gray-500 hover:text-insta-pink transition-colors mb-6 group">
@@ -490,6 +476,8 @@ const Signup = () => {
               </Link>
             </p>
           </div>
+
+          <AuthFooter />
         </div>
       </div>
     </div>

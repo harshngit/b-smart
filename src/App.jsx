@@ -44,6 +44,7 @@ import AccountActionsSettings from './pages/settingpages/AccountActionsSettings'
 import NotificationSettings from './pages/settingpages/NotificationSettings';
 import SavedPosts from './pages/settingpages/SavedPosts';
 import AuthCallback from './pages/AuthCallback';
+import PublicPolicyPage from './pages/PublicPolicyPage';
 import Notifications from './pages/Notifications';
 import VendorNotifications from './pages/vendor-pages/VendorNotifications';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -122,6 +123,7 @@ function App() {
           <Route path="/auth/google/success" element={<AuthCallback />} />
           <Route path="/forgot-password"    element={<ForgotPassword />} />
           <Route path="/verify-otp"         element={<VerifyOtp />} />
+          <Route path="/legal/:type"        element={<PublicPolicyPage />} />
 
           <Route path="/" element={
             <ProtectedRoute>

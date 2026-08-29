@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, FileText, Shield, RefreshCw, BookOpen,
+  ArrowLeft, FileText, Shield, RefreshCw, BookOpen, ShieldCheck,
   Download, Trash2, SlidersHorizontal, Database, Edit3, XCircle,
-  Loader2, Check, ChevronRight, X, AlertCircle,
+  Loader2, Check, ChevronRight, X, AlertCircle, LifeBuoy, Megaphone,
 } from 'lucide-react';
 import api from '../../lib/api';
 
@@ -56,6 +56,21 @@ const LEGAL_DOCS = [
     icon: BookOpen,  iconBg: 'bg-teal-50 dark:bg-gray-800',   iconColor: 'text-teal-500',
     label: 'Community Guidelines', sublabel: 'Standards for a safe community',
     policyType: 'community_guidelines',
+  },
+  {
+    icon: ShieldCheck, iconBg: 'bg-emerald-50 dark:bg-gray-800', iconColor: 'text-emerald-500',
+    label: 'Child Safety Standards', sublabel: 'Our standards against CSAE',
+    policyType: 'child-safety-standards',
+  },
+  {
+    icon: LifeBuoy, iconBg: 'bg-cyan-50 dark:bg-gray-800', iconColor: 'text-cyan-500',
+    label: 'Support', sublabel: 'Get help with your account',
+    policyType: 'support',
+  },
+  {
+    icon: Megaphone, iconBg: 'bg-violet-50 dark:bg-gray-800', iconColor: 'text-violet-500',
+    label: 'Marketing', sublabel: 'About B-Smart and what you can do',
+    policyType: 'marketing',
   },
 ];
 
