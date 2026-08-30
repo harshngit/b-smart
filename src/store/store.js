@@ -4,6 +4,7 @@ import themeReducer from './themeSlice';
 import walletReducer from './walletSlice';
 import chatReducer from './chatSlice';
 import storyReducer from './storySlice';
+import cartReducer from './cartSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,5 +13,6 @@ export const store = configureStore({
     wallet: walletReducer,
     chat: chatReducer,
     story: storyReducer,
+    cart: cartReducer,
   },
 });

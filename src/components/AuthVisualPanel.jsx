@@ -29,9 +29,9 @@ const AuthVisualPanel = () => {
   const active = SLIDES[activeIndex];
 
   return (
-    <div className="hidden lg:flex lg:w-[60%] self-stretch relative bg-gradient-to-b from-[#fff3f4] to-white dark:from-black dark:to-black overflow-hidden flex-col">
+    <div className="hidden lg:flex lg:w-[60%] self-stretch relative bg-gradient-to-b from-[#fff3f4] via-white to-white dark:from-black dark:via-[#1a0a14] dark:to-black overflow-hidden flex-col">
       <div className="p-10 pb-0">
-        <img src={bsmartLogo} alt="bSmart" className="h-10 w-auto object-contain" />
+        <img src={bsmartLogo} alt="bSmart" className="h-16 w-auto object-contain" />
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-10 min-h-0">
@@ -42,7 +42,7 @@ const AuthVisualPanel = () => {
             autoplay={{ delay: 3000, disableOnInteraction: false }}
             onSlideChange={(swiper) => setActiveIndex(swiper.realIndex)}
             loop
-            className="w-full aspect-[4/3] rounded-3xl shadow-xl"
+            className="w-full "
           >
             {SLIDES.map((slide) => (
               <SwiperSlide key={slide.name}>

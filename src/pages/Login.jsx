@@ -199,10 +199,6 @@ const Login = () => {
       <div className="w-full lg:w-[40%] lg:h-screen lg:overflow-y-auto flex flex-col justify-center px-6 sm:px-12 xl:px-24 bg-white dark:bg-black">
         <div className="max-w-md w-full mx-auto">
           <div className="mb-8">
-            <Link to="/" className="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-insta-pink transition-colors mb-6 group">
-              <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" />
-              Back to Home
-            </Link>
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Log In</h2>
             <p className="text-gray-500 dark:text-gray-400">Enter your credentials to access your account.</p>
           </div>
