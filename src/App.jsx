@@ -11,9 +11,10 @@ import CreatePost from './pages/CreatePost';
 import Reels from './pages/Reels';
 import Promote from './pages/Promote';
 import Ads from './pages/Ads';
-// Marketplace (Market/ProductDetail/Cart/Checkout) is built but disabled for
-// production — not ready for release. Routes and nav entry removed; pages,
-// cartSlice, and mockProducts data are kept in the repo for re-enabling later.
+import Market from './pages/Market';
+import ProductDetail from './pages/ProductDetail';
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
 import VendorAds from './pages/VendorAds';
 import AdPublicDetail from './pages/AdPublicDetail';
 import VendorPublicProfile from './pages/VendorPublicProfile';
@@ -139,6 +140,10 @@ function App() {
             <Route path="/reels"            element={<Reels />} />
             <Route path="/promote"          element={<Promote />} />
             <Route path="/ads"              element={<Ads />} />
+            <Route path="/market"           element={<Market />} />
+            <Route path="/market/product/:productId" element={<ProductDetail />} />
+            <Route path="/cart"             element={<Cart />} />
+            <Route path="/checkout"         element={<Checkout />} />
             <Route path="/vendor-ads"       element={<VendorAds />} />
             <Route path="/profile"          element={<Profile />} />
             <Route path="/profile/:userId"  element={<Profile />} />

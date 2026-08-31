@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, Rocket, LogOut, CirclePlay, Zap, CloudLightning } from 'lucide-react';
+import { Home, PlusSquare, Clapperboard, User, Menu, Image, Video, Target, Megaphone, Moon, Sun, Search, Heart, Bell, MessageCircle, LayoutDashboard, FileText, CreditCard, Settings, CheckCheck, Trash2, Eye, Clock, X, Play, Loader2, Rocket, LogOut, CirclePlay, Zap, CloudLightning, ShoppingBag } from 'lucide-react';
 import { toggleTheme } from '../store/themeSlice';
 import bsmartLogo from '../assets/bsmart.png';
 import bsmartIcon from '../assets/bsmart_logo.png';
@@ -523,6 +523,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
     { icon: CirclePlay, label: 'Spotlights', path: '/ads', tourId: 'nav-spotlights' },
     { icon: Rocket, label: 'Campaigns', path: '/promote', tourId: 'nav-campaigns' },
     { icon: Zap, label: 'bSparks', path: '/reels', tourId: 'nav-bsparks' },
+    { icon: ShoppingBag, label: 'Market Place', path: '/market', tourId: 'nav-market' },
     { icon: MessageCircle, label: 'Messages', path: '/messages', tourId: 'nav-messages' },
   ];
 
