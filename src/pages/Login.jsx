@@ -4,9 +4,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import api from '../lib/api';
 import authService from '../services/authService';
 import { login, fetchMe } from '../store/authSlice';
-import { ArrowLeft, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Lock, User, LogIn, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import AuthFooter from '../components/AuthFooter';
-import AuthVisualPanel from '../components/AuthVisualPanel';
 
 const OtpLoginModal = ({ email, otp, onChange, onClose, onSubmit, loading, error, message }) => {
   return (
@@ -152,7 +151,7 @@ const Login = () => {
 
     const handleMessage = async (event) => {
       // Verify origin if needed, but for now we accept from self/subdomains
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+      if (event.data?.type === 'SOCIAL_AUTH_SUCCESS') {
         const { token } = event.data;
         if (token) {
           authService.setSession(token);
@@ -174,7 +173,7 @@ const Login = () => {
           }
         }
         window.removeEventListener('message', handleMessage);
-      } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
+      } else if (event.data?.type === 'SOCIAL_AUTH_ERROR') {
         setError(event.data.error || 'Google authentication failed');
         window.removeEventListener('message', handleMessage);
       }
@@ -191,9 +190,78 @@ const Login = () => {
     }, 1000);
   };
 
+  const handleAppleLogin = () => {
+    const baseURL = api.defaults.baseURL || 'http://localhost:5000/api';
+    const authUrl = `${baseURL}/auth/apple`;
+
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    const popup = window.open(
+      authUrl,
+      'apple-login',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    const handleMessage = async (event) => {
+      if (event.data?.type === 'SOCIAL_AUTH_SUCCESS') {
+        const { token } = event.data;
+        if (token) {
+          authService.setSession(token);
+          setLoading(true);
+
+          try {
+            await dispatch(fetchMe()).unwrap();
+            navigate('/');
+          } catch (err) {
+            console.error('Failed to fetch user details:', err);
+            const msg =
+              err?.response?.data?.message ||
+              err?.message ||
+              'Authentication successful but failed to load user data';
+            setError(normalizeLoginError(msg));
+          } finally {
+            setLoading(false);
+          }
+        }
+        window.removeEventListener('message', handleMessage);
+      } else if (event.data?.type === 'SOCIAL_AUTH_ERROR') {
+        setError(event.data.error || 'Apple authentication failed');
+        window.removeEventListener('message', handleMessage);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    const timer = setInterval(() => {
+      if (popup && popup.closed) {
+        clearInterval(timer);
+        window.removeEventListener('message', handleMessage);
+      }
+    }, 1000);
+  };
+
   return (
     <div className="min-h-screen flex bg-white dark:bg-black lg:h-screen lg:overflow-hidden">
-      <AuthVisualPanel />
+      {/* Left Side - Visuals (Hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-[60%] self-stretch relative bg-insta-gradient overflow-hidden">
+        <div className="absolute inset-0 bg-black/10" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-12 text-center z-10">
+          <div className="w-24 h-24 bg-white/20 backdrop-blur-lg rounded-3xl flex items-center justify-center mb-8 shadow-xl border border-white/30">
+            <LogIn size={48} className="text-white" />
+          </div>
+          <h1 className="text-4xl font-bold mb-4 tracking-tight">Welcome Back!</h1>
+          <p className="text-lg text-white/90 max-w-md font-light leading-relaxed">
+            Connect with friends, share your moments, and discover new experiences with b_smart.
+          </p>
+
+          {/* Decorative circles */}
+          <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-purple-900/20 rounded-full blur-3xl" />
+        </div>
+      </div>
 
       {/* Right Side - Form */}
       <div className="w-full lg:w-[40%] lg:h-screen lg:overflow-y-auto flex flex-col justify-center px-6 sm:px-12 xl:px-24 bg-white dark:bg-black">
@@ -311,6 +379,17 @@ const Login = () => {
               />
             </svg>
             Continue with Google
+          </button>
+
+          <button
+            onClick={handleAppleLogin}
+            type="button"
+            className="w-full flex items-center justify-center gap-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-white py-3.5 mt-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all shadow-sm hover:shadow"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.63.91-1.377 0-2.35-1.25-3.36-2.66-1.463-2.06-2.65-5.28-2.65-8.31 0-4.98 3.29-7.61 6.55-7.61 1.61 0 2.977.99 3.97.99.973 0 2.44-1.05 4.24-1.05.756 0 3.51.07 5.28 2.66-.15.09-3.14 1.83-3.14 5.61 0 4.42 3.88 5.98 3.918 5.99z" />
+            </svg>
+            Continue with Apple
           </button>
 
         <div className="text-center mt-8 space-y-2">

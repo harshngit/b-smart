@@ -56,6 +56,7 @@ const ProductDetail = () => {
   const product = getProductById(productId);
   const [qty, setQty] = useState(1);
   const [favorite, setFavorite] = useState(false);
+  
   const [thumbIndex, setThumbIndex] = useState(0);
 
   if (!product) {

@@ -17,7 +17,7 @@ const AuthCallback = () => {
       if (token) {
         // If inside a popup, send token to opener
         if (window.opener) {
-          window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', token }, '*');
+          window.opener.postMessage({ type: 'SOCIAL_AUTH_SUCCESS', token }, '*');
           window.close();
           return;
         }
@@ -41,7 +41,7 @@ const AuthCallback = () => {
         // Handle error param if present
         const error = searchParams.get('error');
         if (window.opener) {
-          window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', error }, '*');
+          window.opener.postMessage({ type: 'SOCIAL_AUTH_ERROR', error }, '*');
           window.close();
           return;
         }
