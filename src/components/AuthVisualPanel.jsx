@@ -42,7 +42,7 @@ const AuthVisualPanel = () => {
             autoplay={{ delay: 3000, disableOnInteraction: false }}
             onSlideChange={(swiper) => setActiveIndex(swiper.realIndex)}
             loop
-            className="w-full "
+            className="w-full aspect-video rounded-3xl shadow-xl"
           >
             {SLIDES.map((slide) => (
               <SwiperSlide key={slide.name}>
