@@ -5,7 +5,7 @@ import api from '../lib/api';
 import authService from '../services/authService';
 import { setUser } from '../store/authSlice';
 import { markNewSignup } from '../utils/tour';
-import { ArrowLeft, User, Mail, Phone, Lock, Eye, EyeOff, ChevronDown, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Lock, Eye, EyeOff, ChevronDown, CheckCircle2, XCircle, Loader2, UserPlus } from 'lucide-react';
 import AuthFooter from '../components/AuthFooter';
 import AuthVisualPanel from '../components/AuthVisualPanel';
 
@@ -231,7 +231,23 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen flex bg-white dark:bg-black lg:h-screen lg:overflow-hidden">
-      <AuthVisualPanel />
+      {/* Left Side - Visuals (Hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-[60%] self-stretch relative bg-insta-gradient overflow-hidden">
+        <div className="absolute inset-0 bg-black/10" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-12 text-center z-10">
+          <div className="w-24 h-24 bg-white/20 backdrop-blur-lg rounded-3xl flex items-center justify-center mb-8 shadow-xl border border-white/30">
+            <UserPlus size={48} className="text-white" />
+          </div>
+          <h1 className="text-4xl font-bold mb-4 tracking-tight">Join b_smart!</h1>
+          <p className="text-lg text-white/90 max-w-md font-light leading-relaxed">
+            Create, connect, shop, and grow with b_smart — share your moments, discover fresh content, and explore new opportunities.
+          </p>
+
+          {/* Decorative circles */}
+          <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-purple-900/20 rounded-full blur-3xl" />
+        </div>
+      </div>
 
       {/* Right Side - Form (scrollable on desktop) */}
       <div className="w-full lg:w-[40%] lg:h-screen lg:overflow-y-auto flex flex-col justify-start px-6 sm:px-12 xl:px-24 bg-white dark:bg-black py-12">
