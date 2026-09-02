@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Trash2, Minus, Plus, Lock, ArrowRight } from 'lucide-react';
+import { Trash2, Minus, Plus, Lock, ArrowRight, ShoppingCart } from 'lucide-react';
 import { removeItem, incrementQty, decrementQty } from '../store/cartSlice';
 import { CATEGORY_STYLE } from './Market';
 
@@ -27,9 +27,20 @@ const Cart = () => {
       </div>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <p className="text-gray-500 dark:text-gray-400 mb-4">Your cart is empty.</p>
-          <Link to="/market" className="text-[#fa3f5e] font-semibold text-sm">Browse the Market</Link>
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-20 h-20 rounded-full bg-pink-50 dark:bg-gray-900 flex items-center justify-center mb-5">
+            <ShoppingCart size={30} className="text-[#fa3f5e]" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1.5">Your cart is empty</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-xs">
+            Looks like you haven't added anything yet — go find something you'll love.
+          </p>
+          <Link
+            to="/market"
+            className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
+          >
+            Browse the Market <ArrowRight size={16} />
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">

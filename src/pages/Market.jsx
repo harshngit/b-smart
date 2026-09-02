@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Shirt, Cpu, Home as HomeIcon, Sparkles, Heart, Star, Eye, ShoppingCart } from 'lucide-react';
-import { MOCK_PRODUCTS } from '../data/mockProducts';
+import { Shirt, Cpu, Home as HomeIcon, Sparkles, Heart, Star, Eye, Store, ShoppingCart } from 'lucide-react';
 import { addItem } from '../store/cartSlice';
 
 const CATEGORIES = ['All', 'Fashion', 'Tech', 'Home', 'Beauty'];
@@ -49,7 +48,7 @@ const ProductCard = ({ product, isFavorite, onToggleFavorite }) => {
       <div className="p-4">
         <p className={`text-[11px] font-bold uppercase tracking-wide mb-1 ${text}`}>{product.category}</p>
         <Link to={`/market/product/${product.id}`}>
-          <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1.5 truncate hover:underline" title={product.name}>
+          <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1.5 truncate hover:text-[#fa3f5e] transition-colors" title={product.name}>
             {product.name}
           </h3>
         </Link>
@@ -85,29 +84,38 @@ const ProductCard = ({ product, isFavorite, onToggleFavorite }) => {
 const Market = () => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [favorites, setFavorites] = useState({});
+  const allProducts = useSelector((state) => state.products.items);
   const cartCount = useSelector((state) => state.cart.items.reduce((sum, i) => sum + i.qty, 0));
 
   const toggleFavorite = (id) => setFavorites((f) => ({ ...f, [id]: !f[id] }));
 
   const products = activeCategory === 'All'
-    ? MOCK_PRODUCTS
-    : MOCK_PRODUCTS.filter((p) => p.category === activeCategory);
+    ? allProducts
+    : allProducts.filter((p) => p.category === activeCategory);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1100px] mx-auto px-4 pt-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Marketplace</h1>
-        <Link
-          to="/cart"
-          className="relative w-10 h-10 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
-        >
-          <ShoppingCart size={18} />
-          {cartCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#fa3f5e] text-white text-[10px] font-bold flex items-center justify-center leading-none">
-              {cartCount > 99 ? '99+' : cartCount}
-            </span>
-          )}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/market/my-store"
+            className="flex items-center gap-1.5 px-3 h-10 rounded-full border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
+          >
+            <Store size={16} /> My Store
+          </Link>
+          <Link
+            to="/cart"
+            className="relative w-10 h-10 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
+          >
+            <ShoppingCart size={18} />
+            {cartCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#fa3f5e] text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
+            )}
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6">

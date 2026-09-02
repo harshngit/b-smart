@@ -12,6 +12,9 @@ import Reels from './pages/Reels';
 import Promote from './pages/Promote';
 import Ads from './pages/Ads';
 import Market from './pages/Market';
+import AddProduct from './pages/AddProduct';
+import EditProduct from './pages/EditProduct';
+import MyStore from './pages/MyStore';
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -141,6 +144,9 @@ function App() {
             <Route path="/promote"          element={<Promote />} />
             <Route path="/ads"              element={<Ads />} />
             <Route path="/market"           element={<Market />} />
+            <Route path="/market/add-product" element={<AddProduct />} />
+            <Route path="/market/edit-product/:productId" element={<EditProduct />} />
+            <Route path="/market/my-store"  element={<MyStore />} />
             <Route path="/market/product/:productId" element={<ProductDetail />} />
             <Route path="/cart"             element={<Cart />} />
             <Route path="/checkout"         element={<Checkout />} />

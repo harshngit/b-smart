@@ -36,7 +36,7 @@ const AuthVisualPanel = () => {
 
       <div className="flex-1 flex flex-col items-center justify-center px-10 min-h-0">
         <div className="w-full max-w-lg">
-          <p className="text-center text-2xl font-semibold text-insta-pink tracking-wide mb-4">{active.name}</p>
+          <p className="text-center text-3xl font-semibold text-insta-pink tracking-wide mb-4">{active.name}</p>
           <Swiper
             modules={[Autoplay]}
             autoplay={{ delay: 3000, disableOnInteraction: false }}
@@ -46,7 +46,7 @@ const AuthVisualPanel = () => {
           >
             {SLIDES.map((slide) => (
               <SwiperSlide key={slide.name}>
-                <img src={slide.src} alt={slide.name} className="block w-full h-full object-cover rounded-3xl" />
+                <img src={slide.src} alt={slide.name} className="block w-full h-full object-contain rounded-3xl" />
               </SwiperSlide>
             ))}
           </Swiper>

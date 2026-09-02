@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   ChevronRight, ChevronDown, Heart, Star, Minus, Plus,
   ShoppingCart,
 } from 'lucide-react';
-import { getProductById, MOCK_PRODUCTS } from '../data/mockProducts';
 import { addItem } from '../store/cartSlice';
 import { CATEGORY_STYLE } from './Market';
 
@@ -53,7 +52,8 @@ const ProductDetail = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const product = getProductById(productId);
+  const allProducts = useSelector((state) => state.products.items);
+  const product = allProducts.find((p) => String(p.id) === String(productId));
   const [qty, setQty] = useState(1);
   const [favorite, setFavorite] = useState(false);
   
@@ -84,7 +84,7 @@ const ProductDetail = () => {
     addToCart();
     navigate('/cart');
   };
-  const related = MOCK_PRODUCTS.filter((p) => p.vendor === product.vendor && p.id !== product.id).slice(0, 4);
+  const related = allProducts.filter((p) => p.vendor === product.vendor && p.id !== product.id).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1100px] mx-auto px-4 pt-6">
@@ -137,7 +137,10 @@ const ProductDetail = () => {
             ${product.price.toFixed(2)} <span className="text-sm font-normal text-gray-400">USD</span>
           </p>
 
-          <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-6">{product.description}</p>
+          <div
+            className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-6 [&_a]:text-[#fa3f5e] [&_a]:underline"
+            dangerouslySetInnerHTML={{ __html: product.description }}
+          />
 
           <div className="flex items-center gap-3 mb-5">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</span>
@@ -168,9 +171,17 @@ const ProductDetail = () => {
           </div>
 
           <div>
-            <AccordionRow title="Material">{product.material}</AccordionRow>
-            <AccordionRow title="Dimensions">{product.dimensions}</AccordionRow>
-            <AccordionRow title="Shipping & Returns">Ships in 3-5 business days. Free returns within 30 days.</AccordionRow>
+            <AccordionRow title="Material">
+              <span className="[&_a]:text-[#fa3f5e] [&_a]:underline" dangerouslySetInnerHTML={{ __html: product.material }} />
+            </AccordionRow>
+            <AccordionRow title="Dimensions">
+              <span className="[&_a]:text-[#fa3f5e] [&_a]:underline" dangerouslySetInnerHTML={{ __html: product.dimensions }} />
+            </AccordionRow>
+            <AccordionRow title="Shipping & Returns">
+              {product.shippingReturns
+                ? <span className="[&_a]:text-[#fa3f5e] [&_a]:underline" dangerouslySetInnerHTML={{ __html: product.shippingReturns }} />
+                : 'Ships in 3-5 business days. Free returns within 30 days.'}
+            </AccordionRow>
           </div>
         </div>
       </div>
