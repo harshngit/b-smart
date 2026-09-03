@@ -73,7 +73,7 @@ const ProductDetail = () => {
   const addToCart = () => dispatch(addItem({
     id: product.id,
     name: product.name,
-    subtitle: product.material,
+    subtitle: product.dimensions,
     brand: product.vendor,
     price: product.price,
     category: product.category,
@@ -137,10 +137,15 @@ const ProductDetail = () => {
             ${product.price.toFixed(2)} <span className="text-sm font-normal text-gray-400">USD</span>
           </p>
 
-          <div
-            className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-6 [&_a]:text-[#fa3f5e] [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: product.description }}
-          />
+          <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-6">
+            {product.description}
+          </p>
+
+          {product.highlights?.length > 0 && (
+            <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 mb-6 list-disc list-inside">
+              {product.highlights.map((h, i) => <li key={i}>{h}</li>)}
+            </ul>
+          )}
 
           <div className="flex items-center gap-3 mb-5">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</span>
@@ -171,17 +176,19 @@ const ProductDetail = () => {
           </div>
 
           <div>
-            <AccordionRow title="Material">
-              <span className="[&_a]:text-[#fa3f5e] [&_a]:underline" dangerouslySetInnerHTML={{ __html: product.material }} />
+            {product.dimensions && (
+              <AccordionRow title="Dimensions">{product.dimensions}</AccordionRow>
+            )}
+            <AccordionRow title="Delivery">
+              {product.dispatchTime ? `Dispatched in ${product.dispatchTime}. ` : 'Ships in 1-2 business days. '}
+              {product.countryOfOrigin && `Made in ${product.countryOfOrigin}.`}
             </AccordionRow>
-            <AccordionRow title="Dimensions">
-              <span className="[&_a]:text-[#fa3f5e] [&_a]:underline" dangerouslySetInnerHTML={{ __html: product.dimensions }} />
+            <AccordionRow title="Return Policy">
+              {product.returnPolicy || '7 Days Replacement'}
             </AccordionRow>
-            <AccordionRow title="Shipping & Returns">
-              {product.shippingReturns
-                ? <span className="[&_a]:text-[#fa3f5e] [&_a]:underline" dangerouslySetInnerHTML={{ __html: product.shippingReturns }} />
-                : 'Ships in 3-5 business days. Free returns within 30 days.'}
-            </AccordionRow>
+            {product.warranty && product.warranty !== 'None' && (
+              <AccordionRow title="Warranty">{product.warranty}</AccordionRow>
+            )}
           </div>
         </div>
       </div>

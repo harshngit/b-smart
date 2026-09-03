@@ -21,7 +21,7 @@ const ProductCard = ({ product, isFavorite, onToggleFavorite }) => {
     dispatch(addItem({
       id: product.id,
       name: product.name,
-      subtitle: product.material,
+      subtitle: product.dimensions,
       brand: product.vendor,
       price: product.price,
       category: product.category,
