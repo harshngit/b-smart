@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning, Bookmark, Users, Store } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning, Bookmark, Store } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -22,7 +22,7 @@ import bSmartBanner1 from '../assets/B-smart-banners/1.png';
 import bSmartBanner2 from '../assets/B-smart-banners/2.png';
 import bSmartBanner3 from '../assets/B-smart-banners/3.png';
 import bSmartBanner4 from '../assets/B-smart-banners/4.png';
-import { InterestsModal, InterestedSection } from '../components/InterestsPicker';
+import { InterestsModal, InterestedSection, getCategoryImage } from '../components/InterestsPicker';
 import { AD_CATEGORIES_FALLBACK } from '../constants/interestCategories';
 import {
     checkFollowStatus,
@@ -508,7 +508,7 @@ const Profile = () => {
                 const { data } = await api.get('/suggestions/users');
                 const list = Array.isArray(data) ? data : (data?.data || data?.users || []);
                 const selfId = currentUser?.id || currentUser?._id;
-                setSuggestedUsers(list.filter((u) => String(u._id || u.id) !== String(selfId)).slice(0, 8));
+                setSuggestedUsers(list.filter((u) => String(u._id || u.id) !== String(selfId)).slice(0, 6));
             } catch (err) {
                 console.error('Error fetching suggested users:', err);
             }
@@ -1326,13 +1326,12 @@ const Profile = () => {
 
     const SIDEBAR_NAV = [
         { label: 'Saved items', icon: <Bookmark size={18} />, to: '/settings/saved' },
-        { label: 'Groups',      icon: <Users size={18} /> },
+        { label: 'Interests',   icon: <Star size={18} />, onClick: handleStarClick },
         { label: 'Campaigns',   icon: <Megaphone size={18} />, to: '/promote' },
         { label: 'My Store',    icon: <Store size={18} />, to: '/market/my-store' },
-        { label: 'Events',      icon: <Calendar size={18} /> },
     ];
 
-    const SidebarNavItem = ({ icon, label, to }) => {
+    const SidebarNavItem = ({ icon, label, to, onClick }) => {
         const cls = "w-full flex items-center justify-between px-2.5 py-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors";
         const content = (
             <>
@@ -1345,7 +1344,7 @@ const Profile = () => {
         );
         return to
             ? <Link to={to} className={cls}>{content}</Link>
-            : <button type="button" onClick={() => handleComingSoon(label)} className={cls}>{content}</button>;
+            : <button type="button" onClick={onClick || (() => handleComingSoon(label))} className={cls}>{content}</button>;
     };
 
     // ── Right-column "Suggested for you" row ─────────────────────────────────
@@ -1384,32 +1383,32 @@ const Profile = () => {
         };
 
         return (
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 py-2.5">
                 <button type="button" onClick={() => navigate(`/profile/${userId}`)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
                         {user.avatar_url ? (
                             <img src={user.avatar_url} alt={username} className="w-full h-full object-cover" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-300 font-bold text-sm">
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-300 font-bold text-xs">
                                 {username[0]?.toUpperCase()}
                             </div>
                         )}
                     </div>
                     <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{username}</p>
-                        <p className="text-xs text-gray-400 truncate">Suggested for you</p>
+                        <p className="text-[13px] font-semibold text-gray-900 dark:text-white truncate">{username}</p>
+                        <p className="text-[11px] text-gray-400 truncate">Suggested for you</p>
                     </div>
                 </button>
                 <button
                     onClick={handleClick}
                     disabled={loading}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0 transition-colors ${
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 transition-colors ${
                         state === 'following' || state === 'requested'
                             ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
                             : 'bg-[#fa3f5e] text-white hover:opacity-90'
                     }`}
                 >
-                    {loading ? <Loader2 size={12} className="animate-spin" /> : state === 'following' ? 'Following' : state === 'requested' ? 'Requested' : 'Follow'}
+                    {loading ? <Loader2 size={9} className="animate-spin" /> : state === 'following' ? 'Following' : state === 'requested' ? 'Requested' : 'Follow'}
                 </button>
             </div>
         );
@@ -2033,6 +2032,20 @@ const Profile = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Bio — shown below the buttons on your own profile */}
+                            {isOwnProfile && profileUser.bio && (
+                                <div className="text-center mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                    <p className={`text-[13px] text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed ${!isBioExpanded ? 'line-clamp-3' : ''}`}>
+                                        {profileUser.bio}
+                                    </p>
+                                    {(profileUser.bio.includes('\n') || profileUser.bio.length > 80) && (
+                                        <button onClick={() => setIsBioExpanded(!isBioExpanded)} className="text-[12px] font-bold text-gray-500 dark:text-gray-400 mt-0.5 hover:underline">
+                                            {isBioExpanded ? 'Show less' : 'Read more'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -2041,27 +2054,11 @@ const Profile = () => {
                         {SIDEBAR_NAV.map((item) => <SidebarNavItem key={item.label} {...item} />)}
                     </div>
 
-                    {/* Bio / highlights / interests / vendor card */}
-                    {((isOwnProfile && profileUser.bio) || (isVendor && isOwnProfile) || !contentLocked || showInterestsSection || (isVendor && vendorInfo)) && (
+                    {/* Highlights / interests / vendor card */}
+                    {((isVendor && isOwnProfile) || !contentLocked || showInterestsSection || (isVendor && vendorInfo)) && (
                         <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm p-4 space-y-4">
-                            {((isOwnProfile && profileUser.bio) || (isVendor && isOwnProfile)) && (
-                                <div className="text-center">
-                                    {isVendor && isOwnProfile && (
-                                        <div className="mb-2 flex justify-center"><ValidationStatusBadge validated={vendorValidated} /></div>
-                                    )}
-                                    {isOwnProfile && profileUser.bio && (
-                                        <div>
-                                            <p className={`text-[14px] text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed text-left ${!isBioExpanded ? 'line-clamp-3' : ''}`}>
-                                                {profileUser.bio}
-                                            </p>
-                                            {(profileUser.bio.includes('\n') || profileUser.bio.length > 80) && (
-                                                <button onClick={() => setIsBioExpanded(!isBioExpanded)} className="text-[13px] font-bold text-gray-500 dark:text-gray-400 mt-1 hover:underline">
-                                                    {isBioExpanded ? 'Show less' : 'Read more'}
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                            {isVendor && isOwnProfile && (
+                                <div className="flex justify-center"><ValidationStatusBadge validated={vendorValidated} /></div>
                             )}
 
                             {!contentLocked && (
@@ -2106,15 +2103,40 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* ── Column 3: suggested users ─────────────────────────────── */}
-                <div className="hidden xl:block w-[300px] shrink-0 overflow-y-auto pb-6 scrollbar-hide">
+                {/* ── Column 3: suggested users + interests ─────────────────── */}
+                <div className="hidden xl:block w-[300px] shrink-0 overflow-y-auto pb-6 scrollbar-hide space-y-3">
                     <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm p-4">
                         <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Suggested for you</h3>
                         {suggestedUsers.length === 0 ? (
                             <p className="text-xs text-gray-400 dark:text-gray-500">No suggestions right now.</p>
                         ) : (
-                            <div className="space-y-3">
+                            <div className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {suggestedUsers.map((u) => <SuggestedUserRow key={u._id || u.id} user={u} />)}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm p-4">
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Interests</h3>
+                        {userInterests.length === 0 ? (
+                            <p className="text-xs text-gray-400 dark:text-gray-500">No interests listed yet.</p>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                                {userInterests.map((interest) => {
+                                    const img = getCategoryImage(interest);
+                                    return (
+                                        <div key={interest} className="relative aspect-[16/9] rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800">
+                                            {img ? (
+                                                <img src={img} alt={interest} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-lg">🏷️</div>
+                                            )}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent flex items-end p-1.5">
+                                                <span className="text-white text-[10px] font-bold truncate leading-tight">{interest}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

@@ -121,7 +121,7 @@ const AddProduct = () => {
   const stockNum = parseInt(form.stockQuantity, 10) || 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1280px] ml-auto px-4 pt-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1450px] ml-auto px-4 pt-6">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add Product</h1>
         <div className="flex gap-2">

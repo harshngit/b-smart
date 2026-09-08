@@ -21,7 +21,7 @@ const StoreOrders = () => {
   const orders = filter === 'All' ? MOCK_ORDERS : MOCK_ORDERS.filter((o) => o.status === filter);
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 md:px-8 pt-6">
+    <div className="max-w-[1450px] ml-auto px-4 md:px-8 pt-6">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Orders</h1>
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">
         Mock only — showing placeholder orders, not wired to a real checkout/payments flow yet.

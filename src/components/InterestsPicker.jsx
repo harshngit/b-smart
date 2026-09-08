@@ -28,7 +28,7 @@ const CATEGORY_IMAGES_LIST = [
     bSmartBanner16, bSmartBanner17, bSmartBanner18, bSmartBanner19
 ];
 
-const getCategoryImage = (categoryName) => {
+export const getCategoryImage = (categoryName) => {
     const idx = AD_CATEGORIES_FALLBACK.indexOf(categoryName);
     if (idx !== -1) return CATEGORY_IMAGES_LIST[idx];
     return null;

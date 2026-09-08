@@ -87,7 +87,7 @@ const ProductDetail = () => {
   const related = allProducts.filter((p) => p.vendor === product.vendor && p.id !== product.id).slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1100px] mx-auto px-4 pt-6">
+    <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1300px] ml-auto px-4 pt-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mb-5">
         <Link to="/market" className="hover:text-[#fa3f5e]">Marketplace</Link>

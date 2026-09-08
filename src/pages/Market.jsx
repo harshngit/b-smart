@@ -94,7 +94,7 @@ const Market = () => {
     : allProducts.filter((p) => p.category === activeCategory);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1100px] mx-auto px-4 pt-6">
+    <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1300px] ml-auto px-4 pt-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Marketplace</h1>
         <div className="flex items-center gap-2">

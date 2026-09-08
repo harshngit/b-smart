@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Wrench, Trash2, X } from 'lucide-react';
-
-const SEED_SERVICES = [
-  { id: 1, name: 'Installation Service', description: 'On-site setup and installation for purchased products.', price: 25 },
-  { id: 2, name: 'Home Delivery',        description: 'Doorstep delivery within city limits.',                   price: 10 },
-];
+import { SEED_SERVICES } from '../data/mockServices';
 
 const AddServiceModal = ({ isOpen, onClose, onAdd }) => {
   const [name, setName] = useState('');
@@ -64,7 +60,7 @@ const StoreServices = () => {
   const handleRemove = (id) => setServices((prev) => prev.filter((s) => s.id !== id));
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 md:px-8 pt-6">
+    <div className="max-w-[1450px] ml-auto px-4 md:px-8 pt-6">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Services</h1>
         <button
