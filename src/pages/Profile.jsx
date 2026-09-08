@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning, Bookmark, Users, Store } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
 import api from '../lib/api';
+import PostCard from '../components/PostCard';
+import PromoteCard from '../components/PromoteCard';
 import PostDetailModal from '../components/PostDetailModal';
 import AvatarCropModal from '../components/AvatarCropModal';
 import FollowersModal from '../components/FollowersModal';
@@ -205,6 +207,7 @@ const Profile = () => {
 
     const [userAds, setUserAds] = useState([]);
     const [loadingAds, setLoadingAds] = useState(false);
+    const [suggestedUsers, setSuggestedUsers] = useState([]);
 
     // Follow state: null = unknown, 'following', 'requested', 'not_following'
     const [followState, setFollowState] = useState('not_following');
@@ -497,6 +500,21 @@ const Profile = () => {
             fetchAds();
         }
     }, [profileUser?.role, profileUser?._id, profileUser?.id]); // eslint-disable-line
+
+    // ── Fetch suggested users (right-column rail) ───────────────────────────
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            try {
+                const { data } = await api.get('/suggestions/users');
+                const list = Array.isArray(data) ? data : (data?.data || data?.users || []);
+                const selfId = currentUser?.id || currentUser?._id;
+                setSuggestedUsers(list.filter((u) => String(u._id || u.id) !== String(selfId)).slice(0, 8));
+            } catch (err) {
+                console.error('Error fetching suggested users:', err);
+            }
+        };
+        fetchSuggestions();
+    }, [currentUser]);
 
     // ── Fetch vendor business info ───────────────────────────────────────────
     useEffect(() => {
@@ -1057,15 +1075,6 @@ const Profile = () => {
         </div>
     );
 
-    const renderContent = () => {
-        if (isBlocked) return <BlockedContentWall />;
-        if (contentLocked) return <PrivateProfileWall />;
-        if (activeTab === null) return null;
-        if (activeTab === 'ads') return <AdsGrid />;
-        if (activeTab === 'tweets') return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Tweets are private." /> : <TweetsGrid />;
-        if (activeTab === 'promote_reels') return privacyRestricted.pulse ? <PrivacyRestrictedPlaceholder message="Reels are private." /> : <PromoteReelsGrid />;
-        return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Posts are private." /> : <PostGrid />;
-    };
     const renderContentMobile = () => {
         if (isBlocked) return <BlockedContentWall />;
         if (contentLocked) return <PrivateProfileWall />;
@@ -1138,19 +1147,24 @@ const Profile = () => {
                     <div key={i} className="aspect-square bg-gray-100 dark:bg-gray-900 animate-pulse" />
                 ))
             ) : displayedPosts.length === 0 ? (
-                <div className="col-span-3 bg-white dark:bg-black py-14 text-center">
+                <div className="col-span-3 bg-white dark:bg-black py-16 text-center">
                     <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
                         {activeTab === 'reels'
                             ? <Zap size={30} className="text-gray-300 dark:text-gray-600" />
                             : activeTab === 'tweets'
                             ? <CloudLightning size={30} className="text-gray-300 dark:text-gray-600" />
-                            : <Grid size={30} className="text-gray-300 dark:text-gray-600" />}
+                            : <Image size={30} className="text-gray-300 dark:text-gray-600" />}
                     </div>
-                    <h3 className="font-semibold text-base text-gray-900 dark:text-white mb-1">
-                        {activeTab === 'reels' ? 'No Reels Yet' : activeTab === 'tweets' ? 'No Tweets Yet' : 'No Posts Yet'}
+                    <h3 className="font-bold text-base text-gray-900 dark:text-white mb-1.5">
+                        {activeTab === 'reels' ? 'No Reels Yet' : activeTab === 'tweets' ? 'No Tweets Yet' : 'No content yet'}
                     </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[280px] mx-auto mb-4">
+                        {activeTab === 'all' && 'Share your first post, photo, video or article with the community.'}
+                    </p>
                     {isOwnProfile && (
-                        <Link to="/create" className="text-blue-500 text-sm font-semibold mt-1 inline-block">Create now</Link>
+                        <Link to="/create" className="inline-block px-5 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-bold rounded-xl shadow-md hover:opacity-90 transition-opacity">
+                            Create post
+                        </Link>
                     )}
                 </div>
             ) : (
@@ -1306,6 +1320,271 @@ const Profile = () => {
             )}
         </div>
     );
+
+    // ── Left-panel quick nav (Saved / Groups / Campaigns / Marketplace / Events) ──
+    const handleComingSoon = (label) => setRewardToast({ type: 'success', message: `${label} is coming soon.` });
+
+    const SIDEBAR_NAV = [
+        { label: 'Saved items', icon: <Bookmark size={18} />, to: '/settings/saved' },
+        { label: 'Groups',      icon: <Users size={18} /> },
+        { label: 'Campaigns',   icon: <Megaphone size={18} />, to: '/promote' },
+        { label: 'My Store',    icon: <Store size={18} />, to: '/market/my-store' },
+        { label: 'Events',      icon: <Calendar size={18} /> },
+    ];
+
+    const SidebarNavItem = ({ icon, label, to }) => {
+        const cls = "w-full flex items-center justify-between px-2.5 py-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors";
+        const content = (
+            <>
+                <span className="flex items-center gap-3">
+                    <span className="text-gray-500 dark:text-gray-400">{icon}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{label}</span>
+                </span>
+                <ChevronRight size={16} className="text-gray-300 dark:text-gray-600" />
+            </>
+        );
+        return to
+            ? <Link to={to} className={cls}>{content}</Link>
+            : <button type="button" onClick={() => handleComingSoon(label)} className={cls}>{content}</button>;
+    };
+
+    // ── Right-column "Suggested for you" row ─────────────────────────────────
+    const SuggestedUserRow = ({ user }) => {
+        const userId = user._id || user.id;
+        const username = user.username || user.full_name || 'User';
+        const [state, setState] = useState('not_following');
+        const [loading, setLoading] = useState(false);
+
+        useEffect(() => {
+            let cancelled = false;
+            checkFollowStatus(userId).then((status) => {
+                if (cancelled) return;
+                if (status?.isFollowing || status?.status === 'following') setState('following');
+                else if (status?.isPending || status?.requested || status?.status === 'pending') setState('requested');
+            }).catch(() => {});
+            return () => { cancelled = true; };
+        }, [userId]);
+
+        const handleClick = async (e) => {
+            e.stopPropagation();
+            if (loading) return;
+            setLoading(true);
+            try {
+                if (state === 'following') { await unfollowUser(userId); setState('not_following'); }
+                else if (state === 'requested') { await cancelFollowRequest(userId); setState('not_following'); }
+                else {
+                    const result = await followUser(userId);
+                    setState(result?.status === 'pending' || result?.pending || result?.requested ? 'requested' : 'following');
+                }
+            } catch (err) {
+                console.error('Error updating follow status:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        return (
+            <div className="flex items-center gap-2.5">
+                <button type="button" onClick={() => navigate(`/profile/${userId}`)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                        {user.avatar_url ? (
+                            <img src={user.avatar_url} alt={username} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-300 font-bold text-sm">
+                                {username[0]?.toUpperCase()}
+                            </div>
+                        )}
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{username}</p>
+                        <p className="text-xs text-gray-400 truncate">Suggested for you</p>
+                    </div>
+                </button>
+                <button
+                    onClick={handleClick}
+                    disabled={loading}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0 transition-colors ${
+                        state === 'following' || state === 'requested'
+                            ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                            : 'bg-[#fa3f5e] text-white hover:opacity-90'
+                    }`}
+                >
+                    {loading ? <Loader2 size={12} className="animate-spin" /> : state === 'following' ? 'Following' : state === 'requested' ? 'Requested' : 'Follow'}
+                </button>
+            </div>
+        );
+    };
+
+    // ── Desktop middle column: posts rendered as individual feed cards ──────
+    const PostsFeedCards = () => {
+        if (loadingPosts) {
+            return (
+                <div className="space-y-3">
+                    {Array(3).fill(null).map((_, i) => (
+                        <div key={i} className="h-72 rounded-2xl bg-gray-100 dark:bg-gray-900 animate-pulse" />
+                    ))}
+                </div>
+            );
+        }
+        if (displayedPosts.length === 0) {
+            return (
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl py-16 text-center">
+                    <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        {activeTab === 'reels' ? <Zap size={30} className="text-gray-300 dark:text-gray-600" /> : <Image size={30} className="text-gray-300 dark:text-gray-600" />}
+                    </div>
+                    <h3 className="font-bold text-base text-gray-900 dark:text-white mb-1.5">
+                        {activeTab === 'reels' ? 'No Reels Yet' : 'No content yet'}
+                    </h3>
+                    {activeTab !== 'reels' && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[280px] mx-auto mb-4">
+                            Share your first post, photo, video or article with the community.
+                        </p>
+                    )}
+                    {isOwnProfile && (
+                        <Link to="/create" className="inline-block px-5 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-sm font-bold rounded-xl shadow-md hover:opacity-90 transition-opacity">
+                            Create post
+                        </Link>
+                    )}
+                </div>
+            );
+        }
+        return (
+            <div>
+                {displayedPosts.map((post) => (
+                    <PostCard
+                        key={post._id || post.id}
+                        post={post}
+                        onCommentClick={(item) => setSelectedPost(item)}
+                        onDelete={(id) => setUserPosts((prev) => prev.filter((p) => (p._id || p.id) !== id))}
+                        mediaMaxHeight={340}
+                    />
+                ))}
+            </div>
+        );
+    };
+
+    const TweetsFeedCards = () => {
+        if (loadingPosts) {
+            return (
+                <div className="flex flex-col items-center py-16 gap-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl">
+                    <Loader2 className="w-7 h-7 animate-spin text-orange-500" />
+                    <span className="text-sm text-gray-400">Loading tweets…</span>
+                </div>
+            );
+        }
+        if (userTweets.length === 0) {
+            return (
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl py-16 text-center">
+                    <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CloudLightning size={30} className="text-gray-300 dark:text-gray-600" />
+                    </div>
+                    <h3 className="font-bold text-base text-gray-900 dark:text-white mb-1">No Tweets Yet</h3>
+                    {isOwnProfile && (
+                        <Link to="/tweets" className="text-[#fa3f5e] text-sm font-semibold mt-1 inline-block">Create a tweet</Link>
+                    )}
+                </div>
+            );
+        }
+        return (
+            <div className="space-y-3">
+                {userTweets.map((tweet) => {
+                    const tweetId = tweet._id || tweet.id;
+                    const mediaItems = Array.isArray(tweet.media) ? tweet.media : [];
+                    return (
+                        <div key={tweetId}
+                            className="flex gap-3 p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                            onClick={() => setSelectedTweet(tweet)}>
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
+                                {tweet.author?.avatar_url ? (
+                                    <img src={tweet.author.avatar_url.startsWith('http') ? tweet.author.avatar_url : `${BASE_URL}/uploads/${tweet.author.avatar_url}`}
+                                        alt="avatar" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm font-bold">
+                                        {(tweet.author?.username || '?')[0].toUpperCase()}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">
+                                        {tweet.author?.full_name || tweet.author?.username || 'User'}
+                                    </span>
+                                    <span className="text-xs text-gray-400 truncate">@{tweet.author?.username}</span>
+                                </div>
+                                {tweet.content && (
+                                    <p className="text-sm text-gray-800 dark:text-gray-200 line-clamp-3 leading-relaxed mb-2">{tweet.content}</p>
+                                )}
+                                {mediaItems.length > 0 && (
+                                    <div onClick={e => e.stopPropagation()}>
+                                        <TweetImageGallery
+                                            mediaItems={mediaItems}
+                                            onImageClick={() => setSelectedTweet(tweet)}
+                                        />
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-4 text-xs text-gray-400 mt-2">
+                                    <span className="flex items-center gap-1"><Heart size={13} /> {tweet.likesCount || 0}</span>
+                                    <span className="flex items-center gap-1"><MessageCircle size={13} /> {tweet.repliesCount || tweet.commentsCount || 0}</span>
+                                    <span className="flex items-center gap-1"><Eye size={13} /> {tweet.viewsCount || 0}</span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    const PromoteReelsFeedCards = () => {
+        if (loadingPosts) {
+            return (
+                <div className="flex flex-col items-center py-16 gap-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl">
+                    <Loader2 className="w-7 h-7 animate-spin text-orange-500" />
+                    <span className="text-sm text-gray-400">Loading promoted reels…</span>
+                </div>
+            );
+        }
+        if (userPromoteReels.length === 0) {
+            return (
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl py-16 text-center">
+                    <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Megaphone size={30} className="text-gray-300 dark:text-gray-600" />
+                    </div>
+                    <h3 className="font-bold text-base text-gray-900 dark:text-white mb-1">No Promoted Reels Yet</h3>
+                    {isOwnProfile && (
+                        <Link to="/promote" className="text-[#fa3f5e] text-sm font-semibold mt-1 inline-block">Promote now</Link>
+                    )}
+                </div>
+            );
+        }
+        return (
+            <div>
+                {userPromoteReels.map((reel) => (
+                    <PromoteCard
+                        key={reel._id || reel.id}
+                        item={reel}
+                        onOpenDetail={(pr) => setSelectedPromoteReel(pr)}
+                    />
+                ))}
+            </div>
+        );
+    };
+
+    const renderDesktopContent = () => {
+        if (isBlocked) return <BlockedContentWall />;
+        if (contentLocked) return <PrivateProfileWall />;
+        if (activeTab === null) return null;
+        if (activeTab === 'ads') {
+            return (
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden">
+                    <AdsGrid />
+                </div>
+            );
+        }
+        if (activeTab === 'tweets') return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Tweets are private." /> : <TweetsFeedCards />;
+        if (activeTab === 'promote_reels') return privacyRestricted.pulse ? <PrivacyRestrictedPlaceholder message="Reels are private." /> : <PromoteReelsFeedCards />;
+        return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Posts are private." /> : <PostsFeedCards />;
+    };
 
     // ── Follower mutual avatars (small stack shown under username) ────────────
     const MutualFollowers = () => {
@@ -1606,212 +1885,238 @@ const Profile = () => {
             </div>
 
 
-            {/* DESKTOP — two-panel layout */}
-            <div className="hidden md:flex h-[calc(100vh-0px)]">
+            {/* DESKTOP — three-column layout */}
+            <div className="hidden md:flex h-[calc(100vh-0px)] bg-gray-50 dark:bg-black gap-4 px-4 pt-4 overflow-hidden">
 
-                {/* ── Left Panel: fixed, scrollable if needed ─────────────────── */}
-                <div className="w-[40%] shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 overflow-y-auto bg-white dark:bg-black px-8 py-10">
+                {/* ── Column 1: profile info ────────────────────────────────── */}
+                <div className="w-[300px] shrink-0 overflow-y-auto pb-6 space-y-3 scrollbar-hide">
 
-                    {/* Avatar */}
-                    <div className="flex justify-center mb-5">
-                        <div className="relative">
-                            {/* Orange gradient ring when user has a story */}
-                            <div
-                                className={`rounded-full p-[3px] ${profileStory ? 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-600 cursor-pointer' : 'bg-transparent'}`}
-                                onClick={profileStory ? () => setShowStoryViewer(true) : isOwnProfile ? () => setShowAvatarModal(true) : undefined}
-                            >
-                                <div className={`rounded-full p-[2.5px] ${profileStory ? 'bg-white dark:bg-black' : ''}`}>
+                    {/* Identity card */}
+                    <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
+                        {/* Cover banner */}
+                        <div className="relative h-[90px] bg-gradient-to-br from-pink-100 via-rose-50 to-orange-100 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 overflow-hidden">
+                            <div className="absolute -right-6 -top-8 w-28 h-28 rounded-full bg-white/40 dark:bg-white/5" />
+                            <div className="absolute left-6 -bottom-4 w-16 h-16 rounded-full bg-white/30 dark:bg-white/5" />
+                        </div>
+
+                        <div className="px-5 pb-5">
+                            {/* Avatar — overlaps the banner */}
+                            <div className="flex justify-center -mt-12 mb-3">
+                                <div className="relative">
                                     <div
-                                        className={`w-[134px] h-[134px] rounded-full overflow-hidden ${!profileStory && isOwnProfile ? 'cursor-pointer hover:opacity-90' : ''}`}
-                                        style={{boxShadow:'0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10)'}}
+                                        className={`rounded-full p-[3px] ${profileStory ? 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-600 cursor-pointer' : 'bg-white dark:bg-gray-900'}`}
+                                        onClick={profileStory ? () => setShowStoryViewer(true) : isOwnProfile ? () => setShowAvatarModal(true) : undefined}
                                     >
-                                        {profileUser.avatar_url ? (
-                                            <img src={profileUser.avatar_url} className="w-full h-full rounded-full object-cover" alt="Profile" />
-                                        ) : (
-                                            <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-4xl font-bold text-gray-600 dark:text-gray-300 rounded-full">
-                                                {getInitials(profileUser.full_name || profileUser.username)}
+                                        <div className={`rounded-full p-[2.5px] ${profileStory ? 'bg-white dark:bg-gray-900' : ''}`}>
+                                            <div
+                                                className={`w-[92px] h-[92px] rounded-full overflow-hidden ${!profileStory && isOwnProfile ? 'cursor-pointer hover:opacity-90' : ''}`}
+                                                style={{boxShadow:'0 6px 20px rgba(0,0,0,0.15)'}}
+                                            >
+                                                {profileUser.avatar_url ? (
+                                                    <img src={profileUser.avatar_url} className="w-full h-full rounded-full object-cover" alt="Profile" />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-2xl font-bold text-gray-600 dark:text-gray-300 rounded-full">
+                                                        {getInitials(profileUser.full_name || profileUser.username)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {isOwnProfile && (
+                                        <button type="button" onClick={() => setShowAvatarModal(true)}
+                                            className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-[#fa3f5e] text-white flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-md hover:opacity-90 transition-opacity">
+                                            <Plus size={13} strokeWidth={2.5} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Username + full name */}
+                            <div className="text-center mb-3">
+                                <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                    <h2 className="text-[17px] font-bold text-gray-900 dark:text-white tracking-tight truncate max-w-full">
+                                        @{profileUser.username}
+                                    </h2>
+                                    {isVendor && vendorValidated && <VerifiedBadge />}
+                                </div>
+                                {profileUser.full_name && (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">{profileUser.full_name}</p>
+                                )}
+                            </div>
+
+                            {/* Bio — shown up top (before the action button) on other people's profiles */}
+                            {!isOwnProfile && profileUser.bio && (
+                                <div className="text-center mb-3">
+                                    <p className={`text-[13px] text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed ${!isBioExpanded ? 'line-clamp-2' : ''}`}>
+                                        {profileUser.bio}
+                                    </p>
+                                    {(profileUser.bio.includes('\n') || profileUser.bio.length > 60) && (
+                                        <button onClick={() => setIsBioExpanded(!isBioExpanded)} className="text-[12px] font-bold text-gray-500 dark:text-gray-400 mt-0.5 hover:underline">
+                                            {isBioExpanded ? 'Show less' : 'Read more'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Stats */}
+                            <div className="flex items-center justify-center gap-5 mb-1 text-sm">
+                                <span className="text-center">
+                                    <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.posts_count ?? userPosts.length)}</span>
+                                    <span className="text-gray-500 dark:text-gray-400 text-xs">moments</span>
+                                </span>
+                                <button type="button" onClick={() => !isPrivacyBlocked && setFollowersModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
+                                    <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.followers_count || 0)}</span>
+                                    <span className="text-gray-500 dark:text-gray-400 text-xs">followers</span>
+                                </button>
+                                <button type="button" onClick={() => !isPrivacyBlocked && setFollowingModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
+                                    <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.following_count || 0)}</span>
+                                    <span className="text-gray-500 dark:text-gray-400 text-xs">following</span>
+                                </button>
+                            </div>
+                            <div className="flex justify-center mb-3"><MutualFollowers /></div>
+
+                            {/* Buttons — all below the identity info */}
+                            {isOwnProfile ? (
+                                <Link to="/settings/account" className="block w-full text-center px-5 py-2.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-xl text-sm shadow-md hover:opacity-90 transition-opacity mb-2.5">
+                                    Edit profile
+                                </Link>
+                            ) : canFollow && (
+                                <button onClick={handleFollow} disabled={followLoading} className={`w-full mb-2.5 ${getFollowButtonClass('md')}`}>
+                                    {getFollowButtonLabel()}
+                                </button>
+                            )}
+
+                            <div className="flex items-center justify-center gap-2 flex-wrap">
+                                <button type="button" onClick={handleShareProfile} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" aria-label="Share">
+                                    <Share2 size={16} />
+                                </button>
+                                <button type="button" onClick={handleStarClick} className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`} aria-label="View interests">
+                                    <Star size={16} fill={showInterestsSection ? 'currentColor' : 'none'} />
+                                </button>
+                                {(isOwnProfile || canMessage) && (
+                                    <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" aria-label="Message">
+                                        <MessageCircle size={16} />
+                                    </button>
+                                )}
+                                {isOwnProfile ? (
+                                    <Link to="/settings" className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        <Settings size={16} />
+                                    </Link>
+                                ) : (
+                                    <div className="relative" ref={userOptionsMenuRef}>
+                                        <button type="button" onClick={() => setShowUserOptionsMenu(v => !v)} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                            <MoreHorizontal size={17} />
+                                        </button>
+                                        {showUserOptionsMenu && (
+                                            <div className="absolute left-[-43px] top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-xl overflow-hidden min-w-[200px]">
+                                                {/* Block / Unblock */}
+                                                <button
+                                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                    onClick={() => isBlocked ? handleUnblock() : setShowBlockConfirm(true)}
+                                                    disabled={blockLoading}
+                                                >
+                                                    {blockLoading ? <Loader2 size={16} className="animate-spin" /> : <UserX size={16} />}
+                                                    {isBlocked ? 'Unblock User' : 'Block User'}
+                                                </button>
+                                                {/* Report */}
+                                                <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-t border-gray-100 dark:border-gray-800" onClick={() => { setShowUserOptionsMenu(false); setRewardToast({ type: 'success', message: 'Report submitted successfully.' }); }}>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                                                    Report
+                                                </button>
+                                                {/* Notifications */}
+                                                <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-t border-gray-100 dark:border-gray-800 disabled:opacity-50" onClick={handleToggleNotifications} disabled={notifLoading}>
+                                                    {notifLoading ? <Loader2 size={16} className="animate-spin" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}
+                                                    {notificationEnabled ? 'Turn Off Notifications' : 'Turn On Notifications'}
+                                                </button>
                                             </div>
                                         )}
                                     </div>
-                                </div>
+                                )}
                             </div>
-                            {isOwnProfile && (
-                                <button type="button" onClick={() => setShowAvatarModal(true)}
-                                    className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center border-2 border-white dark:border-black shadow-md hover:bg-blue-600 transition-colors">
-                                    <Plus size={16} strokeWidth={2.5} />
-                                </button>
-                            )}
                         </div>
                     </div>
 
-                    {/* Username */}
-                    <div className="text-center mb-4">
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                            <h2 className="text-[22px] font-light text-gray-900 dark:text-white tracking-tight">
-                                @{profileUser.username}
-                            </h2>
-                            {isVendor && vendorValidated && <VerifiedBadge />}
-                        </div>
+                    {/* Quick nav card */}
+                    <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm p-2">
+                        {SIDEBAR_NAV.map((item) => <SidebarNavItem key={item.label} {...item} />)}
                     </div>
 
-                    {/* Actions row */}
-                    <div className="flex items-center justify-center gap-2 mb-5 flex-wrap">
-                        {isOwnProfile ? (
-                            <>
-                                <Link to="/settings/account" className="px-5 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-xl text-sm shadow-md hover:opacity-90 transition-opacity">
-                                    Edit profile
-                                </Link>
-                                <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Share">
-                                    <Share2 size={17} />
-                                </button>
-                                <button type="button" onClick={handleStarClick} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="View interests">
-                                    <Star size={17} fill={showInterestsSection ? 'currentColor' : 'none'} />
-                                </button>
-                                <button type="button" onClick={handleOpenMessages} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Message">
-                                    <MessageCircle size={17} />
-                                </button>
-                                <Link to="/settings" className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                    <Settings size={17} />
-                                </Link>
-                            </>
-                        ) : (
-                            <>
-                                {canFollow && (
-                                    <button onClick={handleFollow} disabled={followLoading} className={getFollowButtonClass('md')}>
-                                        {getFollowButtonLabel()}
-                                    </button>
-                                )}
-                                <button type="button" onClick={handleShareProfile} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Share">
-                                    <Share2 size={17} />
-                                </button>
-                                <button type="button" onClick={handleStarClick} className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'}`} aria-label="View interests">
-                                    <Star size={17} fill={showInterestsSection ? 'currentColor' : 'none'} />
-                                </button>
-                                {canMessage && (
-                                    <button type="button" onClick={handleOpenMessages} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" aria-label="Message">
-                                        <MessageCircle size={17} />
-                                    </button>
-                                )}
-                                <div className="relative" ref={userOptionsMenuRef}>
-                                    <button type="button" onClick={() => setShowUserOptionsMenu(v => !v)} className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                        <MoreHorizontal size={18} />
-                                    </button>
-                                    {showUserOptionsMenu && (
-                                        <div className="absolute left-[-43px] top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-xl overflow-hidden min-w-[200px]">
-                                            {/* Block / Unblock */}
-                                            <button
-                                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
-                                                onClick={() => isBlocked ? handleUnblock() : setShowBlockConfirm(true)}
-                                                disabled={blockLoading}
-                                            >
-                                                {blockLoading ? <Loader2 size={16} className="animate-spin" /> : <UserX size={16} />}
-                                                {isBlocked ? 'Unblock User' : 'Block User'}
-                                            </button>
-                                            {/* Report */}
-                                            <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-t border-gray-100 dark:border-gray-800" onClick={() => { setShowUserOptionsMenu(false); setRewardToast({ type: 'success', message: 'Report submitted successfully.' }); }}>
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-                                                Report
-                                            </button>
-                                            {/* Notifications */}
-                                            <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-t border-gray-100 dark:border-gray-800 disabled:opacity-50" onClick={handleToggleNotifications} disabled={notifLoading}>
-                                                {notifLoading ? <Loader2 size={16} className="animate-spin" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}
-                                                {notificationEnabled ? 'Turn Off Notifications' : 'Turn On Notifications'}
-                                            </button>
+                    {/* Bio / highlights / interests / vendor card */}
+                    {((isOwnProfile && profileUser.bio) || (isVendor && isOwnProfile) || !contentLocked || showInterestsSection || (isVendor && vendorInfo)) && (
+                        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm p-4 space-y-4">
+                            {((isOwnProfile && profileUser.bio) || (isVendor && isOwnProfile)) && (
+                                <div className="text-center">
+                                    {isVendor && isOwnProfile && (
+                                        <div className="mb-2 flex justify-center"><ValidationStatusBadge validated={vendorValidated} /></div>
+                                    )}
+                                    {isOwnProfile && profileUser.bio && (
+                                        <div>
+                                            <p className={`text-[14px] text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed text-left ${!isBioExpanded ? 'line-clamp-3' : ''}`}>
+                                                {profileUser.bio}
+                                            </p>
+                                            {(profileUser.bio.includes('\n') || profileUser.bio.length > 80) && (
+                                                <button onClick={() => setIsBioExpanded(!isBioExpanded)} className="text-[13px] font-bold text-gray-500 dark:text-gray-400 mt-1 hover:underline">
+                                                    {isBioExpanded ? 'Show less' : 'Read more'}
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
-                            </>
-                        )}
-                    </div>
+                            )}
 
-                    {/* Stats */}
-                    <div className="flex items-center justify-center gap-6 mb-5 text-sm">
-                        <span className="text-center">
-                            <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.posts_count ?? userPosts.length)}</span>
-                            <span className="text-gray-500 dark:text-gray-400">moments</span>
-                        </span>
-                        <button type="button" onClick={() => !isPrivacyBlocked && setFollowersModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
-                            <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.followers_count || 0)}</span>
-                            <span className="text-gray-500 dark:text-gray-400">followers</span>
-                        </button>
-                        <button type="button" onClick={() => !isPrivacyBlocked && setFollowingModalOpen(true)} className="text-center hover:opacity-70 transition-opacity">
-                            <span className="block font-bold text-gray-900 dark:text-white text-base">{isPrivacyBlocked ? '—' : fmt(profileUser.following_count || 0)}</span>
-                            <span className="text-gray-500 dark:text-gray-400">following</span>
-                        </button>
-                    </div>
+                            {!contentLocked && (
+                                <HighlightsRail users={profileUser ? [profileUser] : []} variant="profile" allowCreate={isOwnProfile} />
+                            )}
 
-                    {/* Full name + bio */}
-                    <div className="text-center">
-                        {(profileUser.full_name || profileUser.username) && (
-                            <div className="font-bold text-base text-gray-900 dark:text-white mb-1">
-                                {profileUser.full_name || profileUser.username}
-                            </div>
-                        )}
-                        {isVendor && isOwnProfile && (
-                            <div className="mb-2 flex justify-center"><ValidationStatusBadge validated={vendorValidated} /></div>
-                        )}
-                        {profileUser.bio && (
-                            <div>
-                                <p className={`text-[14px] text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed text-left ${!isBioExpanded ? 'line-clamp-3' : ''}`}>
-                                    {profileUser.bio}
-                                </p>
-                                {(profileUser.bio.includes('\n') || profileUser.bio.length > 80) && (
-                                    <button onClick={() => setIsBioExpanded(!isBioExpanded)} className="text-[13px] font-bold text-gray-500 dark:text-gray-400 mt-1 hover:underline">
-                                        {isBioExpanded ? 'Show less' : 'Read more'}
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                        <MutualFollowers />
-                    </div>
+                            {showInterestsSection && (
+                                <InterestedSection
+                                    isDesktop
+                                    interests={userInterests}
+                                    isOwnProfile={isOwnProfile}
+                                    onAdd={() => setShowInterestsModal(true)}
+                                />
+                            )}
 
-                    {/* Highlights */}
-                    {!contentLocked && (
-                        <div className="mt-6">
-                            <HighlightsRail users={profileUser ? [profileUser] : []} variant="profile" allowCreate={isOwnProfile} />
+                            <VendorBusinessCard />
                         </div>
                     )}
-
-                    {/* Interested section */}
-                    {showInterestsSection && (
-                        <div className="mt-6">
-                            <InterestedSection 
-                                isDesktop
-                                interests={userInterests} 
-                                isOwnProfile={isOwnProfile} 
-                                onAdd={() => setShowInterestsModal(true)} 
-                            />
-                        </div>
-                    )}
-
-                    <VendorBusinessCard />
-
                 </div>
 
-                {/* ── Right Panel: tabs + scrollable grid ─────────────────────── */}
-                <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-                    {/* Tabs */}
+                {/* ── Column 2: tabs + feed cards ───────────────────────────── */}
+                <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
                     {!contentLocked && (
-                        <div className="flex border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black shrink-0">
+                        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm shrink-0 flex overflow-x-auto mb-3">
                             {tabConfig.map(tab => (
                                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                    className={`flex items-center gap-1.5 px-6 py-4 border-b-[2px] text-[11px] font-semibold tracking-widest uppercase transition-all ${
+                                    className={`flex items-center gap-1.5 px-5 py-3.5 border-b-[2px] text-sm font-semibold whitespace-nowrap transition-all ${
                                         activeTab === tab.key
-                                            ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
+                                            ? 'border-[#fa3f5e] text-gray-900 dark:text-white'
                                             : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                                     }`}>
-                                    {React.cloneElement(tab.icon, { size: 12 })} {tab.label}
+                                    {React.cloneElement(tab.icon, { size: 16 })} {tab.label}
                                 </button>
                             ))}
                         </div>
                     )}
 
-                    {/* Grid */}
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto scrollbar-hide">
                         <div className="pb-12">
-                            {renderContent()}
+                            {renderDesktopContent()}
                         </div>
+                    </div>
+                </div>
+
+                {/* ── Column 3: suggested users ─────────────────────────────── */}
+                <div className="hidden xl:block w-[300px] shrink-0 overflow-y-auto pb-6 scrollbar-hide">
+                    <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm p-4">
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Suggested for you</h3>
+                        {suggestedUsers.length === 0 ? (
+                            <p className="text-xs text-gray-400 dark:text-gray-500">No suggestions right now.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {suggestedUsers.map((u) => <SuggestedUserRow key={u._id || u.id} user={u} />)}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

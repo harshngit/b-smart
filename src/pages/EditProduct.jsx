@@ -63,7 +63,7 @@ const EditProduct = () => {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center gap-3">
         <p className="text-gray-500 dark:text-gray-400">Product not found.</p>
-        <Link to="/market/my-store" className="text-[#fa3f5e] font-semibold text-sm">Back to My Store</Link>
+        <Link to="/market/my-store/products" className="text-[#fa3f5e] font-semibold text-sm">Back to My Store</Link>
       </div>
     );
   }
@@ -139,13 +139,13 @@ const EditProduct = () => {
   const handleSaveDraft = (e) => {
     e.preventDefault();
     dispatch(updateProduct(buildPayload('Draft')));
-    navigate('/market/my-store');
+    navigate('/market/my-store/products');
   };
 
   const handlePublish = (e) => {
     e.preventDefault();
     dispatch(updateProduct(buildPayload(form.status === 'Draft' ? 'Active' : form.status)));
-    navigate('/market/my-store');
+    navigate('/market/my-store/products');
   };
 
   const stockNum = parseInt(form.stockQuantity, 10) || 0;
@@ -169,7 +169,7 @@ const EditProduct = () => {
           </button>
         </div>
       </div>
-      <Link to="/market/my-store" className="text-xs text-gray-400 hover:text-[#fa3f5e]">← Back to My Store</Link>
+      <Link to="/market/my-store/products" className="text-xs text-gray-400 hover:text-[#fa3f5e]">← Back to My Store</Link>
 
       <div className="mt-5">
         <Stepper

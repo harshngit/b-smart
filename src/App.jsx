@@ -14,7 +14,11 @@ import Ads from './pages/Ads';
 import Market from './pages/Market';
 import AddProduct from './pages/AddProduct';
 import EditProduct from './pages/EditProduct';
-import MyStore from './pages/MyStore';
+import StoreLayout from './myStore/components/StoreLayout';
+import StoreDashboard from './myStore/pages/Dashboard';
+import StoreOrders from './myStore/pages/Orders';
+import StoreProducts from './myStore/pages/Products';
+import StoreServices from './myStore/pages/Services';
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -146,7 +150,6 @@ function App() {
             <Route path="/market"           element={<Market />} />
             <Route path="/market/add-product" element={<AddProduct />} />
             <Route path="/market/edit-product/:productId" element={<EditProduct />} />
-            <Route path="/market/my-store"  element={<MyStore />} />
             <Route path="/market/product/:productId" element={<ProductDetail />} />
             <Route path="/cart"             element={<Cart />} />
             <Route path="/checkout"         element={<Checkout />} />
@@ -196,6 +199,17 @@ function App() {
             <Route path="billing"                element={<CoinsBilling />} />
             <Route path="settings"               element={<VendorSettings />} />
             <Route path="notifications"          element={<VendorNotifications />} />
+          </Route>
+
+          <Route path="/market/my-store" element={
+            <ProtectedRoute>
+              <StoreLayout />
+            </ProtectedRoute>
+          }>
+            <Route index          element={<StoreDashboard />} />
+            <Route path="orders"   element={<StoreOrders />} />
+            <Route path="products" element={<StoreProducts />} />
+            <Route path="services" element={<StoreServices />} />
           </Route>
 
           <Route path="/post/:postId" element={

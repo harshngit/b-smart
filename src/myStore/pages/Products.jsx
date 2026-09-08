@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Plus, ArrowLeft, Star, Pencil, Trash2 } from 'lucide-react';
-import { CATEGORY_STYLE } from './Market';
-import { deleteProduct } from '../store/productsSlice';
+import { Plus, Star, Pencil, Trash2 } from 'lucide-react';
+import { CATEGORY_STYLE } from '../../pages/Market';
+import { deleteProduct } from '../../store/productsSlice';
 
 const STATUS_STYLE = {
   Active:         'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400',
@@ -17,7 +17,7 @@ const StatusBadge = ({ status }) => (
   </span>
 );
 
-const MyStore = () => {
+const StoreProducts = () => {
   const products = useSelector((state) => state.products.items);
   const dispatch = useDispatch();
 
@@ -28,13 +28,9 @@ const MyStore = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1100px] mx-auto px-4 pt-6">
-      <Link to="/market" className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-[#fa3f5e] mb-3">
-        <ArrowLeft size={14} /> Back to Marketplace
-      </Link>
-
+    <div className="max-w-[1200px] mx-auto px-4 md:px-8 pt-6">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Store</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Products</h1>
         <Link
           to="/market/add-product"
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
@@ -46,7 +42,7 @@ const MyStore = () => {
         Mock only — showing all products as a placeholder for your store, not filtered by vendor yet.
       </p>
 
-      <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-800">
+      <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-900 text-left text-gray-500 dark:text-gray-400">
@@ -127,4 +123,4 @@ const MyStore = () => {
   );
 };
 
-export default MyStore;
+export default StoreProducts;

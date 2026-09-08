@@ -299,7 +299,8 @@ const ExpandCaption = ({ username, userId, text, isAd }) => {
 };
 
 // ─── Media Renderer ────────────────────────────────────────────────────────────
-const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
+const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [], maxHeight = 560 }) => {
+  const mediaMaxHeightCss = `min(${maxHeight}px, 100vw)`;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [videoReady, setVideoReady]     = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
@@ -469,7 +470,7 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
           {thumbnailUrl && showThumb && (
             <img src={thumbnailUrl} alt="thumbnail"
               className="w-full object-contain absolute inset-0 z-[2]"
-              style={{ maxHeight: 'min(560px, 100vw)' }} />
+              style={{ maxHeight: mediaMaxHeightCss }} />
           )}
           {/* Buffering spinner — shown while video is not yet playing */}
           {!videoPlaying && (
@@ -486,7 +487,7 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
             key={`${mediaSrc}-${currentIndex}`}
             src={mediaSrc}
             className="w-full object-contain relative z-[1]"
-            style={{ maxHeight: 'min(560px, 100vw)' }}
+            style={{ maxHeight: mediaMaxHeightCss }}
             muted={isMuted}
             playsInline
             loop={false}
@@ -541,7 +542,7 @@ const MediaRenderer = ({ mediaItems, isAdType, peopleTags = [] }) => {
             src={mediaSrc || fixUrl(currentItem.image)}
             alt="Post"
             className="w-full object-contain"
-            style={{ maxHeight: 'min(560px, 100vw)', ...(currentItem.image_editing?.filter?.css ? { filter: currentItem.image_editing.filter.css } : {}) }}
+            style={{ maxHeight: mediaMaxHeightCss, ...(currentItem.image_editing?.filter?.css ? { filter: currentItem.image_editing.filter.css } : {}) }}
           />
           <PeopleTagsOverlay tags={peopleTags} />
         </div>
@@ -728,7 +729,7 @@ const TagMentions = ({ tags }) => {
 };
 
 // ─── PostCard ──────────────────────────────────────────────────────────────────
-const PostCard = ({ post, onCommentClick, onDelete }) => {
+const PostCard = ({ post, onCommentClick, onDelete, mediaMaxHeight }) => {
   const { userObject } = useSelector(s => s.auth);
   const isAd = isAdItem(post);
   const isTweet = isTweetItem(post);
@@ -1183,7 +1184,7 @@ const PostCard = ({ post, onCommentClick, onDelete }) => {
           contentUrl={reportContentUrl}
         />
       )}
-      <MediaRenderer mediaItems={mediaItems} isAdType={isAd} peopleTags={peopleTags} />
+      <MediaRenderer mediaItems={mediaItems} isAdType={isAd} peopleTags={peopleTags} {...(mediaMaxHeight ? { maxHeight: mediaMaxHeight } : {})} />
 
       {/* ── Action Bar ────────────────────────────────────────────────────── */}
       <div className="px-3 pt-2">

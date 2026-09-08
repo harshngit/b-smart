@@ -109,13 +109,13 @@ const AddProduct = () => {
   const handleSaveDraft = (e) => {
     e.preventDefault();
     dispatch(addProduct(buildPayload('Draft')));
-    navigate('/market/my-store');
+    navigate('/market/my-store/products');
   };
 
   const handlePublish = (e) => {
     e.preventDefault();
     dispatch(addProduct(buildPayload(form.status === 'Draft' ? 'Active' : form.status)));
-    navigate('/market/my-store');
+    navigate('/market/my-store/products');
   };
 
   const stockNum = parseInt(form.stockQuantity, 10) || 0;
@@ -139,7 +139,7 @@ const AddProduct = () => {
           </button>
         </div>
       </div>
-      <Link to="/market/my-store" className="text-xs text-gray-400 hover:text-[#fa3f5e]">← Back to My Store</Link>
+      <Link to="/market/my-store/products" className="text-xs text-gray-400 hover:text-[#fa3f5e]">← Back to My Store</Link>
 
       <div className="mt-5">
         <Stepper
