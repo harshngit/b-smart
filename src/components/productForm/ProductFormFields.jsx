@@ -277,7 +277,7 @@ export const WeightInput = ({ value, unit, onValueChange, onUnitChange }) => (
 );
 
 // ─── Key Highlights (max N, reorder handle is decorative) ─────────────────────
-export const HighlightsList = ({ items, onChange, max = MAX_HIGHLIGHTS }) => {
+export const HighlightsList = ({ items, onChange, max = MAX_HIGHLIGHTS, placeholder = 'e.g. Premium full-grain leather for durability' }) => {
   const update = (i, val) => onChange(items.map((h, idx) => (idx === i ? val : h)));
   const remove = (i) => onChange(items.filter((_, idx) => idx !== i));
   const add = () => onChange([...items, '']);
@@ -294,7 +294,7 @@ export const HighlightsList = ({ items, onChange, max = MAX_HIGHLIGHTS }) => {
             <input
               value={h}
               onChange={(e) => update(i, e.target.value)}
-              placeholder="e.g. Premium full-grain leather for durability"
+              placeholder={placeholder}
               className={inputCls}
             />
             <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-red-500 flex-shrink-0">
@@ -371,9 +371,9 @@ export const VariantsPricingTable = ({ variants, onChange, onRemove, onAdd }) =>
 );
 
 // ─── Product image gallery: main preview + thumbnail strip ─────────────────────
-export const ImageGallery = ({ images, mainIndex, onSetMain, onAdd, onRemove, fileInputRef, onDrop, onDragOver, onDragLeave, isDragging }) => (
+export const ImageGallery = ({ images, mainIndex, onSetMain, onAdd, onRemove, fileInputRef, onDrop, onDragOver, onDragLeave, isDragging, label = 'Product Images *' }) => (
   <div>
-    <label className={labelCls}>Product Images *</label>
+    <label className={labelCls}>{label}</label>
     <div
       onDrop={onDrop}
       onDragOver={onDragOver}

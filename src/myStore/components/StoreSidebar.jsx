@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, Package, Wrench, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Package, Wrench, ArrowLeft, Calendar } from 'lucide-react';
 import bsmartLogo from '../../assets/bsmart.png';
 import bsmartIcon from '../../assets/bsmart_logo.png';
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/market/my-store' },
+  { icon: Calendar,        label: 'Bookings', path: '/market/my-store/bookings' },
   { icon: ClipboardList,   label: 'Orders',    path: '/market/my-store/orders' },
   { icon: Package,         label: 'Products',  path: '/market/my-store/products' },
   { icon: Wrench,          label: 'Services',  path: '/market/my-store/services' },

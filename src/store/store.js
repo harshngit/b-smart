@@ -6,6 +6,9 @@ import chatReducer from './chatSlice';
 import storyReducer from './storySlice';
 import cartReducer from './cartSlice';
 import productsReducer from './productsSlice';
+import servicesReducer from './servicesSlice';
+import ordersReducer from './ordersSlice';
+import bookingsReducer from './bookingsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,5 +19,8 @@ export const store = configureStore({
     story: storyReducer,
     cart: cartReducer,
     products: productsReducer,
+    services: servicesReducer,
+    orders: ordersReducer,
+    bookings: bookingsReducer,
   },
 });

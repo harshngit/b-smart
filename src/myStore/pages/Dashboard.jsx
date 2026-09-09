@@ -38,8 +38,14 @@ const buildEarningsSeries = (period) => {
   });
 };
 
-const StatCard = ({ icon: Icon, label, value, sub, accent, sparkline }) => (
-  <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 shadow-sm min-w-0">
+const StatCard = ({ icon: Icon, label, value, sub, accent, sparkline, to }) => {
+  const Component = to ? Link : 'div';
+
+  return (
+  <Component
+    {...(to ? { to, 'aria-label': `View ${label.toLowerCase()}` } : {})}
+    className={`bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 shadow-sm min-w-0 ${to ? 'block transition-colors hover:border-[#fa3f5e] dark:hover:border-[#fa3f5e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fa3f5e] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-black' : ''}`}
+  >
     <div className="flex items-center gap-2 mb-2">
       {Icon && (
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${accent}`}>
@@ -65,8 +71,9 @@ const StatCard = ({ icon: Icon, label, value, sub, accent, sparkline }) => (
         </ResponsiveContainer>
       </div>
     )}
-  </div>
-);
+  </Component>
+  );
+};
 
 const HealthItem = ({ icon: Icon, title, sub, done }) => (
   <div className="flex items-center gap-3 py-2.5">
@@ -87,13 +94,16 @@ const HealthItem = ({ icon: Icon, title, sub, done }) => (
 
 const StoreDashboard = () => {
   const products = useSelector((state) => state.products.items);
+  const services = useSelector((state) => state.services.items);
+  const orders = useSelector((state) => state.orders.items);
+  const bookings = useSelector((state) => state.bookings.items);
   const [earningsPeriod, setEarningsPeriod] = useState('This month');
   const earningsData = useMemo(() => buildEarningsSeries(earningsPeriod), [earningsPeriod]);
   const earningsTotal = earningsData[earningsData.length - 1].value;
 
   const activeProducts = products.filter((p) => (p.status || (p.rating > 0 ? 'Active' : 'Draft')) === 'Active').length;
-  const openOrders = MOCK_ORDERS.filter((o) => !['Delivered', 'Cancelled'].includes(o.status)).length;
-  const newBookings = MOCK_BOOKINGS.filter((b) => b.status === 'New').length;
+  const openOrders = orders.filter((o) => !['Delivered', 'Cancelled'].includes(o.status)).length;
+  const newBookings = bookings.filter((b) => b.status === 'New').length;
   const availableBalance = Math.round(THIS_MONTH_TOTAL * 0.7);
 
   const recentActivity = [
@@ -103,7 +113,7 @@ const StoreDashboard = () => {
   ];
 
   return (
-    <div className="max-w-[1450px] ml-auto px-4 md:px-8 pt-6 pb-10">
+    <div className="max-w-[1280px] ml-auto px-4 md:px-8 pt-6 pb-10">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">My Store</h1>
 
       {/* Live status banner */}
@@ -124,10 +134,10 @@ const StoreDashboard = () => {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
         <StatCard label="This month" value={`$${THIS_MONTH_TOTAL.toLocaleString()}`} sparkline />
         <StatCard label="Available balance" value={`$${availableBalance.toLocaleString()}`} />
-        <StatCard icon={Briefcase} accent="bg-teal-50 dark:bg-teal-900/20 text-teal-600" label="Services" value={SEED_SERVICES.length} sub="active" />
-        <StatCard icon={Package} accent="bg-purple-50 dark:bg-purple-900/20 text-purple-600" label="Products" value={activeProducts} sub="active" />
-        <StatCard icon={Calendar} accent="bg-blue-50 dark:bg-blue-900/20 text-blue-600" label="Bookings" value={newBookings} sub="new" />
-        <StatCard icon={ShoppingBag} accent="bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e]" label="Orders" value={openOrders} sub="open" />
+        <StatCard to="/market/my-store/services" icon={Briefcase} accent="bg-teal-50 dark:bg-teal-900/20 text-teal-600" label="Services" value={services.filter((service) => service.status === 'Published').length} sub="active" />
+        <StatCard to="/market/my-store/products" icon={Package} accent="bg-purple-50 dark:bg-purple-900/20 text-purple-600" label="Products" value={activeProducts} sub="active" />
+        <StatCard to="/market/my-store/bookings" icon={Calendar} accent="bg-blue-50 dark:bg-blue-900/20 text-blue-600" label="Bookings" value={newBookings} sub="new" />
+        <StatCard to="/market/my-store/orders" icon={ShoppingBag} accent="bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e]" label="Orders" value={openOrders} sub="open" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
@@ -194,7 +204,7 @@ const StoreDashboard = () => {
             <h2 className="font-bold text-gray-900 dark:text-white text-sm mb-3">Quick actions</h2>
             <div className="space-y-2">
               <Link
-                to="/market/my-store/services"
+                to="/market/add-service"
                 className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 <div className="w-7 h-7 rounded-full bg-teal-500 text-white flex items-center justify-center flex-shrink-0">
@@ -219,7 +229,7 @@ const StoreDashboard = () => {
             <h2 className="font-bold text-gray-900 dark:text-white text-sm mb-1">Store health</h2>
             <div className="divide-y divide-gray-50 dark:divide-gray-800">
               <HealthItem icon={UserCog} title="Complete your profile" sub="Add store information and profile photo" done />
-              <HealthItem icon={Package} title="Add a service or product" sub="List at least one service or product" done={products.length > 0 || SEED_SERVICES.length > 0} />
+              <HealthItem icon={Package} title="Add a service or product" sub="List at least one service or product" done={products.length > 0 || services.length > 0} />
               <HealthItem icon={CreditCard} title="Set up payments" sub="Connect a payout method" done />
               <HealthItem icon={MessageCircle} title="Respond to messages" sub="Keep your response rate high" done />
             </div>

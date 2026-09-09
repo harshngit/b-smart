@@ -115,7 +115,7 @@ const StoreProducts = () => {
   const pagedProducts = filteredProducts.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
-    <div className="max-w-[1450px] ml-auto px-4 md:px-8 pt-6">
+    <div className="max-w-[1280px] ml-auto px-4 md:px-8 pt-6">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Products</h1>
         <Link

@@ -14,9 +14,12 @@ import Ads from './pages/Ads';
 import Market from './pages/Market';
 import AddProduct from './pages/AddProduct';
 import EditProduct from './pages/EditProduct';
+import AddService from './pages/AddService';
+import EditService from './pages/EditService';
 import StoreLayout from './myStore/components/StoreLayout';
 import StoreDashboard from './myStore/pages/Dashboard';
 import StoreOrders from './myStore/pages/Orders';
+import StoreBookings from './myStore/pages/Bookings';
 import StoreProducts from './myStore/pages/Products';
 import StoreServices from './myStore/pages/Services';
 import ProductDetail from './pages/ProductDetail';
@@ -150,6 +153,8 @@ function App() {
             <Route path="/market"           element={<Market />} />
             <Route path="/market/add-product" element={<AddProduct />} />
             <Route path="/market/edit-product/:productId" element={<EditProduct />} />
+            <Route path="/market/add-service" element={<AddService />} />
+            <Route path="/market/edit-service/:serviceId" element={<EditService />} />
             <Route path="/market/product/:productId" element={<ProductDetail />} />
             <Route path="/cart"             element={<Cart />} />
             <Route path="/checkout"         element={<Checkout />} />
@@ -208,6 +213,9 @@ function App() {
           }>
             <Route index          element={<StoreDashboard />} />
             <Route path="orders"   element={<StoreOrders />} />
+            <Route path="orders/:orderId" element={<StoreOrders />} />
+            <Route path="bookings" element={<StoreBookings />} />
+            <Route path="bookings/:bookingId" element={<StoreBookings />} />
             <Route path="products" element={<StoreProducts />} />
             <Route path="services" element={<StoreServices />} />
           </Route>

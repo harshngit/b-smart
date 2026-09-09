@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { ArrowLeft, LayoutDashboard, ClipboardList, Package, Wrench } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, ClipboardList, Package, Wrench, Calendar } from 'lucide-react';
 import StoreSidebar from './StoreSidebar';
 
 const MOBILE_NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/market/my-store' },
+  { icon: Calendar,        label: 'Bookings', path: '/market/my-store/bookings' },
   { icon: ClipboardList,   label: 'Orders',    path: '/market/my-store/orders' },
   { icon: Package,         label: 'Products',  path: '/market/my-store/products' },
   { icon: Wrench,          label: 'Services',  path: '/market/my-store/services' },
