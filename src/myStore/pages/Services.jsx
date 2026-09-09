@@ -29,15 +29,15 @@ export default function StoreServices() {
     <div className="max-w-[1280px] ml-auto px-4 md:px-8 pt-6 pb-10">
       <div className="flex items-center justify-between gap-3 mb-5">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Services</h1>
-        <Link to="/market/add-service" className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white bg-teal-700 hover:bg-teal-800 transition-colors"><Plus size={16} /> Add Service</Link>
+        <Link to="/market/add-service" className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange transition-colors"><Plus size={16} /> Add Service</Link>
       </div>
       <div className="flex gap-5 border-b border-gray-200 dark:border-gray-800 mb-4">
-        {['Published', 'Draft'].map((value) => <button type="button" key={value} onClick={() => { setTab(value); setPage(1); }} aria-pressed={tab === value} className={`pb-2.5 px-2 text-sm font-semibold border-b-2 transition-colors ${tab === value ? 'border-teal-600 text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{value === 'Draft' ? 'Drafts' : value}</button>)}
+        {['Published', 'Draft'].map((value) => <button type="button" key={value} onClick={() => { setTab(value); setPage(1); }} aria-pressed={tab === value} className={`pb-2.5 px-2 text-sm font-semibold border-b-2 transition-colors ${tab === value ? 'border-[#fa3f5e] text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{value === 'Draft' ? 'Drafts' : value}</button>)}
       </div>
       <div className="flex flex-wrap gap-3 mb-5">
         <div className="relative flex-1 min-w-[180px] sm:max-w-md">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input aria-label="Search services" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search services" className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 dark:text-white" />
+          <input aria-label="Search services" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search services" className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#fa3f5e]/20 focus:border-[#fa3f5e] dark:text-white" />
         </div>
         <Dropdown className="w-44" value={status} options={['All status', 'Visible', 'Hidden']} onChange={(value) => { setStatus(value); setPage(1); }} />
       </div>
@@ -51,12 +51,12 @@ export default function StoreServices() {
               const visible = service.status === 'Published' && service.visible;
               return <tr key={service.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                 <td className="px-5 py-4"><div className="flex items-center gap-3.5 min-w-[230px]">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden flex-shrink-0 bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center">
-                    {service.images?.[0] ? <img src={service.images[0]} alt="" className="w-full h-full object-cover" /> : <Wrench size={28} className="text-teal-600" />}
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden flex-shrink-0 bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+                    {service.images?.[0] ? <img src={service.images[0]} alt="" className="w-full h-full object-cover" /> : <Wrench size={28} className="text-[#fa3f5e]" />}
                   </div>
                   <div className="min-w-0">
-                    <Link to={`/market/edit-service/${service.id}`} className="font-semibold text-gray-900 dark:text-white hover:text-teal-600">{service.name || 'Untitled service'}</Link>
-                    <p className="text-xs font-semibold text-teal-600 dark:text-teal-400 mt-1.5">{servicePrice(service)}</p>
+                    <Link to={`/market/edit-service/${service.id}`} className="font-semibold text-gray-900 dark:text-white hover:text-[#fa3f5e]">{service.name || 'Untitled service'}</Link>
+                    <p className="text-xs font-semibold text-[#fa3f5e] mt-1.5">{servicePrice(service)}</p>
                     <p className="flex items-center gap-1.5 text-xs text-gray-400 mt-1.5"><Calendar size={12} />{service.bookings} bookings</p>
                   </div>
                 </div></td>
@@ -64,7 +64,7 @@ export default function StoreServices() {
                 <td className="px-5 py-4 text-gray-500 dark:text-gray-400">{service.bookings}</td>
                 <td className="px-5 py-4"><button type="button" disabled={service.status === 'Draft'} aria-label={`${visible ? 'Hide' : 'Show'} ${service.name}`} onClick={() => dispatch(updateService({ id: service.id, visible: !service.visible }))} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${visible ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-green-500' : 'bg-gray-400'}`} />{visible ? 'Visible' : 'Hidden'}</button></td>
                 <td className="px-5 py-4"><div className="flex items-center justify-end gap-3">
-                  <Link to={`/market/edit-service/${service.id}`} aria-label={`Edit ${service.name}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-teal-600"><Pencil size={13} /> Edit</Link>
+                  <Link to={`/market/edit-service/${service.id}`} aria-label={`Edit ${service.name}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-[#fa3f5e]"><Pencil size={13} /> Edit</Link>
                   <ServiceActions service={service} />
                 </div></td>
               </tr>;

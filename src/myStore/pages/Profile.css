@@ -1,0 +1,207 @@
+/* Explicit, page-scoped geometry keeps the reference layout independent of
+   generated arbitrary Tailwind grid/aspect utilities. Colors remain in JSX. */
+.store-profile {
+  width: 100%;
+  max-width: 1280px;
+  box-sizing: border-box;
+}
+
+.store-profile--services .store-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.store-profile-header {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 12px;
+  align-items: center;
+}
+
+.store-profile-avatar { grid-column: 1; grid-row: 1; }
+.store-profile-header > :nth-child(2) { grid-column: 2; min-width: 0; }
+.store-profile-actions { grid-column: 1 / -1; }
+.store-profile-avatar > div { width: 96px; height: 96px; }
+
+.store-profile--services .store-profile-tabs { height: 48px; }
+.store-profile--services .store-profile-tabs > button {
+  position: relative;
+  border-bottom: 0;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.store-profile--services .store-profile-tabs > button + button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  height: 16px;
+  width: 1px;
+  background: currentColor;
+  opacity: .15;
+}
+.store-profile--services .store-profile-tabs > button[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: currentColor;
+}
+
+.store-profile--products .store-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.store-profile--products .store-profile-actions > button { display: none; }
+.store-profile--products .store-profile-tabs { height: 48px; }
+.store-profile--products .store-profile-tabs > button {
+  position: relative;
+  border-bottom: 0;
+  padding: 12px 4px;
+}
+.store-profile-tabs > button:focus:not(:focus-visible) { outline: none; }
+.store-profile-tabs > button:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
+.store-profile--products .store-profile-tabs > button + button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 16px;
+  background: currentColor;
+  opacity: .15;
+}
+.store-profile--products .store-profile-tabs > button[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: currentColor;
+}
+.store-product-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.store-product-filters > div { min-width: 0; width: 100%; }
+.store-product-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.store-product-grid > article { min-width: 0; }
+.store-product-image {
+  width: 100%;
+  aspect-ratio: 1 / 1.12;
+  flex: none;
+  overflow: hidden;
+}
+.store-product-image > img { position: absolute; inset: 0; }
+.store-product-grid > article > div:last-child { min-height: 152px; }
+
+@media (min-width: 400px) {
+  .store-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 700px) {
+  .store-product-filters { grid-template-columns: minmax(0, 1fr) 130px 160px; }
+}
+@media (min-width: 900px) {
+  .store-profile--products .store-profile-layout { grid-template-columns: minmax(0, 1fr) 210px; }
+  .store-profile--products .store-profile-layout > aside { min-width: 0; position: sticky; top: 24px; }
+  .store-profile--products .store-profile-header {
+    position: relative;
+    min-height: 156px;
+    grid-template-columns: 112px minmax(0, 1fr);
+    padding: 20px;
+  }
+  .store-profile--products .store-profile-avatar > div { width: 112px; height: 112px; }
+  .store-profile--products .store-profile-actions { grid-column: 2; margin-top: -8px; }
+  .store-profile--products .store-profile-avatar { grid-row: 1 / 3; }
+  .store-product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .store-product-filters { grid-template-columns: minmax(0, 1fr) 110px 145px; gap: 10px; }
+  .store-product-filters button, .store-product-filters input { font-size: 12px; padding-right: 10px; }
+}
+@media (min-width: 1200px) {
+  .store-profile--products .store-profile-layout { grid-template-columns: minmax(0, 1fr) 240px; }
+  .store-profile--products .store-profile-actions { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); margin: 0; }
+  .store-profile--products .store-profile-header > :nth-child(2) { padding-right: 120px; }
+  .store-product-filters { grid-template-columns: minmax(0, 1fr) 140px 180px; }
+}
+
+.store-service-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.store-service-grid > article { min-width: 0; }
+.store-service-image {
+  width: 100%;
+  aspect-ratio: 6 / 5;
+  flex: none;
+  min-height: 180px;
+  overflow: hidden;
+}
+.store-service-image > img { position: absolute; inset: 0; }
+.store-service-grid > article > div:last-child { min-height: 200px; }
+.store-service-grid > article > div:last-child > p { min-height: 40px; }
+.store-service-grid > article > div:last-child > button {
+  position: relative;
+  justify-content: center;
+  font-weight: 500;
+}
+.store-service-grid > article > div:last-child > button > svg {
+  position: absolute;
+  right: 12px;
+}
+
+@media (min-width: 600px) {
+  .store-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 900px) {
+  .store-profile--services .store-profile-layout {
+    grid-template-columns: minmax(0, 1fr) 210px;
+  }
+  .store-service-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .store-profile--services .store-profile-layout > aside {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .store-profile--services .store-profile-layout > aside > div { flex: 1; }
+  .store-profile--services .store-profile-header {
+    position: relative;
+    min-height: 156px;
+    grid-template-columns: 112px minmax(0, 1fr);
+    padding: 20px;
+  }
+  .store-profile--services .store-profile-avatar > div { width: 112px; height: 112px; }
+  .store-profile--services .store-profile-header > :nth-child(2) { align-self: start; }
+  .store-profile--services .store-profile-actions {
+    grid-column: 2;
+    justify-content: flex-end;
+    margin-top: -8px;
+  }
+  .store-profile--services .store-profile-avatar { grid-row: 1 / 3; }
+}
+
+@media (min-width: 1200px) {
+  .store-profile--services .store-profile-layout { grid-template-columns: minmax(0, 1fr) 240px; }
+  .store-profile--services .store-profile-actions {
+    position: absolute;
+    right: 20px;
+    bottom: 28px;
+    margin-top: 0;
+  }
+  .store-profile--services .store-profile-header > :nth-child(2) > p:last-child {
+    padding-right: 225px;
+  }
+}

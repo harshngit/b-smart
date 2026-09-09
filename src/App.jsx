@@ -20,6 +20,7 @@ import StoreLayout from './myStore/components/StoreLayout';
 import StoreDashboard from './myStore/pages/Dashboard';
 import StoreOrders from './myStore/pages/Orders';
 import StoreBookings from './myStore/pages/Bookings';
+import StoreProfile from './myStore/pages/Profile';
 import StoreProducts from './myStore/pages/Products';
 import StoreServices from './myStore/pages/Services';
 import ProductDetail from './pages/ProductDetail';
@@ -215,6 +216,7 @@ function App() {
             <Route path="orders"   element={<StoreOrders />} />
             <Route path="orders/:orderId" element={<StoreOrders />} />
             <Route path="bookings" element={<StoreBookings />} />
+            <Route path="profile" element={<StoreProfile />} />
             <Route path="bookings/:bookingId" element={<StoreBookings />} />
             <Route path="products" element={<StoreProducts />} />
             <Route path="services" element={<StoreServices />} />
