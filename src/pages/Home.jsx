@@ -11,6 +11,7 @@ import PromoteDetailModal from '../components/PromoteDetailModal';
 import StoryRail from '../components/StoryRail';
 import StoryViewer from '../components/StoryViewer';
 import LocationSelector from '../components/LocationSelector';
+import LoginPromptModal from '../components/LoginPromptModal';
 import { getProfilePath } from '../utils/profilePath';
 import api from '../lib/api';
 import bsmartLogo from '../assets/bsmart.png';
@@ -645,7 +646,7 @@ const injectSuggestionCard = (posts, suggestedUsers) => {
 // ── Home ──────────────────────────────────────────────────────────────────────
 const Home = () => {
   const navigate = useNavigate();
-  const { userObject } = useSelector(s => s.auth);
+  const { userObject, isAuthenticated } = useSelector(s => s.auth);
   const [activeTab, setActiveTab] = useState('all');
 
   const [posts,          setPosts]          = useState([]);
@@ -655,6 +656,7 @@ const Home = () => {
   const [selectedItem,   setSelectedItem]   = useState(null);
   const [selectedTweet,  setSelectedTweet]  = useState(null);
   const [selectedPromoteReel, setSelectedPromoteReel] = useState(null);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -688,25 +690,33 @@ const Home = () => {
 
   const fetchPosts = useCallback(async () => {
     try {
+      if (!isAuthenticated) {
+        const { data } = await api.get('/posts/feed/guest', {
+          params: { limit: 6 },
+        });
+        return normalizeApiArray(data);
+      }
       const { data } = await api.get('/posts/feed', {
         params: { tab: activeTab },
       });
       return normalizeApiArray(data);
     }
     catch (e) { console.error('Error fetching posts:', e); return []; }
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
 
   const fetchSuggestedUsers = useCallback(async () => {
+    if (!isAuthenticated) return [];
     try {
       const res = await fetch(`${BASE_URL}/api/suggestions/users`, { headers: adAuthHeaders() });
       if (!res.ok) return [];
       return normalizeApiArray(await res.json());
     } catch { return []; }
-  }, []);
+  }, [isAuthenticated]);
 
   // Returns a Set of saved IDs, or null when format is unknown (caller falls back to item.is_saved_by_me).
   // Returning null is intentional: an empty Set is truthy and suppresses the fallback.
   const fetchSavedPostIds = useCallback(async () => {
+    if (!isAuthenticated) return null;
     try {
       const { data } = await api.get('/saved/posts');
       if (!data) return null;
@@ -720,9 +730,10 @@ const Home = () => {
       if (arr === null) return null;
       return new Set(arr.map(i => String(i.post?._id || i.post_id || i._id || i.id || '')).filter(Boolean));
     } catch { return null; }
-  }, []);
+  }, [isAuthenticated]);
 
   const fetchSavedPromoteReelIds = useCallback(async () => {
+    if (!isAuthenticated) return null;
     try {
       const { data } = await api.get('/saved/promote-reels');
       if (!data) return null;
@@ -737,9 +748,10 @@ const Home = () => {
       if (arr === null) return null;
       return new Set(arr.map(i => String(i.promote_reel?._id || i.promote_reel_id || i._id || i.id || '')).filter(Boolean));
     } catch { return null; }
-  }, []);
+  }, [isAuthenticated]);
 
   const fetchSavedAdIds = useCallback(async () => {
+    if (!isAuthenticated) return null;
     try {
       const { data } = await api.get('/saved/ads');
       if (!data) return null;
@@ -753,7 +765,7 @@ const Home = () => {
       if (arr === null) return null;
       return new Set(arr.map(i => String(i.ad?._id || i.ad_id || i._id || i.id || '')).filter(Boolean));
     } catch { return null; }
-  }, []);
+  }, [isAuthenticated]);
 
   const loadFeed = useCallback(async () => {
     setLoading(true);
@@ -822,6 +834,16 @@ const Home = () => {
   useEffect(() => {
     if (userObject?.role === 'vendor') navigate('/vendor/dashboard');
   }, [userObject, navigate]);
+
+  useEffect(() => {
+    if (isAuthenticated || loading || feed.length === 0) return;
+    if (sessionStorage.getItem('bsmart_guest_login_prompt_shown')) return;
+    const timer = setTimeout(() => {
+      setShowLoginPrompt(true);
+      sessionStorage.setItem('bsmart_guest_login_prompt_shown', '1');
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, loading, feed.length]);
 
   const handlePostDeleted = (postId) => {
     setPosts(prev => prev.filter(p => (p._id || p.id) !== postId));
@@ -919,6 +941,19 @@ const Home = () => {
                 );
               })
             )}
+            {!isAuthenticated && !loading && feed.length > 0 && (
+              <div className="bg-white dark:bg-black mb-4 border-b border-gray-200 dark:border-gray-800 pb-4 md:rounded-lg md:border p-6 flex flex-col items-center text-center gap-2">
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">Sign up to see more</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Join b_smart to see the full feed, follow people, and join the conversation.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPrompt(true)}
+                  className="rounded-full px-6 py-2.5 text-sm font-semibold bg-gray-900 text-white dark:bg-white dark:text-black hover:opacity-90 transition"
+                >
+                  Sign up to see more
+                </button>
+              </div>
+            )}
             </div>
             <Footer />
           </div>
@@ -941,6 +976,10 @@ const Home = () => {
         isOpen={!!selectedPromoteReel}
         promoteReel={selectedPromoteReel}
         onClose={() => setSelectedPromoteReel(null)}
+      />
+      <LoginPromptModal
+        open={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
       />
     </div>
   );

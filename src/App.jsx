@@ -129,24 +129,24 @@ function App() {
           <Route path="/verify-otp"         element={<VerifyOtp />} />
           <Route path="/legal/:type"        element={<PublicPolicyPage />} />
 
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }>
+          {/* Layout itself is guest-accessible so Home / Reels / Promote can render
+              without login. Every other child route stays behind ProtectedRoute
+              individually — only those three are meant to be publicly viewable. */}
+          <Route path="/" element={<Layout />}>
             <Route index                    element={<Home />} />
-            <Route path="/create"           element={<CreatePost />} />
             <Route path="/reels"            element={<Reels />} />
             <Route path="/promote"          element={<Promote />} />
-            <Route path="/ads"              element={<Ads />} />
-            <Route path="/vendor-ads"       element={<VendorAds />} />
-            <Route path="/profile"          element={<Profile />} />
-            <Route path="/profile/:userId"  element={<Profile />} />
-            <Route path="/edit-profile"     element={<EditProfile />} />
-            <Route path="/wallet"           element={<WalletDetails />} />
-            <Route path="/gift-cards"       element={<GiftCards />} />
-            <Route path="/gift-card-orders" element={<GiftCardOrders />} />
-            <Route path="/settings" element={<Settings />}>
+
+            <Route path="/create"           element={<ProtectedRoute><CreatePost /></ProtectedRoute>} />
+            <Route path="/ads"              element={<ProtectedRoute><Ads /></ProtectedRoute>} />
+            <Route path="/vendor-ads"       element={<ProtectedRoute><VendorAds /></ProtectedRoute>} />
+            <Route path="/profile"          element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/profile/:userId"  element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/edit-profile"     element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+            <Route path="/wallet"           element={<ProtectedRoute><WalletDetails /></ProtectedRoute>} />
+            <Route path="/gift-cards"       element={<ProtectedRoute><GiftCards /></ProtectedRoute>} />
+            <Route path="/gift-card-orders" element={<ProtectedRoute><GiftCardOrders /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>}>
               <Route path="account"        element={<AccountSettings />} />
               <Route path="privacy"        element={<PrivacySettings />} />
               <Route path="security"       element={<SecuritySettings />} />
@@ -162,13 +162,13 @@ function App() {
               <Route path="saved"           element={<SavedPosts />} />
               <Route path="account-actions" element={<AccountActionsSettings />} />
             </Route>
-            <Route path="/notifications"    element={<Notifications />} />
-            <Route path="/search"           element={<Search />} />
-            <Route path="/messages"         element={<ChatPage />} />
-            <Route path="/suggestions"      element={<Suggestions />} />
-            <Route path="/messages/:conversationId" element={<ChatPage />} />
-            <Route path="/ads/:adId/details" element={<AdPublicDetail />} />
-            <Route path="/vendor/:vendorId/public" element={<VendorPublicProfile />} />
+            <Route path="/notifications"    element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            <Route path="/search"           element={<ProtectedRoute><Search /></ProtectedRoute>} />
+            <Route path="/messages"         element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+            <Route path="/suggestions"      element={<ProtectedRoute><Suggestions /></ProtectedRoute>} />
+            <Route path="/messages/:conversationId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+            <Route path="/ads/:adId/details" element={<ProtectedRoute><AdPublicDetail /></ProtectedRoute>} />
+            <Route path="/vendor/:vendorId/public" element={<ProtectedRoute><VendorPublicProfile /></ProtectedRoute>} />
 
           </Route>
 
