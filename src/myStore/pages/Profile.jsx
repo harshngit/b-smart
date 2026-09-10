@@ -11,7 +11,7 @@ const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray
 const primary = 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white rounded-lg font-semibold';
 
 function ListingCard({ item, service, favorite, onFavorite, onAdd, added }) {
-  const [expanded, setExpanded] = useState(false);
+
   const [imageFailed, setImageFailed] = useState(false);
   const Icon = service ? Briefcase : CATEGORY_STYLE[item.category]?.icon || Package;
   return (
@@ -29,7 +29,7 @@ function ListingCard({ item, service, favorite, onFavorite, onAdd, added }) {
           <span className="text-sm font-bold text-[#fa3f5e]">{service && item.rateType === 'Starting from' ? <><span className="text-[10px] font-normal text-gray-400 mr-1">From</span>₹{item.price}</> : service ? servicePrice(item) : `₹${item.price.toFixed(2)}`}</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4"><Star size={13} className="fill-amber-400 text-amber-400" />{item.rating > 0 ? <><span className="font-semibold text-gray-700 dark:text-gray-200">{item.rating}</span><span>({item.reviews || 0})</span></> : 'New listing'}</div>
-        {service ? <><button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)} className={`${primary} relative w-full mt-auto py-2.5 px-3 flex items-center justify-center !font-medium text-xs`}>{expanded ? 'Hide service' : 'View service'}<ChevronRight size={15} className={`absolute right-3 ${expanded ? 'rotate-90' : ''}`} /></button>{expanded && <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 leading-5"><p>{item.method || 'At customer location'}</p>{item.highlights?.map((highlight) => <p key={highlight}>• {highlight}</p>)}<p className="mt-2">Contact the store to discuss availability.</p></div>}</> : <button type="button" onClick={onAdd} className="mt-auto w-full py-2.5 text-xs font-semibold text-[#fa3f5e] border border-[#fa3f5e]/40 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/10 flex items-center justify-center gap-2">{added ? <Check size={15} /> : <ShoppingCart size={15} />}{added ? 'Add another' : 'Add'}</button>}
+        {service ? <Link to={`/market/service/${item.id}`} className={`${primary} relative w-full mt-auto py-2.5 px-3 flex items-center justify-center !font-medium text-xs`}>View service<ChevronRight size={15} className="absolute right-3" /></Link> : <button type="button" onClick={onAdd} className="mt-auto w-full py-2.5 text-xs font-semibold text-[#fa3f5e] border border-[#fa3f5e]/40 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/10 flex items-center justify-center gap-2">{added ? <Check size={15} /> : <ShoppingCart size={15} />}{added ? 'Add another' : 'Add'}</button>}
       </div>
     </article>
   );
@@ -57,7 +57,7 @@ export default function StoreProfile() {
   const shownProducts = products.filter((item) => item.name.toLowerCase().includes(search.trim().toLowerCase()) && (category === 'All categories' || item.category === category)).sort((a, b) => sort === 'Price: Low to high' ? a.price - b.price : sort === 'Price: High to low' ? b.price - a.price : sort === 'Top rated' ? b.rating - a.rating : 0);
   const toggleFavorite = (key) => setFavorites((current) => ({ ...current, [key]: !current[key] }));
   const add = (item) => {
-    dispatch(addItem({ id: item.id, name: item.name, subtitle: item.dimensions, brand: item.vendor, price: item.price, category: item.category }));
+    dispatch(addItem({ id: item.id, name: item.name, subtitle: item.dimensions, brand: item.vendor, price: item.price, category: item.category, images: item.images, storeName: `${name}'s Personal Store`, storeAvatar: avatar, storeType: 'Personal Store' }));
     setNotice(`${item.name} added to your cart.`);
   };
   return (

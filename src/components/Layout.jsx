@@ -364,7 +364,7 @@ const Layout = () => {
       )}
 
       {/* Floating Wallet for Desktop — balance from Redux wallet slice */}
-      {!isExcludedPage && (
+      {!isExcludedPage && !/^\/(cart|checkout)\/?$/.test(location.pathname) && !location.pathname.startsWith('/market/service/') && (
         <Link
           to="/wallet"
           data-tour="wallet"

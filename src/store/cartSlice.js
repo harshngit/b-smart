@@ -12,6 +12,8 @@ const cartSlice = createSlice({
       const existing = state.items.find((i) => i.id === id);
       if (existing) {
         existing.qty += qty;
+        existing.saved = false;
+        existing.selected = true;
       } else {
         state.items.push({ ...action.payload, qty });
       }
@@ -30,8 +32,22 @@ const cartSlice = createSlice({
     clearCart: (state) => {
       state.items = [];
     },
+    toggleSelection: (state, action) => {
+      const item = state.items.find((i) => i.id === action.payload);
+      if (item && !item.saved) item.selected = item.selected === false;
+    },
+    selectAll: (state, action) => {
+      state.items.forEach((item) => { if (!item.saved) item.selected = action.payload; });
+    },
+    toggleSaved: (state, action) => {
+      const item = state.items.find((i) => i.id === action.payload);
+      if (item) { item.saved = !item.saved; item.selected = !item.saved; }
+    },
+    checkoutSelected: (state) => {
+      state.items = state.items.filter((item) => item.saved || item.selected === false);
+    },
   },
 });
 
-export const { addItem, removeItem, incrementQty, decrementQty, clearCart } = cartSlice.actions;
+export const { addItem, removeItem, incrementQty, decrementQty, clearCart, toggleSelection, selectAll, toggleSaved, checkoutSelected } = cartSlice.actions;
 export default cartSlice.reducer;

@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, nanoid } from '@reduxjs/toolkit';
 import { MOCK_BOOKINGS } from '../myStore/data/mockBookings';
 import { localDate, validProposal } from '../myStore/data/bookingHelpers';
 
@@ -14,6 +14,12 @@ const bookingsSlice = createSlice({
     verified: true, paymentSecured: true, proposedDate: '', proposedTime: '',
   })) },
   reducers: {
+    requestBooking: {
+      prepare: (booking) => ({ payload: { ...booking, id: `BK-${nanoid(8)}` } }),
+      reducer: (state, { payload }) => {
+        state.items.push({ ...payload, status: 'New', verified: false, paymentSecured: false, proposedDate: '', proposedTime: '' });
+      },
+    },
     acceptBooking: (state, { payload }) => {
       const booking = state.items.find((item) => item.id === payload);
       if (booking?.status === 'New') booking.status = 'Confirmed';
@@ -38,5 +44,5 @@ const bookingsSlice = createSlice({
     },
   },
 });
-export const { acceptBooking, declineBooking, proposeBookingTime, completeBooking } = bookingsSlice.actions;
+export const { acceptBooking, declineBooking, proposeBookingTime, completeBooking, requestBooking } = bookingsSlice.actions;
 export default bookingsSlice.reducer;

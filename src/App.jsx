@@ -24,6 +24,7 @@ import StoreProfile from './myStore/pages/Profile';
 import StoreProducts from './myStore/pages/Products';
 import StoreServices from './myStore/pages/Services';
 import ProductDetail from './pages/ProductDetail';
+import ServiceDetail from './pages/ServiceDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import VendorAds from './pages/VendorAds';
@@ -157,6 +158,7 @@ function App() {
             <Route path="/market/add-service" element={<AddService />} />
             <Route path="/market/edit-service/:serviceId" element={<EditService />} />
             <Route path="/market/product/:productId" element={<ProductDetail />} />
+            <Route path="/market/service/:serviceId" element={<ServiceDetail />} />
             <Route path="/cart"             element={<Cart />} />
             <Route path="/checkout"         element={<Checkout />} />
             <Route path="/vendor-ads"       element={<VendorAds />} />

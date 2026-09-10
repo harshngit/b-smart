@@ -56,7 +56,7 @@ export default function StoreServices() {
                     {service.images?.[0] ? <img src={service.images[0]} alt="" className="w-full h-full object-cover" /> : <ServiceIcon size={28} className="text-[#fa3f5e]" />}
                   </div>
                   <div className="min-w-0">
-                    <Link to={`/market/edit-service/${service.id}`} className="font-semibold text-gray-900 dark:text-white hover:text-[#fa3f5e]">{service.name || 'Untitled service'}</Link>
+                    <Link to={`/market/service/${service.id}?from=services`} className="font-semibold text-gray-900 dark:text-white hover:text-[#fa3f5e]">{service.name || 'Untitled service'}</Link>
                     <p className="text-xs font-semibold text-[#fa3f5e] mt-1.5">{servicePrice(service)}</p>
                     <p className="flex items-center gap-1.5 text-xs text-gray-400 mt-1.5"><Calendar size={12} />{service.bookings} bookings</p>
                   </div>
@@ -64,7 +64,8 @@ export default function StoreServices() {
                 <td className="px-5 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{servicePrice(service)}</td>
                 <td className="px-5 py-4 text-gray-500 dark:text-gray-400">{service.bookings}</td>
                 <td className="px-5 py-4"><button type="button" disabled={service.status === 'Draft'} aria-label={`${visible ? 'Hide' : 'Show'} ${service.name}`} onClick={() => dispatch(updateService({ id: service.id, visible: !service.visible }))} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${visible ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-green-500' : 'bg-gray-400'}`} />{visible ? 'Visible' : 'Hidden'}</button></td>
-                <td className="px-5 py-4"><div className="flex items-center justify-end gap-3">
+                <td className="px-5 py-4"><div className="flex items-center justify-end gap-3 whitespace-nowrap">
+                  <Link to={`/market/service/${service.id}?from=services`} aria-label={`View ${service.name}`} className="inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange">View service</Link>
                   <Link to={`/market/edit-service/${service.id}`} aria-label={`Edit ${service.name}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-[#fa3f5e]"><Pencil size={13} /> Edit</Link>
                   <ServiceActions service={service} />
                 </div></td>
