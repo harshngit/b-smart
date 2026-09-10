@@ -60,7 +60,7 @@ const ProductCard = ({ product, isFavorite, onToggleFavorite }) => {
           <span>{product.views}</span>
         </div>
         <p className="font-bold text-[#fa3f5e] mb-3">
-          ${product.price.toFixed(2)} <span className="text-gray-400 dark:text-gray-500 text-xs font-normal">USD</span>
+          ₹{product.price.toFixed(2)} <span className="text-gray-400 dark:text-gray-500 text-xs font-normal">INR</span>
         </p>
         <div className="flex gap-2">
           <button

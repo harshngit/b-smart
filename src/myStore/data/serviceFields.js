@@ -5,7 +5,7 @@ export const METHODS = ['At customer location', 'Online', 'At my location'];
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const defaultAvailability = () => DAYS.map((day, index) => ({ day, slots: index < 5 ? [{ start: '09:00', end: '17:00' }] : [] }));
 export const servicePrice = ({ price, rateType }) => {
-  const amount = `$${Number(price || 0).toLocaleString()}`;
+  const amount = `₹${Number(price || 0).toLocaleString()}`;
   return rateType === 'Starting from' ? `From ${amount}` : `${amount}${rateType === 'Per hour' ? ' / hour' : rateType === 'Per session' ? ' / session' : ''}`;
 };
 

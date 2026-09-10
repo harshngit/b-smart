@@ -1,6 +1,7 @@
+import ServiceIcon from './ServiceIcon';
 import React from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { ArrowLeft, LayoutDashboard, ClipboardList, Package, Wrench, Calendar, UserRound } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, ClipboardList, Package, Calendar, UserRound } from 'lucide-react';
 import StoreSidebar from './StoreSidebar';
 
 const MOBILE_NAV_ITEMS = [
@@ -9,7 +10,7 @@ const MOBILE_NAV_ITEMS = [
   { icon: Calendar,        label: 'Bookings', path: '/market/my-store/bookings' },
   { icon: ClipboardList,   label: 'Orders',    path: '/market/my-store/orders' },
   { icon: Package,         label: 'Products',  path: '/market/my-store/products' },
-  { icon: Wrench,          label: 'Services',  path: '/market/my-store/services' },
+  { icon: ServiceIcon,          label: 'Service',  path: '/market/my-store/services' },
 ];
 
 // Layout for the My Store module — its own sidebar (desktop) / tab bar (mobile),

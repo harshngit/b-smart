@@ -132,8 +132,8 @@ const StoreDashboard = () => {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-        <StatCard label="This month" value={`$${THIS_MONTH_TOTAL.toLocaleString()}`} sparkline />
-        <StatCard label="Available balance" value={`$${availableBalance.toLocaleString()}`} />
+        <StatCard label="This month" value={`₹${THIS_MONTH_TOTAL.toLocaleString()}`} sparkline />
+        <StatCard label="Available balance" value={`₹${availableBalance.toLocaleString()}`} />
         <StatCard to="/market/my-store/services" icon={Briefcase} accent="bg-teal-50 dark:bg-teal-900/20 text-teal-600" label="Services" value={services.filter((service) => service.status === 'Published').length} sub="active" />
         <StatCard to="/market/my-store/products" icon={Package} accent="bg-purple-50 dark:bg-purple-900/20 text-purple-600" label="Products" value={activeProducts} sub="active" />
         <StatCard to="/market/my-store/bookings" icon={Calendar} accent="bg-blue-50 dark:bg-blue-900/20 text-blue-600" label="Bookings" value={newBookings} sub="new" />
@@ -150,7 +150,7 @@ const StoreDashboard = () => {
               <Dropdown className="w-40" value={earningsPeriod} onChange={setEarningsPeriod} options={PERIOD_OPTIONS} />
             </div>
             <p className="text-2xl font-bold text-[#fa3f5e] mb-4">
-              ${earningsTotal.toLocaleString()} <span className="text-xs font-medium text-gray-400">{earningsPeriod}</span>
+              ₹{earningsTotal.toLocaleString()} <span className="text-xs font-medium text-gray-400">{earningsPeriod}</span>
             </p>
             <div className="h-56 -ml-2">
               <ResponsiveContainer width="100%" height="100%">
@@ -163,8 +163,8 @@ const StoreDashboard = () => {
                   </defs>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-gray-100 dark:stroke-gray-800" />
                   <XAxis dataKey="label" interval={PERIOD_CONFIG[earningsPeriod].xInterval} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={(v) => `$${v}`} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} />
-                  <Tooltip formatter={(v) => [`$${v}`, 'Earnings']} contentStyle={{ borderRadius: 10, border: '1px solid #f3f4f6', fontSize: 12 }} />
+                  <YAxis tickFormatter={(v) => `₹${v}`} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} />
+                  <Tooltip formatter={(v) => [`₹${v}`, 'Earnings']} contentStyle={{ borderRadius: 10, border: '1px solid #f3f4f6', fontSize: 12 }} />
                   <Area type="monotone" dataKey="value" stroke="#fa3f5e" strokeWidth={2.5} fill="url(#earningsFill)" />
                 </AreaChart>
               </ResponsiveContainer>

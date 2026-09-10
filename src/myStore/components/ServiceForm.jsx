@@ -111,7 +111,7 @@ export default function ServiceForm({ service }) {
           </SectionCard>
           <SectionCard ref={step2Ref} step={2} title="Pricing">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div><label htmlFor="service-price" className={labelCls}>Price ($) *</label><input id="service-price" type="number" min="0" step="0.01" value={form.price} onChange={set('price')} required placeholder="0" className={inputCls} /></div>
+              <div><label htmlFor="service-price" className={labelCls}>Price (₹) *</label><input id="service-price" type="number" min="0" step="0.01" value={form.price} onChange={set('price')} required placeholder="0" className={inputCls} /></div>
               <Dropdown label="Rate *" value={form.rateType} options={RATE_TYPES} onChange={(value) => setField('rateType', value)} />
               <Dropdown label="Duration *" value={form.duration} options={DURATIONS} onChange={(value) => setField('duration', value)} />
             </div>

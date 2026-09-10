@@ -1,7 +1,8 @@
+import ServiceIcon from '../components/ServiceIcon';
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus, Search, Pencil, Calendar, Wrench } from 'lucide-react';
+import { Plus, Search, Pencil, Calendar } from 'lucide-react';
 import { Dropdown } from '../../components/productForm/ProductFormFields';
 import { updateService } from '../../store/servicesSlice';
 import { servicePrice } from '../data/serviceFields';
@@ -52,7 +53,7 @@ export default function StoreServices() {
               return <tr key={service.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                 <td className="px-5 py-4"><div className="flex items-center gap-3.5 min-w-[230px]">
                   <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden flex-shrink-0 bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
-                    {service.images?.[0] ? <img src={service.images[0]} alt="" className="w-full h-full object-cover" /> : <Wrench size={28} className="text-[#fa3f5e]" />}
+                    {service.images?.[0] ? <img src={service.images[0]} alt="" className="w-full h-full object-cover" /> : <ServiceIcon size={28} className="text-[#fa3f5e]" />}
                   </div>
                   <div className="min-w-0">
                     <Link to={`/market/edit-service/${service.id}`} className="font-semibold text-gray-900 dark:text-white hover:text-[#fa3f5e]">{service.name || 'Untitled service'}</Link>

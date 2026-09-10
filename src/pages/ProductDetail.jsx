@@ -42,7 +42,7 @@ const MiniProductCard = ({ product }) => {
       </div>
       <div className="p-3">
         <p className="text-sm text-gray-900 dark:text-white font-medium truncate">{product.name}</p>
-        <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">${product.price.toFixed(2)}</p>
+        <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">₹{product.price.toFixed(2)}</p>
       </div>
     </Link>
   );
@@ -134,7 +134,7 @@ const ProductDetail = () => {
           </div>
 
           <p className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            ${product.price.toFixed(2)} <span className="text-sm font-normal text-gray-400">USD</span>
+            ₹{product.price.toFixed(2)} <span className="text-sm font-normal text-gray-400">INR</span>
           </p>
 
           <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-6">

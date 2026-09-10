@@ -24,7 +24,7 @@ import {
   Target,
   TrendingUp,
   Users,
-  DollarSign,
+  IndianRupee,
   Zap,
 } from "lucide-react";
 
@@ -34,7 +34,7 @@ const REPORTS = [
   { id: "engagement", label: "Engagement Report", endpoint: "/reports/engagement", desc: "Likes, shares, comments & interactions", icon: Heart, color: "text-pink-500", bg: "bg-pink-50 dark:bg-pink-900/20" },
   { id: "conversion", label: "Conversion Report", endpoint: "/reports/conversions", desc: "Conversion tracking & ROI insights", icon: Zap, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
   { id: "geographic", label: "Geographic Report", endpoint: "/reports/geographic", desc: "Audience breakdown by location", icon: Globe, color: "text-green-500", bg: "bg-green-50 dark:bg-green-900/20" },
-  { id: "financial", label: "Financial Report", endpoint: "/reports/financial", desc: "Spend, budget & billing summary", icon: DollarSign, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-900/20" },
+  { id: "financial", label: "Financial Report", endpoint: "/reports/financial", desc: "Spend, budget & billing summary", icon: IndianRupee, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-900/20" },
 ];
 
 const PRESETS = [
@@ -50,7 +50,7 @@ const SUMMARY_CARDS = [
   { key: "total_impressions", label: "Total Impressions", icon: Eye, tone: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" },
   { key: "total_clicks", label: "Total Clicks", icon: MousePointerClick, tone: "bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400" },
   { key: "engagement_rate", label: "Engagement Rate", icon: Heart, tone: "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400", kind: "percent" },
-  { key: "total_spend", label: "Total Spend", icon: DollarSign, tone: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400" },
+  { key: "total_spend", label: "Total Spend", icon: IndianRupee, tone: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400" },
   { key: "conversions", label: "Conversions", icon: Zap, tone: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400" },
   { key: "reach", label: "Reach", icon: Users, tone: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" },
 ];

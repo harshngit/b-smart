@@ -1,5 +1,5 @@
 export const ORDER_TABS = ['New', 'Processing', 'Shipped', 'Completed'];
-export const money = (value) => `$${Number(value).toFixed(2)}`;
+export const money = (value) => `₹${Number(value).toFixed(2)}`;
 export const orderDate = (value) => new Date(`${value}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const TAB_STATUSES = { New: ['Pending'], Processing: ['Processing'], Shipped: ['Shipped'], Completed: ['Delivered', 'Cancelled'] };
 
