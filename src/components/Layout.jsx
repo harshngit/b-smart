@@ -23,6 +23,22 @@ const Layout = () => {
   const showTopBar = !isExcludedPage && !isFullScreenPage;
 
 
+  // Load the AdSense/Auto-Ads script only here — Layout only ever mounts around
+  // real content pages (Home, Reels, Promote, etc.), never on the auth screens
+  // (login/signup/forgot-password/verify-otp/OAuth callback), which are routed
+  // outside Layout entirely. Keeps ads off thin/no-content screens by construction.
+  useEffect(() => {
+    if (document.getElementById('adsbygoogle-script')) return;
+    const clientId = import.meta.env.VITE_ADSENSE_CLIENT_ID;
+    if (!clientId) return;
+    const script = document.createElement('script');
+    script.id = 'adsbygoogle-script';
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientId}`;
+    document.head.appendChild(script);
+  }, []);
+
   const [walletCoins, setWalletCoins] = useState(null);
 
   // Direct /wallet/me call — also syncs Redux so TopBar stays live

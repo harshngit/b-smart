@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Plus, Search, Pencil, Trash2, MoreVertical } from 'lucide-react';
-import { CATEGORY_STYLE } from '../../pages/Market';
+import { CATEGORY_STYLE } from '../../data/marketplaceCategoryStyle';
 import { deleteProduct } from '../../store/productsSlice';
 import { Dropdown } from '../../components/productForm/ProductFormFields';
 

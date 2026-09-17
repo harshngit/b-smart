@@ -52,7 +52,9 @@ function BookingPage({ service }) {
     if (!availableTimes(service, date).includes(time)) { setError('Choose an available date and time.'); setReviewing(false); return; }
     if (atCustomer && !address.trim()) { setError('Enter your service address.'); setAddressOpen(true); return; }
     if (!reviewing) { setReviewing(true); return; }
-    dispatch(requestBooking({ serviceId: service.id, service: service.name, customer: user?.name || user?.full_name || user?.username || 'Customer', date, time, amount: Number(service.price), duration: service.duration, address: atCustomer ? address.trim() : service.method === 'Online' ? 'Online' : service.address, note: note.trim() }));
+    const buyerId = user?._id || user?.id;
+    if (!buyerId) { setError('Please sign in again to request this service.'); return; }
+    dispatch(requestBooking({ buyerId: String(buyerId), requestedAt: new Date().toISOString(), serviceId: service.id, service: service.name, customer: user?.name || user?.full_name || user?.username || 'Customer', date, time, amount: Number(service.price), duration: service.duration, address: atCustomer ? address.trim() : service.method === 'Online' ? 'Online' : service.address, note: note.trim() }));
     setSubmitted(true);
   };
 

@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, nanoid } from '@reduxjs/toolkit';
 import { MOCK_ORDERS } from '../myStore/data/mockOrders';
 
 export const COURIERS = ['Delhivery', 'Blue Dart', 'DTDC', 'India Post', 'Other'];
@@ -23,6 +23,16 @@ const ordersSlice = createSlice({
     notifyCustomer: true,
   })) },
   reducers: {
+    placeOrder: {
+      prepare: (order) => {
+        const now = new Date();
+        const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+        return { payload: { ...order, id: `ORD-${nanoid(8)}`, date, createdAt: now.toISOString(), time: now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) } };
+      },
+      reducer: (state, { payload }) => {
+        state.items.push({ ...payload, status: 'Pending', confirmed: false, packed: false, courier: '', trackingNumber: '', notifyCustomer: true });
+      },
+    },
     updateOrderFulfillment: (state, { payload }) => {
       const order = state.items.find((item) => item.id === payload.id);
       if (!order || !['Pending', 'Processing'].includes(order.status)) return;
@@ -45,5 +55,5 @@ const ordersSlice = createSlice({
     },
   },
 });
-export const { updateOrderFulfillment, shipOrder } = ordersSlice.actions;
+export const { placeOrder, updateOrderFulfillment, shipOrder } = ordersSlice.actions;
 export default ordersSlice.reducer;

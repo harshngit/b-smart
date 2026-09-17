@@ -14,6 +14,7 @@ import Avatar from '../components/Avatar';
 import LocationLink from '../components/LocationLink';
 import ShareContentModal from '../components/ShareContentModal';
 import ContentReportModal from '../components/ContentReportModal';
+import LoginPromptModal from '../components/LoginPromptModal';
 
 const BASE_URL = 'https://api.bebsmart.in';
 const IMAGE_DURATION = 15;
@@ -563,10 +564,11 @@ const SlideBottomInfo = ({ p, isMuted, onToggleMute }) => {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 const Promote = () => {
-  const { userObject } = useSelector(s => s.auth);
+  const { userObject, isAuthenticated } = useSelector(s => s.auth);
   const currentUserId = userObject?._id || userObject?.id || null;
   const currentUserAvatar = userObject?.avatar_url || null;
   const currentUserName = userObject?._full_name || userObject?.username || 'You';
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const pageHeightClass = 'h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]';
@@ -772,6 +774,27 @@ const Promote = () => {
     if (pg === 1) setLoading(true);
     setError(null);
     try {
+      if (!isAuthenticated) {
+        // Guest: only hit the public, unauthenticated promote-reels endpoint —
+        // never call /saved/promote-reels or /follows/status/bulk without a token,
+        // and never paginate past the single guest page (no `page` param support).
+        const res = await promoteReelService.listPromoteReelsGuest({ limit: 6 });
+        const items = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+        const enriched = items.map(p => ({
+          ...p,
+          is_saved_by_me: !!(p.is_saved_by_me),
+          is_author_followed_by_me: !!(p.is_author_followed_by_me),
+        }));
+        setPromotes(enriched);
+        setCurrentIndex(0);
+        setProgress(0);
+        setLikedIds(new Set(enriched.filter(p => p.is_liked_by_me).map(p => p._id)));
+        setSavedIds(new Set(enriched.filter(p => p.is_saved_by_me).map(p => p._id)));
+        setHasMore(false);
+        setLoading(false);
+        return;
+      }
+
       const res = await promoteReelService.listPromoteReels({ page: pg, limit: 10 });
       // API returns { page, limit, data: [...] } or plain array
       const items = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
@@ -846,19 +869,30 @@ const Promote = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => { fetchPromotes(1); }, [fetchPromotes]);
 
-  // Load more near end
+  // Load more near end — guests never paginate (guest endpoint has no page
+  // param and already caps at a single small preview page).
   useEffect(() => {
-    if (!hasMore || loading) return;
+    if (!isAuthenticated || !hasMore || loading) return;
     if (promotes.length > 0 && currentIndex >= promotes.length - 3) {
       const next = page + 1;
       setPage(next);
       fetchPromotes(next, true);
     }
   }, [currentIndex, promotes.length, hasMore, loading, page, fetchPromotes]);
+
+  useEffect(() => {
+    if (isAuthenticated || loading || promotes.length === 0) return;
+    if (sessionStorage.getItem('bsmart_guest_login_prompt_shown')) return;
+    const timer = setTimeout(() => {
+      setShowLoginPrompt(true);
+      sessionStorage.setItem('bsmart_guest_login_prompt_shown', '1');
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, loading, promotes.length]);
 
   // ── Progress bar (image promotes) ────────────────────────────────────────────
   useEffect(() => {
@@ -1369,6 +1403,18 @@ const Promote = () => {
         </div>
       </div>
 
+      {!isAuthenticated && promotes.length > 0 && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-4 z-40 flex justify-center px-4" style={{ bottom: 'max(16px, env(safe-area-inset-bottom, 16px))' }}>
+          <button
+            type="button"
+            onClick={() => setShowLoginPrompt(true)}
+            className="rounded-full px-5 py-2.5 text-sm font-semibold bg-white dark:bg-white text-black shadow-2xl hover:opacity-90 transition"
+          >
+            Sign up to see more
+          </button>
+        </div>
+      )}
+
       {/* Desktop nav arrows */}
       <div className="hidden md:flex fixed right-5 top-1/2 -translate-y-1/2 z-40 flex-col gap-3">
         <button onClick={() => goToIndex(currentIndex - 1)} disabled={currentIndex === 0}
@@ -1432,6 +1478,8 @@ const Promote = () => {
         contentId={reportPromote?._id || reportPromote?.id}
         contentUrl={getPromoteShareUrl(reportPromote)}
       />
+
+      <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
 
       <style>{`
         @keyframes slideInLeft { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }

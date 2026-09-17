@@ -3,9 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { LayoutGrid, Briefcase, Package, Heart, Star, Clock, MapPin, Globe, MessageCircle, UserPlus, Check, BadgeCheck, ShoppingCart, ChevronRight, Search, UserRound } from 'lucide-react';
 import { Dropdown, inputCls } from '../../components/productForm/ProductFormFields';
-import { CATEGORY_STYLE } from '../../pages/Market';
+import { CATEGORY_STYLE } from '../../data/marketplaceCategoryStyle';
 import { servicePrice } from '../data/serviceFields';
 import { addItem } from '../../store/cartSlice';
+import useMarketplaceWishlist from '../../hooks/useMarketplaceWishlist';
 
 const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm';
 const primary = 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white rounded-lg font-semibold';
@@ -37,6 +38,7 @@ function ListingCard({ item, service, favorite, onFavorite, onAdd, added }) {
 
 export default function StoreProfile() {
   const dispatch = useDispatch();
+  const { isSaved, toggle } = useMarketplaceWishlist();
   const user = useSelector((state) => state.auth.userObject);
   const services = useSelector((state) => state.services.items).filter((item) => item.status === 'Published' && item.visible);
   const products = useSelector((state) => state.products.items).filter((item) => (item.status || (item.rating > 0 ? 'Active' : 'Draft')) === 'Active');
@@ -47,7 +49,6 @@ export default function StoreProfile() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All categories');
   const [sort, setSort] = useState('Recommended');
-  const [favorites, setFavorites] = useState({});
   const [following, setFollowing] = useState(false);
   const [areasOpen, setAreasOpen] = useState(false);
   const [notice, setNotice] = useState('');
@@ -55,7 +56,6 @@ export default function StoreProfile() {
   const avatar = user?.profile_picture || user?.avatar;
   const count = cart.reduce((sum, item) => sum + item.qty, 0);
   const shownProducts = products.filter((item) => item.name.toLowerCase().includes(search.trim().toLowerCase()) && (category === 'All categories' || item.category === category)).sort((a, b) => sort === 'Price: Low to high' ? a.price - b.price : sort === 'Price: High to low' ? b.price - a.price : sort === 'Top rated' ? b.rating - a.rating : 0);
-  const toggleFavorite = (key) => setFavorites((current) => ({ ...current, [key]: !current[key] }));
   const add = (item) => {
     dispatch(addItem({ id: item.id, name: item.name, subtitle: item.dimensions, brand: item.vendor, price: item.price, category: item.category, images: item.images, storeName: `${name}'s Personal Store`, storeAvatar: avatar, storeType: 'Personal Store' }));
     setNotice(`${item.name} added to your cart.`);
@@ -75,14 +75,14 @@ export default function StoreProfile() {
           <div id="profile-listings" role="tabpanel" aria-labelledby={`profile-tab-${tab}`} className="space-y-6">
             {tab === 'All' && <>
               <div aria-label="All listings" className="grid grid-cols-1 min-[600px]:grid-cols-2 min-[900px]:grid-cols-3 gap-3 items-start">
-                {services.map((item) => <ListingCard key={`service-${item.id}`} item={item} service favorite={!!favorites[`service-${item.id}`]} onFavorite={() => toggleFavorite(`service-${item.id}`)} />)}
-                {products.map((item) => <ListingCard key={`product-${item.id}`} item={item} favorite={!!favorites[`product-${item.id}`]} onFavorite={() => toggleFavorite(`product-${item.id}`)} onAdd={() => add(item)} added={cart.some((entry) => entry.id === item.id)} />)}
+                {services.map((item) => <ListingCard key={`service-${item.id}`} item={item} service favorite={isSaved('service', item.id)} onFavorite={() => toggle('service', item.id)} />)}
+                {products.map((item) => <ListingCard key={`product-${item.id}`} item={item} favorite={isSaved('product', item.id)} onFavorite={() => toggle('product', item.id)} onAdd={() => add(item)} added={cart.some((entry) => entry.id === item.id)} />)}
                 {!services.length && !products.length && <p className="col-span-full py-10 text-center text-gray-400">No published listings yet.</p>}
               </div>
               <p role="status" className="text-xs text-[#fa3f5e] mt-3">{notice}</p>
             </>}
-            {tab === 'Services' && <section aria-label="Services"><h2 className="sr-only">Services</h2><div className="grid grid-cols-1 min-[600px]:grid-cols-2 min-[900px]:grid-cols-3 gap-3 items-start">{services.map((item) => <ListingCard key={item.id} item={item} service favorite={!!favorites[`service-${item.id}`]} onFavorite={() => toggleFavorite(`service-${item.id}`)} />)}{!services.length && <p className="col-span-full py-10 text-center text-gray-400">No published services yet.</p>}</div></section>}
-            {tab === 'Products' && <section aria-label="Products"><h2 className="sr-only">Products</h2><div className="grid grid-cols-1 min-[700px]:grid-cols-[minmax(0,1fr)_130px_160px] min-[900px]:grid-cols-[minmax(0,1fr)_110px_145px] min-[1200px]:grid-cols-[minmax(0,1fr)_140px_180px] gap-3 min-[900px]:gap-2.5 mb-4 min-[900px]:[&_button]:text-xs min-[900px]:[&_button]:pr-2.5 min-[900px]:[&_input]:text-xs min-[900px]:[&_input]:pr-2.5"><div className="relative w-full min-w-0"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input aria-label="Search products" placeholder="Search products" value={search} onChange={(event) => setSearch(event.target.value)} className={`${inputCls} pl-9`} /></div><Dropdown className="w-full min-w-0" value={category} options={['All categories', ...new Set(products.map((item) => item.category))]} onChange={setCategory} /><Dropdown className="w-full min-w-0" value={sort} options={['Recommended', 'Price: Low to high', 'Price: High to low', 'Top rated']} onChange={setSort} /></div><div className="grid grid-cols-1 min-[400px]:grid-cols-2 min-[900px]:grid-cols-4 gap-3">{shownProducts.map((item) => <ListingCard key={item.id} item={item} favorite={!!favorites[`product-${item.id}`]} onFavorite={() => toggleFavorite(`product-${item.id}`)} onAdd={() => add(item)} added={cart.some((entry) => entry.id === item.id)} />)}{!shownProducts.length && <p className="col-span-full py-10 text-center text-gray-400">No products match your search.</p>}</div><p role="status" className="text-xs text-[#fa3f5e] mt-3">{notice}</p></section>}
+            {tab === 'Services' && <section aria-label="Services"><h2 className="sr-only">Services</h2><div className="grid grid-cols-1 min-[600px]:grid-cols-2 min-[900px]:grid-cols-3 gap-3 items-start">{services.map((item) => <ListingCard key={item.id} item={item} service favorite={isSaved('service', item.id)} onFavorite={() => toggle('service', item.id)} />)}{!services.length && <p className="col-span-full py-10 text-center text-gray-400">No published services yet.</p>}</div></section>}
+            {tab === 'Products' && <section aria-label="Products"><h2 className="sr-only">Products</h2><div className="grid grid-cols-1 min-[700px]:grid-cols-[minmax(0,1fr)_130px_160px] min-[900px]:grid-cols-[minmax(0,1fr)_110px_145px] min-[1200px]:grid-cols-[minmax(0,1fr)_140px_180px] gap-3 min-[900px]:gap-2.5 mb-4 min-[900px]:[&_button]:text-xs min-[900px]:[&_button]:pr-2.5 min-[900px]:[&_input]:text-xs min-[900px]:[&_input]:pr-2.5"><div className="relative w-full min-w-0"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input aria-label="Search products" placeholder="Search products" value={search} onChange={(event) => setSearch(event.target.value)} className={`${inputCls} pl-9`} /></div><Dropdown className="w-full min-w-0" value={category} options={['All categories', ...new Set(products.map((item) => item.category))]} onChange={setCategory} /><Dropdown className="w-full min-w-0" value={sort} options={['Recommended', 'Price: Low to high', 'Price: High to low', 'Top rated']} onChange={setSort} /></div><div className="grid grid-cols-1 min-[400px]:grid-cols-2 min-[900px]:grid-cols-4 gap-3">{shownProducts.map((item) => <ListingCard key={item.id} item={item} favorite={isSaved('product', item.id)} onFavorite={() => toggle('product', item.id)} onAdd={() => add(item)} added={cart.some((entry) => entry.id === item.id)} />)}{!shownProducts.length && <p className="col-span-full py-10 text-center text-gray-400">No products match your search.</p>}</div><p role="status" className="text-xs text-[#fa3f5e] mt-3">{notice}</p></section>}
           </div>
         </main>
         <aside aria-label="Store information" className="space-y-4 min-w-0 min-[900px]:sticky min-[900px]:top-6">

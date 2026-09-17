@@ -15,6 +15,7 @@ import EditContentModal from '../components/EditContentModal';
 import LocationLink from '../components/LocationLink';
 import OwnerContentOptionsModal from '../components/OwnerContentOptionsModal';
 import ShareContentModal from '../components/ShareContentModal';
+import LoginPromptModal from '../components/LoginPromptModal';
 
 const BASE_URL = 'https://api.bebsmart.in/api';
 
@@ -667,11 +668,12 @@ const Reels = () => {
   const actionPanelRef  = useRef(null);
   const [actionPanelRight, setActionPanelRight] = useState(100);
 
-  const { userObject }  = useSelector((state) => state.auth);
+  const { userObject, isAuthenticated }  = useSelector((state) => state.auth);
   const currentUserId   = userObject?._id || userObject?.id || null;
   const [, setWalletBalance] = useState(
     userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0
   );
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   // ── socket: listen for reel_ready so we can swap spinner → player ──────────
   useEffect(() => {
@@ -773,6 +775,7 @@ const Reels = () => {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     const fetchWallet = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -784,7 +787,7 @@ const Reels = () => {
       } catch { /* silent */ }
     };
     fetchWallet();
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const measure = () => {
@@ -802,6 +805,24 @@ const Reels = () => {
     const fetchReels = async () => {
       try {
         setLoading(true); setError(null);
+
+        if (!isAuthenticated) {
+          // Guest: only hit the public, unauthenticated reels endpoint — never
+          // call /saved/posts or /follows/status/bulk without a token.
+          const reelsRes = await fetch(`${BASE_URL}/posts/reels/guest?limit=6`, { headers: authHeaders() });
+          if (!reelsRes.ok) throw new Error('Failed to fetch reels');
+          const data = await reelsRes.json();
+          const reelsList = normalizeApiArray(data);
+          setReels(
+            reelsList.map(r => ({
+              ...r,
+              is_saved_by_me: !!(r.is_saved_by_me),
+              is_author_followed_by_me: !!(r.is_author_followed_by_me || r.is_followed_by_me),
+            }))
+          );
+          return;
+        }
+
         const [reelsRes, savedRes] = await Promise.all([
           fetch(`${BASE_URL}/posts/reels`, { headers: authHeaders() }),
           fetch(`${BASE_URL}/saved/posts`, { headers: authHeaders() }).catch(() => null),
@@ -857,7 +878,7 @@ const Reels = () => {
       finally { setLoading(false); }
     };
     fetchReels();
-  }, []);
+  }, [isAuthenticated]);
 
   // Shared /reels?reel=<id> links only work if the target reel happens to be
   // within the first loaded page — self-fetch it directly when it isn't, so a
@@ -913,6 +934,16 @@ const Reels = () => {
     setReelProgress(0);
     setIsPausedByUser(false);
   }, [currentIndex, reels]);
+
+  useEffect(() => {
+    if (isAuthenticated || loading || reels.length === 0) return;
+    if (sessionStorage.getItem('bsmart_guest_login_prompt_shown')) return;
+    const timer = setTimeout(() => {
+      setShowLoginPrompt(true);
+      sessionStorage.setItem('bsmart_guest_login_prompt_shown', '1');
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, loading, reels.length]);
 
   // Callback so ReelVideo can register itself in videoRefs
   const setVideoRef = useCallback((index, el) => { videoRefs.current[index] = el; }, []);
@@ -1299,6 +1330,18 @@ const Reels = () => {
           </div>
         </div>
 
+        {!isAuthenticated && reels.length > 0 && (
+          <div className="fixed left-1/2 -translate-x-1/2 bottom-4 z-40 flex justify-center px-4" style={{ bottom: 'max(16px, env(safe-area-inset-bottom, 16px))' }}>
+            <button
+              type="button"
+              onClick={() => setShowLoginPrompt(true)}
+              className="rounded-full px-5 py-2.5 text-sm font-semibold bg-white dark:bg-white text-black shadow-2xl hover:opacity-90 transition"
+            >
+              Sign up to see more
+            </button>
+          </div>
+        )}
+
         {/* Nav arrows */}
         <div className="hidden md:flex fixed right-5 top-1/2 -translate-y-1/2 z-40 flex-col gap-3">
           <button onClick={() => goToIndex(currentIndex - 1)} disabled={currentIndex === 0} className="w-12 h-12 rounded-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-white/25 hover:scale-110 active:scale-95 transition-all disabled:opacity-20 disabled:cursor-not-allowed">
@@ -1345,6 +1388,7 @@ const Reels = () => {
       />
       <EditContentModal isOpen={!!editReel} onClose={() => setEditReel(null)} item={editReel} contentType="reel" onSaved={(updated) => { const updatedId = updated?._id || updated?.post_id; setReels((prev) => prev.map((reel) => ((reel._id || reel.post_id) === updatedId ? { ...reel, ...updated } : reel))); }} />
       <ShareContentModal isOpen={!!shareReel} onClose={() => setShareReel(null)} contentType="reel" contentId={shareReel?._id || shareReel?.post_id} contentUrl={getReelShareUrl(shareReel)} />
+      <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
 
       <style>{`
         @keyframes slideInLeft  { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }

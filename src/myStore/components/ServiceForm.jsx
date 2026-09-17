@@ -8,13 +8,40 @@ import {
   Stepper, SectionCard, ImageGallery, Dropdown, HighlightsList, CompletenessCard, Checkbox,
   inputCls, labelCls, MAX_IMAGES, MAX_HIGHLIGHTS,
 } from '../../components/productForm/ProductFormFields';
-import { SERVICE_CATEGORIES, RATE_TYPES, DURATIONS, METHODS, defaultAvailability, servicePrice, validateService } from '../data/serviceFields';
+import { SERVICE_CATEGORIES, RATE_TYPES, DURATIONS, METHODS, defaultAvailability, servicePrice, validateService, validateSubservices } from '../data/serviceFields';
 
 const STEPS = [
   { label: 'Service Details', subtitle: 'Add basic information' },
   { label: 'Pricing', subtitle: 'Set your rate and duration' },
   { label: 'Availability & Publish', subtitle: 'Location, schedule & publish' },
 ];
+
+const emptySubservice = () => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: '', hours: '', price: '' });
+
+function SubservicesTable({ subservices, onChange, onRemove, onAdd }) {
+  return (
+    <div>
+      <p className={labelCls}>Subservices</p>
+      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 dark:bg-gray-900 text-left text-xs font-semibold text-gray-500 dark:text-gray-400"><th className="p-2.5">Service Name</th><th className="p-2.5">Hr</th><th className="p-2.5">Price (₹)</th><th className="p-2.5" /></tr></thead>
+          <tbody>
+            {subservices.map((subservice, index) => (
+              <tr key={subservice.id} className="border-t border-gray-100 dark:border-gray-800">
+                <td className="p-2.5 min-w-[180px]"><input aria-label={`Subservice ${index + 1} name`} value={subservice.name} onChange={(event) => onChange(subservice.id, { name: event.target.value })} maxLength={150} placeholder="Service name" className={inputCls} /></td>
+                <td className="p-2.5 min-w-[100px]"><input aria-label={`Subservice ${index + 1} hours`} type="number" min="0.01" step="any" value={subservice.hours} onChange={(event) => onChange(subservice.id, { hours: event.target.value })} placeholder="Hr" className={inputCls} /></td>
+                <td className="p-2.5 min-w-[120px]"><input aria-label={`Subservice ${index + 1} price`} type="number" min="0" step="0.01" value={subservice.price} onChange={(event) => onChange(subservice.id, { price: event.target.value })} placeholder="0" className={inputCls} /></td>
+                <td className="p-2.5"><button type="button" aria-label={`Remove subservice ${index + 1}`} onClick={() => onRemove(subservice.id)} className="text-gray-400 hover:text-red-500"><X size={16} /></button></td>
+              </tr>
+            ))}
+            {!subservices.length && <tr><td colSpan={4} className="p-4 text-xs text-gray-400 dark:text-gray-500">No subservices added yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <button type="button" onClick={onAdd} className="flex items-center gap-1 text-xs font-semibold text-[#fa3f5e] hover:text-insta-purple mt-2"><Plus size={13} /> Add Subservice</button>
+    </div>
+  );
+}
 
 export default function ServiceForm({ service }) {
   const navigate = useNavigate();
@@ -31,6 +58,10 @@ export default function ServiceForm({ service }) {
     method: service?.method || METHODS[0], address: service?.address || '',
   }));
   const [highlights, setHighlights] = useState(service?.highlights?.length ? service.highlights : ['', '', '']);
+  const [subservices, setSubservices] = useState(() => service?.subservices?.map((item) => ({
+    id: item.id || emptySubservice().id,
+    name: item.name || '', hours: item.hours == null ? '' : String(item.hours), price: item.price == null ? '' : String(item.price),
+  })) || []);
   const [availability, setAvailability] = useState(() => service?.availability ? structuredClone(service.availability) : defaultAvailability());
   const uploader = useMediaUploader(service?.images || [], MAX_IMAGES);
   const { images } = uploader;
@@ -40,15 +71,18 @@ export default function ServiceForm({ service }) {
   const step3Ref = useRef(null);
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const set = (field) => (event) => setField(field, event.target.value);
+  const updateSubservice = (id, changes) => setSubservices((current) => current.map((item) => item.id === id ? { ...item, ...changes } : item));
+  const removeSubservice = (id) => setSubservices((current) => current.filter((item) => item.id !== id));
+  const addSubservice = () => setSubservices((current) => [...current, emptySubservice()]);
   const goToStep = (step) => {
     setActiveStep(step);
     [step1Ref, step2Ref, step3Ref][step - 1].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const completeness = useMemo(() => [
     { label: 'Service Details', done: !!(form.name.trim() && form.category && form.description.trim() && images.length) },
-    { label: 'Pricing', done: form.price !== '' && Number.isFinite(Number(form.price)) && Number(form.price) >= 0 && !!form.duration },
+    { label: 'Pricing', done: form.price !== '' && Number.isFinite(Number(form.price)) && Number(form.price) >= 0 && !!form.duration && !validateSubservices(subservices) },
     { label: 'Availability & Publish', done: availability.some((day) => day.slots.length) && !validateService(form, availability, true) && (form.method !== 'At my location' || !!form.address.trim()) },
-  ], [form, images, availability]);
+  ], [form, images, availability, subservices]);
   const firstIncomplete = completeness.findIndex((section) => !section.done);
   const autoTarget = firstIncomplete === -1 ? 3 : firstIncomplete + 1;
   const [lastAutoTarget, setLastAutoTarget] = useState(autoTarget);
@@ -58,7 +92,7 @@ export default function ServiceForm({ service }) {
   }
   const changeSlots = (day, update) => setAvailability((current) => current.map((entry) => entry.day === day ? { ...entry, slots: update(entry.slots) } : entry));
   const save = (draft) => {
-    const message = validateService(form, availability, draft);
+    const message = validateService(form, availability, draft, subservices);
     setError(message);
     if (message) {
       requestAnimationFrame(() => errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
@@ -68,6 +102,11 @@ export default function ServiceForm({ service }) {
     const payload = {
       ...form, name: form.name.trim(), description: form.description.trim(),
       price: Number(form.price) || 0, status: draft ? 'Draft' : 'Published',
+      subservices: subservices.filter((item) => item.name.trim() || item.hours !== '' || item.price !== '').map((item) => ({
+        id: item.id, name: item.name.trim(),
+        hours: item.hours === '' ? '' : Number(item.hours),
+        price: item.price === '' ? '' : Number(item.price),
+      })),
       highlights: highlights.filter((value) => value.trim()),
       images: orderedImages.map((image) => image.url), availability,
     };
@@ -115,6 +154,7 @@ export default function ServiceForm({ service }) {
               <Dropdown label="Rate *" value={form.rateType} options={RATE_TYPES} onChange={(value) => setField('rateType', value)} />
               <Dropdown label="Duration *" value={form.duration} options={DURATIONS} onChange={(value) => setField('duration', value)} />
             </div>
+            <SubservicesTable subservices={subservices} onChange={updateSubservice} onRemove={removeSubservice} onAdd={addSubservice} />
           </SectionCard>
           <SectionCard ref={step3Ref} step={3} title="Availability & Publish">
             <div>

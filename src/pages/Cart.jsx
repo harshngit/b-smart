@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Trash2, Minus, Plus, Heart, ArrowRight, ShoppingCart, Store, Truck, Package } from 'lucide-react';
 import { removeItem, incrementQty, decrementQty, toggleSelection, selectAll, toggleSaved } from '../store/cartSlice';
-import { CATEGORY_STYLE } from './Market';
+import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 
 const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm';
 const primary = 'rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange';

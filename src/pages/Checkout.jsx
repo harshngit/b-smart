@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { MapPin, Plus, Check, CreditCard, ChevronRight, Lock, CheckCircle2, X, Home, Briefcase, Wallet, ShieldCheck, Package } from 'lucide-react';
 import { checkoutSelected } from '../store/cartSlice';
+import { placeOrder } from '../store/ordersSlice';
 import { inputCls } from '../components/productForm/ProductFormFields';
 
 const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm';
@@ -55,6 +56,7 @@ function AddressDrawer({ addresses, selected, onClose, onSelect, onAdd }) {
 export default function Checkout() {
   const items = useSelector((state) => state.cart.items).filter((item) => !item.saved && item.selected !== false);
   const products = useSelector((state) => state.products.items);
+  const user = useSelector((state) => state.auth.userObject);
   const balance = Math.max(0, Number(useSelector((state) => state.wallet?.balance) || 0));
   const dispatch = useDispatch();
   const [step, setStep] = useState('Details');
@@ -67,6 +69,7 @@ export default function Checkout() {
   const [billing, setBilling] = useState('');
   const [card, setCard] = useState({ number: '', expiry: '', cvv: '' });
   const [placed, setPlaced] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
   const address = addresses.find((entry) => entry.id === selectedAddress);
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   // Preview-only redemption rate. No wallet mutation or payment request is made.
@@ -79,6 +82,17 @@ export default function Checkout() {
     if (!sameBilling && !billing.trim()) return;
     if (!payment) { setStep('Payment'); return; }
     if (paymentMethod === 'coins' && balance < subtotal) return;
+    const buyerId = user?._id || user?.id;
+    if (!buyerId) { setCheckoutError('Please sign in again to place your order.'); return; }
+    const customer = user.name || user.full_name || user.username || 'Customer';
+    dispatch(placeOrder({
+      buyerId: String(buyerId), customer,
+      productId: items[0].id, product: items[0].name,
+      qty: items.reduce((sum, item) => sum + item.qty, 0),
+      items: items.map((item) => ({ productId: item.id, name: item.name, quantity: item.qty, unitPrice: item.price })),
+      amount: subtotal, coinsDiscount: discount, paymentStatus: 'Paid',
+      address: { name: customer, street: address.address, city: address.city, region: address.state, postalCode: address.zip, country: 'India' },
+    }));
     dispatch(checkoutSelected());
     setCard({ number: '', expiry: '', cvv: '' });
     setPlaced(true);
@@ -87,7 +101,7 @@ export default function Checkout() {
   const itemList = <div className="divide-y divide-gray-100 dark:divide-gray-800">{items.map((item) => <div key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"><ProductImage item={{ ...products.find((product) => product.id === item.id), ...item }} /><div className="min-w-0 flex-1"><p className="text-xs font-medium text-gray-900 dark:text-white break-words">{item.name}</p><p className="text-xs text-gray-400 mt-1">Qty: {item.qty}</p></div><span className="text-xs font-semibold text-gray-900 dark:text-white shrink-0">{money(item.price * item.qty)}</span></div>)}</div>;
   const billingControl = <><label className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-300"><input type="checkbox" checked={sameBilling} onChange={(event) => setSameBilling(event.target.checked)} className="accent-[#fa3f5e] w-4 h-4" />{payment ? 'Use delivery address as billing address' : 'Billing address is the same as delivery address'}</label>{!sameBilling && <label className="block text-xs text-gray-500 mt-3">Billing address<textarea required value={billing} onChange={(event) => setBilling(event.target.value)} className={`${inputCls} mt-2`} /></label>}</>;
 
-  if (placed) return <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 bg-gray-50 dark:bg-black text-center"><CheckCircle2 size={48} className="text-[#fa3f5e]" /><h1 className="text-xl font-bold text-gray-900 dark:text-white">Order placed!</h1><p className="text-sm text-gray-500">This is a mock checkout. No payment was processed or bCoins deducted.</p><Link to="/market" className={`${primary} px-5 py-3`}>Back to Market</Link></div>;
+  if (placed) return <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 bg-gray-50 dark:bg-black text-center"><CheckCircle2 size={48} className="text-[#fa3f5e]" /><h1 className="text-xl font-bold text-gray-900 dark:text-white">Order placed!</h1><p className="text-sm text-gray-500">This is a mock checkout. No payment was processed or bCoins deducted.</p><div className="flex flex-wrap justify-center gap-3"><Link to="/market/my-orders" className={`${primary} px-5 py-3`}>View My Orders</Link><Link to="/market" className="px-5 py-3 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300">Back to Market</Link></div></div>;
   if (!items.length) return <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-gray-50 dark:bg-black"><p className="text-gray-500">Your cart is empty.</p><Link to="/cart" className="text-[#fa3f5e]">Back to cart</Link></div>;
 
   return <div className={`min-h-screen bg-gray-50 dark:bg-black w-full max-w-[1300px] ml-auto px-4 md:px-6 pt-4 pb-12 text-gray-900 dark:text-white grid gap-4 items-start ${addressOpen && !payment ? 'lg:grid-cols-[minmax(0,1fr)_280px]' : 'grid-cols-1'}`}><div className="min-w-0">
@@ -121,6 +135,7 @@ export default function Checkout() {
         {payment && <><h2 className="text-sm font-semibold mb-5">Order summary</h2><div className="pb-5 mb-5 border-b border-gray-100 dark:border-gray-800">{itemList}</div></>}
         <dl className="space-y-4 text-xs text-gray-500 dark:text-gray-400 pb-5 border-b border-gray-100 dark:border-gray-800"><div className="flex justify-between gap-3"><dt>Subtotal</dt><dd>{money(subtotal)}</dd></div>{!payment && <div className="flex justify-between gap-3"><dt>Delivery</dt><dd className="text-[#fa3f5e] font-semibold">Free</dd></div>}<div className="flex justify-between gap-3 text-insta-purple"><dt>bCoins discount</dt><dd>−{money(discount)}</dd></div></dl>
         <div className="flex justify-between items-center py-3 gap-3"><span className="text-sm font-semibold">{payment ? 'Amount due' : 'Total'}</span><strong className="text-xl text-[#fa3f5e]">{money(total)}</strong></div>
+        {checkoutError && <p role="alert" className="text-xs text-red-500">{checkoutError}</p>}
         <button type="submit" disabled={payment && paymentMethod === 'coins' && balance < subtotal} className={`${primary} w-full py-3 flex items-center justify-center gap-2`}>{payment ? <><Lock size={16} />Pay {money(total)}</> : 'Place order'}</button>
         {!payment && <p className="text-[10px] text-gray-400 text-center mt-3"><Lock size={11} className="inline mr-1" />Secure checkout<br />Review payment in the next step</p>}
       </aside>

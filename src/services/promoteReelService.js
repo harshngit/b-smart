@@ -8,6 +8,12 @@ const promoteReelService = {
     return res.data;
   },
 
+  // Public preview for unauthenticated visitors — no token required, small capped limit.
+  listPromoteReelsGuest: async ({ limit = 6 } = {}) => {
+    const res = await api.get('/promote-reels/guest', { params: { limit } });
+    return res.data;
+  },
+
   getPromoteReelById: async (id) => {
     const res = await api.get(`/promote-reels/${id}`);
     return res.data;

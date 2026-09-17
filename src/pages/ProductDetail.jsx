@@ -3,10 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ChevronRight, ChevronDown, Heart, Star, Minus, Plus,
-  ShoppingCart,
+  ShoppingCart, Package,
 } from 'lucide-react';
 import { addItem } from '../store/cartSlice';
-import { CATEGORY_STYLE } from './Market';
+import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
+import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 
 const AccordionRow = ({ title, children }) => {
   const [open, setOpen] = useState(false);
@@ -24,27 +25,27 @@ const AccordionRow = ({ title, children }) => {
   );
 };
 
-const MiniProductCard = ({ product }) => {
-  const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category];
+const MiniProductCard = ({ product, isFavorite, onToggleFavorite }) => {
+  const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
   return (
-    <Link
-      to={`/market/product/${product.id}`}
-      className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow overflow-hidden block"
-    >
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
       <div className={`relative aspect-square flex items-center justify-center ${bg}`}>
+        <Link to={`/market/product/${product.id}`} aria-label={`View ${product.name}`} className="absolute inset-0 flex items-center justify-center"><Icon size={36} className={`${text} opacity-70`} /></Link>
         <button
-          onClick={(e) => e.preventDefault()}
+          type="button"
+          aria-label={`${isFavorite ? 'Remove' : 'Add'} ${product.name} ${isFavorite ? 'from' : 'to'} wishlist`}
+          aria-pressed={isFavorite}
+          onClick={onToggleFavorite}
           className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-white dark:bg-gray-800 shadow flex items-center justify-center"
         >
-          <Heart size={12} className="text-gray-400" />
+          <Heart size={12} className={isFavorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-400'} />
         </button>
-        <Icon size={36} className={`${text} opacity-70`} />
       </div>
-      <div className="p-3">
+      <Link to={`/market/product/${product.id}`} className="block p-3">
         <p className="text-sm text-gray-900 dark:text-white font-medium truncate">{product.name}</p>
         <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">₹{product.price.toFixed(2)}</p>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 };
 
@@ -52,10 +53,11 @@ const ProductDetail = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { isSaved, toggle } = useMarketplaceWishlist();
   const allProducts = useSelector((state) => state.products.items);
   const product = allProducts.find((p) => String(p.id) === String(productId));
   const [qty, setQty] = useState(1);
-  const [favorite, setFavorite] = useState(false);
+  const favorite = isSaved('product', productId);
   
   const [thumbIndex, setThumbIndex] = useState(0);
 
@@ -68,7 +70,7 @@ const ProductDetail = () => {
     );
   }
 
-  const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category];
+  const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
 
   const addToCart = () => dispatch(addItem({
     id: product.id,
@@ -100,7 +102,10 @@ const ProductDetail = () => {
         <div>
           <div className={`relative aspect-[4/3] rounded-2xl flex items-center justify-center ${bg}`}>
             <button
-              onClick={() => setFavorite((f) => !f)}
+              type="button"
+              aria-label={`${favorite ? 'Remove' : 'Add'} ${product.name} ${favorite ? 'from' : 'to'} wishlist`}
+              aria-pressed={favorite}
+              onClick={() => toggle('product', product.id)}
               className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white dark:bg-gray-800 shadow flex items-center justify-center"
             >
               <Heart size={16} className={favorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-400'} />
@@ -222,7 +227,7 @@ const ProductDetail = () => {
         <div className="mt-10">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">More from this seller</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {related.map((p) => <MiniProductCard key={p.id} product={p} />)}
+            {related.map((p) => <MiniProductCard key={p.id} product={p} isFavorite={isSaved('product', p.id)} onToggleFavorite={() => toggle('product', p.id)} />)}
           </div>
         </div>
       )}
