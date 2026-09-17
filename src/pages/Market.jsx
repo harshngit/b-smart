@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Heart, Star, Eye, Store, ShoppingCart, Package, UserRound, ReceiptText } from 'lucide-react';
+import { Heart, Star, Eye, Store, ShoppingCart, Package, UserRound, ReceiptText, Search } from 'lucide-react';
 import { addItem } from '../store/cartSlice';
 import ServiceIcon from '../myStore/components/ServiceIcon';
 import { servicePrice } from '../myStore/data/serviceFields';
@@ -131,18 +131,23 @@ const PersonCard = ({ user, productCount, serviceCount }) => {
 
 const Market = () => {
   const [activeFilter, setActiveFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const { isSaved, toggle } = useMarketplaceWishlist();
   const allProducts = useSelector((state) => state.products.items);
   const allServices = useSelector((state) => state.services.items);
   const user = useSelector((state) => state.auth.userObject);
   const cartCount = useSelector((state) => state.cart.items.reduce((sum, i) => sum + i.qty, 0));
 
-  const products = allProducts.filter((item) => (item.status || (item.rating > 0 ? 'Active' : 'Draft')) === 'Active');
-  const services = allServices.filter((item) => item.status === 'Published' && item.visible);
+  const query = searchQuery.trim().toLowerCase();
+  const matchesQuery = (...values) => !query || values.some((value) => String(value ?? '').toLowerCase().includes(query));
+  const listedProducts = allProducts.filter((item) => (item.status || (item.rating > 0 ? 'Active' : 'Draft')) === 'Active');
+  const listedServices = allServices.filter((item) => item.status === 'Published' && item.visible);
+  const products = listedProducts.filter((item) => matchesQuery(item.name, item.category, item.vendor, item.description));
+  const services = listedServices.filter((item) => matchesQuery(item.name, item.category, item.provider, item.description, ...((item.subservices || []).map((subservice) => subservice.name))));
   const showProducts = activeFilter === 'All' || activeFilter === 'Products';
   const showServices = activeFilter === 'All' || activeFilter === 'Services';
   const showPersons = activeFilter === 'All' || activeFilter === 'Persons';
-  const showCreator = !!user && (products.length > 0 || services.length > 0);
+  const showCreator = !!user && (listedProducts.length > 0 || listedServices.length > 0) && matchesQuery(user.name, user.full_name, user.username);
   const hasResults = (showProducts && products.length > 0) || (showServices && services.length > 0) || (showPersons && showCreator);
 
   return (
@@ -182,22 +187,35 @@ const Market = () => {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        {FILTERS.map((filter) => (
-          <button
-            key={filter}
-            type="button"
-            aria-pressed={activeFilter === filter}
-            onClick={() => setActiveFilter(filter)}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors ${
-              activeFilter === filter
-                ? 'bg-[#fa3f5e] text-white border-[#fa3f5e]'
-                : 'border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700'
-            }`}
-          >
-            {filter}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-6">
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              aria-pressed={activeFilter === filter}
+              onClick={() => setActiveFilter(filter)}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors ${
+                activeFilter === filter
+                  ? 'bg-[#fa3f5e] text-white border-[#fa3f5e]'
+                  : 'border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700'
+              }`}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
+        <div className="relative w-full lg:w-auto lg:flex-1 lg:min-w-0 lg:max-w-[500px]">
+          <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            aria-label="Search Marketplace"
+            placeholder="Search Marketplace"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="w-full h-10 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 pl-10 pr-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-[#fa3f5e]"
+          />
+        </div>
       </div>
 
       <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Featured in Market</h2>
@@ -210,10 +228,10 @@ const Market = () => {
         {showServices && services.map((service) => (
           <ServiceCard key={`service-${service.id}`} service={service} isFavorite={isSaved('service', service.id)} onToggleFavorite={() => toggle('service', service.id)} />
         ))}
-        {showPersons && showCreator && <PersonCard key={user._id || user.id || 'store-creator'} user={user} productCount={products.length} serviceCount={services.length} />}
+        {showPersons && showCreator && <PersonCard key={user._id || user.id || 'store-creator'} user={user} productCount={listedProducts.length} serviceCount={listedServices.length} />}
         {!hasResults && (
           <p className="col-span-full text-center text-gray-400 dark:text-gray-500 py-10">
-            No {activeFilter === 'All' ? 'marketplace listings' : activeFilter.toLowerCase()} yet.
+            {query ? `No results for “${searchQuery.trim()}”.` : `No ${activeFilter === 'All' ? 'marketplace listings' : activeFilter.toLowerCase()} yet.`}
           </p>
         )}
       </div>

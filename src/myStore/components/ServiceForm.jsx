@@ -8,7 +8,7 @@ import {
   Stepper, SectionCard, ImageGallery, Dropdown, HighlightsList, CompletenessCard, Checkbox,
   inputCls, labelCls, MAX_IMAGES, MAX_HIGHLIGHTS,
 } from '../../components/productForm/ProductFormFields';
-import { SERVICE_CATEGORIES, RATE_TYPES, DURATIONS, METHODS, defaultAvailability, servicePrice, validateService, validateSubservices } from '../data/serviceFields';
+import { SERVICE_CATEGORIES, RATE_TYPES, DURATIONS, METHODS, defaultAvailability, servicePrice, isBlankSubservice, validateService, validateSubservices } from '../data/serviceFields';
 
 const STEPS = [
   { label: 'Service Details', subtitle: 'Add basic information' },
@@ -21,7 +21,7 @@ const emptySubservice = () => ({ id: `${Date.now()}-${Math.random().toString(36)
 function SubservicesTable({ subservices, onChange, onRemove, onAdd }) {
   return (
     <div>
-      <p className={labelCls}>Subservices</p>
+      <label className={labelCls}>Subservices</label>
       <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 dark:bg-gray-900 text-left text-xs font-semibold text-gray-500 dark:text-gray-400"><th className="p-2.5">Service Name</th><th className="p-2.5">Hr</th><th className="p-2.5">Price (₹)</th><th className="p-2.5" /></tr></thead>
@@ -34,7 +34,6 @@ function SubservicesTable({ subservices, onChange, onRemove, onAdd }) {
                 <td className="p-2.5"><button type="button" aria-label={`Remove subservice ${index + 1}`} onClick={() => onRemove(subservice.id)} className="text-gray-400 hover:text-red-500"><X size={16} /></button></td>
               </tr>
             ))}
-            {!subservices.length && <tr><td colSpan={4} className="p-4 text-xs text-gray-400 dark:text-gray-500">No subservices added yet.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -58,10 +57,10 @@ export default function ServiceForm({ service }) {
     method: service?.method || METHODS[0], address: service?.address || '',
   }));
   const [highlights, setHighlights] = useState(service?.highlights?.length ? service.highlights : ['', '', '']);
-  const [subservices, setSubservices] = useState(() => service?.subservices?.map((item) => ({
+  const [subservices, setSubservices] = useState(() => service?.subservices?.length ? service.subservices.map((item) => ({
     id: item.id || emptySubservice().id,
     name: item.name || '', hours: item.hours == null ? '' : String(item.hours), price: item.price == null ? '' : String(item.price),
-  })) || []);
+  })) : [emptySubservice()]);
   const [availability, setAvailability] = useState(() => service?.availability ? structuredClone(service.availability) : defaultAvailability());
   const uploader = useMediaUploader(service?.images || [], MAX_IMAGES);
   const { images } = uploader;
@@ -72,7 +71,10 @@ export default function ServiceForm({ service }) {
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const set = (field) => (event) => setField(field, event.target.value);
   const updateSubservice = (id, changes) => setSubservices((current) => current.map((item) => item.id === id ? { ...item, ...changes } : item));
-  const removeSubservice = (id) => setSubservices((current) => current.filter((item) => item.id !== id));
+  const removeSubservice = (id) => setSubservices((current) => {
+    const next = current.filter((item) => item.id !== id);
+    return next.length ? next : [emptySubservice()];
+  });
   const addSubservice = () => setSubservices((current) => [...current, emptySubservice()]);
   const goToStep = (step) => {
     setActiveStep(step);
@@ -102,7 +104,7 @@ export default function ServiceForm({ service }) {
     const payload = {
       ...form, name: form.name.trim(), description: form.description.trim(),
       price: Number(form.price) || 0, status: draft ? 'Draft' : 'Published',
-      subservices: subservices.filter((item) => item.name.trim() || item.hours !== '' || item.price !== '').map((item) => ({
+      subservices: subservices.filter((item) => !isBlankSubservice(item)).map((item) => ({
         id: item.id, name: item.name.trim(),
         hours: item.hours === '' ? '' : Number(item.hours),
         price: item.price === '' ? '' : Number(item.price),
