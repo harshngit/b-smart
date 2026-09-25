@@ -16,7 +16,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../lib/api";
 import { emitFollowStatusChanged } from "../services/followService";
 
-const WS_BASE               = (import.meta.env.VITE_WS_URL || "wss://api.bebsmart.in");
+const WS_BASE               = (import.meta.env.VITE_WS_URL || "wss://bsmart-backend-dev.bsmart.workers.dev");
 const ENABLE_NOTIFICATION_WS = import.meta.env.VITE_ENABLE_NOTIFICATION_WS === "true";
 const POLL_INTERVAL          = 30_000;
 const RECONNECT_MS           = 5_000;

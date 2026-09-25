@@ -19,7 +19,7 @@ import { acceptFollowRequest, declineFollowRequest } from '../services/followSer
 import { store } from '../store/store';
 import PostDetailModal from './PostDetailModal';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const authHeaders = () => {
   const token = localStorage.getItem('token');

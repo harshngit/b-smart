@@ -594,7 +594,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
   useEffect(() => {
     let active = true;
     setIsLoadingCountries(true);
-    fetch('https://api.bebsmart.in/api/countries')
+    fetch('https://bsmart-backend-dev.bsmart.workers.dev/api/countries')
       .then(r => r.json())
       .then(data => {
         if (!active) return;
@@ -619,7 +619,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
     setIsLoadingStates(true);
     Promise.all(
       selectedCountries.map(country =>
-        fetch(`https://api.bebsmart.in/api/countries/${encodeURIComponent(country)}/states`)
+        fetch(`https://bsmart-backend-dev.bsmart.workers.dev/api/countries/${encodeURIComponent(country)}/states`)
           .then(r => r.json())
           .then(res => {
             // response: { success, country, count, data: [{ state, languages, cities }] }
@@ -1264,7 +1264,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
               const tFile = new File([imgBlob], `thumb_${Date.now()}.jpg`, { type: 'image/jpeg' });
               thumbForm.append('file', tFile);
               try {
-                const thumbRes = await api.post('https://api.bebsmart.in/api/upload/thumbnail', thumbForm, {
+                const thumbRes = await api.post('https://bsmart-backend-dev.bsmart.workers.dev/api/upload/thumbnail', thumbForm, {
                   headers: { 'Content-Type': 'multipart/form-data' }
                 });
                 uploadedThumbs = thumbRes.data?.thumbnails || null;
@@ -1393,7 +1393,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             hide_likes_count: hideLikes,
             turn_off_commenting: turnOffCommenting
           };
-          await api.post('https://api.bebsmart.in/api/posts/reels', payload);
+          await api.post('https://bsmart-backend-dev.bsmart.workers.dev/api/posts/reels', payload);
 
         } else if (postType === 'promote') {
           // Promote reel — POST /api/promote-reels
@@ -1548,7 +1548,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
             },
           };
 
-          await api.post('https://api.bebsmart.in/api/ads', adPayload);
+          await api.post('https://bsmart-backend-dev.bsmart.workers.dev/api/ads', adPayload);
 
         } else {
           // Post — existing endpoint unchanged
@@ -2486,7 +2486,7 @@ const CreatePostModal = ({ isOpen, onClose, initialType = 'post', onOpenAdModal 
                               const token = localStorage.getItem('token');
                               const fd = new FormData();
                               fd.append('file', file);
-                              const res = await fetch('https://api.bebsmart.in/api/upload/promote-product', {
+                              const res = await fetch('https://bsmart-backend-dev.bsmart.workers.dev/api/upload/promote-product', {
                                 method: 'POST',
                                 headers: { Authorization: `Bearer ${token}` },
                                 body: fd,

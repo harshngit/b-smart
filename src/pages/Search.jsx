@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { Search as SearchIcon, X, ArrowLeft, Loader2, Clock, Heart, MessageCircle, Eye, Play, Image, Clapperboard } from 'lucide-react';
 import PostDetailModal from '../components/PostDetailModal';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const authHeaders = () => {
   const token = localStorage.getItem('token');

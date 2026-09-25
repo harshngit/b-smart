@@ -16,7 +16,7 @@ const resolveUrl = (raw) => {
   if (!raw) return null;
   const s = String(raw);
   if (s.startsWith('http')) return s;
-  return `https://api.bebsmart.in/uploads/${s.replace(/^\/+/, '').replace(/^uploads\//, '')}`;
+  return `https://bsmart-backend-dev.bsmart.workers.dev/uploads/${s.replace(/^\/+/, '').replace(/^uploads\//, '')}`;
 };
 
 /* ─────────────────────────────────────────────────────────

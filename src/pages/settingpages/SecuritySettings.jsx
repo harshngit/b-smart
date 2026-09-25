@@ -9,7 +9,7 @@ import {
   ChevronRight, Monitor, Clock, LogOut, Trash2, MessageSquare, Pencil, Check,
 } from 'lucide-react';
 
-const BASE = 'https://api.bebsmart.in';
+const BASE = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 /* ───────────────────────── shared helpers ──────────────────── */
 const SectionTitle = ({ title }) => (

@@ -16,7 +16,7 @@ import ShareContentModal from '../components/ShareContentModal';
 import ContentReportModal from '../components/ContentReportModal';
 import LoginPromptModal from '../components/LoginPromptModal';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 const IMAGE_DURATION = 15;
 
 const normalizeAssetUrl = (value) => {

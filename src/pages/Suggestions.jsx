@@ -11,7 +11,7 @@ import {
 } from '../services/followService';
 import { getProfilePath } from '../utils/profilePath';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const normalizeAssetUrl = (value) => {
   if (!value) return null;

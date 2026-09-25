@@ -11,7 +11,7 @@ import adCommentService from '../services/commentServiceJS';
 import ContentReportModal from '../components/ContentReportModal';
 import Avatar from '../components/Avatar';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const formatTimeAgo = (d) => {

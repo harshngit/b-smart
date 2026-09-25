@@ -18,7 +18,7 @@
 
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = 'https://api.bebsmart.in';
+const SOCKET_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 class SocketService {
   constructor() {

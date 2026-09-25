@@ -17,7 +17,7 @@ import {
 import Avatar from './Avatar';
 import ShareContentModal from './ShareContentModal';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const authHeaders = () => {
   const token = localStorage.getItem('token');

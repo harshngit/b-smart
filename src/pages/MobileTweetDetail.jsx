@@ -15,7 +15,7 @@ import {
 import ContentReportModal from '../components/ContentReportModal';
 import Avatar from '../components/Avatar';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const formatTimeAgo = (d) => {
   if (!d) return '';

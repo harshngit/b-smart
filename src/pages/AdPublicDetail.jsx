@@ -9,7 +9,7 @@ import {
   ShoppingBag, Eye, ChevronRight, ChevronLeft, X, Film,
 } from 'lucide-react';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const fmt = (n = 0) => {
   if (!n) return '0';

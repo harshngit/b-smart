@@ -40,7 +40,7 @@ const fmt = (n = 0) => {
     return String(n);
 };
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 const FAVORITE_BANNERS = [bSmartBanner1, bSmartBanner2, bSmartBanner3, bSmartBanner4];
 
 // ── Add Image Modal ───────────────────────────────────────────────────────────

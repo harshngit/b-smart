@@ -10,7 +10,7 @@ import { useSelector } from 'react-redux';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const TX_META = {
   AD_LIKE_REWARD:           { label: 'Ad Like Reward',         icon: Heart,         color: 'text-emerald-400', bg: 'bg-emerald-400/10', dir: 'credit' },

@@ -16,7 +16,7 @@ import Avatar from './Avatar';
 import ContentReportModal from './ContentReportModal';
 import ShareContentModal from './ShareContentModal';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 const fmt = (n = 0) => { if (n >= 1_000_000) return (n/1e6).toFixed(1)+'M'; if (n >= 1_000) return (n/1e3).toFixed(1)+'k'; return String(n); };
 const formatDateFull = (d) => { if (!d) return ''; const dt = new Date(d); return isNaN(dt) ? '' : dt.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}).toUpperCase(); };
 const formatDateRel = (d) => { if (!d) return ''; const s = Math.floor((Date.now()-new Date(d))/1000); if(s<60) return 'Just now'; if(s<3600) return Math.floor(s/60)+'m'; if(s<86400) return Math.floor(s/3600)+'h'; if(s<604800) return Math.floor(s/86400)+'d'; return Math.floor(s/604800)+'w'; };

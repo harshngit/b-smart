@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const storySlice = createSlice({
   name: 'story',

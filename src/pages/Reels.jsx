@@ -17,7 +17,7 @@ import OwnerContentOptionsModal from '../components/OwnerContentOptionsModal';
 import ShareContentModal from '../components/ShareContentModal';
 import LoginPromptModal from '../components/LoginPromptModal';
 
-const BASE_URL = 'https://api.bebsmart.in/api';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev/api';
 
 const getToken = () => localStorage.getItem('token');
 const authHeaders = () => ({
@@ -66,7 +66,7 @@ const normalizeApiArray = (value) => {
 
 const normalizeAssetUrl = (value) => {
   if (!value) return null;
-  const baseUrl = 'https://api.bebsmart.in';
+  const baseUrl = 'https://bsmart-backend-dev.bsmart.workers.dev';
   if (/^http:\/\/api\.bebsmart\.in/i.test(String(value))) return String(value).replace(/^http:\/\//i, 'https://');
   if (String(value).startsWith('http')) return value;
   const normalized = String(value).replace(/^\/+/, '');
@@ -779,7 +779,7 @@ const Reels = () => {
     const fetchWallet = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res   = await fetch('https://api.bebsmart.in/api/wallet', { headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+        const res   = await fetch('https://bsmart-backend-dev.bsmart.workers.dev/api/wallet', { headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
         if (!res.ok) return;
         const data = await res.json();
         const bal  = data?.balance ?? data?.wallet?.balance ?? data?.data?.balance;

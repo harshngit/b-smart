@@ -15,7 +15,7 @@ import {
   MapPinned, Contact, Users, AtSign, Linkedin, Twitter, Facebook, Instagram
 } from 'lucide-react';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const toAbsoluteUploadUrl = (value) => {
   if (!value) return null;

@@ -25,7 +25,7 @@ import {
   FOLLOW_STATUS_CHANGED_EVENT,
 } from '../services/followService';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const normalizeApiArray = (value) => {
   if (Array.isArray(value)) return value;

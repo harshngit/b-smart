@@ -16,7 +16,7 @@ import EditContentModal from '../components/EditContentModal';
 import OwnerContentOptionsModal from '../components/OwnerContentOptionsModal';
 import ShareContentModal from '../components/ShareContentModal';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 const IMAGE_AD_DURATION = 15; // seconds for image ads
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────

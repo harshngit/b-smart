@@ -22,7 +22,7 @@ import LocationLink from './LocationLink';
 import OwnerContentOptionsModal from './OwnerContentOptionsModal';
 import ShareContentModal from './ShareContentModal';
 
-const BASE_URL = 'https://api.bebsmart.in';
+const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
 const fmt = (n = 0) => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
