@@ -1,9 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { Calendar, MapPin, Globe, Plus, X, Star } from 'lucide-react';
-import { addService, updateService } from '../../store/servicesSlice';
+import { Calendar, MapPin, Globe, Plus, X, Star, Loader2 } from 'lucide-react';
 import useMediaUploader from '../../hooks/useMediaUploader';
+import influencerServiceService, { serviceFormToApiPayload } from '../../services/influencerServiceService';
 import {
   Stepper, SectionCard, ImageGallery, Dropdown, HighlightsList, CompletenessCard, Checkbox,
   inputCls, labelCls, MAX_IMAGES, MAX_HIGHLIGHTS,
@@ -44,10 +43,10 @@ function SubservicesTable({ subservices, onChange, onRemove, onAdd }) {
 
 export default function ServiceForm({ service }) {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const [activeStep, setActiveStep] = useState(1);
   const [mainImageIndex, setMainImageIndex] = useState(0);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const errorRef = useRef(null);
   const [form, setForm] = useState(() => ({
     name: service?.name || '', provider: service?.provider || '',
@@ -81,10 +80,10 @@ export default function ServiceForm({ service }) {
     [step1Ref, step2Ref, step3Ref][step - 1].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const completeness = useMemo(() => [
-    { label: 'Service Details', done: !!(form.name.trim() && form.category && form.description.trim() && images.length) },
+    { label: 'Service Details', done: !!(form.name.trim() && form.category && form.description.trim()) },
     { label: 'Pricing', done: form.price !== '' && Number.isFinite(Number(form.price)) && Number(form.price) >= 0 && !!form.duration && !validateSubservices(subservices) },
     { label: 'Availability & Publish', done: availability.some((day) => day.slots.length) && !validateService(form, availability, true) && (form.method !== 'At my location' || !!form.address.trim()) },
-  ], [form, images, availability, subservices]);
+  ], [form, availability, subservices]);
   const firstIncomplete = completeness.findIndex((section) => !section.done);
   const autoTarget = firstIncomplete === -1 ? 3 : firstIncomplete + 1;
   const [lastAutoTarget, setLastAutoTarget] = useState(autoTarget);
@@ -93,7 +92,8 @@ export default function ServiceForm({ service }) {
     if (autoTarget > activeStep) setActiveStep(autoTarget);
   }
   const changeSlots = (day, update) => setAvailability((current) => current.map((entry) => entry.day === day ? { ...entry, slots: update(entry.slots) } : entry));
-  const save = (draft) => {
+  const save = async (draft) => {
+    if (saving) return;
     const message = validateService(form, availability, draft, subservices);
     setError(message);
     if (message) {
@@ -101,19 +101,29 @@ export default function ServiceForm({ service }) {
       return;
     }
     const orderedImages = images.length ? [images[mainIndex], ...images.filter((_, index) => index !== mainIndex)] : [];
-    const payload = {
-      ...form, name: form.name.trim(), description: form.description.trim(),
-      price: Number(form.price) || 0, status: draft ? 'Draft' : 'Published',
-      subservices: subservices.filter((item) => !isBlankSubservice(item)).map((item) => ({
-        id: item.id, name: item.name.trim(),
-        hours: item.hours === '' ? '' : Number(item.hours),
-        price: item.price === '' ? '' : Number(item.price),
-      })),
-      highlights: highlights.filter((value) => value.trim()),
-      images: orderedImages.map((image) => image.url), availability,
-    };
-    dispatch(service ? updateService({ ...payload, id: service.id }) : addService(payload));
-    navigate('/market/my-store/services', { state: { serviceTab: draft ? 'Draft' : 'Published' } });
+    setSaving(true);
+    try {
+      const uploadedImages = await influencerServiceService.prepareImages(orderedImages);
+      const payload = serviceFormToApiPayload({
+        form,
+        highlights,
+        subservices: subservices.filter((item) => !isBlankSubservice(item)),
+        availability,
+        images: uploadedImages,
+        draft,
+      });
+      if (service?.id) {
+        await influencerServiceService.update(service.id, payload);
+      } else {
+        await influencerServiceService.create(payload);
+      }
+      navigate('/market/my-store/services', { state: { serviceTab: draft ? 'Draft' : 'Published' } });
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to save service. Try again.');
+      requestAnimationFrame(() => errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -121,8 +131,8 @@ export default function ServiceForm({ service }) {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{service ? 'Edit Service' : 'Add Service'}</h1>
         <div className="flex gap-2">
-          <button type="button" onClick={() => save(true)} className="px-4 py-2 rounded-lg text-sm font-bold border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900">Save Draft</button>
-          <button type="button" onClick={() => save(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange">{service?.status === 'Published' ? 'Save Changes' : 'Publish Service'}</button>
+          <button type="button" disabled={saving} onClick={() => save(true)} className="px-4 py-2 rounded-lg text-sm font-bold border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900">{saving ? 'Saving...' : 'Save Draft'}</button>
+          <button type="button" disabled={saving} onClick={() => save(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange">{saving ? <span className="inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> Saving</span> : service?.status === 'Published' ? 'Save Changes' : 'Publish Service'}</button>
         </div>
       </div>
       <Link to="/market/my-store/services" className="text-xs text-gray-400 hover:text-[#fa3f5e]">← Back to My Store</Link>

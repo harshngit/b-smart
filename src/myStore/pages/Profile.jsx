@@ -5,13 +5,14 @@ import { LayoutGrid, Briefcase, Package, Heart, Star, Clock, MapPin, Globe, Mess
 import { Dropdown, inputCls } from '../../components/productForm/ProductFormFields';
 import { CATEGORY_STYLE } from '../../data/marketplaceCategoryStyle';
 import { servicePrice } from '../data/serviceFields';
-import { addItem } from '../../store/cartSlice';
+import { setCartItems } from '../../store/cartSlice';
 import useMarketplaceWishlist from '../../hooks/useMarketplaceWishlist';
+import cartService from '../../services/cartService';
 
 const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm';
 const primary = 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white rounded-lg font-semibold';
 
-function ListingCard({ item, service, favorite, onFavorite, onAdd, added }) {
+function ListingCard({ item, service, favorite, onFavorite, onAdd, added, adding }) {
 
   const [imageFailed, setImageFailed] = useState(false);
   const Icon = service ? Briefcase : CATEGORY_STYLE[item.category]?.icon || Package;
@@ -30,7 +31,7 @@ function ListingCard({ item, service, favorite, onFavorite, onAdd, added }) {
           <span className="text-sm font-bold text-[#fa3f5e]">{service && item.rateType === 'Starting from' ? <><span className="text-[10px] font-normal text-gray-400 mr-1">From</span>₹{item.price}</> : service ? servicePrice(item) : `₹${item.price.toFixed(2)}`}</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4"><Star size={13} className="fill-amber-400 text-amber-400" />{item.rating > 0 ? <><span className="font-semibold text-gray-700 dark:text-gray-200">{item.rating}</span><span>({item.reviews || 0})</span></> : 'New listing'}</div>
-        {service ? <Link to={`/market/service/${item.id}`} className={`${primary} relative w-full mt-auto py-2.5 px-3 flex items-center justify-center !font-medium text-xs`}>View service<ChevronRight size={15} className="absolute right-3" /></Link> : <button type="button" onClick={onAdd} className="mt-auto w-full py-2.5 text-xs font-semibold text-[#fa3f5e] border border-[#fa3f5e]/40 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/10 flex items-center justify-center gap-2">{added ? <Check size={15} /> : <ShoppingCart size={15} />}{added ? 'Add another' : 'Add'}</button>}
+        {service ? <Link to={`/market/service/${item.id}`} className={`${primary} relative w-full mt-auto py-2.5 px-3 flex items-center justify-center !font-medium text-xs`}>View service<ChevronRight size={15} className="absolute right-3" /></Link> : <button type="button" onClick={onAdd} disabled={adding} className="mt-auto w-full py-2.5 text-xs font-semibold text-[#fa3f5e] border border-[#fa3f5e]/40 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/10 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">{added ? <Check size={15} /> : <ShoppingCart size={15} />}{adding ? 'Adding...' : added ? 'Add another' : 'Add'}</button>}
       </div>
     </article>
   );
@@ -52,13 +53,27 @@ export default function StoreProfile() {
   const [following, setFollowing] = useState(false);
   const [areasOpen, setAreasOpen] = useState(false);
   const [notice, setNotice] = useState('');
+  const [addingId, setAddingId] = useState(null);
   const name = user?.name || user?.full_name || 'Alex Morgan';
   const avatar = user?.profile_picture || user?.avatar;
   const count = cart.reduce((sum, item) => sum + item.qty, 0);
   const shownProducts = products.filter((item) => item.name.toLowerCase().includes(search.trim().toLowerCase()) && (category === 'All categories' || item.category === category)).sort((a, b) => sort === 'Price: Low to high' ? a.price - b.price : sort === 'Price: High to low' ? b.price - a.price : sort === 'Top rated' ? b.rating - a.rating : 0);
-  const add = (item) => {
-    dispatch(addItem({ id: item.id, name: item.name, subtitle: item.dimensions, brand: item.vendor, price: item.price, category: item.category, images: item.images, storeName: `${name}'s Personal Store`, storeAvatar: avatar, storeType: 'Personal Store' }));
-    setNotice(`${item.name} added to your cart.`);
+  const add = async (item) => {
+    setAddingId(item.id);
+    setNotice('');
+    try {
+      const nextCart = await cartService.addItem({
+        productId: item.id,
+        quantity: 1,
+        variant: item.variants?.[0] ? { color: item.variants[0].color, size: item.variants[0].size } : undefined,
+      });
+      dispatch(setCartItems(nextCart));
+      setNotice(`${item.name} added to your cart.`);
+    } catch (err) {
+      setNotice(err?.response?.data?.message || err.message || 'Could not add this product to your cart.');
+    } finally {
+      setAddingId(null);
+    }
   };
   return (
     <div className="box-border w-full max-w-[1280px] ml-auto px-4 md:px-8 pt-6 pb-10">
@@ -76,13 +91,13 @@ export default function StoreProfile() {
             {tab === 'All' && <>
               <div aria-label="All listings" className="grid grid-cols-1 min-[600px]:grid-cols-2 min-[900px]:grid-cols-3 gap-3 items-start">
                 {services.map((item) => <ListingCard key={`service-${item.id}`} item={item} service favorite={isSaved('service', item.id)} onFavorite={() => toggle('service', item.id)} />)}
-                {products.map((item) => <ListingCard key={`product-${item.id}`} item={item} favorite={isSaved('product', item.id)} onFavorite={() => toggle('product', item.id)} onAdd={() => add(item)} added={cart.some((entry) => entry.id === item.id)} />)}
+                {products.map((item) => <ListingCard key={`product-${item.id}`} item={item} favorite={isSaved('product', item.id)} onFavorite={() => toggle('product', item.id)} onAdd={() => add(item)} added={cart.some((entry) => entry.id === item.id)} adding={addingId === item.id} />)}
                 {!services.length && !products.length && <p className="col-span-full py-10 text-center text-gray-400">No published listings yet.</p>}
               </div>
               <p role="status" className="text-xs text-[#fa3f5e] mt-3">{notice}</p>
             </>}
             {tab === 'Services' && <section aria-label="Services"><h2 className="sr-only">Services</h2><div className="grid grid-cols-1 min-[600px]:grid-cols-2 min-[900px]:grid-cols-3 gap-3 items-start">{services.map((item) => <ListingCard key={item.id} item={item} service favorite={isSaved('service', item.id)} onFavorite={() => toggle('service', item.id)} />)}{!services.length && <p className="col-span-full py-10 text-center text-gray-400">No published services yet.</p>}</div></section>}
-            {tab === 'Products' && <section aria-label="Products"><h2 className="sr-only">Products</h2><div className="grid grid-cols-1 min-[700px]:grid-cols-[minmax(0,1fr)_130px_160px] min-[900px]:grid-cols-[minmax(0,1fr)_110px_145px] min-[1200px]:grid-cols-[minmax(0,1fr)_140px_180px] gap-3 min-[900px]:gap-2.5 mb-4 min-[900px]:[&_button]:text-xs min-[900px]:[&_button]:pr-2.5 min-[900px]:[&_input]:text-xs min-[900px]:[&_input]:pr-2.5"><div className="relative w-full min-w-0"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input aria-label="Search products" placeholder="Search products" value={search} onChange={(event) => setSearch(event.target.value)} className={`${inputCls} pl-9`} /></div><Dropdown className="w-full min-w-0" value={category} options={['All categories', ...new Set(products.map((item) => item.category))]} onChange={setCategory} /><Dropdown className="w-full min-w-0" value={sort} options={['Recommended', 'Price: Low to high', 'Price: High to low', 'Top rated']} onChange={setSort} /></div><div className="grid grid-cols-1 min-[400px]:grid-cols-2 min-[900px]:grid-cols-4 gap-3">{shownProducts.map((item) => <ListingCard key={item.id} item={item} favorite={isSaved('product', item.id)} onFavorite={() => toggle('product', item.id)} onAdd={() => add(item)} added={cart.some((entry) => entry.id === item.id)} />)}{!shownProducts.length && <p className="col-span-full py-10 text-center text-gray-400">No products match your search.</p>}</div><p role="status" className="text-xs text-[#fa3f5e] mt-3">{notice}</p></section>}
+            {tab === 'Products' && <section aria-label="Products"><h2 className="sr-only">Products</h2><div className="grid grid-cols-1 min-[700px]:grid-cols-[minmax(0,1fr)_130px_160px] min-[900px]:grid-cols-[minmax(0,1fr)_110px_145px] min-[1200px]:grid-cols-[minmax(0,1fr)_140px_180px] gap-3 min-[900px]:gap-2.5 mb-4 min-[900px]:[&_button]:text-xs min-[900px]:[&_button]:pr-2.5 min-[900px]:[&_input]:text-xs min-[900px]:[&_input]:pr-2.5"><div className="relative w-full min-w-0"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input aria-label="Search products" placeholder="Search products" value={search} onChange={(event) => setSearch(event.target.value)} className={`${inputCls} pl-9`} /></div><Dropdown className="w-full min-w-0" value={category} options={['All categories', ...new Set(products.map((item) => item.category))]} onChange={setCategory} /><Dropdown className="w-full min-w-0" value={sort} options={['Recommended', 'Price: Low to high', 'Price: High to low', 'Top rated']} onChange={setSort} /></div><div className="grid grid-cols-1 min-[400px]:grid-cols-2 min-[900px]:grid-cols-4 gap-3">{shownProducts.map((item) => <ListingCard key={item.id} item={item} favorite={isSaved('product', item.id)} onFavorite={() => toggle('product', item.id)} onAdd={() => add(item)} added={cart.some((entry) => entry.id === item.id)} adding={addingId === item.id} />)}{!shownProducts.length && <p className="col-span-full py-10 text-center text-gray-400">No products match your search.</p>}</div><p role="status" className="text-xs text-[#fa3f5e] mt-3">{notice}</p></section>}
           </div>
         </main>
         <aside aria-label="Store information" className="space-y-4 min-w-0 min-[900px]:sticky min-[900px]:top-6">

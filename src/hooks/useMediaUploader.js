@@ -3,8 +3,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 // Shared click / drag-drop / paste-from-clipboard image uploader, used by
 // both the Add Product and Edit Product forms.
 export default function useMediaUploader(initialImages = [], maxImages = 10) {
-  const [images, setImages] = useState(
-    initialImages.map((url) => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, url, existing: true }))
+  const [images, setImages] = useState(() =>
+    initialImages.map((url, index) => ({ id: `existing-${index}-${String(url)}`, url, existing: true }))
   );
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -18,6 +18,7 @@ export default function useMediaUploader(initialImages = [], maxImages = 10) {
       const toAdd = files.slice(0, room).map((file) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         url: URL.createObjectURL(file),
+        file,
       }));
       return [...prev, ...toAdd];
     });
@@ -53,7 +54,7 @@ export default function useMediaUploader(initialImages = [], maxImages = 10) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
-    images, isDragging, fileInputRef,
+    images, setImages, isDragging, fileInputRef,
     handleFileInput, handleDrop, handleDragOver, handleDragLeave, removeImage,
   };
 }

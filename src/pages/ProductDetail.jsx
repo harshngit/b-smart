@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ChevronRight, ChevronDown, Heart, Star, Minus, Plus,
-  ShoppingCart, Package,
+  ShoppingCart, Package, Loader2,
 } from 'lucide-react';
-import { addItem } from '../store/cartSlice';
+import { setCartItems } from '../store/cartSlice';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
+import influencerProductService from '../services/influencerProductService';
+import cartService from '../services/cartService';
 
 const AccordionRow = ({ title, children }) => {
   const [open, setOpen] = useState(false);
@@ -27,10 +29,13 @@ const AccordionRow = ({ title, children }) => {
 
 const MiniProductCard = ({ product, isFavorite, onToggleFavorite }) => {
   const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
+  const image = product.images?.[0];
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
       <div className={`relative aspect-square flex items-center justify-center ${bg}`}>
-        <Link to={`/market/product/${product.id}`} aria-label={`View ${product.name}`} className="absolute inset-0 flex items-center justify-center"><Icon size={36} className={`${text} opacity-70`} /></Link>
+        <Link to={`/market/product/${product.id}`} aria-label={`View ${product.name}`} className="absolute inset-0 flex items-center justify-center">
+          {image ? <img src={image} alt={product.name} className="w-full h-full object-cover" /> : <Icon size={36} className={`${text} opacity-70`} />}
+        </Link>
         <button
           type="button"
           aria-label={`${isFavorite ? 'Remove' : 'Add'} ${product.name} ${isFavorite ? 'from' : 'to'} wishlist`}
@@ -55,11 +60,38 @@ const ProductDetail = () => {
   const dispatch = useDispatch();
   const { isSaved, toggle } = useMarketplaceWishlist();
   const allProducts = useSelector((state) => state.products.items);
-  const product = allProducts.find((p) => String(p.id) === String(productId));
+  const fallbackProduct = allProducts.find((p) => String(p.id) === String(productId));
+  const [apiProduct, setApiProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const product = apiProduct || fallbackProduct;
   const [qty, setQty] = useState(1);
+  const [adding, setAdding] = useState(false);
   const favorite = isSaved('product', productId);
   
   const [thumbIndex, setThumbIndex] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    influencerProductService.get(productId)
+      .then((item) => {
+        if (alive) setApiProduct(item);
+      })
+      .catch(() => {
+        if (alive) setApiProduct(null);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => { alive = false; };
+  }, [productId]);
+
+  if (loading && !product) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center gap-3">
+        <p className="text-gray-500 dark:text-gray-400">Loading product...</p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -71,20 +103,28 @@ const ProductDetail = () => {
   }
 
   const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
+  const galleryImages = product.images?.length ? product.images : [];
+  const heroImage = galleryImages[thumbIndex] || galleryImages[0];
 
-  const addToCart = () => dispatch(addItem({
-    id: product.id,
-    name: product.name,
-    subtitle: product.dimensions,
-    brand: product.vendor,
-    price: product.price,
-    category: product.category,
-    qty,
-  }));
+  const addToCart = async () => {
+    if (adding) return false;
+    setAdding(true);
+    try {
+      const cartItems = await cartService.addItem({
+        productId: product.id,
+        quantity: qty,
+        variant: product.variants?.[0] ? { color: product.variants[0].color, size: product.variants[0].size || 'One Size' } : undefined,
+      });
+      dispatch(setCartItems(cartItems));
+      return true;
+    } finally {
+      setAdding(false);
+    }
+  };
 
-  const handleBuyNow = () => {
-    addToCart();
-    navigate('/cart');
+  const handleBuyNow = async () => {
+    const ok = await addToCart();
+    if (ok) navigate('/cart');
   };
   const related = allProducts.filter((p) => p.vendor === product.vendor && p.id !== product.id).slice(0, 4);
 
@@ -110,10 +150,12 @@ const ProductDetail = () => {
             >
               <Heart size={16} className={favorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-400'} />
             </button>
-            <Icon size={96} className={`${text} opacity-70`} />
+            {heroImage
+              ? <img src={heroImage} alt={product.name} className="w-full h-full object-cover" />
+              : <Icon size={96} className={`${text} opacity-70`} />}
           </div>
           <div className="flex gap-3 mt-3">
-            {[0, 1, 2, 3].map((i) => (
+            {(galleryImages.length ? galleryImages : [0, 1, 2, 3]).map((image, i) => (
               <button
                 key={i}
                 onClick={() => setThumbIndex(i)}
@@ -121,11 +163,12 @@ const ProductDetail = () => {
                   thumbIndex === i ? 'border-[#fa3f5e]' : 'border-transparent'
                 }`}
               >
-                <Icon size={22} className={`${text} opacity-70`} />
+                {typeof image === 'string'
+                  ? <img src={image} alt="" className="w-full h-full object-cover" />
+                  : <Icon size={22} className={`${text} opacity-70`} />}
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">Showing mock data — not wired to a real product catalog yet.</p>
         </div>
 
         {/* Info */}
@@ -168,12 +211,14 @@ const ProductDetail = () => {
           <div className="flex gap-3 mb-6">
             <button
               onClick={addToCart}
+              disabled={adding}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
             >
-              <ShoppingCart size={16} /> Add to Cart
+              {adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Add to Cart
             </button>
             <button
               onClick={handleBuyNow}
+              disabled={adding}
               className="flex-1 py-3 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
             >
               Buy Now

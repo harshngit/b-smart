@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { Plus, Search, Pencil, Trash2, MoreVertical } from 'lucide-react';
+import { AlertCircle, Loader2, Plus, Search, Pencil, Trash2, MoreVertical } from 'lucide-react';
 import { CATEGORY_STYLE } from '../../data/marketplaceCategoryStyle';
-import { deleteProduct } from '../../store/productsSlice';
 import { Dropdown } from '../../components/productForm/ProductFormFields';
+import influencerProductService from '../../services/influencerProductService';
 
 const TABS = [
   { key: 'Active',       label: 'Active' },
@@ -84,18 +83,40 @@ const RowActionsMenu = ({ product, onDelete }) => {
 const PAGE_SIZE = 4;
 
 const StoreProducts = () => {
-  const products = useSelector((state) => state.products.items);
-  const dispatch = useDispatch();
-
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('Active');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All categories');
   const [stockFilter, setStockFilter] = useState('All stock');
   const [page, setPage] = useState(1);
 
-  const handleDelete = (id, name) => {
+  useEffect(() => {
+    let alive = true;
+    influencerProductService.listMine()
+      .then((items) => {
+        if (!alive) return;
+        setProducts(items);
+        setError('');
+      })
+      .catch((err) => {
+        if (alive) setError(err?.response?.data?.message || 'Could not load your products.');
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => { alive = false; };
+  }, []);
+
+  const handleDelete = async (id, name) => {
     if (window.confirm(`Remove "${name}" from your store?`)) {
-      dispatch(deleteProduct(id));
+      try {
+        await influencerProductService.remove(id);
+        setProducts((items) => items.filter((item) => String(item.id) !== String(id)));
+      } catch (err) {
+        setError(err?.response?.data?.message || 'Could not delete this product.');
+      }
     }
   };
 
@@ -106,8 +127,6 @@ const StoreProducts = () => {
     if (stockFilter !== 'All stock' && getStockState(p) !== stockFilter) return false;
     return true;
   }), [products, activeTab, search, categoryFilter, stockFilter]);
-
-  useEffect(() => { setPage(1); }, [activeTab, search, categoryFilter, stockFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -126,8 +145,13 @@ const StoreProducts = () => {
         </Link>
       </div>
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-5">
-        Mock only — showing all products as a placeholder for your store, not filtered by vendor yet.
+        Manage products from your influencer catalog.
       </p>
+      {error && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+          <AlertCircle size={15} className="shrink-0" /> {error}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-5 border-b border-gray-200 dark:border-gray-800 mb-4">
@@ -183,7 +207,14 @@ const StoreProducts = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {pagedProducts.map((p) => {
+            {loading && (
+              <tr>
+                <td colSpan={5} className="px-5 py-10 text-center text-gray-400 dark:text-gray-500">
+                  <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading products...</span>
+                </td>
+              </tr>
+            )}
+            {!loading && pagedProducts.map((p) => {
               const style = CATEGORY_STYLE[p.category];
               const Icon = style?.icon;
               return (
@@ -209,7 +240,7 @@ const StoreProducts = () => {
                 </tr>
               );
             })}
-            {filteredProducts.length === 0 && (
+            {!loading && filteredProducts.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-5 py-10 text-center text-gray-400 dark:text-gray-500">
                   No products match this view.

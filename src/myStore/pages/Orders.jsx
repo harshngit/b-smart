@@ -1,18 +1,24 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Search, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide-react';
+import { Search, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, CalendarDays, X, Loader2, RefreshCw } from 'lucide-react';
 import { Dropdown, inputCls } from '../../components/productForm/ProductFormFields';
 import OrderDetails from '../components/OrderDetails';
 import { OrderProductImage, PaymentBadge } from '../components/OrderUI';
 import { filterOrders, ORDER_TABS, money, orderDate } from '../data/orderFilters';
+import orderService from '../../services/orderService';
 
 const PAGE_SIZE = 6;
 const BASE = '/market/my-store/orders';
 
 export default function StoreOrders() {
-  const orders = useSelector((state) => state.orders.items);
+  const fallbackOrders = useSelector((state) => state.orders.items);
   const products = useSelector((state) => state.products.items);
+  const [apiOrders, setApiOrders] = useState([]);
+  const [apiLoaded, setApiLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [updatingId, setUpdatingId] = useState('');
   const { orderId } = useParams();
   const [params, setParams] = useSearchParams();
   const [page, setPage] = useState(1);
@@ -33,6 +39,7 @@ export default function StoreOrders() {
     setPage(1);
     setSelected([]);
   };
+  const orders = apiLoaded ? apiOrders : fallbackOrders;
   const filtered = filterOrders(orders, { tab, search, payment, from, to, oldest });
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -45,11 +52,62 @@ export default function StoreOrders() {
   const activeOrder = orders.find((order) => order.id === orderId);
   const toggle = (id) => setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
 
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      setApiOrders(await orderService.listSeller());
+      setApiLoaded(true);
+    } catch (err) {
+      setApiLoaded(false);
+      setError(err?.response?.data?.message || 'Could not load live seller orders. Showing local orders.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchOrders(); }, []);
+
+  useEffect(() => {
+    if (!orderId || !apiLoaded) return;
+    let alive = true;
+    orderService.get(orderId)
+      .then((fresh) => {
+        if (!alive) return;
+        setApiOrders((current) => current.some((order) => order.id === fresh.id)
+          ? current.map((order) => order.id === fresh.id ? fresh : order)
+          : [fresh, ...current]);
+      })
+      .catch((err) => {
+        if (alive) setError(err?.response?.data?.message || 'Could not load order details.');
+      });
+    return () => { alive = false; };
+  }, [orderId, apiLoaded]);
+
+  const updateOrderStatus = async (id, status) => {
+    setUpdatingId(id);
+    setError('');
+    try {
+      const updated = await orderService.updateStatus(id, status);
+      setApiOrders((current) => current.map((order) => order.id === id ? updated : order));
+      setApiLoaded(true);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Could not update order status.');
+    } finally {
+      setUpdatingId('');
+    }
+  };
+
   return (
     <div className="max-w-[1280px] ml-auto px-4 md:px-8 pt-6 pb-10">
       <div className={orderId ? 'grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_350px] gap-6 items-start' : ''}>
         <section className={`min-w-0 ${orderId ? 'hidden xl:block' : ''}`} aria-label="Orders">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-5">Orders</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Orders</h1>
+            <button type="button" onClick={fetchOrders} className="inline-flex items-center gap-2 text-xs font-semibold text-[#fa3f5e]"><RefreshCw size={14} />Refresh</button>
+          </div>
+          {loading && <div className="flex items-center gap-2 text-sm text-gray-500 mb-4"><Loader2 size={16} className="animate-spin" />Loading seller orders...</div>}
+          {error && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">{error}</p>}
           <div className="flex gap-6 overflow-x-auto border-b border-gray-200 dark:border-gray-800 mb-5">
             {ORDER_TABS.map((value) => <button key={value} type="button" aria-pressed={tab === value} onClick={() => setFilter('tab', value)} className={`pb-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${tab === value ? 'border-[#fa3f5e] text-[#fa3f5e]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'}`}>{value}</button>)}
           </div>
@@ -83,7 +141,7 @@ export default function StoreOrders() {
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {visibleOrders.map((order) => <tr key={order.id} className={orderId === order.id || selected.includes(order.id) ? 'bg-pink-50/60 dark:bg-pink-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'}>
                     <td className="pl-4 py-5"><input type="checkbox" aria-label={`Select ${order.id}`} checked={selected.includes(order.id)} onChange={() => toggle(order.id)} className="accent-[#fa3f5e] rounded" /></td>
-                    <td className="px-3 py-5"><div className="flex items-center gap-2.5"><span className="w-9 h-9 rounded-full bg-gradient-to-br from-insta-purple/15 to-insta-pink/15 text-[#fa3f5e] flex items-center justify-center flex-shrink-0 text-xs font-bold">{order.customer.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><div className="min-w-[100px]"><Link to={`${BASE}/${order.id}${suffix}`} className="text-gray-500 dark:text-gray-400">Order <span className="font-semibold text-[#fa3f5e]">#{order.id}</span></Link><p className="text-gray-600 dark:text-gray-300 mt-1">{order.customer}</p>{order.status === 'Cancelled' && <p className="text-red-500 mt-1">Cancelled</p>}</div></div></td>
+                    <td className="px-3 py-5"><div className="flex items-center gap-2.5"><span className="w-9 h-9 rounded-full bg-gradient-to-br from-insta-purple/15 to-insta-pink/15 text-[#fa3f5e] flex items-center justify-center flex-shrink-0 text-xs font-bold">{String(order.customer || 'C').split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><div className="min-w-[100px]"><Link to={`${BASE}/${order.id}${suffix}`} className="text-gray-500 dark:text-gray-400">Order <span className="font-semibold text-[#fa3f5e]">#{order.id}</span></Link><p className="text-gray-600 dark:text-gray-300 mt-1">{order.customer}</p>{order.status === 'Cancelled' && <p className="text-red-500 mt-1">Cancelled</p>}</div></div></td>
                     <td className="px-3 py-5"><p className="text-gray-500 dark:text-gray-400 mb-2">{order.items.reduce((sum, item) => sum + item.quantity, 0)} item{order.qty === 1 ? '' : 's'}</p><div className="flex gap-1">{order.items.slice(0, 3).map((item) => <OrderProductImage key={item.productId} item={item} products={products} className="w-9 h-9" />)}</div></td>
                     <td className="px-3 py-5 font-semibold text-gray-800 dark:text-gray-200">{money(order.amount)}</td>
                     <td className="px-3 py-5"><PaymentBadge status={order.paymentStatus} /></td>
@@ -100,7 +158,7 @@ export default function StoreOrders() {
             </div>
           </div>
         </section>
-        {orderId && <OrderDetails key={orderId} order={activeOrder} closeTo={closeTo} />}
+        {orderId && <OrderDetails key={orderId} order={activeOrder} closeTo={closeTo} onStatusChange={updateOrderStatus} updating={updatingId === orderId} apiEnabled={apiLoaded} />}
       </div>
     </div>
   );

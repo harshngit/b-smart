@@ -1,36 +1,47 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Heart, Star, Eye, Store, ShoppingCart, Package, UserRound, ReceiptText, Search } from 'lucide-react';
-import { addItem } from '../store/cartSlice';
+import { setCartItems } from '../store/cartSlice';
 import ServiceIcon from '../myStore/components/ServiceIcon';
 import { servicePrice } from '../myStore/data/serviceFields';
 import { getProfilePath } from '../utils/profilePath';
 import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
+import influencerProductService from '../services/influencerProductService';
+import influencerServiceService from '../services/influencerServiceService';
+import cartService from '../services/cartService';
 
 const FILTERS = ['All', 'Products', 'Services', 'Persons'];
 
 export const ProductCard = ({ product, isFavorite, onToggleFavorite, showType = false }) => {
   const dispatch = useDispatch();
   const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
+  const image = product.images?.[0];
+  const [adding, setAdding] = useState(false);
 
-  const handleAddToCart = () => {
-    dispatch(addItem({
-      id: product.id,
-      name: product.name,
-      subtitle: product.dimensions,
-      brand: product.vendor,
-      price: product.price,
-      category: product.category,
-    }));
+  const handleAddToCart = async () => {
+    if (adding) return;
+    setAdding(true);
+    try {
+      const cartItems = await cartService.addItem({
+        productId: product.id,
+        quantity: 1,
+        variant: product.variants?.[0] ? { color: product.variants[0].color, size: product.variants[0].size || 'One Size' } : undefined,
+      });
+      dispatch(setCartItems(cartItems));
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
         <div className={`relative aspect-[4/3] flex items-center justify-center ${bg}`}>
           <Link to={`/market/product/${product.id}`} aria-label={`View ${product.name}`} className="absolute inset-0 flex items-center justify-center">
-            <Icon size={48} className={`${text} opacity-70`} />
+            {image
+              ? <img src={image} alt={product.name} className="w-full h-full object-cover" />
+              : <Icon size={48} className={`${text} opacity-70`} />}
           </Link>
           <span className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-white/90 dark:bg-black/60 text-[10px] font-bold tracking-wide text-gray-700 dark:text-gray-200 uppercase">
             Market
@@ -66,9 +77,10 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, showType = 
         <div className="flex gap-2">
           <button
             onClick={handleAddToCart}
+            disabled={adding}
             className="flex-1 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
           >
-            Add to Cart
+            {adding ? 'Adding...' : 'Add to Cart'}
           </button>
           <Link
             to={`/market/product/${product.id}`}
@@ -132,14 +144,58 @@ const PersonCard = ({ user, productCount, serviceCount }) => {
 const Market = () => {
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [apiProducts, setApiProducts] = useState([]);
+  const [apiServices, setApiServices] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [productsError, setProductsError] = useState('');
+  const [servicesError, setServicesError] = useState('');
   const { isSaved, toggle } = useMarketplaceWishlist();
-  const allProducts = useSelector((state) => state.products.items);
-  const allServices = useSelector((state) => state.services.items);
+  const mockProducts = useSelector((state) => state.products.items);
+  const mockServices = useSelector((state) => state.services.items);
   const user = useSelector((state) => state.auth.userObject);
   const cartCount = useSelector((state) => state.cart.items.reduce((sum, i) => sum + i.qty, 0));
 
+  useEffect(() => {
+    let alive = true;
+    influencerProductService.list()
+      .then((items) => {
+        if (!alive) return;
+        setApiProducts(items);
+        setProductsError('');
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setProductsError(err?.response?.data?.message || 'Could not load live products.');
+      })
+      .finally(() => {
+        if (alive) setProductsLoading(false);
+      });
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    influencerServiceService.list()
+      .then((items) => {
+        if (!alive) return;
+        setApiServices(items);
+        setServicesError('');
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setServicesError(err?.response?.data?.message || 'Could not load live services.');
+      })
+      .finally(() => {
+        if (alive) setServicesLoading(false);
+      });
+    return () => { alive = false; };
+  }, []);
+
   const query = searchQuery.trim().toLowerCase();
   const matchesQuery = (...values) => !query || values.some((value) => String(value ?? '').toLowerCase().includes(query));
+  const allProducts = apiProducts.length > 0 ? apiProducts : mockProducts;
+  const allServices = apiServices.length > 0 ? apiServices : mockServices;
   const listedProducts = allProducts.filter((item) => (item.status || (item.rating > 0 ? 'Active' : 'Draft')) === 'Active');
   const listedServices = allServices.filter((item) => item.status === 'Published' && item.visible);
   const products = listedProducts.filter((item) => matchesQuery(item.name, item.category, item.vendor, item.description));
@@ -219,7 +275,13 @@ const Market = () => {
       </div>
 
       <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Featured in Market</h2>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">Showing local Marketplace listings — not wired to live listings yet.</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">
+        {productsLoading || servicesLoading
+          ? 'Loading live influencer listings...'
+          : productsError || servicesError
+          ? `${productsError || servicesError} Showing local fallback listings where needed.`
+          : 'Showing live influencer products and services.'}
+      </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {showProducts && products.map((p) => (
