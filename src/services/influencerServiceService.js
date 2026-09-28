@@ -1,5 +1,28 @@
 import api from '../lib/api';
-import { prepareProductImages, resolveProductImageUrl } from './influencerProductService';
+import { resolveProductImageUrl, normalizeUploadPath } from './influencerProductService';
+
+// Uploads all files in a single multipart request — one round trip instead of
+// one request per image. Returns results in the same order the files were given.
+const uploadInfluencerServiceImages = async (files) => {
+  if (!files.length) return [];
+  const formData = new FormData();
+  files.forEach((file) => formData.append('files', file));
+  const { data } = await api.post('/upload/influencer-service', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return (data.images || []).map((img) => ({
+    fileName: normalizeUploadPath(img.fileName || img.fileUrl),
+  }));
+};
+
+const prepareServiceImages = async (images) => {
+  const newFiles = images.filter((img) => img.file).map((img) => img.file);
+  const uploaded = await uploadInfluencerServiceImages(newFiles);
+  let uploadIndex = 0;
+  return images.map((img) => (
+    img.file ? uploaded[uploadIndex++] : { fileName: normalizeUploadPath(img.fileName || img.url) }
+  ));
+};
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -112,7 +135,7 @@ export const serviceFormToApiPayload = ({ form, highlights, subservices, availab
 });
 
 const influencerServiceService = {
-  prepareImages: prepareProductImages,
+  prepareImages: prepareServiceImages,
   list: async (params = {}) => {
     const { data } = await api.get('/influencer-services', { params });
     return firstArray(data).map(normalizeInfluencerService);

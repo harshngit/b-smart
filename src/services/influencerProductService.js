@@ -12,7 +12,7 @@ const firstArray = (value) => {
   return candidates.find(Array.isArray) || [];
 };
 
-const normalizeUploadPath = (value) => {
+export const normalizeUploadPath = (value) => {
   if (!value) return '';
   const str = String(value);
   if (/^https?:\/\//i.test(str)) {
@@ -133,19 +133,28 @@ export const productFormToApiPayload = ({ form, highlights, variants, images, st
   warranty: form.warranty,
 });
 
-export const uploadInfluencerProductImage = async (file) => {
+// Uploads all files in a single multipart request — one round trip instead of
+// one request per image. Returns results in the same order the files were given.
+export const uploadInfluencerProductImages = async (files) => {
+  if (!files.length) return [];
   const formData = new FormData();
-  formData.append('file', file);
-  const { data } = await api.post('/upload/promote-product', formData, {
+  files.forEach((file) => formData.append('files', file));
+  const { data } = await api.post('/upload/influencer-product', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  return normalizeUploadPath(data.fileName || data.fileUrl || data.url || data.promote_img);
+  return (data.images || []).map((img) => ({
+    fileName: normalizeUploadPath(img.fileName || img.fileUrl),
+  }));
 };
 
-export const prepareProductImages = async (images) => Promise.all(images.map(async (image) => {
-  if (image.file) return { fileName: await uploadInfluencerProductImage(image.file) };
-  return { fileName: normalizeUploadPath(image.fileName || image.url) };
-}));
+export const prepareProductImages = async (images) => {
+  const newFiles = images.filter((img) => img.file).map((img) => img.file);
+  const uploaded = await uploadInfluencerProductImages(newFiles);
+  let uploadIndex = 0;
+  return images.map((img) => (
+    img.file ? uploaded[uploadIndex++] : { fileName: normalizeUploadPath(img.fileName || img.url) }
+  ));
+};
 
 const influencerProductService = {
   list: async () => {
