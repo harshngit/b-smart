@@ -29,6 +29,15 @@ const StockCell = ({ product }) => {
   );
 };
 
+const ProductThumb = ({ product, style, Icon }) => {
+  const [failed, setFailed] = useState(false);
+  const src = product.images?.[0];
+  if (!src || failed) {
+    return Icon ? <Icon size={24} className={`${style?.text} opacity-70`} /> : null;
+  }
+  return <img src={src} alt="" onError={() => setFailed(true)} className="w-full h-full object-cover" />;
+};
+
 const VisibilityCell = ({ product }) => {
   const visible = getStatus(product) !== 'Draft';
   return (
@@ -219,14 +228,12 @@ const StoreProducts = () => {
               const Icon = style?.icon;
               return (
                 <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3.5">
+                  <td className="px-5 py-4 max-w-0 w-full">
+                    <div className="flex items-center gap-3.5 min-w-0">
                       <div className={`w-[8rem] h-[8rem] rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden ${style?.bg}`}>
-                        {p.images?.[0]
-                          ? <img src={p.images[0]} alt="" className="w-full h-full object-cover" />
-                          : Icon && <Icon size={24} className={`${style.text} opacity-70`} />}
+                        <ProductThumb product={p} style={style} Icon={Icon} />
                       </div>
-                      <Link to={`/market/product/${p.id}`} className="font-semibold text-[15px] text-gray-900 dark:text-white hover:text-[#fa3f5e] transition-colors truncate">
+                      <Link to={`/market/product/${p.id}`} title={p.name} className="font-semibold text-[15px] text-gray-900 dark:text-white hover:text-[#fa3f5e] transition-colors truncate min-w-0 flex-1">
                         {p.name}
                       </Link>
                     </div>

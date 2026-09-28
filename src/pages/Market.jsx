@@ -11,6 +11,7 @@ import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import influencerProductService from '../services/influencerProductService';
 import influencerServiceService from '../services/influencerServiceService';
 import cartService from '../services/cartService';
+import InfluencerSwitchModal from '../components/InfluencerSwitchModal';
 
 const FILTERS = ['All', 'Products', 'Services', 'Persons'];
 
@@ -155,6 +156,8 @@ const Market = () => {
   const mockServices = useSelector((state) => state.services.items);
   const user = useSelector((state) => state.auth.userObject);
   const cartCount = useSelector((state) => state.cart.items.reduce((sum, i) => sum + i.qty, 0));
+  const isInfluencer = user?.role === 'influencer';
+  const [showInfluencerModal, setShowInfluencerModal] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -223,12 +226,22 @@ const Market = () => {
           >
             <ReceiptText size={16} /> My Orders
           </Link>
-          <Link
-            to="/market/my-store"
-            className="flex items-center gap-1.5 px-3 h-10 rounded-full border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
-          >
-            <Store size={16} /> My Store
-          </Link>
+          {isInfluencer ? (
+            <Link
+              to="/market/my-store"
+              className="flex items-center gap-1.5 px-3 h-10 rounded-full border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
+            >
+              <Store size={16} /> My Store
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowInfluencerModal(true)}
+              className="flex items-center gap-1.5 px-3 h-10 rounded-full text-sm font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
+            >
+              <Store size={16} /> Become an Influencer
+            </button>
+          )}
           <Link
             to="/cart"
             className="relative w-10 h-10 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
@@ -297,6 +310,8 @@ const Market = () => {
           </p>
         )}
       </div>
+
+      <InfluencerSwitchModal isOpen={showInfluencerModal} onClose={() => setShowInfluencerModal(false)} />
     </div>
   );
 };
