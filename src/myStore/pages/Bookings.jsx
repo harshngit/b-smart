@@ -8,6 +8,7 @@ import { CustomerAvatar, BookingBadge } from '../components/BookingUI';
 import { BOOKING_TABS, filterBookings, bookingDate, localDate } from '../data/bookingHelpers';
 import { money } from '../data/orderFilters';
 import serviceBookingService from '../../services/serviceBookingService';
+import RowActionsMenu from '../components/RowActionsMenu';
 
 const BASE = '/market/my-store/bookings';
 
@@ -99,7 +100,15 @@ export default function StoreBookings() {
                 <td className="px-4 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap"><span className="flex items-center gap-1.5"><CalendarDays size={13} />{bookingDate(booking.date)} · {booking.time}</span></td>
                 <td className="px-4 py-4 text-[#fa3f5e] font-semibold">{money(booking.amount)}</td>
                 <td className="px-4 py-4"><BookingBadge status={booking.status} /></td>
-                <td className="px-4 py-4 text-right"><Link to={viewUrl(booking.id)} aria-label={`View booking ${booking.id}`} className="inline-flex px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange">View</Link></td>
+                <td className="px-4 py-4 text-right">
+                  <RowActionsMenu ariaLabel={`Actions for booking ${booking.id}`} menuClassName="w-40">
+                    {(close) => (
+                      <Link role="menuitem" to={viewUrl(booking.id)} onClick={close} className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-[#fa3f5e] dark:text-gray-300 dark:hover:bg-gray-800">
+                        View booking
+                      </Link>
+                    )}
+                  </RowActionsMenu>
+                </td>
               </tr>)}{!filtered.length && <tr><td colSpan={5} className="text-center py-12 text-gray-400">No bookings match this view.</td></tr>}</tbody>
             </table>
           </div>

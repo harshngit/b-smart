@@ -1,10 +1,11 @@
 import ServiceIcon from '../components/ServiceIcon';
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AlertCircle, Loader2, Plus, Search, Pencil, Calendar, MoreVertical, Trash2, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Loader2, Plus, Search, Pencil, Calendar, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Dropdown } from '../../components/productForm/ProductFormFields';
 import { servicePrice } from '../data/serviceFields';
 import influencerServiceService from '../../services/influencerServiceService';
+import RowActionsMenu from '../components/RowActionsMenu';
 
 const PAGE_SIZE = 7;
 
@@ -80,36 +81,61 @@ export default function StoreServices() {
         </div>
         <Dropdown className="w-44" value={status} options={['All status', 'Visible', 'Hidden']} onChange={(value) => { setStatus(value); setPage(1); }} />
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-        <table className="w-full text-sm">
-          <thead><tr className="text-left text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800">
+      <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <table className="w-full min-w-[900px] table-fixed border-separate border-spacing-y-3 text-sm">
+          <colgroup>
+            <col className="w-[48%]" />
+            <col className="w-[12%]" />
+            <col className="w-[15%]" />
+            <col className="w-[16%]" />
+            <col className="w-[9%]" />
+          </colgroup>
+          <thead><tr className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500">
             {['Service', 'Price', 'Bookings', 'Visibility', 'Actions'].map((heading) => <th key={heading} className={`px-5 py-3.5 font-medium ${heading === 'Actions' ? 'text-right' : ''}`}>{heading}</th>)}
           </tr></thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody>
             {loading && <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400"><span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading services...</span></td></tr>}
             {!loading && filtered.slice(start, start + PAGE_SIZE).map((service) => {
               const visible = service.status === 'Published' && service.visible;
-              return <tr key={service.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                <td className="px-5 py-4"><div className="flex items-center gap-3.5 min-w-[230px]">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden flex-shrink-0 bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+              return <tr key={service.id} className="group">
+                <td className="rounded-l-xl border-y border-l border-gray-100 bg-white px-4 py-3 transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30"><div className="flex items-start gap-3.5">
+                  <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
                     {service.images?.[0] ? <img src={service.images[0]} alt="" className="w-full h-full object-cover" /> : <ServiceIcon size={28} className="text-[#fa3f5e]" />}
                   </div>
-                  <div className="min-w-0">
-                    <Link to={`/market/service/${service.id}?from=services`} className="font-semibold text-gray-900 dark:text-white hover:text-[#fa3f5e]">{service.name || 'Untitled service'}</Link>
-                    <p className="text-xs font-semibold text-[#fa3f5e] mt-1.5">{servicePrice(service)}</p>
-                    <p className="flex items-center gap-1.5 text-xs text-gray-400 mt-1.5"><Calendar size={12} />{service.bookings} bookings</p>
+                  <div className="min-w-0 flex-1 py-1">
+                    <span className="mb-1 inline-flex rounded-full bg-pink-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#fa3f5e] dark:bg-pink-900/20">
+                      {service.category || 'Service'}
+                    </span>
+                    <Link to={`/market/service/${service.id}?from=services`} className="block whitespace-normal break-words text-[15px] font-bold leading-snug text-gray-900 transition-colors hover:text-[#fa3f5e] dark:text-white">{service.name || 'Untitled service'}</Link>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-400 dark:text-gray-500">{service.shortDescription || service.description || service.provider || 'Influencer service'}</p>
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-400"><Calendar size={12} />{service.bookings} bookings</p>
                   </div>
                 </div></td>
-                <td className="px-5 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{servicePrice(service)}</td>
-                <td className="px-5 py-4 text-gray-500 dark:text-gray-400">{service.bookings}</td>
-                <td className="px-5 py-4"><button type="button" disabled={service.status === 'Draft'} aria-label={`${visible ? 'Hide' : 'Show'} ${service.name}`} onClick={() => patchService(service.id, { visible_to_customers: !service.visible })} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${visible ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-green-500' : 'bg-gray-400'}`} />{visible ? 'Visible' : 'Hidden'}</button></td>
-                <td className="px-5 py-4"><div className="flex items-center justify-end gap-3 whitespace-nowrap">
-                  <Link to={`/market/service/${service.id}?from=services`} aria-label={`View ${service.name}`} className="inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange">View service</Link>
-                  <Link to={`/market/edit-service/${service.id}`} aria-label={`Edit ${service.name}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-[#fa3f5e]"><Pencil size={13} /> Edit</Link>
-                  <button type="button" aria-label={`${visible ? 'Hide' : 'Show'} ${service.name}`} onClick={() => service.status === 'Published' && patchService(service.id, { visible_to_customers: !service.visible })} className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-[#fa3f5e]">{visible ? <EyeOff size={13} /> : <Eye size={13} />}{visible ? 'Hide' : 'Show'}</button>
-                  <button type="button" aria-label={`Delete ${service.name}`} onClick={() => deleteService(service.id, service.name)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-600"><Trash2 size={13} /> Delete</button>
-                  <MoreVertical size={16} className="text-gray-300" />
-                </div></td>
+                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle font-semibold text-gray-800 transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:group-hover:bg-gray-800/30 whitespace-nowrap">{servicePrice(service)}</td>
+                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle text-gray-500 transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:group-hover:bg-gray-800/30">{service.bookings}</td>
+                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30"><button type="button" disabled={service.status === 'Draft'} aria-label={`${visible ? 'Hide' : 'Show'} ${service.name}`} onClick={() => patchService(service.id, { visible_to_customers: !service.visible })} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${visible ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-green-500' : 'bg-gray-400'}`} />{visible ? 'Visible' : 'Hidden'}</button></td>
+                <td className="rounded-r-xl border-y border-r border-gray-100 bg-white px-4 py-3 text-right align-middle transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30">
+                  <RowActionsMenu ariaLabel={`Actions for ${service.name}`}>
+                    {(close) => (
+                      <>
+                        <Link role="menuitem" to={`/market/service/${service.id}?from=services`} onClick={close} className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-[#fa3f5e] dark:text-gray-300 dark:hover:bg-gray-800">
+                          View service
+                        </Link>
+                        <Link role="menuitem" to={`/market/edit-service/${service.id}`} onClick={close} className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-[#fa3f5e] dark:text-gray-300 dark:hover:bg-gray-800">
+                          <Pencil size={13} /> Edit
+                        </Link>
+                        {service.status === 'Published' && (
+                          <button type="button" role="menuitem" onClick={() => { patchService(service.id, { visible_to_customers: !service.visible }); close(); }} className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-[#fa3f5e] dark:text-gray-300 dark:hover:bg-gray-800">
+                            {visible ? <EyeOff size={13} /> : <Eye size={13} />}{visible ? 'Hide' : 'Show'}
+                          </button>
+                        )}
+                        <button type="button" role="menuitem" onClick={() => { close(); deleteService(service.id, service.name); }} className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </>
+                    )}
+                  </RowActionsMenu>
+                </td>
               </tr>;
             })}
             {!loading && !filtered.length && <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400">No services match this view.</td></tr>}

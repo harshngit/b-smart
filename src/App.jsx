@@ -156,10 +156,10 @@ function App() {
             <Route path="/market"           element={<ProtectedRoute><Market /></ProtectedRoute>} />
             <Route path="/market/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
             <Route path="/market/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
-            <Route path="/market/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-            <Route path="/market/edit-product/:productId" element={<ProtectedRoute><EditProduct /></ProtectedRoute>} />
-            <Route path="/market/add-service" element={<ProtectedRoute><AddService /></ProtectedRoute>} />
-            <Route path="/market/edit-service/:serviceId" element={<ProtectedRoute><EditService /></ProtectedRoute>} />
+            <Route path="/market/add-product" element={<ProtectedRoute allowedRoles={['influencer']} redirectTo="/market"><AddProduct /></ProtectedRoute>} />
+            <Route path="/market/edit-product/:productId" element={<ProtectedRoute allowedRoles={['influencer']} redirectTo="/market"><EditProduct /></ProtectedRoute>} />
+            <Route path="/market/add-service" element={<ProtectedRoute allowedRoles={['influencer']} redirectTo="/market"><AddService /></ProtectedRoute>} />
+            <Route path="/market/edit-service/:serviceId" element={<ProtectedRoute allowedRoles={['influencer']} redirectTo="/market"><EditService /></ProtectedRoute>} />
             <Route path="/market/product/:productId" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
             <Route path="/market/service/:serviceId" element={<ProtectedRoute><ServiceDetail /></ProtectedRoute>} />
             <Route path="/cart"             element={<ProtectedRoute><Cart /></ProtectedRoute>} />
@@ -213,7 +213,7 @@ function App() {
           </Route>
 
           <Route path="/market/my-store" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['influencer']} redirectTo="/market">
               <StoreLayout />
             </ProtectedRoute>
           }>

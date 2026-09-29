@@ -7,6 +7,7 @@ import OrderDetails from '../components/OrderDetails';
 import { OrderProductImage, PaymentBadge } from '../components/OrderUI';
 import { filterOrders, ORDER_TABS, money, orderDate } from '../data/orderFilters';
 import orderService from '../../services/orderService';
+import RowActionsMenu from '../components/RowActionsMenu';
 
 const PAGE_SIZE = 6;
 const BASE = '/market/my-store/orders';
@@ -146,7 +147,15 @@ export default function StoreOrders() {
                     <td className="px-3 py-5 font-semibold text-gray-800 dark:text-gray-200">{money(order.amount)}</td>
                     <td className="px-3 py-5"><PaymentBadge status={order.paymentStatus} /></td>
                     <td className="px-3 py-5 text-gray-600 dark:text-gray-300 whitespace-nowrap">{orderDate(order.date)}<p className="text-[10px] text-gray-400 mt-1">{order.time}</p></td>
-                    <td className="px-4 py-5 text-right"><Link to={`${BASE}/${order.id}${suffix}`} aria-label={`View order ${order.id}`} className="inline-flex whitespace-nowrap border border-[#fa3f5e]/40 text-[#fa3f5e] rounded-lg px-3 py-2 font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors">View order</Link></td>
+                    <td className="px-4 py-5 text-right">
+                      <RowActionsMenu ariaLabel={`Actions for order ${order.id}`} menuClassName="w-40">
+                        {(close) => (
+                          <Link role="menuitem" to={`${BASE}/${order.id}${suffix}`} onClick={close} className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-[#fa3f5e] dark:text-gray-300 dark:hover:bg-gray-800">
+                            View order
+                          </Link>
+                        )}
+                      </RowActionsMenu>
+                    </td>
                   </tr>)}
                   {!visibleOrders.length && <tr><td colSpan={7} className="py-14 text-center text-gray-400">No orders match this view.</td></tr>}
                 </tbody>

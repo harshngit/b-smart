@@ -15,7 +15,23 @@ import InfluencerSwitchModal from '../components/InfluencerSwitchModal';
 
 const FILTERS = ['All', 'Products', 'Services', 'Persons'];
 
-export const ProductCard = ({ product, isFavorite, onToggleFavorite, showType = false }) => {
+const MarketCardSkeleton = () => (
+  <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <div className="aspect-[4/3] animate-pulse bg-gray-100 dark:bg-gray-800" />
+    <div className="space-y-3 p-4">
+      <div className="h-3 w-20 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+      <div className="h-4 w-3/4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+      <div className="h-3 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+      <div className="h-5 w-28 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+      <div className="flex gap-2 pt-1">
+        <div className="h-9 flex-1 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+        <div className="h-9 flex-1 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+      </div>
+    </div>
+  </div>
+);
+
+export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantity = 0, showType = false }) => {
   const dispatch = useDispatch();
   const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
   const image = product.images?.[0];
@@ -81,7 +97,7 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, showType = 
             disabled={adding}
             className="flex-1 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
           >
-            {adding ? 'Adding...' : 'Add to Cart'}
+            {adding ? 'Adding...' : cartQuantity > 0 ? `Added ${cartQuantity}` : 'Add to Cart'}
           </button>
           <Link
             to={`/market/product/${product.id}`}
@@ -122,7 +138,7 @@ export const ServiceCard = ({ service, isFavorite, onToggleFavorite, showType = 
 const PersonCard = ({ user, productCount, serviceCount }) => {
   const name = user.name || user.full_name || user.username || 'Store owner';
   const avatar = user.profile_picture || user.avatar || user.avatar_url;
-  const profilePath = user._id || user.id ? getProfilePath(user) : '/market/my-store/profile';
+  const profilePath = user._id || user.id ? getProfilePath(user) : '/profile';
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
       <Link to={profilePath} className="block">
@@ -155,7 +171,8 @@ const Market = () => {
   const mockProducts = useSelector((state) => state.products.items);
   const mockServices = useSelector((state) => state.services.items);
   const user = useSelector((state) => state.auth.userObject);
-  const cartCount = useSelector((state) => state.cart.items.reduce((sum, i) => sum + i.qty, 0));
+  const cartItems = useSelector((state) => state.cart.items);
+  const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
   const isInfluencer = user?.role === 'influencer';
   const [showInfluencerModal, setShowInfluencerModal] = useState(false);
 
@@ -207,7 +224,9 @@ const Market = () => {
   const showServices = activeFilter === 'All' || activeFilter === 'Services';
   const showPersons = activeFilter === 'All' || activeFilter === 'Persons';
   const showCreator = !!user && (listedProducts.length > 0 || listedServices.length > 0) && matchesQuery(user.name, user.full_name, user.username);
-  const hasResults = (showProducts && products.length > 0) || (showServices && services.length > 0) || (showPersons && showCreator);
+  const isShowingSkeletons = (showProducts && productsLoading) || (showServices && servicesLoading);
+  const skeletonCount = activeFilter === 'All' ? 4 : 8;
+  const hasResults = isShowingSkeletons || (showProducts && products.length > 0) || (showServices && services.length > 0) || (showPersons && showCreator);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1300px] ml-auto px-4 pt-6">
@@ -297,13 +316,20 @@ const Market = () => {
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {showProducts && products.map((p) => (
-          <ProductCard key={p.id} product={p} isFavorite={isSaved('product', p.id)} onToggleFavorite={() => toggle('product', p.id)} />
+        {isShowingSkeletons && Array.from({ length: skeletonCount }, (_, index) => <MarketCardSkeleton key={`market-loading-${index}`} />)}
+        {!isShowingSkeletons && showProducts && products.map((p) => (
+          <ProductCard
+            key={p.id}
+            product={p}
+            isFavorite={isSaved('product', p.id)}
+            onToggleFavorite={() => toggle('product', p.id)}
+            cartQuantity={cartItems.find((item) => String(item.productId || item.id) === String(p.id))?.qty || 0}
+          />
         ))}
-        {showServices && services.map((service) => (
+        {!isShowingSkeletons && showServices && services.map((service) => (
           <ServiceCard key={`service-${service.id}`} service={service} isFavorite={isSaved('service', service.id)} onToggleFavorite={() => toggle('service', service.id)} />
         ))}
-        {showPersons && showCreator && <PersonCard key={user._id || user.id || 'store-creator'} user={user} productCount={listedProducts.length} serviceCount={listedServices.length} />}
+        {!isShowingSkeletons && showPersons && showCreator && <PersonCard key={user._id || user.id || 'store-creator'} user={user} productCount={listedProducts.length} serviceCount={listedServices.length} />}
         {!hasResults && (
           <p className="col-span-full text-center text-gray-400 dark:text-gray-500 py-10">
             {query ? `No results for “${searchQuery.trim()}”.` : `No ${activeFilter === 'All' ? 'marketplace listings' : activeFilter.toLowerCase()} yet.`}

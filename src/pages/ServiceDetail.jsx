@@ -51,6 +51,7 @@ function BookingPage({ service }) {
   const times = availableTimes(service, date);
   const images = service.images || [];
   const atCustomer = service.method === 'At customer location';
+  const canUseStoreLinks = fromServices && user?.role === 'influencer';
   const provider = service.provider || user?.name || user?.full_name || user?.username || 'Service provider';
   const providerAvatar = service.providerAvatar || (!service.provider ? user?.profile_picture || user?.avatar : null);
   const providerVerified = service.providerVerified ?? (!service.provider && !!user?.is_verified);
@@ -155,7 +156,7 @@ function BookingPage({ service }) {
   }
 
   return <div className="w-full max-w-[1280px] ml-auto px-4 md:px-6 py-6 bg-gray-50 dark:bg-black min-h-screen text-gray-900 dark:text-white">
-    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-5"><Link to={fromServices ? '/market/my-store' : '/market'}>{fromServices ? 'My Store' : 'Marketplace'}</Link><ChevronRight size={12} aria-hidden="true" /><Link to={fromServices ? '/market/my-store/services' : '/market/my-store/profile?tab=Services'}>{fromServices ? 'My Services' : 'Store profile'}</Link><ChevronRight size={12} aria-hidden="true" /><span aria-current="page" className="text-[#fa3f5e]">{service.name}</span></nav>
+    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-5"><Link to={canUseStoreLinks ? '/market/my-store' : '/market'}>{canUseStoreLinks ? 'My Store' : 'Marketplace'}</Link><ChevronRight size={12} aria-hidden="true" /><Link to={canUseStoreLinks ? '/market/my-store/services' : '/market'}>{canUseStoreLinks ? 'My Services' : 'Services'}</Link><ChevronRight size={12} aria-hidden="true" /><span aria-current="page" className="text-[#fa3f5e]">{service.name}</span></nav>
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
       <main className="min-w-0 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)] gap-5">
@@ -218,6 +219,6 @@ export default function ServiceDetail() {
       <p className="text-gray-500 dark:text-gray-400">Loading service...</p>
     </div>
   );
-  if (!service) return <div className="py-20 px-4 text-center"><h1 className="text-xl font-bold text-gray-900 dark:text-white">Service unavailable</h1><Link to="/market/my-store/profile?tab=Services" className="text-[#fa3f5e] inline-block mt-4">Browse services</Link></div>;
+  if (!service) return <div className="py-20 px-4 text-center"><h1 className="text-xl font-bold text-gray-900 dark:text-white">Service unavailable</h1><Link to="/market" className="text-[#fa3f5e] inline-block mt-4">Browse services</Link></div>;
   return <BookingPage key={service.id} service={service} />;
 }

@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, Loader2, Plus, Search, Pencil, Trash2, MoreVertical } from 'lucide-react';
+import { AlertCircle, Loader2, Plus, Search, Pencil, Trash2, Eye } from 'lucide-react';
 import { CATEGORY_STYLE } from '../../data/marketplaceCategoryStyle';
 import { Dropdown } from '../../components/productForm/ProductFormFields';
 import influencerProductService from '../../services/influencerProductService';
+import RowActionsMenu from '../components/RowActionsMenu';
 
 const TABS = [
   { key: 'Active',       label: 'Active' },
@@ -45,47 +46,6 @@ const VisibilityCell = ({ product }) => {
       <span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-green-500' : 'bg-gray-400'}`} />
       {visible ? 'Visible' : 'Hidden'}
     </span>
-  );
-};
-
-const RowActionsMenu = ({ product, onDelete }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  return (
-    <div className="relative inline-block" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-500 transition-colors"
-        aria-label="More actions"
-      >
-        <MoreVertical size={16} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-xl z-20 overflow-hidden">
-          <Link
-            to={`/market/edit-product/${product.id}`}
-            className="flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <Pencil size={13} /> Edit
-          </Link>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onDelete(product.id, product.name); }}
-            className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            <Trash2 size={13} /> Delete
-          </button>
-        </div>
-      )}
-    </div>
   );
 };
 
@@ -204,10 +164,17 @@ const StoreProducts = () => {
         />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <table className="w-full min-w-[900px] table-fixed border-separate border-spacing-y-3 text-sm [&_tbody_tr>td:nth-child(2)]:border-y [&_tbody_tr>td:nth-child(2)]:border-gray-100 [&_tbody_tr>td:nth-child(2)]:bg-white [&_tbody_tr>td:nth-child(2)]:px-4 [&_tbody_tr>td:nth-child(2)]:py-3 [&_tbody_tr>td:nth-child(2)]:align-middle [&_tbody_tr>td:nth-child(2)]:text-sm [&_tbody_tr>td:nth-child(2)]:font-semibold [&_tbody_tr>td:nth-child(2)]:text-gray-800 dark:[&_tbody_tr>td:nth-child(2)]:border-gray-800 dark:[&_tbody_tr>td:nth-child(2)]:bg-gray-900 dark:[&_tbody_tr>td:nth-child(2)]:text-gray-200">
+          <colgroup>
+            <col className="w-[48%]" />
+            <col className="w-[12%]" />
+            <col className="w-[15%]" />
+            <col className="w-[16%]" />
+            <col className="w-[9%]" />
+          </colgroup>
           <thead>
-            <tr className="text-left text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800">
+            <tr className="text-left text-xs font-semibold text-gray-400 dark:text-gray-500">
               <th className="px-5 py-3.5 font-medium">Product</th>
               <th className="px-5 py-3.5 font-medium">Price</th>
               <th className="px-5 py-3.5 font-medium">Stock</th>
@@ -215,7 +182,7 @@ const StoreProducts = () => {
               <th className="px-5 py-3.5 font-medium text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody>
             {loading && (
               <tr>
                 <td colSpan={5} className="px-5 py-10 text-center text-gray-400 dark:text-gray-500">
@@ -227,22 +194,57 @@ const StoreProducts = () => {
               const style = CATEGORY_STYLE[p.category];
               const Icon = style?.icon;
               return (
-                <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
-                  <td className="px-5 py-4 max-w-0 w-full">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className={`w-[8rem] h-[8rem] rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden ${style?.bg}`}>
+                <tr key={p.id} className="group">
+                  <td className="rounded-l-xl border-y border-l border-gray-100 bg-white px-4 py-3 transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30">
+                    <div className="flex items-start gap-3.5">
+                      <div className={`w-24 h-24 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden ${style?.bg || 'bg-gray-50 dark:bg-gray-800'}`}>
                         <ProductThumb product={p} style={style} Icon={Icon} />
                       </div>
-                      <Link to={`/market/product/${p.id}`} title={p.name} className="font-semibold text-[15px] text-gray-900 dark:text-white hover:text-[#fa3f5e] transition-colors truncate min-w-0 flex-1">
-                        {p.name}
-                      </Link>
+                      <div className="min-w-0 flex-1 py-1">
+                        <span className={`mb-1 inline-flex rounded-full bg-gray-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide dark:bg-gray-800 ${style?.text || 'text-[#fa3f5e]'}`}>
+                          {p.category || 'Product'}
+                        </span>
+                        <Link to={`/market/product/${p.id}`} title={p.name} className="block whitespace-normal break-words text-[15px] font-bold leading-snug text-gray-900 transition-colors hover:text-[#fa3f5e] dark:text-white">
+                          {p.name || 'Untitled product'}
+                        </Link>
+                        <p className="mt-1 truncate text-xs text-gray-400 dark:text-gray-500">{p.brand || p.sellerSku || 'Influencer product'}</p>
+                      </div>
                     </div>
                   </td>
                   <td className="px-5 py-4 text-gray-700 dark:text-gray-300">₹{p.price.toFixed(2)}</td>
-                  <td className="px-5 py-4"><StockCell product={p} /></td>
-                  <td className="px-5 py-4"><VisibilityCell product={p} /></td>
-                  <td className="px-5 py-4 text-right">
-                    <RowActionsMenu product={p} onDelete={handleDelete} />
+                  <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30"><StockCell product={p} /></td>
+                  <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30"><VisibilityCell product={p} /></td>
+                  <td className="rounded-r-xl border-y border-r border-gray-100 bg-white px-4 py-3 text-right align-middle transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30">
+                    <RowActionsMenu ariaLabel={`Actions for ${p.name}`} menuClassName="w-36">
+                      {(close) => (
+                        <>
+                          <Link
+                            role="menuitem"
+                            to={`/market/product/${p.id}`}
+                            onClick={close}
+                            className="flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                          >
+                            <Eye size={13} /> View
+                          </Link>
+                          <Link
+                            role="menuitem"
+                            to={`/market/edit-product/${p.id}`}
+                            onClick={close}
+                            className="flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                          >
+                            <Pencil size={13} /> Edit
+                          </Link>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => { close(); handleDelete(p.id, p.name); }}
+                            className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </>
+                      )}
+                    </RowActionsMenu>
                   </td>
                 </tr>
               );

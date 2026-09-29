@@ -29,6 +29,8 @@ export default function Cart() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState('');
+  const [updatingAction, setUpdatingAction] = useState('');
+  const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -46,8 +48,9 @@ export default function Cart() {
     return () => { alive = false; };
   }, [dispatch]);
 
-  const syncCart = async (action, productId) => {
+  const syncCart = async (action, productId, actionType = 'update') => {
     setUpdatingId(productId);
+    setUpdatingAction(actionType);
     setError('');
     try {
       const cartItems = await action();
@@ -56,17 +59,34 @@ export default function Cart() {
       setError(err?.response?.data?.message || 'Could not update cart.');
     } finally {
       setUpdatingId('');
+      setUpdatingAction('');
     }
   };
 
   const changeQty = (item, quantity) => syncCart(
     () => cartService.updateItem(item.productId || item.id, { quantity, ...(item.variant ? { variant: item.variant } : {}) }),
     item.id,
+    quantity > item.qty ? 'adding' : 'quantity',
   );
 
-  const removeCartItem = (item) => syncCart(() => cartService.removeItem(item.productId || item.id), item.id);
+  const removeCartItem = (item) => syncCart(() => cartService.removeItem(item.productId || item.id), item.id, 'remove');
 
-  const clearCart = () => syncCart(() => cartService.clear(), 'cart');
+  const clearCart = () => syncCart(() => cartService.clear(), 'cart', 'clear');
+
+  const proceedToCheckout = async () => {
+    if (!selected.length || checkingOut) return;
+    setCheckingOut(true);
+    setError('');
+    try {
+      const cartItems = await cartService.get();
+      dispatch(setCartItems(cartItems));
+      navigate('/checkout');
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Could not refresh cart before checkout.');
+    } finally {
+      setCheckingOut(false);
+    }
+  };
 
   const active = items.filter((item) => !item.saved);
   const saved = items.filter((item) => item.saved);
@@ -82,6 +102,8 @@ export default function Cart() {
 
   const renderItem = (item) => {
     const product = products.find((entry) => entry.id === item.id);
+    const addingQuantity = updatingId === item.id && updatingAction === 'adding';
+    const removingQuantity = updatingId === item.id && updatingAction === 'quantity';
     return <article key={item.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3 p-2 border border-gray-100 dark:border-gray-800 rounded-xl">
       {!item.saved && <input type="checkbox" aria-label={`Select ${item.name}`} checked={item.selected !== false} onChange={() => dispatch(toggleSelection(item.id))} className="w-4 h-4 shrink-0 accent-[#fa3f5e] cursor-pointer" />}
       <CartImage item={{ ...product, ...item }} />
@@ -89,9 +111,13 @@ export default function Cart() {
         <Link to={`/market/product/${item.id}`} className="text-sm font-semibold text-gray-900 dark:text-white break-words hover:text-[#fa3f5e]">{item.name}</Link>
         <p className="text-sm font-semibold text-[#fa3f5e] mt-2">{money(item.price)}</p>
         <div className="inline-flex items-center border border-gray-200 dark:border-gray-700 rounded-lg mt-2">
-          <button type="button" aria-label={`Decrease quantity of ${item.name}`} disabled={item.qty <= 1 || updatingId === item.id} onClick={() => changeQty(item, item.qty - 1)} className="p-2 text-[#fa3f5e] disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800"><Minus size={15} /></button>
+          <button type="button" aria-label={`Decrease quantity of ${item.name}`} disabled={item.qty <= 1 || updatingId === item.id} onClick={() => changeQty(item, item.qty - 1)} className="min-w-[34px] px-2 py-2 text-[#fa3f5e] disabled:opacity-70 hover:bg-gray-50 dark:hover:bg-gray-800">
+            {removingQuantity ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold"><Loader2 size={13} className="animate-spin" /> Removing...</span> : <Minus size={15} />}
+          </button>
           <span aria-label={`Quantity of ${item.name}`} className="min-w-7 text-center text-sm font-semibold text-gray-900 dark:text-white">{item.qty}</span>
-          <button type="button" aria-label={`Increase quantity of ${item.name}`} disabled={updatingId === item.id} onClick={() => changeQty(item, item.qty + 1)} className="p-2 text-[#fa3f5e] hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40"><Plus size={15} /></button>
+          <button type="button" aria-label={`Increase quantity of ${item.name}`} disabled={updatingId === item.id} onClick={() => changeQty(item, item.qty + 1)} className="min-w-[34px] px-2 py-2 text-[#fa3f5e] hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-70">
+            {addingQuantity ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold"><Loader2 size={13} className="animate-spin" /> Adding...</span> : <Plus size={15} />}
+          </button>
         </div>
       </div>
       <div className="w-full sm:w-auto flex sm:flex-col justify-end gap-4 sm:gap-4 sm:pl-1 sm:pr-2 shrink-0 text-xs text-gray-500 dark:text-gray-400">
@@ -142,7 +168,7 @@ export default function Cart() {
 
         </dl>
         <div className="flex justify-between items-center gap-3 py-5"><span className="text-sm font-semibold text-gray-900 dark:text-white">Total</span><span className="text-xl font-bold text-[#fa3f5e]">{money(subtotal)}</span></div>
-        <div className="flex items-center gap-2.5 border-t border-gray-100 dark:border-gray-800 pt-3 pb-4 text-xs text-gray-500 dark:text-gray-400"><span className="w-7 h-7 shrink-0 rounded-full bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white flex items-center justify-center text-lg font-bold">b</span><span>You will earn <span className="font-semibold text-[#fa3f5e]">{rewardCoins.toLocaleString('en-IN')} bCoins</span></span></div><button type="button" disabled={!selected.length} onClick={() => navigate('/checkout')} className={`${primary} w-full py-3 disabled:opacity-40 disabled:cursor-not-allowed`}>Proceed to Checkout</button>
+        <div className="flex items-center gap-2.5 border-t border-gray-100 dark:border-gray-800 pt-3 pb-4 text-xs text-gray-500 dark:text-gray-400"><span className="w-7 h-7 shrink-0 rounded-full bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white flex items-center justify-center text-lg font-bold">b</span><span>You will earn <span className="font-semibold text-[#fa3f5e]">{rewardCoins.toLocaleString('en-IN')} bCoins</span></span></div><button type="button" disabled={!selected.length || checkingOut} onClick={proceedToCheckout} className={`${primary} w-full py-3 disabled:opacity-40 disabled:cursor-not-allowed`}>{checkingOut ? <span className="inline-flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />Checking cart...</span> : 'Proceed to Checkout'}</button>
         
       </aside>
     </div>}

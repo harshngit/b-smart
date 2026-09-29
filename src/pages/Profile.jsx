@@ -1327,13 +1327,16 @@ const Profile = () => {
     const handleComingSoon = (label) => setRewardToast({ type: 'success', message: `${label} is coming soon.` });
 
     const isInfluencer = currentUser?.role === 'influencer';
+    const storeNavItem = isOwnProfile
+        ? isInfluencer
+            ? { label: 'My Store', icon: <Store size={18} />, to: '/market/my-store' }
+            : { label: 'Become an Influencer', icon: <Store size={18} />, onClick: () => setShowInfluencerModal(true) }
+        : { label: 'Marketplace', icon: <Store size={18} />, to: '/market' };
     const SIDEBAR_NAV = [
         { label: 'Saved items', icon: <Bookmark size={18} />, to: '/settings/saved' },
         { label: 'Interests',   icon: <Star size={18} />, onClick: handleStarClick },
         { label: 'Campaigns',   icon: <Megaphone size={18} />, to: '/promote' },
-        (isOwnProfile && !isInfluencer)
-            ? { label: 'Become an Influencer', icon: <Store size={18} />, onClick: () => setShowInfluencerModal(true) }
-            : { label: 'My Store', icon: <Store size={18} />, to: '/market/my-store' },
+        storeNavItem,
     ];
 
     const SidebarNavItem = ({ icon, label, to, onClick }) => {
