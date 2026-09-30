@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Heart, Star, Eye, Store, ShoppingCart, Package, UserRound, ReceiptText, Search } from 'lucide-react';
+import { CheckCircle2, Heart, Star, Eye, Store, ShoppingCart, Package, UserRound, ReceiptText, Search } from 'lucide-react';
 import { addItem } from '../store/cartSlice';
 import ServiceIcon from '../myStore/components/ServiceIcon';
 import { servicePrice } from '../myStore/data/serviceFields';
@@ -181,6 +181,7 @@ const Market = () => {
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
   const isInfluencer = user?.role === 'influencer';
   const [showInfluencerModal, setShowInfluencerModal] = useState(false);
+  const [wishlistPopup, setWishlistPopup] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -199,6 +200,12 @@ const Market = () => {
       });
     return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    if (!wishlistPopup) return undefined;
+    const timeout = window.setTimeout(() => setWishlistPopup(''), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [wishlistPopup]);
 
   useEffect(() => {
     let alive = true;
@@ -233,9 +240,20 @@ const Market = () => {
   const isShowingSkeletons = (showProducts && productsLoading) || (showServices && servicesLoading);
   const skeletonCount = activeFilter === 'All' ? 4 : 8;
   const hasResults = isShowingSkeletons || (showProducts && products.length > 0) || (showServices && services.length > 0) || (showPersons && showCreator);
+  const toggleProductWishlist = (product) => {
+    const alreadySaved = isSaved('product', product.id);
+    toggle('product', product.id, product);
+    if (!alreadySaved) setWishlistPopup('Added to wishlist');
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1300px] ml-auto px-4 pt-6">
+      {wishlistPopup && (
+        <div role="status" aria-live="polite" className="fixed bottom-6 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-xl border border-pink-100 bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-xl dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+          <CheckCircle2 size={18} className="text-[#fa3f5e]" />
+          {wishlistPopup}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Marketplace</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -328,7 +346,7 @@ const Market = () => {
             key={p.id}
             product={p}
             isFavorite={isSaved('product', p.id)}
-            onToggleFavorite={() => toggle('product', p.id)}
+            onToggleFavorite={() => toggleProductWishlist(p)}
             cartQuantity={cartItems.find((item) => String(item.productId || item.id) === String(p.id))?.qty || 0}
           />
         ))}

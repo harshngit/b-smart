@@ -21,9 +21,10 @@ export default function useMarketplaceWishlist() {
     type === 'product' && products.some((item) => String(item.id) === String(id))
   );
 
-  const toggle = (type, id) => {
+  const toggle = (type, id, product = null) => {
     if (!userId || type !== 'product' || id == null) return;
-    dispatch(isSaved(type, id) ? removeWishlistItem(id) : addWishlistItem(id));
+    const payload = { productId: id, product };
+    dispatch(isSaved(type, id) ? removeWishlistItem(payload) : addWishlistItem(payload));
   };
 
   return {

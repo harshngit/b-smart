@@ -20,11 +20,11 @@ const wishlistService = {
   },
   addItem: async (productId) => {
     await api.post('/wishlist/items', { product_id: productId });
-    return wishlistService.list();
+    return { productId };
   },
   removeItem: async (productId) => {
     await api.delete(`/wishlist/items/${productId}`);
-    return wishlistService.list();
+    return { productId };
   },
   clear: async () => {
     await api.delete('/wishlist');

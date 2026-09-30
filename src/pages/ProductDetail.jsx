@@ -160,7 +160,7 @@ const ProductDetail = () => {
               type="button"
               aria-label={`${favorite ? 'Remove' : 'Add'} ${product.name} ${favorite ? 'from' : 'to'} wishlist`}
               aria-pressed={favorite}
-              onClick={() => toggle('product', product.id)}
+              onClick={() => toggle('product', product.id, product)}
               className={`absolute top-4 right-4 w-9 h-9 rounded-full bg-white dark:bg-gray-800 shadow items-center justify-center ${canUseStoreLinks ? 'hidden' : 'flex'}`}
             >
               <Heart size={16} className={favorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-400'} />
@@ -300,7 +300,7 @@ const ProductDetail = () => {
         <div className="mt-10">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">More from this seller</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {related.map((p) => <MiniProductCard key={p.id} product={p} isFavorite={isSaved('product', p.id)} onToggleFavorite={() => toggle('product', p.id)} />)}
+            {related.map((p) => <MiniProductCard key={p.id} product={p} isFavorite={isSaved('product', p.id)} onToggleFavorite={() => toggle('product', p.id, p)} />)}
           </div>
         </div>
       )}
