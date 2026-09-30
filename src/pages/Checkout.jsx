@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-  MapPin, Plus, Check, CreditCard, ChevronRight, Lock, CheckCircle2, X,
-  Home, Briefcase, Wallet, ShieldCheck, Package, Loader2, ReceiptText,
+  MapPin, Plus, Check, CreditCard, ChevronRight, Lock, X,
+  Home, Briefcase, Wallet, ShieldCheck, Package, Loader2,
 } from 'lucide-react';
 import { setCartItems } from '../store/cartSlice';
 import { placeOrder } from '../store/ordersSlice';
@@ -11,6 +11,7 @@ import { fetchWallet } from '../store/walletSlice';
 import { inputCls } from '../components/productForm/ProductFormFields';
 import checkoutService, { loadRazorpay } from '../services/checkoutService';
 import addressService from '../services/addressService';
+import CheckoutSuccessView from '../components/checkout/CheckoutSuccessView';
 
 const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm';
 const primary = 'rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-insta-pink focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed';
@@ -393,83 +394,17 @@ export default function Checkout() {
 
   if (placed) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black px-4 py-8 text-gray-900 dark:text-white md:px-6">
-        <div className="mx-auto w-full max-w-5xl space-y-5">
-          <section className="text-center">
-            <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-pink-50 text-[#fa3f5e] ring-8 ring-white dark:bg-pink-900/20 dark:ring-gray-900">
-              <CheckCircle2 size={44} strokeWidth={2.4} />
-            </span>
-            <h1 className="mt-5 text-2xl font-bold text-gray-900 dark:text-white md:text-3xl">Order placed successfully!</h1>
-            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-              Thank you for your order. Your payment has been verified and your order is now confirmed.
-            </p>
-            {orderMessage && <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">{orderMessage}</p>}
-          </section>
-
-          <section className={`${panel} p-4 md:p-5`} aria-label="Order information">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                ['Order ID', successOrderId],
-                ['Order Date', successDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })],
-                ['Payment Method', successPaymentMethod === 'wallet' ? 'Wallet' : 'Razorpay'],
-                ['Total Amount', money(successTotal)],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/60">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
-                  <p className="mt-1 break-words text-sm font-bold text-gray-900 dark:text-white">{value}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className={`${panel} overflow-hidden`} aria-label="Order summary">
-            <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-4 dark:border-gray-800 md:px-5">
-              <div>
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">Order Summary</h2>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{successItems.length} {successItems.length === 1 ? 'item' : 'items'} purchased</p>
-              </div>
-              <ReceiptText size={22} className="text-[#fa3f5e]" />
-            </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {successItems.length ? successItems.map((item) => {
-                const productMatch = products.find((product) => String(product.id) === String(item.productId));
-                const variantText = item.variant ? [item.variant.color, item.variant.size].filter(Boolean).join(' / ') : '';
-                return (
-                  <div key={`${item.productId}-${item.name}`} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center md:px-5">
-                    <ProductImage item={{ ...productMatch, ...item }} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.name}</p>
-                      {variantText && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Variant: {variantText}</p>}
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
-                    </div>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">{money(Number(item.unitPrice || 0) * Number(item.quantity || 1))}</p>
-                  </div>
-                );
-              }) : (
-                <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400 md:px-5">Order details are being prepared. You can view the full order in My Orders.</p>
-              )}
-            </div>
-          </section>
-
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
-            <Link to="/market" className="flex min-h-11 items-center justify-center rounded-lg border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-white dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900">
-              Continue Shopping
-            </Link>
-            <Link to="/market/my-orders" className={`${primary} flex min-h-11 items-center justify-center px-5 py-3`}>
-              View My Orders
-            </Link>
-          </div>
-
-          <section className={`${panel} grid gap-3 p-4 sm:grid-cols-3 md:p-5`} aria-label="Order status">
-            {['Payment verified', 'Order confirmed', 'Order details available in My Orders'].map((status) => (
-              <div key={status} className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                <CheckCircle2 size={18} className="shrink-0 text-[#fa3f5e]" />
-                {status}
-              </div>
-            ))}
-          </section>
-        </div>
-      </div>
+      <CheckoutSuccessView
+        orderId={successOrderId}
+        orderDate={successDate}
+        paymentMethod={successPaymentMethod}
+        total={successTotal}
+        items={successItems.map((item) => ({
+          ...products.find((product) => String(product.id) === String(item.productId)),
+          ...item,
+        }))}
+        orderMessage={orderMessage}
+      />
     );
   }
 
