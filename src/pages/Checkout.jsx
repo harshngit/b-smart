@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   MapPin, Plus, Check, CreditCard, ChevronRight, Lock, CheckCircle2, X,
-  Home, Briefcase, Wallet, ShieldCheck, Package, Loader2,
+  Home, Briefcase, Wallet, ShieldCheck, Package, Loader2, ReceiptText,
 } from 'lucide-react';
 import { setCartItems } from '../store/cartSlice';
 import { placeOrder } from '../store/ordersSlice';
@@ -154,6 +154,7 @@ export default function Checkout() {
   const [checkoutError, setCheckoutError] = useState('');
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderMessage, setOrderMessage] = useState('');
+  const [confirmedOrder, setConfirmedOrder] = useState(null);
 
   const address = addresses.find((entry) => entry.id === selectedAddress) || addresses[0] || blankAddress;
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
@@ -236,14 +237,24 @@ export default function Checkout() {
 
   const recordLocalOrder = (apiOrder, shippingAddress, status = 'Pending', paymentStatus = 'Pending') => {
     const customer = shippingAddress.name || user?.name || user?.full_name || user?.username || 'Customer';
-    dispatch(placeOrder({
+    const action = placeOrder({
       buyerId: String(user?._id || user?.id || ''),
+      apiOrderId: apiOrder?._id || apiOrder?.id || apiOrder?.order_id || '',
       customer,
       productId: items[0].id,
       product: items[0].name,
       qty: items.reduce((sum, item) => sum + item.qty, 0),
-      items: items.map((item) => ({ productId: item.id, name: item.name, quantity: item.qty, unitPrice: item.price })),
-      amount: apiOrder?.amount ?? total,
+      items: items.map((item) => ({
+        productId: item.id,
+        name: item.name,
+        quantity: item.qty,
+        unitPrice: item.price,
+        variant: item.variant,
+        images: item.images || [],
+        image: item.image,
+      })),
+      amount: apiOrder?.amount ?? apiOrder?.total_amount ?? total,
+      paymentMethod,
       paymentStatus,
       status,
       address: {
@@ -254,7 +265,9 @@ export default function Checkout() {
         postalCode: shippingAddress.pincode,
         country: 'India',
       },
-    }));
+    });
+    dispatch(action);
+    return action.payload;
   };
 
   const submit = async (event) => {
@@ -277,7 +290,8 @@ export default function Checkout() {
       const backendOrderId = apiOrder?._id || apiOrder?.id || apiOrder?.order_id || result?.id || result?._id;
 
       if (paymentMethod === 'wallet') {
-        recordLocalOrder(apiOrder, shippingAddress, 'Confirmed', 'Paid');
+        const localOrder = recordLocalOrder(apiOrder, shippingAddress, 'Confirmed', 'Paid');
+        setConfirmedOrder(localOrder);
         dispatch(setCartItems([]));
         dispatch(fetchWallet());
         setOrderMessage('Your wallet payment is confirmed and the cart has been cleared.');
@@ -313,7 +327,8 @@ export default function Checkout() {
           try {
             const verified = await checkoutService.verifyPayment(backendOrderId, paymentResponse);
             const verifiedOrder = verified?.order || verified?.data?.order || apiOrder;
-            recordLocalOrder(verifiedOrder, shippingAddress, 'Confirmed', 'Paid');
+            const localOrder = recordLocalOrder(verifiedOrder, shippingAddress, 'Confirmed', 'Paid');
+            setConfirmedOrder(localOrder);
             dispatch(setCartItems([]));
             setOrderMessage('Payment verified. Your order is confirmed and the cart has been cleared.');
             setPlaced(true);
@@ -362,15 +377,97 @@ export default function Checkout() {
     </>
   );
 
+  const successItems = confirmedOrder?.items?.length ? confirmedOrder.items : items.map((item) => ({
+    productId: item.id,
+    name: item.name,
+    quantity: item.qty,
+    unitPrice: item.price,
+    variant: item.variant,
+    images: item.images || [],
+    image: item.image,
+  }));
+  const successOrderId = confirmedOrder?.apiOrderId || confirmedOrder?.id || 'Processing';
+  const successDate = confirmedOrder?.createdAt ? new Date(confirmedOrder.createdAt) : new Date();
+  const successPaymentMethod = confirmedOrder?.paymentMethod || paymentMethod;
+  const successTotal = confirmedOrder?.amount ?? total;
+
   if (placed) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 bg-gray-50 dark:bg-black text-center">
-        <CheckCircle2 size={48} className="text-[#fa3f5e]" />
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Order placed!</h1>
-        <p className="text-sm text-gray-500">{orderMessage || 'Your order has been submitted.'}</p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Link to="/market/my-orders" className={`${primary} px-5 py-3`}>View My Orders</Link>
-          <Link to="/market" className="px-5 py-3 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300">Back to Market</Link>
+      <div className="min-h-screen bg-gray-50 dark:bg-black px-4 py-8 text-gray-900 dark:text-white md:px-6">
+        <div className="mx-auto w-full max-w-5xl space-y-5">
+          <section className="text-center">
+            <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-pink-50 text-[#fa3f5e] ring-8 ring-white dark:bg-pink-900/20 dark:ring-gray-900">
+              <CheckCircle2 size={44} strokeWidth={2.4} />
+            </span>
+            <h1 className="mt-5 text-2xl font-bold text-gray-900 dark:text-white md:text-3xl">Order placed successfully!</h1>
+            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+              Thank you for your order. Your payment has been verified and your order is now confirmed.
+            </p>
+            {orderMessage && <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">{orderMessage}</p>}
+          </section>
+
+          <section className={`${panel} p-4 md:p-5`} aria-label="Order information">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                ['Order ID', successOrderId],
+                ['Order Date', successDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })],
+                ['Payment Method', successPaymentMethod === 'wallet' ? 'Wallet' : 'Razorpay'],
+                ['Total Amount', money(successTotal)],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/60">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+                  <p className="mt-1 break-words text-sm font-bold text-gray-900 dark:text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className={`${panel} overflow-hidden`} aria-label="Order summary">
+            <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-4 dark:border-gray-800 md:px-5">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">Order Summary</h2>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{successItems.length} {successItems.length === 1 ? 'item' : 'items'} purchased</p>
+              </div>
+              <ReceiptText size={22} className="text-[#fa3f5e]" />
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {successItems.length ? successItems.map((item) => {
+                const productMatch = products.find((product) => String(product.id) === String(item.productId));
+                const variantText = item.variant ? [item.variant.color, item.variant.size].filter(Boolean).join(' / ') : '';
+                return (
+                  <div key={`${item.productId}-${item.name}`} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center md:px-5">
+                    <ProductImage item={{ ...productMatch, ...item }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.name}</p>
+                      {variantText && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Variant: {variantText}</p>}
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
+                    </div>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{money(Number(item.unitPrice || 0) * Number(item.quantity || 1))}</p>
+                  </div>
+                );
+              }) : (
+                <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400 md:px-5">Order details are being prepared. You can view the full order in My Orders.</p>
+              )}
+            </div>
+          </section>
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
+            <Link to="/market" className="flex min-h-11 items-center justify-center rounded-lg border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-white dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900">
+              Continue Shopping
+            </Link>
+            <Link to="/market/my-orders" className={`${primary} flex min-h-11 items-center justify-center px-5 py-3`}>
+              View My Orders
+            </Link>
+          </div>
+
+          <section className={`${panel} grid gap-3 p-4 sm:grid-cols-3 md:p-5`} aria-label="Order status">
+            {['Payment verified', 'Order confirmed', 'Order details available in My Orders'].map((status) => (
+              <div key={status} className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <CheckCircle2 size={18} className="shrink-0 text-[#fa3f5e]" />
+                {status}
+              </div>
+            ))}
+          </section>
         </div>
       </div>
     );
