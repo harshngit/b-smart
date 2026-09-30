@@ -177,6 +177,10 @@ const influencerProductService = {
     const { data } = await api.patch(`/influencer-products/${id}`, payload);
     return normalizeInfluencerProduct(data.product || data.data || data);
   },
+  addStock: async (id, quantity) => {
+    const { data } = await api.patch(`/influencer-products/${id}/stock`, { quantity });
+    return normalizeInfluencerProduct(data.product || data.data || data);
+  },
   remove: async (id) => api.delete(`/influencer-products/${id}`),
 };
 

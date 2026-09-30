@@ -33,7 +33,7 @@ export const normalizeServiceBooking = (booking = {}) => {
   const slot = booking.time_slot || {};
   const start = slot.start || booking.start_time || booking.time || '';
   const end = slot.end || booking.end_time || '';
-  const status = titleStatus(booking.status);
+  const status = titleStatus(booking.booking_status || booking.status);
   const paymentStatus = titleStatus(booking.payment_status || booking.paymentStatus, ['Confirmed', 'In Progress', 'Completed'].includes(status) ? 'Paid' : 'Pending');
 
   return {

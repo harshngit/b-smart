@@ -1,11 +1,12 @@
 import ServiceIcon from '../components/ServiceIcon';
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AlertCircle, Loader2, Plus, Search, Pencil, Calendar, Trash2, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Plus, Search, Pencil, Calendar, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Dropdown } from '../../components/productForm/ProductFormFields';
 import { servicePrice } from '../data/serviceFields';
 import influencerServiceService from '../../services/influencerServiceService';
 import RowActionsMenu from '../components/RowActionsMenu';
+import CatalogRowSkeleton from '../components/CatalogRowSkeleton';
 
 const PAGE_SIZE = 7;
 
@@ -94,7 +95,7 @@ export default function StoreServices() {
             {['Service', 'Price', 'Bookings', 'Visibility', 'Actions'].map((heading) => <th key={heading} className={`px-5 py-3.5 font-medium ${heading === 'Actions' ? 'text-right' : ''}`}>{heading}</th>)}
           </tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400"><span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading services...</span></td></tr>}
+            {loading && Array.from({ length: PAGE_SIZE }, (_, i) => <CatalogRowSkeleton key={i} />)}
             {!loading && filtered.slice(start, start + PAGE_SIZE).map((service) => {
               const visible = service.status === 'Published' && service.visible;
               return <tr key={service.id}>

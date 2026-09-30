@@ -35,7 +35,7 @@ export const normalizeOrder = (order = {}) => {
   const items = (order.items || order.line_items || order.products || []).map(normalizeItem);
   const buyer = order.buyer || order.buyer_id || order.user || order.user_id || {};
   const shipping = order.shipping_address || order.address || {};
-  const status = titleStatus(order.status, 'Pending');
+  const status = titleStatus(order.order_status || order.status, 'Pending');
   const paymentStatus = titleStatus(order.payment_status || order.paymentStatus, status === 'Cancelled' ? 'Refunded' : 'Paid');
   const createdAt = order.createdAt || order.created_at || order.date || order.placed_at;
   const date = createdAt
@@ -71,7 +71,7 @@ export const normalizeOrder = (order = {}) => {
     packed: ['Processing', 'Shipped', 'Delivered'].includes(status),
     courier: order.courier || order.shipping?.courier || '',
     trackingNumber: order.tracking_number || order.trackingNumber || order.shipping?.tracking_number || '',
-    notifyCustomer: true,
+    notifyCustomer: order.notify_customer ?? true,
   };
 };
 
@@ -92,8 +92,8 @@ const orderService = {
     const { data } = await api.get('/orders/seller/mine');
     return firstArray(data).map(normalizeOrder);
   },
-  updateStatus: async (id, status) => {
-    const { data } = await api.patch(`/orders/${id}/status`, { status: String(status).toLowerCase() });
+  updateStatus: async (id, status, extra = {}) => {
+    const { data } = await api.patch(`/orders/${id}/status`, { status: String(status).toLowerCase(), ...extra });
     return normalizeOrder(data?.order || data?.data?.order || data?.data || data);
   },
 };

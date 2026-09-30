@@ -1,22 +1,16 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Check, Coins, Copy, CreditCard, MapPin, Package, PackageCheck,
   Truck, UserRound, Wallet, X,
 } from 'lucide-react';
-import { Checkbox, Dropdown, inputCls, labelCls } from '../../components/productForm/ProductFormFields';
+import { Dropdown, inputCls, labelCls } from '../../components/productForm/ProductFormFields';
 import { COURIERS, canShipOrder, shipOrder, updateOrderFulfillment } from '../../store/ordersSlice';
 import { OrderProductImage, PaymentBadge } from './OrderUI';
 import { money } from '../data/orderFilters';
 
-function StepNumber({ number, done }) {
-  return (
-    <span className={`inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${done ? 'bg-[#fa3f5e] text-white shadow-sm shadow-[#fa3f5e]/20' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
-      {done ? <Check size={14} /> : number}
-    </span>
-  );
-}
+const STATUS_OPTIONS = ['Confirmed', 'Processing', 'Shipped', 'Delivered'];
 
 function SummaryCard({ label, value, icon: Icon }) {
   return (
@@ -30,10 +24,22 @@ function SummaryCard({ label, value, icon: Icon }) {
   );
 }
 
-export default function OrderDetails({ order, closeTo, onStatusChange, updating = false, apiEnabled = false }) {
+export default function OrderDetails({ order, closeTo, onStatusChange, onFulfillmentChange, updating = false, apiEnabled = false }) {
   const dispatch = useDispatch();
   const products = useSelector((state) => state.products.items);
   const headingRef = useRef(null);
+  const [selectedStatus, setSelectedStatus] = useState(
+    order && !['Pending', 'New'].includes(order.status) ? order.status : 'Confirmed'
+  );
+  // Tracks the last order.status we've synced the dropdown to, so we can tell
+  // "the order changed under us" (server/socket update) apart from "the seller
+  // is mid-way through picking a new status" — adjusted during render per
+  // React's guidance, not in an effect, to avoid an extra render pass.
+  const [syncedStatus, setSyncedStatus] = useState(order?.status);
+  if (order && order.status !== syncedStatus) {
+    setSyncedStatus(order.status);
+    if (!['Pending', 'New'].includes(order.status)) setSelectedStatus(order.status);
+  }
 
   useEffect(() => { headingRef.current?.focus({ preventScroll: true }); }, [order?.id]);
 
@@ -47,14 +53,37 @@ export default function OrderDetails({ order, closeTo, onStatusChange, updating 
   }
 
   const editable = ['Pending', 'Confirmed', 'Processing'].includes(order.status);
-  const update = (changes) => dispatch(updateOrderFulfillment({ id: order.id, ...changes }));
-  const setStatus = (status) => {
-    if (apiEnabled) onStatusChange?.(order.id, status);
-    else if (status === 'Shipped') dispatch(shipOrder(order.id));
+  // In live mode, courier/tracking/notify edits update local UI state only (via
+  // onFulfillmentChange) until a status-change button actually persists them —
+  // checking/unchecking the mock Redux store here would silently not affect the
+  // real order being displayed.
+  const update = (changes) => {
+    if (apiEnabled) onFulfillmentChange?.(order.id, changes);
+    else dispatch(updateOrderFulfillment({ id: order.id, ...changes }));
   };
-  const canAdvanceToProcessing = ['Pending', 'Confirmed'].includes(order.status);
-  const canAdvanceToShipped = ['Confirmed', 'Processing'].includes(order.status);
+  const setStatus = (status) => {
+    if (apiEnabled) {
+      onStatusChange?.(order.id, status, {
+        courier: order.courier,
+        tracking_number: order.trackingNumber,
+        confirmed_items: order.confirmed,
+        packed: order.packed,
+        notify_customer: order.notifyCustomer,
+      });
+    } else if (status === 'Shipped') dispatch(shipOrder(order.id));
+  };
   const canAdvanceToDelivered = order.status === 'Shipped';
+  const needsShippingInfo = selectedStatus === 'Shipped';
+  const canSubmitStatus = !needsShippingInfo || (order.courier && order.trackingNumber?.trim());
+  const handleUpdateStatus = () => {
+    if (apiEnabled) {
+      onStatusChange?.(order.id, selectedStatus, {
+        courier: order.courier,
+        tracking_number: order.trackingNumber,
+        notify_customer: order.notifyCustomer,
+      });
+    } else if (selectedStatus === 'Shipped') dispatch(shipOrder(order.id));
+  };
   const earnings = Math.max(0, order.amount - order.coinsDiscount);
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const progressSteps = ['Confirmed', 'Processing', 'Shipped', 'Delivered'];
@@ -122,24 +151,43 @@ export default function OrderDetails({ order, closeTo, onStatusChange, updating 
             This order has been cancelled.
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-4">
-            {progressSteps.map((step, index) => {
-              const done = activeStep >= index;
-              const current = activeStep === index;
-              return (
-                <div key={step} className="relative flex items-center gap-3 md:block">
-                  {index < progressSteps.length - 1 && <span className={`absolute left-[calc(50%+18px)] right-[calc(-50%+18px)] top-5 hidden h-0.5 md:block ${activeStep > index ? 'bg-[#fa3f5e]' : 'bg-gray-200 dark:bg-gray-800'}`} />}
-                  <span className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full ${done ? 'bg-[#fa3f5e] text-white' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
-                    {done ? <Check size={18} /> : index + 1}
-                  </span>
-                  <div className="md:mt-3">
-                    <p className={`text-sm font-bold ${done ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>{step}</p>
-                    <p className="mt-0.5 text-xs text-gray-400">{current ? 'Current step' : done ? 'Completed' : 'Waiting'}</p>
+          <>
+            {/* Circles + connecting lines — each step owns the left/right half of
+                its connector, so adjacent halves always meet under the circle
+                regardless of column width, instead of guessing pixel offsets. */}
+            <div className="hidden md:flex items-center">
+              {progressSteps.map((step, index) => {
+                const done = activeStep >= index;
+                const pastStep = activeStep > index;
+                return (
+                  <div key={step} className="flex flex-1 items-center">
+                    <div className={`h-0.5 flex-1 ${index === 0 ? 'invisible' : done ? 'bg-[#fa3f5e]' : 'bg-gray-200 dark:bg-gray-800'}`} />
+                    <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full font-semibold ${done ? 'bg-[#fa3f5e] text-white' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
+                      {done ? <Check size={18} /> : index + 1}
+                    </span>
+                    <div className={`h-0.5 flex-1 ${index === progressSteps.length - 1 ? 'invisible' : pastStep ? 'bg-[#fa3f5e]' : 'bg-gray-200 dark:bg-gray-800'}`} />
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            <div className="grid gap-4 md:mt-3 md:grid-cols-4">
+              {progressSteps.map((step, index) => {
+                const done = activeStep >= index;
+                const current = activeStep === index;
+                return (
+                  <div key={step} className="flex items-center gap-3 md:flex-col md:text-center">
+                    <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full font-semibold md:hidden ${done ? 'bg-[#fa3f5e] text-white' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
+                      {done ? <Check size={18} /> : index + 1}
+                    </span>
+                    <div>
+                      <p className={`text-sm font-bold ${done ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>{step}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">{current ? 'Current step' : done ? 'Completed' : 'Waiting'}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </section>
 
@@ -196,30 +244,31 @@ export default function OrderDetails({ order, closeTo, onStatusChange, updating 
           <div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">Fulfill order</h3>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Confirm, pack, assign shipping, and notify the customer.</p>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Update order</h3>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Set the order's status, shipping details, and whether to notify the customer.</p>
               </div>
               {apiEnabled && <span className="rounded-full bg-green-50 px-3 py-1.5 text-xs font-bold text-green-600 dark:bg-green-900/20">Live updates</span>}
             </div>
             <div className="grid gap-3 lg:grid-cols-2">
-              <div className="rounded-2xl border border-gray-100 p-4 dark:border-gray-800">
-                <div className="flex items-start gap-3"><StepNumber number={1} done={order.confirmed} /><div className="flex-1"><Checkbox checked={order.confirmed} onChange={(confirmed) => apiEnabled && confirmed ? setStatus('Confirmed') : update({ confirmed })} label="Confirm items" /><p className="mt-1 text-[11px] text-gray-400">{order.confirmed ? 'All items confirmed' : 'Check the items in this order'}</p></div></div>
-              </div>
-              <div className="rounded-2xl border border-gray-100 p-4 dark:border-gray-800">
-                <div className="flex items-start gap-3"><StepNumber number={2} done={order.packed} /><fieldset disabled={!order.confirmed && !apiEnabled} className="flex-1 disabled:opacity-50"><Checkbox checked={order.packed} onChange={(packed) => apiEnabled && packed ? setStatus('Processing') : update({ packed })} label="Pack order" /><p className="mt-1 text-[11px] text-gray-400">{order.packed ? 'Order packed and ready' : 'Pack all confirmed items'}</p></fieldset></div>
-              </div>
               <div className="rounded-2xl border border-gray-100 p-4 dark:border-gray-800 lg:col-span-2">
-                <div className="flex items-start gap-3"><StepNumber number={3} done={!!(order.courier && order.trackingNumber.trim())} /><div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2"><Dropdown label="Courier" value={order.courier || 'Select courier'} options={COURIERS} onChange={(courier) => update({ courier })} /><div><label htmlFor="order-tracking" className={labelCls}>Tracking number</label><input id="order-tracking" value={order.trackingNumber} maxLength={80} onChange={(event) => update({ trackingNumber: event.target.value })} placeholder="Enter tracking number" className={inputCls} /></div></div></div>
+                <Dropdown label="Status" value={selectedStatus} options={STATUS_OPTIONS} onChange={setSelectedStatus} />
               </div>
+              {needsShippingInfo && (
+                <div className="rounded-2xl border border-gray-100 p-4 dark:border-gray-800 lg:col-span-2">
+                  <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2">
+                    <Dropdown label="Courier" value={order.courier || 'Select courier'} options={COURIERS} onChange={(courier) => update({ courier })} />
+                    <div><label htmlFor="order-tracking" className={labelCls}>Tracking number</label><input id="order-tracking" value={order.trackingNumber} maxLength={80} onChange={(event) => update({ trackingNumber: event.target.value })} placeholder="Enter tracking number" className={inputCls} /></div>
+                  </div>
+                </div>
+              )}
               <div className="rounded-2xl border border-gray-100 p-4 dark:border-gray-800 lg:col-span-2">
-                <div className="flex items-center gap-3"><StepNumber number={4} done={order.notifyCustomer} /><div className="flex-1"><p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Notify customer</p><p className="mt-1 text-[11px] text-gray-400">Send shipping confirmation</p></div><button type="button" role="switch" aria-checked={order.notifyCustomer} aria-label="Notify customer" onClick={() => update({ notifyCustomer: !order.notifyCustomer })} className={`h-6 w-10 rounded-full p-0.5 transition-colors ${order.notifyCustomer ? 'bg-[#fa3f5e]' : 'bg-gray-300 dark:bg-gray-700'}`}><span className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${order.notifyCustomer ? 'translate-x-4' : ''}`} /></button></div>
+                <div className="flex items-center gap-3"><div className="flex-1"><p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Notify customer</p><p className="mt-1 text-[11px] text-gray-400">Send a status update notification</p></div><button type="button" role="switch" aria-checked={order.notifyCustomer} aria-label="Notify customer" onClick={() => update({ notifyCustomer: !order.notifyCustomer })} className={`h-6 w-10 rounded-full p-0.5 transition-colors ${order.notifyCustomer ? 'bg-[#fa3f5e]' : 'bg-gray-300 dark:bg-gray-700'}`}><span className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${order.notifyCustomer ? 'translate-x-4' : ''}`} /></button></div>
               </div>
             </div>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              {apiEnabled && canAdvanceToProcessing && <button type="button" disabled={updating} onClick={() => setStatus('Processing')} className="flex-1 rounded-xl border border-[#fa3f5e]/40 py-3 text-sm font-bold text-[#fa3f5e] disabled:cursor-not-allowed disabled:opacity-40">Move to processing</button>}
-              <button type="button" disabled={updating || (apiEnabled ? !canAdvanceToShipped : !canShipOrder(order))} onClick={() => setStatus('Shipped')} className="flex-1 rounded-xl bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{updating ? 'Updating...' : 'Mark as shipped'}</button>
+            <div className="mt-4">
+              <button type="button" disabled={updating || (apiEnabled ? !canSubmitStatus : !canShipOrder(order))} onClick={handleUpdateStatus} className="w-full rounded-xl bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{updating ? 'Updating...' : `Update to ${selectedStatus}`}</button>
             </div>
-            {apiEnabled ? <p className="mt-2 text-[11px] text-gray-400">Status updates are sent to the order tracking API.</p> : !canShipOrder(order) && <p className="mt-2 text-[11px] text-gray-400">Confirm and pack the items, then enter the courier and tracking number.</p>}
+            {apiEnabled ? <p className="mt-2 text-[11px] text-gray-400">{needsShippingInfo && !canSubmitStatus ? 'Enter courier and tracking number to mark as shipped.' : 'Status updates are sent to the order tracking API.'}</p> : !canShipOrder(order) && <p className="mt-2 text-[11px] text-gray-400">Enter the courier and tracking number to ship this order.</p>}
           </div>
         ) : (
           <div className="space-y-3 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800/60">
