@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ChevronRight, ChevronDown, Heart, Star, Minus, Plus,
   ShoppingCart, Package, Loader2,
 } from 'lucide-react';
-import { setCartItems } from '../store/cartSlice';
+import { addItem } from '../store/cartSlice';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import influencerProductService from '../services/influencerProductService';
-import cartService from '../services/cartService';
 
 const AccordionRow = ({ title, children }) => {
   const [open, setOpen] = useState(false);
@@ -56,10 +55,12 @@ const MiniProductCard = ({ product, isFavorite, onToggleFavorite }) => {
 
 const ProductDetail = () => {
   const { productId } = useParams();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { isSaved, toggle } = useMarketplaceWishlist();
   const allProducts = useSelector((state) => state.products.items);
+  const user = useSelector((state) => state.auth.userObject);
   const fallbackProduct = allProducts.find((p) => String(p.id) === String(productId));
   const [apiProduct, setApiProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -105,21 +106,29 @@ const ProductDetail = () => {
   const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
   const galleryImages = product.images?.length ? product.images : [];
   const heroImage = galleryImages[thumbIndex] || galleryImages[0];
+  const canUseStoreLinks = params.get('from') === 'products' && user?.role === 'influencer';
 
   const addToCart = async () => {
     if (adding) return false;
     setAdding(true);
-    try {
-      const cartItems = await cartService.addItem({
-        productId: product.id,
-        quantity: qty,
-        variant: product.variants?.[0] ? { color: product.variants[0].color, size: product.variants[0].size || 'One Size' } : undefined,
-      });
-      dispatch(setCartItems(cartItems));
-      return true;
-    } finally {
-      setAdding(false);
-    }
+    dispatch(addItem({
+      id: product.id,
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      category: product.category,
+      images: product.images || [],
+      image: product.images?.[0],
+      qty,
+      variant: product.variants?.[0] ? { color: product.variants[0].color, size: product.variants[0].size || 'One Size' } : undefined,
+      storeName: product.vendor,
+      storeAvatar: product.seller?.avatar_url,
+      storeType: 'Influencer Store',
+      selected: true,
+      saved: false,
+    }));
+    window.setTimeout(() => setAdding(false), 250);
+    return true;
   };
 
   const handleBuyNow = async () => {
@@ -132,8 +141,14 @@ const ProductDetail = () => {
     <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1300px] ml-auto px-4 pt-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mb-5">
-        <Link to="/market" className="hover:text-[#fa3f5e]">Marketplace</Link>
+        <Link to={canUseStoreLinks ? '/market/my-store' : '/market'} className="hover:text-[#fa3f5e]">{canUseStoreLinks ? 'My Store' : 'Marketplace'}</Link>
         <ChevronRight size={14} />
+        {canUseStoreLinks && (
+          <>
+            <Link to="/market/my-store/products" className="hover:text-[#fa3f5e]">My Products</Link>
+            <ChevronRight size={14} />
+          </>
+        )}
         <span>{product.category}</span>
       </div>
 
@@ -146,7 +161,7 @@ const ProductDetail = () => {
               aria-label={`${favorite ? 'Remove' : 'Add'} ${product.name} ${favorite ? 'from' : 'to'} wishlist`}
               aria-pressed={favorite}
               onClick={() => toggle('product', product.id)}
-              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white dark:bg-gray-800 shadow flex items-center justify-center"
+              className={`absolute top-4 right-4 w-9 h-9 rounded-full bg-white dark:bg-gray-800 shadow items-center justify-center ${canUseStoreLinks ? 'hidden' : 'flex'}`}
             >
               <Heart size={16} className={favorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-400'} />
             </button>
@@ -195,35 +210,48 @@ const ProductDetail = () => {
             </ul>
           )}
 
-          <div className="flex items-center gap-3 mb-5">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</span>
-            <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800">
-                <Minus size={14} />
-              </button>
-              <span className="w-8 text-center text-sm font-semibold text-gray-900 dark:text-white">{qty}</span>
-              <button onClick={() => setQty((q) => q + 1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800">
-                <Plus size={14} />
-              </button>
+          {canUseStoreLinks ? (
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Link to="/market/my-store/products" className="flex items-center justify-center rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-800 dark:border-gray-700 dark:text-gray-200">
+                Back to My Products
+              </Link>
+              <Link to={`/market/edit-product/${product.id}`} className="flex items-center justify-center rounded-xl bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange py-3 text-sm font-bold text-white">
+                Edit Product
+              </Link>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-5">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</span>
+                <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <Minus size={14} />
+                  </button>
+                  <span className="w-8 text-center text-sm font-semibold text-gray-900 dark:text-white">{qty}</span>
+                  <button onClick={() => setQty((q) => q + 1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
 
-          <div className="flex gap-3 mb-6">
-            <button
-              onClick={addToCart}
-              disabled={adding}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
-            >
-              {adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Add to Cart
-            </button>
-            <button
-              onClick={handleBuyNow}
-              disabled={adding}
-              className="flex-1 py-3 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
-            >
-              Buy Now
-            </button>
-          </div>
+              <div className="flex gap-3 mb-6">
+                <button
+                  onClick={addToCart}
+                  disabled={adding}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
+                >
+                  {adding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />} Add to Cart
+                </button>
+                <button
+                  onClick={handleBuyNow}
+                  disabled={adding}
+                  className="flex-1 py-3 rounded-xl text-sm font-bold border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
+                >
+                  Buy Now
+                </button>
+              </div>
+            </>
+          )}
 
           <div>
             {product.dimensions && (
@@ -244,7 +272,7 @@ const ProductDetail = () => {
       </div>
 
       {/* Seller bar */}
-      <div className="mt-10 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-wrap items-center justify-between gap-4">
+      {!canUseStoreLinks && <div className="mt-10 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-bold text-gray-600 dark:text-gray-300">
             {product.vendor.charAt(0)}
@@ -265,10 +293,10 @@ const ProductDetail = () => {
             Follow
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Related */}
-      {related.length > 0 && (
+      {!canUseStoreLinks && related.length > 0 && (
         <div className="mt-10">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">More from this seller</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">

@@ -1,18 +1,38 @@
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { toggleWishlistItem } from '../store/wishlistSlice';
+import {
+  addWishlistItem,
+  clearWishlist,
+  fetchWishlist,
+  removeWishlistItem,
+} from '../store/wishlistSlice';
 
 export default function useMarketplaceWishlist() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.userObject);
+  const { products, loading, error } = useSelector((state) => state.wishlist);
   const userId = user?._id || user?.id;
-  const saved = useSelector((state) => userId ? state.wishlist.byUser[String(userId)] : undefined);
-  const items = saved || [];
+
+  useEffect(() => {
+    if (userId) dispatch(fetchWishlist());
+  }, [dispatch, userId]);
+
+  const isSaved = (type, id) => (
+    type === 'product' && products.some((item) => String(item.id) === String(id))
+  );
+
+  const toggle = (type, id) => {
+    if (!userId || type !== 'product' || id == null) return;
+    dispatch(isSaved(type, id) ? removeWishlistItem(id) : addWishlistItem(id));
+  };
 
   return {
-    items,
-    isSaved: (type, id) => items.some((item) => item.type === type && item.id === String(id)),
-    toggle: (type, id) => {
-      if (userId) dispatch(toggleWishlistItem({ userId: String(userId), type, id }));
-    },
+    items: products.map((item) => ({ type: 'product', id: String(item.id) })),
+    products,
+    loading,
+    error,
+    isSaved,
+    toggle,
+    clear: () => dispatch(clearWishlist()),
   };
 }

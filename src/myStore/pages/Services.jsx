@@ -97,8 +97,8 @@ export default function StoreServices() {
             {loading && <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400"><span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading services...</span></td></tr>}
             {!loading && filtered.slice(start, start + PAGE_SIZE).map((service) => {
               const visible = service.status === 'Published' && service.visible;
-              return <tr key={service.id} className="group">
-                <td className="rounded-l-xl border-y border-l border-gray-100 bg-white px-4 py-3 transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30"><div className="flex items-start gap-3.5">
+              return <tr key={service.id}>
+                <td className="rounded-l-xl border-y border-l border-gray-100 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900"><div className="flex items-start gap-3.5">
                   <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
                     {service.images?.[0] ? <img src={service.images[0]} alt="" className="w-full h-full object-cover" /> : <ServiceIcon size={28} className="text-[#fa3f5e]" />}
                   </div>
@@ -111,10 +111,10 @@ export default function StoreServices() {
                     <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-400"><Calendar size={12} />{service.bookings} bookings</p>
                   </div>
                 </div></td>
-                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle font-semibold text-gray-800 transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:group-hover:bg-gray-800/30 whitespace-nowrap">{servicePrice(service)}</td>
-                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle text-gray-500 transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:group-hover:bg-gray-800/30">{service.bookings}</td>
-                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30"><button type="button" disabled={service.status === 'Draft'} aria-label={`${visible ? 'Hide' : 'Show'} ${service.name}`} onClick={() => patchService(service.id, { visible_to_customers: !service.visible })} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${visible ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-green-500' : 'bg-gray-400'}`} />{visible ? 'Visible' : 'Hidden'}</button></td>
-                <td className="rounded-r-xl border-y border-r border-gray-100 bg-white px-4 py-3 text-right align-middle transition-colors group-hover:border-[#fa3f5e]/30 group-hover:bg-pink-50/20 dark:border-gray-800 dark:bg-gray-900 dark:group-hover:bg-gray-800/30">
+                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle font-semibold text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 whitespace-nowrap">{servicePrice(service)}</td>
+                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">{service.bookings}</td>
+                <td className="border-y border-gray-100 bg-white px-4 py-3 align-middle dark:border-gray-800 dark:bg-gray-900"><button type="button" disabled={service.status === 'Draft'} aria-label={`${visible ? 'Hide' : 'Show'} ${service.name}`} onClick={() => patchService(service.id, { visible_to_customers: !service.visible })} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${visible ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-green-500' : 'bg-gray-400'}`} />{visible ? 'Visible' : 'Hidden'}</button></td>
+                <td className="rounded-r-xl border-y border-r border-gray-100 bg-white px-4 py-3 text-right align-middle dark:border-gray-800 dark:bg-gray-900">
                   <RowActionsMenu ariaLabel={`Actions for ${service.name}`}>
                     {(close) => (
                       <>

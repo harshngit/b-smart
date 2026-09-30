@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -10,15 +10,12 @@ import { placeOrder } from '../store/ordersSlice';
 import { fetchWallet } from '../store/walletSlice';
 import { inputCls } from '../components/productForm/ProductFormFields';
 import checkoutService, { loadRazorpay } from '../services/checkoutService';
+import addressService from '../services/addressService';
 
 const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm';
 const primary = 'rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-insta-pink focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed';
 const money = (value) => `Rs ${Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const initialAddresses = [
-  { id: 'home', label: 'Home', name: 'Aniket', phone: '9876543210', address_line1: '221B Baker St', city: 'Mumbai', state: 'MH', pincode: '400001' },
-  { id: 'work', label: 'Work', name: 'Aniket', phone: '9876543210', address_line1: '460 Harbor Avenue', city: 'Bengaluru', state: 'KA', pincode: '560001' },
-];
 const blankAddress = { label: '', name: '', phone: '', address_line1: '', city: '', state: '', pincode: '' };
 
 function ProductImage({ item }) {
@@ -33,18 +30,44 @@ function ProductImage({ item }) {
   );
 }
 
-function AddressDrawer({ addresses, selected, onClose, onSelect, onAdd }) {
+function AddressDrawer({ addresses, selected, loading, actionId, onClose, onSelect, onSave, onDelete, onSetDefault }) {
   const [pending, setPending] = useState(selected);
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState('');
   const [form, setForm] = useState(blankAddress);
+
+  useEffect(() => {
+    setPending(selected);
+  }, [selected]);
 
   const submit = (event) => {
     event.preventDefault();
     if (Object.values(form).some((value) => !String(value).trim())) return;
-    const id = `address-${Date.now()}`;
-    onAdd({ ...form, id });
-    setPending(id);
+    onSave(form, editingId).then((saved) => {
+      if (saved?.id) setPending(saved.id);
+      setAdding(false);
+      setEditingId('');
+      setForm(blankAddress);
+    });
+  };
+
+  const startEdit = (address) => {
+    setAdding(true);
+    setEditingId(address.id);
+    setForm({
+      label: address.label || '',
+      name: address.name || '',
+      phone: address.phone || '',
+      address_line1: address.address_line1 || '',
+      city: address.city || '',
+      state: address.state || '',
+      pincode: address.pincode || '',
+    });
+  };
+
+  const cancelForm = () => {
     setAdding(false);
+    setEditingId('');
     setForm(blankAddress);
   };
 
@@ -57,25 +80,32 @@ function AddressDrawer({ addresses, selected, onClose, onSelect, onAdd }) {
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">Saved addresses</p>
+          {loading && <p className="flex items-center gap-2 text-xs text-gray-500"><Loader2 size={14} className="animate-spin" />Loading addresses...</p>}
+          {!loading && !addresses.length && <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">No saved addresses yet. Add one to continue checkout.</p>}
           {addresses.map((address) => (
             <label key={address.id} className={`flex items-center gap-3 rounded-xl border p-4 cursor-pointer ${pending === address.id ? 'border-[#fa3f5e] bg-pink-50/40 dark:bg-pink-900/10' : 'border-gray-200 dark:border-gray-700'}`}>
               <input type="radio" name="delivery-address" value={address.id} checked={pending === address.id} onChange={() => setPending(address.id)} className="accent-[#fa3f5e] w-4 h-4 shrink-0" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-semibold">
                   <span className="text-[#fa3f5e]">{address.label === 'Work' ? <Briefcase size={18} /> : <Home size={18} />}</span>
                   {address.label}
-                  {address.id === 'home' && <span className="rounded bg-purple-50 dark:bg-purple-900/20 px-2 py-1 text-[10px] text-insta-purple">Default</span>}
+                  {address.is_default && <span className="rounded bg-purple-50 dark:bg-purple-900/20 px-2 py-1 text-[10px] text-insta-purple">Default</span>}
                 </p>
                 <p className="text-xs leading-6 text-gray-500 dark:text-gray-400 mt-2 break-words">
                   {address.name} · {address.phone}<br />
                   {address.address_line1}<br />
                   {address.city}, {address.state} {address.pincode}
                 </p>
+                <div className="flex flex-wrap items-center gap-3 mt-3 text-[11px] font-semibold">
+                  <button type="button" onClick={(event) => { event.preventDefault(); startEdit(address); }} className="text-gray-600 dark:text-gray-300">Edit</button>
+                  {!address.is_default && <button type="button" disabled={actionId === address.id} onClick={(event) => { event.preventDefault(); onSetDefault(address.id); }} className="text-insta-purple disabled:opacity-50">{actionId === address.id ? 'Setting...' : 'Set default'}</button>}
+                  <button type="button" disabled={actionId === address.id} onClick={(event) => { event.preventDefault(); onDelete(address.id); }} className="text-[#fa3f5e] disabled:opacity-50">{actionId === address.id ? 'Deleting...' : 'Delete'}</button>
+                </div>
               </div>
             </label>
           ))}
-          <button type="button" onClick={() => setAdding(!adding)} aria-expanded={adding} className="w-full flex items-center justify-center gap-2 border border-dashed border-[#fa3f5e]/40 rounded-lg py-4 text-xs font-semibold text-[#fa3f5e]">
-            <Plus size={18} />{adding ? 'Cancel new address' : 'Add new address'}
+          <button type="button" onClick={() => (adding ? cancelForm() : setAdding(true))} aria-expanded={adding} className="w-full flex items-center justify-center gap-2 border border-dashed border-[#fa3f5e]/40 rounded-lg py-4 text-xs font-semibold text-[#fa3f5e]">
+            <Plus size={18} />{adding ? 'Cancel address form' : 'Add new address'}
           </button>
           {adding && (
             <form onSubmit={submit} className="space-y-3">
@@ -93,12 +123,12 @@ function AddressDrawer({ addresses, selected, onClose, onSelect, onAdd }) {
                   <input required maxLength={key === 'phone' ? 20 : 150} name={key} value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} className={`${inputCls} mt-1`} />
                 </label>
               ))}
-              <button className={`${primary} w-full py-3`}>Save address</button>
+              <button disabled={Boolean(actionId)} className={`${primary} w-full py-3`}>{actionId ? 'Saving...' : editingId ? 'Update address' : 'Save address'}</button>
             </form>
           )}
         </div>
         <div className="p-5 border-t border-gray-100 dark:border-gray-800">
-          <button type="button" onClick={() => onSelect(pending)} className={`${primary} w-full py-3`}>Use this address</button>
+          <button type="button" disabled={!pending} onClick={() => onSelect(pending)} className={`${primary} w-full py-3`}>Use this address</button>
         </div>
       </div>
     </aside>
@@ -112,8 +142,10 @@ export default function Checkout() {
   const balance = Math.max(0, Number(useSelector((state) => state.wallet?.balance) || 0));
   const dispatch = useDispatch();
   const [step, setStep] = useState('Details');
-  const [addresses, setAddresses] = useState(initialAddresses);
-  const [selectedAddress, setSelectedAddress] = useState('home');
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddress, setSelectedAddress] = useState('');
+  const [addressesLoading, setAddressesLoading] = useState(true);
+  const [addressActionId, setAddressActionId] = useState('');
   const [addressOpen, setAddressOpen] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState('wallet');
   const [sameBilling, setSameBilling] = useState(true);
@@ -123,12 +155,75 @@ export default function Checkout() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderMessage, setOrderMessage] = useState('');
 
-  const address = addresses.find((entry) => entry.id === selectedAddress) || addresses[0];
+  const address = addresses.find((entry) => entry.id === selectedAddress) || addresses[0] || blankAddress;
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const discount = 0;
   const total = subtotal;
   const payment = step === 'Payment';
   const walletInsufficient = payment && paymentMethod === 'wallet' && balance < total;
+
+  const loadAddresses = useCallback(async ({ keepSelected = true } = {}) => {
+    setAddressesLoading(true);
+    try {
+      const list = await addressService.list();
+      setAddresses(list);
+      setSelectedAddress((current) => (keepSelected && list.some((entry) => entry.id === current) ? current : list[0]?.id || ''));
+      return list;
+    } catch (err) {
+      setCheckoutError(err?.response?.data?.message || 'Could not load saved addresses.');
+      return [];
+    } finally {
+      setAddressesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAddresses({ keepSelected: false });
+  }, [loadAddresses]);
+
+  const saveAddress = async (entry, editingId = '') => {
+    setAddressActionId(editingId || 'new');
+    setCheckoutError('');
+    try {
+      const saved = editingId ? await addressService.update(editingId, entry) : await addressService.create(entry);
+      const list = await loadAddresses({ keepSelected: true });
+      const selected = list.find((item) => item.id === saved.id) || saved;
+      setSelectedAddress(selected.id);
+      return selected;
+    } catch (err) {
+      setCheckoutError(err?.response?.data?.message || 'Could not save this address.');
+      throw err;
+    } finally {
+      setAddressActionId('');
+    }
+  };
+
+  const deleteAddress = async (id) => {
+    setAddressActionId(id);
+    setCheckoutError('');
+    try {
+      await addressService.remove(id);
+      await loadAddresses({ keepSelected: false });
+    } catch (err) {
+      setCheckoutError(err?.response?.data?.message || 'Could not delete this address.');
+    } finally {
+      setAddressActionId('');
+    }
+  };
+
+  const setDefaultAddress = async (id) => {
+    setAddressActionId(id);
+    setCheckoutError('');
+    try {
+      await addressService.setDefault(id);
+      const list = await loadAddresses({ keepSelected: true });
+      if (list.some((entry) => entry.id === id)) setSelectedAddress(id);
+    } catch (err) {
+      setCheckoutError(err?.response?.data?.message || 'Could not set this address as default.');
+    } finally {
+      setAddressActionId('');
+    }
+  };
 
   const buildShippingAddress = () => ({
     name: address.name || user?.name || user?.full_name || user?.username || 'Customer',
@@ -377,9 +472,13 @@ export default function Checkout() {
         <AddressDrawer
           addresses={addresses}
           selected={selectedAddress}
+          loading={addressesLoading}
+          actionId={addressActionId}
           onClose={() => setAddressOpen(false)}
           onSelect={(id) => { setSelectedAddress(id); setAddressOpen(false); }}
-          onAdd={(entry) => setAddresses((current) => [...current, entry])}
+          onSave={saveAddress}
+          onDelete={deleteAddress}
+          onSetDefault={setDefaultAddress}
         />
       )}
     </div>

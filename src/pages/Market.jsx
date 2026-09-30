@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Heart, Star, Eye, Store, ShoppingCart, Package, UserRound, ReceiptText, Search } from 'lucide-react';
-import { setCartItems } from '../store/cartSlice';
+import { addItem } from '../store/cartSlice';
 import ServiceIcon from '../myStore/components/ServiceIcon';
 import { servicePrice } from '../myStore/data/serviceFields';
 import { getProfilePath } from '../utils/profilePath';
@@ -10,7 +10,6 @@ import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import influencerProductService from '../services/influencerProductService';
 import influencerServiceService from '../services/influencerServiceService';
-import cartService from '../services/cartService';
 import InfluencerSwitchModal from '../components/InfluencerSwitchModal';
 
 const FILTERS = ['All', 'Products', 'Services', 'Persons'];
@@ -40,16 +39,23 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
   const handleAddToCart = async () => {
     if (adding) return;
     setAdding(true);
-    try {
-      const cartItems = await cartService.addItem({
-        productId: product.id,
-        quantity: 1,
-        variant: product.variants?.[0] ? { color: product.variants[0].color, size: product.variants[0].size || 'One Size' } : undefined,
-      });
-      dispatch(setCartItems(cartItems));
-    } finally {
-      setAdding(false);
-    }
+    dispatch(addItem({
+      id: product.id,
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      category: product.category,
+      images: product.images || [],
+      image,
+      qty: 1,
+      variant: product.variants?.[0] ? { color: product.variants[0].color, size: product.variants[0].size || 'One Size' } : undefined,
+      storeName: product.vendor,
+      storeAvatar: product.seller?.avatar_url,
+      storeType: 'Influencer Store',
+      selected: true,
+      saved: false,
+    }));
+    window.setTimeout(() => setAdding(false), 250);
   };
 
   return (

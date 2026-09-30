@@ -12,6 +12,7 @@ import { availableTimes, durationMinutes } from '../myStore/data/serviceBooking'
 import { bookingTime, localDate } from '../myStore/data/bookingHelpers';
 import influencerServiceService from '../services/influencerServiceService';
 import serviceBookingService from '../services/serviceBookingService';
+import addressService from '../services/addressService';
 import { fetchWallet } from '../store/walletSlice';
 
 const panel = 'rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm';
@@ -39,6 +40,9 @@ function BookingPage({ service }) {
   const [addressOpen, setAddressOpen] = useState(false);
   const [showAllTimes, setShowAllTimes] = useState(false);
   const [address, setAddress] = useState({ address_line1: '', city: '', pincode: '' });
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedSavedAddress, setSelectedSavedAddress] = useState('');
+  const [addressesLoading, setAddressesLoading] = useState(false);
   const [note, setNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('wallet');
   const [selectedSubservices, setSelectedSubservices] = useState([]);
@@ -59,6 +63,36 @@ function BookingPage({ service }) {
   const chosenDay = new Date(`${date}T12:00:00`);
   const addressText = [address.address_line1, address.city, address.pincode].filter(Boolean).join(', ');
 
+  useEffect(() => {
+    if (!atCustomer) return;
+    let active = true;
+    setAddressesLoading(true);
+    addressService.list()
+      .then((list) => {
+        if (!active) return;
+        setSavedAddresses(list);
+        const first = list[0];
+        if (first) {
+          setSelectedSavedAddress(first.id);
+          setAddress({
+            name: first.name || '',
+            phone: first.phone || '',
+            address_line1: first.address_line1 || '',
+            city: first.city || '',
+            state: first.state || '',
+            pincode: first.pincode || '',
+          });
+        }
+      })
+      .catch(() => {
+        if (active) setSavedAddresses([]);
+      })
+      .finally(() => {
+        if (active) setAddressesLoading(false);
+      });
+    return () => { active = false; };
+  }, [atCustomer]);
+
   const selectDate = (value) => {
     setDate(value);
     setTime(availableTimes(service, value)[0] || '');
@@ -67,6 +101,19 @@ function BookingPage({ service }) {
     setError('');
   };
   const updateAddress = (key, value) => setAddress((current) => ({ ...current, [key]: value }));
+  const chooseSavedAddress = (id) => {
+    setSelectedSavedAddress(id);
+    const saved = savedAddresses.find((entry) => entry.id === id);
+    if (!saved) return;
+    setAddress({
+      name: saved.name || '',
+      phone: saved.phone || '',
+      address_line1: saved.address_line1 || '',
+      city: saved.city || '',
+      state: saved.state || '',
+      pincode: saved.pincode || '',
+    });
+  };
   const slotEnd = (start) => {
     const [hours, minutes] = start.split(':').map(Number);
     const total = hours * 60 + minutes + durationMinutes(service.duration);
@@ -79,7 +126,7 @@ function BookingPage({ service }) {
   const submit = async (event) => {
     event.preventDefault();
     if (!availableTimes(service, date).includes(time)) { setError('Choose an available date and time.'); setReviewing(false); return; }
-    if (atCustomer && Object.values(address).some((value) => !value.trim())) { setError('Enter your complete service address.'); setAddressOpen(true); return; }
+    if (atCustomer && [address.address_line1, address.city, address.pincode].some((value) => !String(value || '').trim())) { setError('Enter your complete service address.'); setAddressOpen(true); return; }
     if (!reviewing) { setReviewing(true); return; }
     const buyerId = user?._id || user?.id;
     if (!buyerId) { setError('Please sign in again to request this service.'); return; }
@@ -176,6 +223,22 @@ function BookingPage({ service }) {
         <details className={`${panel} p-4 group`}><summary className="flex items-center gap-3 cursor-pointer list-none text-xs"><ShieldCheck size={20} className="text-gray-500" /><span className="flex-1">Cancellation policy</span><ChevronRight size={17} className="group-open:rotate-90" /></summary><p className="text-xs leading-6 text-gray-500 mt-3">{service.cancellationPolicy || 'Contact the provider to confirm cancellation terms before booking.'}</p></details>
       </main>
       <aside className={`${panel} p-4 lg:sticky lg:top-6 min-w-0`}>
+        {canUseStoreLinks ? (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold">Store service</h2>
+            <p className="text-xs leading-6 text-gray-500 dark:text-gray-400">You are viewing this service from My Store.</p>
+            <div className="rounded-lg border border-gray-100 p-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+              <p className="font-semibold text-gray-900 dark:text-white">{service.status || 'Published'}</p>
+              <p className="mt-1">{service.visible ? 'Visible to customers' : 'Hidden from customers'}</p>
+            </div>
+            <Link to="/market/my-store/services" className="block rounded-xl border border-gray-200 py-3 text-center text-sm font-bold text-gray-800 dark:border-gray-700 dark:text-gray-200">
+              Back to My Services
+            </Link>
+            <Link to={`/market/edit-service/${service.id}`} className={`${primary} block py-3 text-center`}>
+              Edit Service
+            </Link>
+          </div>
+        ) : (
         <form onSubmit={submit} className="space-y-4"><h2 className="text-sm font-semibold">{reviewing ? 'Review your booking' : 'Select availability'}</h2>
           {reviewing ? <div className="space-y-3 text-sm text-gray-500"><p className="font-semibold text-gray-900 dark:text-white">{service.name}</p><p>{chosenDay.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - {bookingTime(time)}</p><p>{service.duration}</p><p className="break-words">{atCustomer ? addressText : service.method === 'Online' ? 'Online' : service.address}</p>{selectedSubservices.length > 0 && <p>Selected: {selectedSubservices.join(', ')}</p>}<p className="font-semibold text-[#fa3f5e]">{servicePrice(service)}</p><p className="text-xs">Payment: {paymentMethod === 'wallet' ? 'Wallet' : 'Razorpay'}</p><button type="button" onClick={() => setReviewing(false)} className="text-xs text-[#fa3f5e]">Edit booking</button></div> : <>
             <div className="flex items-center gap-2"><div className="grid grid-cols-5 gap-1 flex-1 min-w-0">{dates.map((value) => { const day = new Date(`${value}T12:00:00`); return <button type="button" key={value} onClick={() => selectDate(value)} aria-pressed={date === value} className={`rounded-lg border py-2 text-center ${date === value ? 'border-[#fa3f5e] text-[#fa3f5e] bg-pink-50/30 dark:bg-pink-900/10' : 'border-gray-100 dark:border-gray-800 text-gray-500'}`}><span className="block text-[10px]">{day.toLocaleDateString('en-US', { weekday: 'short' })}</span><strong className="block text-sm mt-1">{day.getDate()}</strong><span className="block text-[10px] mt-1">{day.toLocaleDateString('en-US', { month: 'short' })}</span></button>; })}</div><button type="button" aria-label="Choose another date" aria-expanded={calendarOpen} onClick={() => setCalendarOpen(!calendarOpen)} className="rounded-lg border border-gray-100 dark:border-gray-800 p-2 text-gray-500"><CalendarDays size={18} /></button></div>
@@ -185,13 +248,14 @@ function BookingPage({ service }) {
             {(times.filter((slot) => slot < '12:00').length > 3 || times.filter((slot) => slot >= '12:00').length > 3) && <button type="button" onClick={() => setShowAllTimes(!showAllTimes)} className="text-[11px] text-[#fa3f5e]">{showAllTimes ? 'Show fewer times' : 'More available times'}</button>}{!times.length && <p className="text-xs text-gray-500">No available times on this date. Choose another day.</p>}
             <div className="flex items-center gap-2 rounded-lg border border-gray-100 dark:border-gray-800 p-3 text-xs"><Clock size={16} className="text-gray-500" />{service.duration}</div>
             {service.subservices?.length > 0 && <fieldset className="space-y-2"><legend className="text-xs font-semibold">Subservices</legend>{service.subservices.map((item) => <label key={item.name} className="flex items-center gap-2 text-xs text-gray-500"><input type="checkbox" checked={selectedSubservices.includes(item.name)} onChange={() => toggleSubservice(item.name)} className="accent-[#fa3f5e]" />{item.name}</label>)}</fieldset>}
-            {atCustomer ? <div><button type="button" onClick={() => setAddressOpen(!addressOpen)} aria-expanded={addressOpen} className="w-full flex items-center gap-2 p-3 rounded-lg border border-gray-100 dark:border-gray-800 text-left"><MapPin size={17} className="text-gray-500 shrink-0" /><span className="flex-1 min-w-0 text-[11px] text-gray-500">Service address<span className="block truncate text-xs text-gray-900 dark:text-white mt-0.5">{addressText || 'Add your address'}</span></span><ChevronRight size={16} /></button>{addressOpen && <div className="space-y-2"><label className="block text-xs text-gray-500">Address line<input required value={address.address_line1} onChange={(event) => updateAddress('address_line1', event.target.value)} className={`${inputCls} mt-1`} /></label><label className="block text-xs text-gray-500">City<input required value={address.city} onChange={(event) => updateAddress('city', event.target.value)} className={`${inputCls} mt-1`} /></label><label className="block text-xs text-gray-500">Pincode<input required value={address.pincode} onChange={(event) => updateAddress('pincode', event.target.value)} className={`${inputCls} mt-1`} /></label></div>}</div> : <p className="text-xs flex gap-2 text-gray-500"><MapPin size={16} />{service.method === 'Online' ? 'Joining details will be arranged with the provider.' : service.address || 'Contact the provider for the location.'}</p>}
+            {atCustomer ? <div><button type="button" onClick={() => setAddressOpen(!addressOpen)} aria-expanded={addressOpen} className="w-full flex items-center gap-2 p-3 rounded-lg border border-gray-100 dark:border-gray-800 text-left"><MapPin size={17} className="text-gray-500 shrink-0" /><span className="flex-1 min-w-0 text-[11px] text-gray-500">Service address<span className="block truncate text-xs text-gray-900 dark:text-white mt-0.5">{addressesLoading ? 'Loading saved addresses...' : addressText || 'Add your address'}</span></span><ChevronRight size={16} /></button>{addressOpen && <div className="space-y-2">{savedAddresses.length > 0 && <label className="block text-xs text-gray-500">Saved address<select value={selectedSavedAddress} onChange={(event) => chooseSavedAddress(event.target.value)} className={`${inputCls} mt-1`}><option value="">Choose saved address</option>{savedAddresses.map((entry) => <option key={entry.id} value={entry.id}>{entry.label} - {entry.city}, {entry.pincode}</option>)}</select></label>}<label className="block text-xs text-gray-500">Address line<input required value={address.address_line1} onChange={(event) => updateAddress('address_line1', event.target.value)} className={`${inputCls} mt-1`} /></label><label className="block text-xs text-gray-500">City<input required value={address.city} onChange={(event) => updateAddress('city', event.target.value)} className={`${inputCls} mt-1`} /></label><label className="block text-xs text-gray-500">Pincode<input required value={address.pincode} onChange={(event) => updateAddress('pincode', event.target.value)} className={`${inputCls} mt-1`} /></label></div>}</div> : <p className="text-xs flex gap-2 text-gray-500"><MapPin size={16} />{service.method === 'Online' ? 'Joining details will be arranged with the provider.' : service.address || 'Contact the provider for the location.'}</p>}
             <fieldset className="space-y-2"><legend className="text-xs font-semibold">Payment method</legend>{[['wallet', 'Wallet'], ['razorpay', 'Razorpay']].map(([value, label]) => <label key={value} className="flex items-center gap-2 text-xs text-gray-500"><input type="radio" name="payment_method" value={value} checked={paymentMethod === value} onChange={() => setPaymentMethod(value)} className="accent-[#fa3f5e]" />{label}</label>)}</fieldset>
             <details><summary className="text-[11px] text-gray-500 cursor-pointer">Add a note (optional)</summary><label className="block text-xs text-gray-500 mt-2">Note for the provider<textarea value={note} onChange={(event) => setNote(event.target.value)} className={`${inputCls} mt-1`} rows={2} /></label></details>
           </>}
           {error && <p role="alert" className="text-xs text-[#fa3f5e]">{error}</p>}
           <button disabled={!time || submitting} className={`${primary} w-full py-3`}>{submitting ? 'Processing...' : reviewing ? 'Book service' : 'Continue'}</button>
         </form>
+        )}
       </aside>
     </div>
   </div>;

@@ -22,7 +22,7 @@ const normalizeCartItem = (item = {}) => {
     name: product.name || item.name || 'Product',
     subtitle: product.dimensions || item.subtitle || '',
     brand: product.vendor || item.brand || '',
-    price: Number(item.price ?? item.live_price ?? product.price ?? 0),
+    price: Number(product.price || item.live_price || item.price || 0),
     mrp: Number(product.mrp || item.mrp || 0),
     category: product.category || item.category || '',
     qty: Number(item.quantity ?? item.qty ?? 1),
@@ -64,6 +64,15 @@ const cartService = {
   clear: async () => {
     await api.delete('/cart');
     return [];
+  },
+  syncItems: async (items = []) => {
+    await api.delete('/cart');
+    await Promise.all(items.map((item) => api.post('/cart/items', {
+      product_id: item.productId || item.id,
+      quantity: item.qty || item.quantity || 1,
+      ...(item.variant ? { variant: item.variant } : {}),
+    })));
+    return items;
   },
 };
 

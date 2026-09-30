@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { LayoutGrid, Briefcase, Package, Heart, Star, Clock, MapPin, Globe, MessageCircle, UserPlus, Check, BadgeCheck, ShoppingCart, ChevronRight, Search, UserRound } from 'lucide-react';
+import { LayoutGrid, Briefcase, Package, Heart, Star, Clock, MapPin, Globe, MessageCircle, UserPlus, Check, BadgeCheck, ShoppingCart, ChevronRight, Search, UserRound, Loader2, Save } from 'lucide-react';
 import { Dropdown, inputCls } from '../../components/productForm/ProductFormFields';
 import { CATEGORY_STYLE } from '../../data/marketplaceCategoryStyle';
 import { servicePrice } from '../data/serviceFields';
-import { setCartItems } from '../../store/cartSlice';
+import { addItem } from '../../store/cartSlice';
 import useMarketplaceWishlist from '../../hooks/useMarketplaceWishlist';
-import cartService from '../../services/cartService';
+import storeProfileService from '../../services/storeProfileService';
 
 const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm';
 const primary = 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white rounded-lg font-semibold';
+
+const textToList = (value) => String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+const listToText = (value) => (Array.isArray(value) ? value.join(', ') : '');
 
 function ListingCard({ item, service, favorite, onFavorite, onAdd, added, adding }) {
 
@@ -54,36 +57,127 @@ export default function StoreProfile() {
   const [areasOpen, setAreasOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [addingId, setAddingId] = useState(null);
+  const [storeProfile, setStoreProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaved, setProfileSaved] = useState('');
+  const [profileForm, setProfileForm] = useState({
+    service_areas: '',
+    languages: '',
+    store_type: '',
+    trust_badges: '',
+  });
   const name = user?.name || user?.full_name || 'Alex Morgan';
   const avatar = user?.profile_picture || user?.avatar;
+  const userId = user?._id || user?.id;
+  const influencerProfile = user?.influencer_profile || user?.influencerProfile || {};
+  const fallbackStoreName = influencerProfile.store_name || `${name}'s Store`;
+  const storeName = storeProfile?.store_name || fallbackStoreName;
+  const storeType = storeProfile?.store_type || influencerProfile.store_type || 'Personal Store';
+  const about = storeProfile?.about || influencerProfile.store_description || user?.bio || 'Helping you make everyday life simpler with thoughtful services and useful products. Explore the store to find what works for you.';
+  const serviceAreas = storeProfile?.service_areas?.length ? storeProfile.service_areas : (influencerProfile.service_areas || []);
+  const languages = storeProfile?.languages?.length ? storeProfile.languages : (influencerProfile.languages || ['English']);
+  const trustBadges = storeProfile?.trust_badges?.length ? storeProfile.trust_badges : (influencerProfile.trust_badges || ['Professional', 'Trusted', 'Reliable']);
+  const productCount = storeProfile?.product_count || products.length;
+  const serviceCount = storeProfile?.service_count || services.length;
+  const followersCount = storeProfile?.followers_count ?? user?.followers_count ?? 0;
+  const followingCount = storeProfile?.following_count ?? user?.following_count ?? 0;
   const count = cart.reduce((sum, item) => sum + item.qty, 0);
   const shownProducts = products.filter((item) => item.name.toLowerCase().includes(search.trim().toLowerCase()) && (category === 'All categories' || item.category === category)).sort((a, b) => sort === 'Price: Low to high' ? a.price - b.price : sort === 'Price: High to low' ? b.price - a.price : sort === 'Top rated' ? b.rating - a.rating : 0);
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    setProfileLoading(true);
+    setProfileError('');
+    storeProfileService.get(userId)
+      .then((profile) => {
+        if (!active) return;
+        setStoreProfile(profile);
+        setFollowing(Boolean(profile.is_following));
+        setProfileForm({
+          service_areas: listToText(profile.service_areas),
+          languages: listToText(profile.languages),
+          store_type: profile.store_type || '',
+          trust_badges: listToText(profile.trust_badges),
+        });
+      })
+      .catch((error) => {
+        if (!active) return;
+        setProfileError(error?.response?.data?.message || 'Store profile could not be loaded.');
+      })
+      .finally(() => {
+        if (active) setProfileLoading(false);
+      });
+    return () => { active = false; };
+  }, [userId]);
+
+  const updateProfileForm = (field, value) => {
+    setProfileSaved('');
+    setProfileForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const saveStoreProfile = async (event) => {
+    event.preventDefault();
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileSaved('');
+    const payload = {
+      service_areas: textToList(profileForm.service_areas),
+      languages: textToList(profileForm.languages),
+      store_type: profileForm.store_type.trim(),
+      trust_badges: textToList(profileForm.trust_badges),
+    };
+    try {
+      const saved = await storeProfileService.update(payload);
+      const merged = { ...storeProfile, ...payload, ...saved };
+      setStoreProfile(merged);
+      setProfileForm({
+        service_areas: listToText(merged.service_areas),
+        languages: listToText(merged.languages),
+        store_type: merged.store_type || '',
+        trust_badges: listToText(merged.trust_badges),
+      });
+      setProfileSaved('Store profile updated.');
+    } catch (error) {
+      setProfileError(error?.response?.data?.message || 'Store profile update failed.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   const add = async (item) => {
     setAddingId(item.id);
     setNotice('');
-    try {
-      const nextCart = await cartService.addItem({
-        productId: item.id,
-        quantity: 1,
-        variant: item.variants?.[0] ? { color: item.variants[0].color, size: item.variants[0].size } : undefined,
-      });
-      dispatch(setCartItems(nextCart));
-      setNotice(`${item.name} added to your cart.`);
-    } catch (err) {
-      setNotice(err?.response?.data?.message || err.message || 'Could not add this product to your cart.');
-    } finally {
-      setAddingId(null);
-    }
+    dispatch(addItem({
+      id: item.id,
+      productId: item.id,
+      name: item.name,
+      price: item.price,
+      category: item.category,
+      images: item.images || [],
+      image: item.images?.[0],
+      qty: 1,
+      variant: item.variants?.[0] ? { color: item.variants[0].color, size: item.variants[0].size } : undefined,
+      storeName: storeName || item.vendor,
+      storeAvatar: avatar,
+      storeType: 'Influencer Store',
+      selected: true,
+      saved: false,
+    }));
+    setNotice(`${item.name} added to your cart.`);
+    window.setTimeout(() => setAddingId(null), 250);
   };
   return (
     <div className="box-border w-full max-w-[1280px] ml-auto px-4 md:px-8 pt-6 pb-10">
       <div className={`grid grid-cols-1 min-[900px]:grid-cols-[minmax(0,1fr)_210px] min-[1200px]:grid-cols-[minmax(0,1fr)_240px] gap-4 items-start`}>
         <main className="min-w-0">
           <section aria-label="Store profile" className={`${panel} p-4 min-[900px]:p-5 min-[900px]:relative min-[900px]:min-h-[156px] grid grid-cols-[96px_minmax(0,1fr)] min-[900px]:grid-cols-[112px_minmax(0,1fr)] items-center gap-x-5 gap-y-3`}>
-            <div className="relative flex-shrink-0 col-start-1 row-start-1 min-[900px]:row-span-2"><div className="w-24 h-24 min-[900px]:w-28 min-[900px]:h-28 rounded-full overflow-hidden bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">{avatar ? <img src={avatar} alt={name} className="w-full h-full object-cover" /> : <UserRound size={48} className="text-[#fa3f5e]" />}</div>{user?.is_verified && <BadgeCheck className="absolute bottom-1 right-0 text-[#fa3f5e] fill-white dark:fill-gray-900" size={27} />}</div>
-            <div className="col-start-2 min-w-0 min-[900px]:self-start"><h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white break-words">{name}’s Store</h1><p className="flex items-center gap-1.5 text-xs text-insta-purple font-semibold mt-2">{user?.is_verified && <BadgeCheck size={14} />}{user?.is_verified ? 'Verified creator' : 'Personal Store'}</p><p className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-3"><Star size={15} className="fill-amber-400 text-amber-400" />{user?.rating > 0 ? <><span className="font-semibold text-gray-900 dark:text-white">{user.rating}</span><span className="ml-2">{user.reviews || 0} reviews</span></> : 'No store reviews yet'}</p><p className="text-[11px] text-gray-500 dark:text-gray-400 mt-3 min-[1200px]:pr-[225px]">Professional · Trusted · Reliable</p></div>
+            <div className="relative flex-shrink-0 col-start-1 row-start-1 min-[900px]:row-span-2"><div className="w-24 h-24 min-[900px]:w-28 min-[900px]:h-28 rounded-full overflow-hidden bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">{avatar ? <img src={avatar} alt={storeName} className="w-full h-full object-cover" /> : <UserRound size={48} className="text-[#fa3f5e]" />}</div>{user?.is_verified && <BadgeCheck className="absolute bottom-1 right-0 text-[#fa3f5e] fill-white dark:fill-gray-900" size={27} />}</div>
+            <div className="col-start-2 min-w-0 min-[900px]:self-start"><h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white break-words">{storeName}</h1><p className="flex items-center gap-1.5 text-xs text-insta-purple font-semibold mt-2">{user?.is_verified && <BadgeCheck size={14} />}{user?.is_verified ? `Verified creator · ${storeType}` : storeType}</p><p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400 mt-3"><span className="flex items-center gap-1.5"><Star size={15} className="fill-amber-400 text-amber-400" />{user?.rating > 0 ? <><span className="font-semibold text-gray-900 dark:text-white">{user.rating}</span><span>{user.reviews || 0} reviews</span></> : 'No store reviews yet'}</span><span>{productCount} {productCount === 1 ? 'product' : 'products'}</span><span>{serviceCount} {serviceCount === 1 ? 'service' : 'services'}</span><span>{followersCount} followers</span><span>{followingCount} following</span></p><p className="text-[11px] text-gray-500 dark:text-gray-400 mt-3 min-[1200px]:pr-[225px]">{trustBadges.length ? trustBadges.join(' · ') : 'Trusted store'}</p></div>
             <div className="col-span-2 min-[900px]:col-span-1 min-[900px]:col-start-2 min-[900px]:-mt-2 flex flex-wrap justify-end gap-2 min-[1200px]:absolute min-[1200px]:right-5 min-[1200px]:m-0 min-[1200px]:bottom-7"><Link to="/messages" className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 shadow-sm"><MessageCircle size={15} />Message</Link><button type="button" aria-pressed={following} onClick={() => setFollowing(!following)} className={`${primary} flex items-center gap-2 px-4 py-2.5 text-xs`}>{following ? <Check size={15} /> : <UserPlus size={15} />}{following ? 'Following' : 'Follow'}</button></div>
           </section>
+          {profileLoading && <p className="mt-2 flex items-center gap-2 text-xs text-gray-500"><Loader2 size={14} className="animate-spin" />Loading store profile...</p>}
           <div role="tablist" aria-label="Store listings" className={`${panel} h-12 flex mt-3 mb-3 overflow-hidden`}>
             {[['All', LayoutGrid], ['Services', Briefcase], ['Products', Package]].map(([value, Icon], index) => <button key={value} id={`profile-tab-${value}`} role="tab" type="button" aria-selected={tab === value} aria-controls="profile-listings" onClick={() => setTab(value)} className={`relative flex-1 min-w-0 flex items-center justify-center gap-2 py-3 px-1 text-xs sm:text-sm font-semibold border-b-0 transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-current focus-visible:-outline-offset-4 ${index > 0 ? "before:content-[''] before:absolute before:left-0 before:h-4 before:w-px before:bg-current before:opacity-[0.15]" : ''} ${tab === value ? "text-[#fa3f5e] after:content-[''] after:absolute after:bottom-0 after:left-1/4 after:right-1/4 after:h-0.5 after:bg-current" : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>{React.createElement(Icon, { size: 17 })}{value}</button>)}
           </div>
@@ -114,7 +208,42 @@ export default function StoreProfile() {
               <ChevronRight size={18} strokeWidth={1.5} className="shrink-0 text-gray-700 dark:text-gray-300" />
             </Link>
           )}
-          <div aria-label="About store" className={`${panel} p-4 lg:p-5 divide-y divide-gray-100 dark:divide-gray-800`}><section className="pb-5"><h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">About {name.split(' ')[0]}</h2><p className="text-xs leading-6 text-gray-500 dark:text-gray-400">{user?.bio || 'Helping you make everyday life simpler with thoughtful services and useful products. Explore the store to find what works for you.'}</p></section><section className="py-5 flex items-start gap-3"><span className="w-9 h-9 rounded-full bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e] flex items-center justify-center shrink-0"><Clock size={19} /></span><p className="text-xs leading-5 text-gray-500 dark:text-gray-400">Message the store for availability and response times.</p></section><section className="py-5"><h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Service areas</h2><div className="flex gap-3"><span className="w-9 h-9 rounded-full bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e] flex items-center justify-center shrink-0"><MapPin size={19} /></span><div><p className="text-xs leading-5 text-gray-500 dark:text-gray-400">At your location and online, depending on the service.</p><button type="button" aria-expanded={areasOpen} onClick={() => setAreasOpen(!areasOpen)} className="text-xs font-semibold text-[#fa3f5e] mt-3">{areasOpen ? 'Hide areas' : 'View all areas'}</button>{areasOpen && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-5">Contact the store to confirm coverage for your address.</p>}</div></div></section><section className="pt-5"><h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Languages</h2><p className="flex gap-3 items-center text-xs text-gray-500 dark:text-gray-400"><span className="w-9 h-9 rounded-full bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e] flex items-center justify-center shrink-0"><Globe size={19} /></span>English</p></section></div>
+          <div aria-label="About store" className={`${panel} p-4 lg:p-5 divide-y divide-gray-100 dark:divide-gray-800`}>
+            <section className="pb-5">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">About {storeName}</h2>
+              <p className="text-xs leading-6 text-gray-500 dark:text-gray-400">{about}</p>
+            </section>
+            <section className="py-5 flex items-start gap-3">
+              <span className="w-9 h-9 rounded-full bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e] flex items-center justify-center shrink-0"><Clock size={19} /></span>
+              <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">Message the store for availability and response times.</p>
+            </section>
+            <section className="py-5">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Service areas</h2>
+              <div className="flex gap-3">
+                <span className="w-9 h-9 rounded-full bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e] flex items-center justify-center shrink-0"><MapPin size={19} /></span>
+                <div>
+                  <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">{serviceAreas.length ? serviceAreas.slice(0, 2).join(', ') : 'At your location and online, depending on the service.'}</p>
+                  {serviceAreas.length > 2 && <button type="button" aria-expanded={areasOpen} onClick={() => setAreasOpen(!areasOpen)} className="text-xs font-semibold text-[#fa3f5e] mt-3">{areasOpen ? 'Hide areas' : 'View all areas'}</button>}
+                  {areasOpen && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-5">{serviceAreas.join(', ')}</p>}
+                </div>
+              </div>
+            </section>
+            <section className="py-5">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Languages</h2>
+              <p className="flex gap-3 items-center text-xs text-gray-500 dark:text-gray-400"><span className="w-9 h-9 rounded-full bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e] flex items-center justify-center shrink-0"><Globe size={19} /></span>{languages.length ? languages.join(', ') : 'English'}</p>
+            </section>
+            <section className="pt-5">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Store profile</h2>
+              <form onSubmit={saveStoreProfile} className="space-y-3">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">Store type<input value={profileForm.store_type} onChange={(event) => updateProfileForm('store_type', event.target.value)} placeholder="Personal Store" className={`${inputCls} mt-1`} /></label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">Service areas<input value={profileForm.service_areas} onChange={(event) => updateProfileForm('service_areas', event.target.value)} placeholder="Mumbai, Online" className={`${inputCls} mt-1`} /></label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">Languages<input value={profileForm.languages} onChange={(event) => updateProfileForm('languages', event.target.value)} placeholder="English, Hindi" className={`${inputCls} mt-1`} /></label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">Trust badges<input value={profileForm.trust_badges} onChange={(event) => updateProfileForm('trust_badges', event.target.value)} placeholder="Professional, Trusted, Reliable" className={`${inputCls} mt-1`} /></label>
+                <button type="submit" disabled={profileSaving} className={`${primary} w-full px-4 py-2.5 text-xs flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed`}>{profileSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}{profileSaving ? 'Saving...' : 'Save profile'}</button>
+                {(profileSaved || profileError) && <p className={`text-xs leading-5 ${profileSaved ? 'text-emerald-600' : 'text-[#fa3f5e]'}`}>{profileSaved || profileError}</p>}
+              </form>
+            </section>
+          </div>
         </aside>
       </div>
     </div>
