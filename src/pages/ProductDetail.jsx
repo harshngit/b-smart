@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ChevronRight, ChevronDown, Heart, Star, Minus, Plus,
@@ -11,8 +11,8 @@ import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import influencerProductService from '../services/influencerProductService';
 import { ProductCard } from './Market';
 
-const AccordionRow = ({ title, children }) => {
-  const [open, setOpen] = useState(false);
+const AccordionRow = ({ title, children, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-b border-gray-100 dark:border-gray-800">
       <button
@@ -56,36 +56,43 @@ const AccordionRow = ({ title, children }) => {
 
 const ProductDetail = () => {
   const { productId } = useParams();
+  const location = useLocation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { isSaved, toggle } = useMarketplaceWishlist();
   const allProducts = useSelector((state) => state.products.items);
   const user = useSelector((state) => state.auth.userObject);
-  const fallbackProduct = allProducts.find((p) => String(p.id) === String(productId));
-  const [apiProduct, setApiProduct] = useState(null);
+  const routedProduct = location.state?.product && String(location.state.product.id) === String(productId) ? location.state.product : null;
+  const fallbackProduct = routedProduct || allProducts.find((p) => String(p.id) === String(productId));
+  const [apiProduct, setApiProduct] = useState(routedProduct || null);
+  const [loadedProductId, setLoadedProductId] = useState(null);
   const [apiProductPool, setApiProductPool] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const product = apiProduct || fallbackProduct;
+  const currentApiProduct = apiProduct && String(apiProduct.id) === String(productId) ? apiProduct : null;
+  const product = currentApiProduct || fallbackProduct;
   const [qty, setQty] = useState(1);
   const [adding, setAdding] = useState(false);
   const favorite = isSaved('product', productId);
   
   const [thumbIndex, setThumbIndex] = useState(0);
-  const [zoomActive, setZoomActive] = useState(false);
   const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [productId]);
 
   useEffect(() => {
     let alive = true;
     influencerProductService.get(productId)
       .then((item) => {
-        if (alive) setApiProduct(item);
+        if (!alive) return;
+        setApiProduct(item);
+        setLoadedProductId(productId);
       })
       .catch(() => {
-        if (alive) setApiProduct(null);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
+        if (!alive) return;
+        setApiProduct(null);
+        setLoadedProductId(productId);
       });
     return () => { alive = false; };
   }, [productId]);
@@ -102,10 +109,11 @@ const ProductDetail = () => {
     return () => { alive = false; };
   }, []);
 
-  if (loading && !product) {
+  if (!product && loadedProductId !== productId) {
     return (
-      <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center gap-3">
-        <p className="text-gray-500 dark:text-gray-400">Loading product...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex flex-col items-center justify-center gap-3">
+        <Loader2 size={34} className="animate-spin text-[#fa3f5e]" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading product...</p>
       </div>
     );
   }
@@ -162,11 +170,26 @@ const ProductDetail = () => {
     const ok = await addToCart();
     if (ok) navigate('/cart');
   };
+  const normalizeKey = (value) => String(value || '').trim().toLowerCase();
   const productPool = apiProductPool.length ? apiProductPool : allProducts;
+  const currentCategory = normalizeKey(product.category);
+  const currentVendor = normalizeKey(product.vendor);
+  const currentSellerId = product.seller?._id || product.seller?.id || product.user_id || product.user;
   const similarProducts = productPool
     .filter((p) => String(p.id) !== String(product.id))
-    .filter((p) => p.category === product.category || p.vendor === product.vendor)
-    .slice(0, 4);
+    .map((p) => {
+      const sameCategory = normalizeKey(p.category) === currentCategory;
+      const sameVendor = normalizeKey(p.vendor) === currentVendor;
+      const sellerId = p.seller?._id || p.seller?.id || p.user_id || p.user;
+      const sameSeller = currentSellerId && sellerId && String(sellerId) === String(currentSellerId);
+      return {
+        product: p,
+        score: (sameCategory ? 3 : 0) + (sameSeller ? 2 : 0) + (sameVendor ? 1 : 0),
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4)
+    .map(({ product: item }) => item);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1300px] ml-auto px-4 md:px-6 pt-6">
@@ -188,9 +211,7 @@ const ProductDetail = () => {
         <div className="lg:sticky lg:top-5 min-w-0">
           <div
             className={`group relative aspect-[4/3] rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 flex items-center justify-center ${bg}`}
-            onMouseEnter={() => setZoomActive(true)}
             onMouseMove={handleZoomMove}
-            onMouseLeave={() => setZoomActive(false)}
           >
             <button
               type="button"
@@ -204,7 +225,6 @@ const ProductDetail = () => {
             {heroImage
               ? <img src={heroImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.85]" style={{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }} />
               : <Icon size={96} className={`${text} opacity-70`} />}
-            {heroImage && <span className={`pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-semibold text-white transition-opacity ${zoomActive ? 'opacity-0' : 'opacity-100'}`}>Hover to zoom</span>}
           </div>
           <div className="flex gap-3 mt-3 overflow-x-auto pb-1">
             {(galleryImages.length ? galleryImages : [0, 1, 2, 3]).map((image, i) => (
@@ -298,7 +318,7 @@ const ProductDetail = () => {
             {product.dimensions && (
               <AccordionRow title="Dimensions">{product.dimensions}</AccordionRow>
             )}
-            <AccordionRow title="Delivery">
+            <AccordionRow title="Delivery" defaultOpen>
               {product.dispatchTime ? `Dispatched in ${product.dispatchTime}. ` : 'Ships in 1-2 business days. '}
               {product.countryOfOrigin && `Made in ${product.countryOfOrigin}.`}
             </AccordionRow>
@@ -377,7 +397,7 @@ const ProductDetail = () => {
         </section>
       )}
 
-      {!canUseStoreLinks && similarProducts.length > 0 && (
+      {similarProducts.length > 0 && (
         <section className="mt-8">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>

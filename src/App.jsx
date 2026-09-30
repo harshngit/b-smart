@@ -13,6 +13,7 @@ import Promote from './pages/Promote';
 import Ads from './pages/Ads';
 import Market from './pages/Market';
 import MyOrders from './pages/MyOrders';
+import OrderDetail from './pages/OrderDetail';
 import Wishlist from './pages/Wishlist';
 import AddProduct from './pages/AddProduct';
 import EditProduct from './pages/EditProduct';
@@ -155,6 +156,7 @@ function App() {
             <Route path="/ads"              element={<ProtectedRoute><Ads /></ProtectedRoute>} />
             <Route path="/market"           element={<ProtectedRoute><Market /></ProtectedRoute>} />
             <Route path="/market/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
+            <Route path="/market/my-orders/:orderId" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
             <Route path="/market/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
             <Route path="/market/add-product" element={<ProtectedRoute allowedRoles={['influencer']} redirectTo="/market"><AddProduct /></ProtectedRoute>} />
             <Route path="/market/edit-product/:productId" element={<ProtectedRoute allowedRoles={['influencer']} redirectTo="/market"><EditProduct /></ProtectedRoute>} />

@@ -70,6 +70,10 @@ export default function StoreOrders() {
   useEffect(() => { fetchOrders(); }, []);
 
   useEffect(() => {
+    if (orderId) window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [orderId]);
+
+  useEffect(() => {
     if (!orderId || !apiLoaded) return;
     let alive = true;
     orderService.get(orderId)
@@ -99,10 +103,37 @@ export default function StoreOrders() {
     }
   };
 
+  if (orderId) {
+    return (
+      <div className="max-w-[1280px] ml-auto px-4 md:px-8 pt-6 pb-10">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <Link to={closeTo} className="inline-flex items-center gap-2 text-sm font-semibold text-[#fa3f5e]">
+            <ChevronLeft size={16} />
+            Back to Orders
+          </Link>
+          <button type="button" onClick={fetchOrders} className="inline-flex items-center gap-2 text-xs font-semibold text-[#fa3f5e]">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+        {loading && !activeOrder && <div className="mb-4 flex items-center gap-2 text-sm text-gray-500"><Loader2 size={16} className="animate-spin" />Loading order details...</div>}
+        {error && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">{error}</p>}
+        <OrderDetails
+          key={orderId}
+          order={activeOrder}
+          closeTo={closeTo}
+          onStatusChange={updateOrderStatus}
+          updating={updatingId === orderId}
+          apiEnabled={apiLoaded}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-[1280px] ml-auto px-4 md:px-8 pt-6 pb-10">
-      <div className={orderId ? 'grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_350px] gap-6 items-start' : ''}>
-        <section className={`min-w-0 ${orderId ? 'hidden xl:block' : ''}`} aria-label="Orders">
+      <div>
+        <section className="min-w-0" aria-label="Orders">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Orders</h1>
             <button type="button" onClick={fetchOrders} className="inline-flex items-center gap-2 text-xs font-semibold text-[#fa3f5e]"><RefreshCw size={14} />Refresh</button>
@@ -167,7 +198,6 @@ export default function StoreOrders() {
             </div>
           </div>
         </section>
-        {orderId && <OrderDetails key={orderId} order={activeOrder} closeTo={closeTo} onStatusChange={updateOrderStatus} updating={updatingId === orderId} apiEnabled={apiLoaded} />}
       </div>
     </div>
   );

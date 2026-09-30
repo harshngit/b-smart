@@ -63,7 +63,7 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
         <div className={`relative aspect-[4/3] flex items-center justify-center ${bg}`}>
-          <Link to={`/market/product/${product.id}`} aria-label={`View ${product.name}`} className="absolute inset-0 flex items-center justify-center">
+          <Link to={`/market/product/${product.id}`} state={{ product }} aria-label={`View ${product.name}`} className="absolute inset-0 flex items-center justify-center">
             {image
               ? <img ref={imageRef} src={image} alt={product.name} className="w-full h-full object-cover" />
               : <Icon size={48} className={`${text} opacity-70`} />}
@@ -84,7 +84,7 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
 
       <div className="p-4">
         <p className={`text-[11px] font-bold uppercase tracking-wide mb-1 ${text}`}>{showType ? `Product · ${product.category}` : product.category}</p>
-        <Link to={`/market/product/${product.id}`}>
+        <Link to={`/market/product/${product.id}`} state={{ product }}>
           <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1.5 truncate hover:text-[#fa3f5e] transition-colors" title={product.name}>
             {product.name}
           </h3>
@@ -109,6 +109,7 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
           </button>
           <Link
             to={`/market/product/${product.id}`}
+            state={{ product }}
             className="flex-1 py-1.5 rounded-lg text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-center"
           >
             View Details

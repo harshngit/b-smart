@@ -26,6 +26,7 @@ const normalizeItem = (item = {}) => {
     quantity: Number(item.quantity ?? item.qty ?? 1),
     unitPrice: Number(item.unit_price ?? item.unitPrice ?? item.price ?? product.selling_price ?? product.price ?? 0),
     image: item.image || product.images?.[0]?.url || product.images?.[0],
+    variant: item.variant || item.selected_variant || item.options || null,
   };
 };
 

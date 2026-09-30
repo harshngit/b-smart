@@ -101,7 +101,11 @@ export default function MyOrders() {
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-4 border-b border-gray-100 dark:border-gray-800">
                 <div className="min-w-0">
                   <p className="text-xs text-gray-500 dark:text-gray-400">{type === 'service' ? 'Service booking' : 'Product order'} - {formatDate(date)}</p>
-                  <h2 className="text-sm font-bold text-gray-900 dark:text-white mt-1 break-all">Order #{record.id}</h2>
+                  {type === 'product' ? (
+                    <Link to={`/market/my-orders/${record.id}`} className="mt-1 block text-sm font-bold text-gray-900 hover:text-[#fa3f5e] dark:text-white break-all">Order #{record.id}</Link>
+                  ) : (
+                    <h2 className="text-sm font-bold text-gray-900 dark:text-white mt-1 break-all">Order #{record.id}</h2>
+                  )}
                 </div>
                 <span className="rounded-full px-3 py-1 text-xs font-semibold bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e]">{record.status}</span>
               </div>
@@ -123,6 +127,7 @@ export default function MyOrders() {
               <div className="flex flex-wrap items-center justify-end gap-3 px-4 sm:px-5 py-3 border-t border-gray-100 dark:border-gray-800 text-sm">
                 {type === 'product' && canCancel(record.status) && <button type="button" disabled={cancellingId === record.id} onClick={() => cancelOrder(record.id)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 disabled:opacity-50"><XCircle size={14} />{cancellingId === record.id ? 'Cancelling...' : 'Cancel order'}</button>}
                 {type === 'service' && canCancel(record.status) && <button type="button" disabled={cancellingId === record.id} onClick={() => cancelBooking(record.id)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 disabled:opacity-50"><XCircle size={14} />{cancellingId === record.id ? 'Cancelling...' : 'Cancel booking'}</button>}
+                {type === 'product' && <Link to={`/market/my-orders/${record.id}`} className="text-xs font-semibold text-[#fa3f5e]">View details</Link>}
                 <span className="text-gray-500 dark:text-gray-400">Total</span>
                 <strong className="text-[#fa3f5e]">{money(type === 'product' ? record.amount - (record.coinsDiscount || 0) : record.amount)}</strong>
               </div>
