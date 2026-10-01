@@ -145,16 +145,12 @@ export default function StoreOrders() {
 
   if (orderId) {
     return (
-      <div className="max-w-[1280px] ml-auto px-4 md:px-8 pt-6 pb-10">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link to={closeTo} className="inline-flex items-center gap-2 text-sm font-semibold text-[#fa3f5e]">
-            <ChevronLeft size={16} />
+      <div className="max-w-[1280px] ml-auto px-4 md:px-8 pb-10">
+        <div className="mb-5 pt-6">
+          <Link to={closeTo} className="inline-flex items-center gap-2 rounded-lg px-1 py-1 text-xs font-bold text-[#d90445] transition hover:text-[#fa3f5e]">
+            <ChevronLeft size={14} />
             Back to Orders
           </Link>
-          <button type="button" onClick={fetchOrders} className="inline-flex items-center gap-2 text-xs font-semibold text-[#fa3f5e]">
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
         </div>
         {loading && !activeOrder && <div className="mb-4 flex items-center gap-2 text-sm text-gray-500"><Loader2 size={16} className="animate-spin" />Loading order details...</div>}
         {error && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">{error}</p>}
