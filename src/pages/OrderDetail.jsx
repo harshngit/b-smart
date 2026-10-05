@@ -6,6 +6,7 @@ import {
   MapPin, Package, RefreshCw, Truck, Wallet, XCircle,
 } from 'lucide-react';
 import orderService from '../services/orderService';
+import socketService from '../services/socketService';
 import { fetchWallet } from '../store/walletSlice';
 
 const panel = 'rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900';
@@ -126,6 +127,14 @@ export default function OrderDetail() {
 
   useEffect(() => { loadOrder(); }, [loadOrder]);
 
+  useEffect(() => {
+    const onStatusUpdated = (payload) => {
+      if (String(payload?.orderId ?? payload?.id ?? payload?._id ?? orderId) === String(orderId)) loadOrder();
+    };
+    socketService.on('order-status-updated', onStatusUpdated);
+    return () => socketService.off('order-status-updated', onStatusUpdated);
+  }, [orderId, loadOrder]);
+
   const copyOrderId = async () => {
     try {
       await navigator.clipboard?.writeText(String(order?.id || orderId));
@@ -196,6 +205,7 @@ export default function OrderDetail() {
         </div>
 
         {error && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">{error}</p>}
+        {order.refundFailed && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">Your refund is being processed manually.</p>}
 
         <section className={`${panel} overflow-hidden`}>
           <div className="flex flex-col gap-4 border-b border-gray-100 p-5 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
@@ -217,7 +227,7 @@ export default function OrderDetail() {
               </div>
               <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
                 <p className="text-[11px] font-bold uppercase text-gray-400">Payment</p>
-                <p className="mt-1 text-sm font-bold">{order.paymentStatus}</p>
+                <p className="mt-1 text-sm font-bold">{order.status === 'Cancelled' && order.paymentStatus === 'Paid' ? 'Refund pending' : order.paymentStatus}</p>
               </div>
               <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
                 <p className="text-[11px] font-bold uppercase text-gray-400">Status</p>

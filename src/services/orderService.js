@@ -72,6 +72,10 @@ export const normalizeOrder = (order = {}) => {
     courier: order.courier || order.shipping?.courier || '',
     trackingNumber: order.tracking_number || order.trackingNumber || order.shipping?.tracking_number || '',
     notifyCustomer: order.notify_customer ?? true,
+    orderNumber: order.order_number || id,
+    buyerUsername: buyer?.username || '',
+    refundFailed: !!order.refund_failed,
+    refundError: order.refund_error || '',
   };
 };
 
@@ -84,16 +88,26 @@ const orderService = {
     const { data } = await api.get(`/orders/${id}`);
     return normalizeOrder(data?.order || data?.data?.order || data?.data || data);
   },
-  cancel: async (id) => {
-    const { data } = await api.patch(`/orders/${id}/cancel`);
+  cancel: async (id, reason = '') => {
+    const { data } = await api.patch(`/orders/${id}/cancel`, reason ? { reason } : undefined);
     return normalizeOrder(data?.order || data?.data?.order || data?.data || data);
+  },
+  adminList: async (params = {}) => {
+    const query = Object.fromEntries(Object.entries(params).filter(([, value]) => value !== '' && value !== undefined && value !== false));
+    const { data } = await api.get('/orders/admin/all', { params: query });
+    return {
+      orders: firstArray(data).map(normalizeOrder),
+      total: Number(data?.total ?? 0),
+      totalPages: Number(data?.totalPages ?? 1),
+      page: Number(data?.page ?? 1),
+    };
   },
   listSeller: async () => {
     const { data } = await api.get('/orders/seller/mine');
     return firstArray(data).map(normalizeOrder);
   },
   updateStatus: async (id, status, extra = {}) => {
-    const { data } = await api.patch(`/orders/${id}/status`, { status: String(status).toLowerCase(), ...extra });
+    const { data } = await api.patch(`/orders/${id}/status`, { order_status: String(status).toLowerCase(), ...extra });
     return normalizeOrder(data?.order || data?.data?.order || data?.data || data);
   },
 };
