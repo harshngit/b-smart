@@ -31,7 +31,7 @@ function ProductImage({ item }) {
   );
 }
 
-function AddressDrawer({ addresses, selected, loading, actionId, onClose, onSelect, onSave, onDelete, onSetDefault }) {
+function AddressDrawer({ addresses, selected, loading, actionId, onClose, onSelect, onSave, onDelete, onSetDefault, onUseAddress }) {
   const [pending, setPending] = useState(selected);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState('');
@@ -85,7 +85,17 @@ function AddressDrawer({ addresses, selected, loading, actionId, onClose, onSele
           {!loading && !addresses.length && <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">No saved addresses yet. Add one to continue checkout.</p>}
           {addresses.map((address) => (
             <label key={address.id} className={`flex items-center gap-3 rounded-xl border p-4 cursor-pointer ${pending === address.id ? 'border-[#fa3f5e] bg-pink-50/40 dark:bg-pink-900/10' : 'border-gray-200 dark:border-gray-700'}`}>
-              <input type="radio" name="delivery-address" value={address.id} checked={pending === address.id} onChange={() => setPending(address.id)} className="accent-[#fa3f5e] w-4 h-4 shrink-0" />
+              <input
+                type="radio"
+                name="delivery-address"
+                value={address.id}
+                checked={pending === address.id}
+                onChange={() => {
+                  setPending(address.id);
+                  onSelect(address.id);
+                }}
+                className="accent-[#fa3f5e] w-4 h-4 shrink-0"
+              />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-semibold">
                   <span className="text-[#fa3f5e]">{address.label === 'Work' ? <Briefcase size={18} /> : <Home size={18} />}</span>
@@ -129,7 +139,8 @@ function AddressDrawer({ addresses, selected, loading, actionId, onClose, onSele
           )}
         </div>
         <div className="p-5 border-t border-gray-100 dark:border-gray-800">
-          <button type="button" disabled={!pending} onClick={() => onSelect(pending)} className={`${primary} w-full py-3`}>Use this address</button>
+          <button type="button" disabled={!pending} onClick={() => { onSelect(pending); onUseAddress(pending); }} className={`${primary} w-full py-3`}>Use this address & Continue</button>
+          <p className="mt-3 text-center text-[10px] text-gray-400"><Lock size={11} className="mr-1 inline" />Payment opens after confirming your delivery address</p>
         </div>
       </div>
     </aside>
@@ -157,11 +168,13 @@ export default function Checkout() {
   const [orderMessage, setOrderMessage] = useState('');
   const [confirmedOrder, setConfirmedOrder] = useState(null);
 
-  const address = addresses.find((entry) => entry.id === selectedAddress) || addresses[0] || blankAddress;
+  const address = addresses.find((entry) => entry.id === selectedAddress) || blankAddress;
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const discount = 0;
   const total = subtotal;
   const payment = step === 'Payment';
+  const hasSelectedAddress = Boolean(addresses.find((entry) => entry.id === selectedAddress));
+  const hasCompleteAddress = hasSelectedAddress && ['name', 'phone', 'address_line1', 'city', 'state', 'pincode'].every((key) => String(address?.[key] || '').trim());
   const walletInsufficient = payment && paymentMethod === 'wallet' && balance < total;
 
   const loadAddresses = useCallback(async ({ keepSelected = true } = {}) => {
@@ -236,6 +249,21 @@ export default function Checkout() {
     pincode: address.pincode || address.zip || '',
   });
 
+  const continueToPayment = (addressId = selectedAddress) => {
+    const chosenAddress = addresses.find((entry) => entry.id === addressId);
+    const complete = chosenAddress && ['name', 'phone', 'address_line1', 'city', 'state', 'pincode'].every((key) => String(chosenAddress?.[key] || '').trim());
+    if (!complete) {
+      setCheckoutError('Please select or add a complete delivery address before continuing.');
+      setAddressOpen(true);
+      return false;
+    }
+    setSelectedAddress(addressId);
+    setCheckoutError('');
+    setAddressOpen(false);
+    setStep('Payment');
+    return true;
+  };
+
   const recordLocalOrder = (apiOrder, shippingAddress, status = 'Pending', paymentStatus = 'Pending') => {
     const customer = shippingAddress.name || user?.name || user?.full_name || user?.username || 'Customer';
     const action = placeOrder({
@@ -274,7 +302,10 @@ export default function Checkout() {
   const submit = async (event) => {
     event.preventDefault();
     if (!sameBilling && !billing.trim()) return;
-    if (!payment) { setStep('Payment'); return; }
+    if (!payment) {
+      continueToPayment();
+      return;
+    }
     if (walletInsufficient) return;
 
     const shippingAddress = buildShippingAddress();
@@ -415,17 +446,46 @@ export default function Checkout() {
   return (
     <div className={`min-h-screen bg-gray-50 dark:bg-black w-full max-w-[1300px] ml-auto px-4 md:px-6 pt-4 pb-12 text-gray-900 dark:text-white grid gap-4 items-start ${addressOpen && !payment ? 'lg:grid-cols-[minmax(0,1fr)_280px]' : 'grid-cols-1'}`}>
       <div className="min-w-0">
-        <h1 className={payment ? 'sr-only' : 'text-xl font-bold mb-4'}>Checkout</h1>
-        <nav aria-label="Checkout progress" className={payment ? 'w-full md:w-[64%] pt-2 mb-8' : 'max-w-[300px] mb-5'}>
-          <ol className="flex">
-            {['Cart', 'Details', 'Payment'].map((label, index) => {
-              const complete = index === 0 || (index === 1 && payment);
-              const current = label === step;
-              const content = <><span className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${complete || current ? 'bg-[#fa3f5e] text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-400'}`}>{complete ? <Check size={14} /> : index + 1}</span><span className={`mt-2 text-[11px] ${current ? 'font-semibold' : 'text-gray-400'}`}>{label}</span></>;
-              return <li key={label} className="relative flex-1">{index < 2 && <span aria-hidden="true" className={`absolute top-3 left-1/2 w-full h-px ${complete && (index === 0 || payment) ? 'bg-[#fa3f5e]' : 'bg-gray-200 dark:bg-gray-700'}`} />}{label === 'Cart' ? <Link to="/cart" className="relative flex flex-col items-center">{content}</Link> : <button type="button" aria-current={current ? 'step' : undefined} onClick={() => setStep(label)} className="relative w-full flex flex-col items-center">{content}</button>}</li>;
-            })}
-          </ol>
-        </nav>
+        <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Checkout</h1>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {payment ? 'Choose a payment method and confirm your order.' : 'Select a delivery address to continue.'}
+            </p>
+          </div>
+          <nav aria-label="Checkout progress" className="w-full md:max-w-[420px]">
+            <ol className="flex items-start">
+              {['Cart', 'Details', 'Payment'].map((label, index) => {
+                const complete = index === 0 || (index === 1 && payment);
+                const current = label === step;
+                const stepState = complete ? 'Complete' : current ? 'Current' : 'Pending';
+                const content = (
+                  <>
+                    <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${
+                      complete
+                        ? 'bg-emerald-500 text-white'
+                        : current
+                          ? 'bg-[#fa3f5e] text-white'
+                          : 'border border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-900'
+                    }`}>
+                      {complete ? <Check size={14} /> : index + 1}
+                    </span>
+                    <span className={`mt-2 text-xs font-semibold ${current ? 'text-gray-950 dark:text-white' : complete ? 'text-emerald-600' : 'text-gray-400'}`}>{label}</span>
+                    <span className="sr-only">{stepState}</span>
+                  </>
+                );
+                return (
+                  <li key={label} className="relative flex flex-1 justify-center">
+                    {index < 2 && <span aria-hidden="true" className={`absolute left-1/2 top-4 h-px w-full ${complete && (index === 0 || payment) ? 'bg-[#fa3f5e]' : 'bg-gray-200 dark:bg-gray-700'}`} />}
+                    {label === 'Cart'
+                      ? <Link to="/cart" className="relative flex flex-col items-center rounded-lg px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-insta-pink">{content}</Link>
+                      : <button type="button" aria-current={current ? 'step' : undefined} onClick={() => (label === 'Payment' ? continueToPayment() : setStep(label))} className="relative flex flex-col items-center rounded-lg px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-insta-pink">{content}</button>}
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        </div>
 
         <form onSubmit={submit} className={`grid grid-cols-1 gap-4 items-start ${payment ? 'md:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)] md:gap-6' : 'md:grid-cols-[minmax(0,2fr)_minmax(190px,1fr)]'}`}>
           <main className="min-w-0 space-y-3">
@@ -435,14 +495,22 @@ export default function Checkout() {
                   <span className="p-2 rounded-full bg-pink-50 dark:bg-pink-900/20 text-[#fa3f5e]"><MapPin size={20} /></span>
                   <div className="flex-1 min-w-0">
                     <h2 className="text-sm font-semibold">Delivery address</h2>
-                    <p className="text-xs font-semibold mt-2">{address.label}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">{address.name} · {address.phone}<br />{address.address_line1}, {address.city}, {address.state} {address.pincode}</p>
+                    <p className="text-xs font-semibold mt-2">{hasSelectedAddress ? address.label || 'Saved address' : 'No delivery address selected'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">
+                      {hasSelectedAddress
+                        ? <>{address.name} &middot; {address.phone}<br />{address.address_line1}, {address.city}, {address.state} {address.pincode}</>
+                        : 'Choose a saved address or add a new one to continue.'}
+                    </p>
                   </div>
-                  <button type="button" onClick={() => setAddressOpen(true)} className="flex items-center gap-1 text-xs text-[#fa3f5e] py-1">Change <ChevronRight size={14} /></button>
+                  {!addressOpen && (
+                    <button type="button" onClick={() => setAddressOpen(true)} className="flex items-center gap-1 text-xs text-[#fa3f5e] py-1">
+                      Change <ChevronRight size={14} />
+                    </button>
+                  )}
                 </section>
                 <section className={`${panel} p-3`}><h2 className="text-sm font-semibold mb-4">Order summary</h2>{itemList}</section>
                 <section className={`${panel} p-3`}>
-                  <button type="button" onClick={() => setStep('Payment')} className="flex items-center gap-3 w-full text-xs pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
+                  <button type="button" onClick={() => continueToPayment()} className="flex items-center gap-3 w-full text-xs pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
                     <CreditCard size={20} className="text-[#fa3f5e]" />
                     <span className="flex-1 text-left">{paymentMethod === 'wallet' ? 'Wallet coins' : 'Razorpay'}</span>
                     <ChevronRight size={16} />
@@ -491,10 +559,23 @@ export default function Checkout() {
             </dl>
             <div className="flex justify-between items-center py-3 gap-3"><span className="text-sm font-semibold">{payment ? 'Amount due' : 'Total'}</span><strong className="text-xl text-[#fa3f5e]">{money(total)}</strong></div>
             {checkoutError && <p role="alert" className="text-xs text-red-500 mb-3">{checkoutError}</p>}
-            <button type="submit" disabled={checkingOut || walletInsufficient} className={`${primary} w-full py-3 flex items-center justify-center gap-2`}>
-              {checkingOut ? <><Loader2 size={16} className="animate-spin" />Processing</> : payment ? <><Lock size={16} />Pay {money(total)}</> : 'Place order'}
-            </button>
-            {!payment && <p className="text-[10px] text-gray-400 text-center mt-3"><Lock size={11} className="inline mr-1" />Secure checkout<br />Review payment in the next step</p>}
+            {payment ? (
+              <>
+                <button type="submit" disabled={checkingOut || walletInsufficient} className={`${primary} w-full py-3 flex items-center justify-center gap-2`}>
+                  {checkingOut ? <><Loader2 size={16} className="animate-spin" />Processing</> : <><Lock size={16} />Pay {money(total)}</>}
+                </button>
+                <p className="text-[10px] text-gray-400 text-center mt-3"><Lock size={11} className="inline mr-1" />Secure checkout</p>
+              </>
+            ) : (
+              <>
+                {!addressOpen && (
+                  <button type="button" disabled={!hasCompleteAddress} onClick={() => continueToPayment()} className={`${primary} w-full py-3 flex items-center justify-center gap-2`}>
+                    Continue to payment <ChevronRight size={16} />
+                  </button>
+                )}
+                <p className="text-[10px] text-gray-400 text-center mt-3"><Lock size={11} className="inline mr-1" />Select a delivery address to unlock payment</p>
+              </>
+            )}
           </aside>
         </form>
         {!payment && <p className="text-[11px] text-gray-400 mt-5">Wallet uses coins at 1 coin = Rs 1. Razorpay opens the secure payment gateway.</p>}
@@ -507,7 +588,8 @@ export default function Checkout() {
           loading={addressesLoading}
           actionId={addressActionId}
           onClose={() => setAddressOpen(false)}
-          onSelect={(id) => { setSelectedAddress(id); setAddressOpen(false); }}
+          onSelect={(id) => setSelectedAddress(id)}
+          onUseAddress={continueToPayment}
           onSave={saveAddress}
           onDelete={deleteAddress}
           onSetDefault={setDefaultAddress}
