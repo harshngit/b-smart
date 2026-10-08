@@ -15,7 +15,7 @@ const STEPS = [
   { label: 'Availability & Publish', subtitle: 'Location, schedule & publish' },
 ];
 
-const emptySubservice = () => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: '', hours: '', price: '' });
+const emptySubservice = () => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: '', hours: '', price: '', sqft: '' });
 
 function SubservicesTable({ subservices, onChange, onRemove, onAdd }) {
   return (
@@ -23,11 +23,12 @@ function SubservicesTable({ subservices, onChange, onRemove, onAdd }) {
       <label className={labelCls}>Subservices</label>
       <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
         <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 dark:bg-gray-900 text-left text-xs font-semibold text-gray-500 dark:text-gray-400"><th className="p-2.5">Service Name</th><th className="p-2.5">Hr</th><th className="p-2.5">Price (₹)</th><th className="p-2.5" /></tr></thead>
+          <thead><tr className="bg-gray-50 dark:bg-gray-900 text-left text-xs font-semibold text-gray-500 dark:text-gray-400"><th className="p-2.5">Service Name</th><th className="p-2.5">Sqft</th><th className="p-2.5">Hr</th><th className="p-2.5">Price (₹)</th><th className="p-2.5" /></tr></thead>
           <tbody>
             {subservices.map((subservice, index) => (
               <tr key={subservice.id} className="border-t border-gray-100 dark:border-gray-800">
                 <td className="p-2.5 min-w-[180px]"><input aria-label={`Subservice ${index + 1} name`} value={subservice.name} onChange={(event) => onChange(subservice.id, { name: event.target.value })} maxLength={150} placeholder="Service name" className={inputCls} /></td>
+                <td className="p-2.5 min-w-[100px]"><input aria-label={`Subservice ${index + 1} sqft`} type="number" min="0" step="1" value={subservice.sqft} onChange={(event) => onChange(subservice.id, { sqft: event.target.value })} placeholder="Sqft" className={inputCls} /></td>
                 <td className="p-2.5 min-w-[100px]"><input aria-label={`Subservice ${index + 1} hours`} type="number" min="0.01" step="any" value={subservice.hours} onChange={(event) => onChange(subservice.id, { hours: event.target.value })} placeholder="Hr" className={inputCls} /></td>
                 <td className="p-2.5 min-w-[120px]"><input aria-label={`Subservice ${index + 1} price`} type="number" min="0" step="0.01" value={subservice.price} onChange={(event) => onChange(subservice.id, { price: event.target.value })} placeholder="0" className={inputCls} /></td>
                 <td className="p-2.5"><button type="button" aria-label={`Remove subservice ${index + 1}`} onClick={() => onRemove(subservice.id)} className="text-gray-400 hover:text-red-500"><X size={16} /></button></td>
@@ -59,6 +60,7 @@ export default function ServiceForm({ service }) {
   const [subservices, setSubservices] = useState(() => service?.subservices?.length ? service.subservices.map((item) => ({
     id: item.id || emptySubservice().id,
     name: item.name || '', hours: item.hours == null ? '' : String(item.hours), price: item.price == null ? '' : String(item.price),
+    sqft: item.sqft == null || item.sqft === 0 ? '' : String(item.sqft),
   })) : [emptySubservice()]);
   const [availability, setAvailability] = useState(() => service?.availability ? structuredClone(service.availability) : defaultAvailability());
   const isCreate = !service?.id;

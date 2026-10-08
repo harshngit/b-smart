@@ -26,7 +26,7 @@ export function validateServiceTimeArea({ serviceTime, serviceAreaText, isCreate
   return '';
 }
 
-export const isBlankSubservice = (subservice) => !subservice.name.trim() && subservice.hours === '' && subservice.price === '';
+export const isBlankSubservice = (subservice) => !subservice.name.trim() && subservice.hours === '' && subservice.price === '' && !subservice.sqft;
 
 export function validateSubservices(subservices) {
   for (const subservice of subservices) {
@@ -34,6 +34,7 @@ export function validateSubservices(subservices) {
     if (!subservice.name.trim()) return 'Enter a name for each subservice.';
     if (subservice.hours === '' || !Number.isFinite(Number(subservice.hours)) || Number(subservice.hours) <= 0) return 'Enter hours greater than zero for each subservice.';
     if (subservice.price === '' || !Number.isFinite(Number(subservice.price)) || Number(subservice.price) < 0) return 'Enter a valid price for each subservice.';
+    if (subservice.sqft !== '' && subservice.sqft != null && (!Number.isFinite(Number(subservice.sqft)) || Number(subservice.sqft) < 0)) return 'Enter a valid sqft (or leave it blank) for each subservice.';
   }
   return '';
 }

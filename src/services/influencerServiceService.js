@@ -99,6 +99,7 @@ export const normalizeInfluencerService = (service = {}) => {
       name: item.name || '',
       hours: item.hours ?? '',
       price: item.price ?? '',
+      sqft: item.sqft ?? '',
     })),
     method: METHOD_FROM_API[service.service_method] || service.method || 'At customer location',
     serviceTime: service.service_time?.start && service.service_time?.end
@@ -131,6 +132,7 @@ export const serviceFormToApiPayload = ({ form, highlights, subservices, availab
     name: item.name.trim(),
     hours: Number(item.hours) || 0,
     price: Number(item.price) || 0,
+    sqft: Number(item.sqft) || 0,
   })),
   service_method: METHOD_TO_API[form.method] || 'at_customer_location',
   weekly_availability: availabilityToApi(availability),
