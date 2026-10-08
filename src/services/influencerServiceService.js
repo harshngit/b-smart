@@ -101,6 +101,10 @@ export const normalizeInfluencerService = (service = {}) => {
       price: item.price ?? '',
     })),
     method: METHOD_FROM_API[service.service_method] || service.method || 'At customer location',
+    serviceTime: service.service_time?.start && service.service_time?.end
+      ? { start: service.service_time.start, end: service.service_time.end }
+      : { start: '', end: '' },
+    serviceArea: Array.isArray(service.service_area) ? service.service_area : [],
     availability: availabilityFromApi(service.weekly_availability || service.availability),
     visible: service.visible_to_customers ?? service.visible ?? true,
     status: service.status === 'draft' || service.status === 'Draft' ? 'Draft' : 'Published',
@@ -113,7 +117,7 @@ export const normalizeInfluencerService = (service = {}) => {
   };
 };
 
-export const serviceFormToApiPayload = ({ form, highlights, subservices, availability, images, draft }) => ({
+export const serviceFormToApiPayload = ({ form, highlights, subservices, availability, images, draft, serviceTime, serviceArea }) => ({
   images,
   name: form.name.trim(),
   category: form.category,
@@ -132,6 +136,9 @@ export const serviceFormToApiPayload = ({ form, highlights, subservices, availab
   weekly_availability: availabilityToApi(availability),
   visible_to_customers: Boolean(form.visible),
   status: draft ? 'draft' : 'active',
+  // Required on create, optional on update — omit when blank so a PATCH keeps the existing value.
+  ...(serviceTime?.start && serviceTime?.end ? { service_time: { start: serviceTime.start, end: serviceTime.end } } : {}),
+  ...(Array.isArray(serviceArea) && serviceArea.length ? { service_area: serviceArea } : {}),
 });
 
 const influencerServiceService = {

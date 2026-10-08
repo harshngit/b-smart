@@ -7,7 +7,7 @@ import {
   Stepper, SectionCard, ImageGallery, Dropdown, HighlightsList, CompletenessCard, Checkbox,
   inputCls, labelCls, MAX_IMAGES, MAX_HIGHLIGHTS,
 } from '../../components/productForm/ProductFormFields';
-import { SERVICE_CATEGORIES, RATE_TYPES, DURATIONS, METHODS, defaultAvailability, servicePrice, isBlankSubservice, validateService, validateSubservices } from '../data/serviceFields';
+import { SERVICE_CATEGORIES, RATE_TYPES, DURATIONS, METHODS, defaultAvailability, servicePrice, isBlankSubservice, validateService, validateSubservices, validateServiceTimeArea, textToList, listToText } from '../data/serviceFields';
 
 const STEPS = [
   { label: 'Service Details', subtitle: 'Add basic information' },
@@ -61,6 +61,9 @@ export default function ServiceForm({ service }) {
     name: item.name || '', hours: item.hours == null ? '' : String(item.hours), price: item.price == null ? '' : String(item.price),
   })) : [emptySubservice()]);
   const [availability, setAvailability] = useState(() => service?.availability ? structuredClone(service.availability) : defaultAvailability());
+  const isCreate = !service?.id;
+  const [serviceTime, setServiceTime] = useState(() => (service?.serviceTime?.start && service?.serviceTime?.end ? { ...service.serviceTime } : { start: '', end: '' }));
+  const [serviceArea, setServiceArea] = useState(() => listToText(service?.serviceArea));
   const uploader = useMediaUploader(service?.images || [], MAX_IMAGES);
   const { images } = uploader;
   const mainIndex = Math.min(mainImageIndex, Math.max(0, images.length - 1));
@@ -82,8 +85,8 @@ export default function ServiceForm({ service }) {
   const completeness = useMemo(() => [
     { label: 'Service Details', done: !!(form.name.trim() && form.category && form.description.trim()) },
     { label: 'Pricing', done: form.price !== '' && Number.isFinite(Number(form.price)) && Number(form.price) >= 0 && !!form.duration && !validateSubservices(subservices) },
-    { label: 'Availability & Publish', done: availability.some((day) => day.slots.length) && !validateService(form, availability, true) && (form.method !== 'At my location' || !!form.address.trim()) },
-  ], [form, availability, subservices]);
+    { label: 'Availability & Publish', done: availability.some((day) => day.slots.length) && !validateService(form, availability, true) && (form.method !== 'At my location' || !!form.address.trim()) && !validateServiceTimeArea({ serviceTime, serviceAreaText: serviceArea, isCreate }) },
+  ], [form, availability, subservices, serviceTime, serviceArea, isCreate]);
   const firstIncomplete = completeness.findIndex((section) => !section.done);
   const autoTarget = firstIncomplete === -1 ? 3 : firstIncomplete + 1;
   const [lastAutoTarget, setLastAutoTarget] = useState(autoTarget);
@@ -94,7 +97,8 @@ export default function ServiceForm({ service }) {
   const changeSlots = (day, update) => setAvailability((current) => current.map((entry) => entry.day === day ? { ...entry, slots: update(entry.slots) } : entry));
   const save = async (draft) => {
     if (saving) return;
-    const message = validateService(form, availability, draft, subservices);
+    const message = validateService(form, availability, draft, subservices)
+      || validateServiceTimeArea({ serviceTime, serviceAreaText: serviceArea, isCreate });
     setError(message);
     if (message) {
       requestAnimationFrame(() => errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
@@ -111,6 +115,8 @@ export default function ServiceForm({ service }) {
         availability,
         images: uploadedImages,
         draft,
+        serviceTime,
+        serviceArea: textToList(serviceArea),
       });
       if (service?.id) {
         await influencerServiceService.update(service.id, payload);
@@ -176,6 +182,22 @@ export default function ServiceForm({ service }) {
               </div>
             </div>
             {form.method === 'At my location' && <div><label htmlFor="service-address" className={labelCls}>Service Address *</label><input id="service-address" value={form.address} onChange={set('address')} required placeholder="Where customers should visit" className={inputCls} /></div>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Service Hours {isCreate ? '*' : ''}</label>
+                <div className="flex items-center gap-2">
+                  <input type="time" aria-label="Service hours start" value={serviceTime.start} onChange={(event) => setServiceTime((current) => ({ ...current, start: event.target.value }))} className={inputCls} />
+                  <span className="text-gray-400">–</span>
+                  <input type="time" aria-label="Service hours end" value={serviceTime.end} onChange={(event) => setServiceTime((current) => ({ ...current, end: event.target.value }))} className={inputCls} />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">General hours this service is offered within — separate from weekly availability below.</p>
+              </div>
+              <div>
+                <label htmlFor="service-area" className={labelCls}>Coverage Areas {isCreate ? '*' : ''}</label>
+                <input id="service-area" value={serviceArea} onChange={(event) => setServiceArea(event.target.value)} placeholder="Malad, Andheri, Bandra" className={inputCls} />
+                <p className="text-xs text-gray-400 mt-1">Separate multiple areas with commas.</p>
+              </div>
+            </div>
             <div>
               <label className={labelCls}>Weekly availability</label>
               <div className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg">

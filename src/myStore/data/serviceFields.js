@@ -9,6 +9,23 @@ export const servicePrice = ({ price, rateType }) => {
   return rateType === 'Starting from' ? `From ${amount}` : `${amount}${rateType === 'Per hour' ? ' / hour' : rateType === 'Per session' ? ' / session' : ''}`;
 };
 
+export const textToList = (value) => String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+export const listToText = (value) => (Array.isArray(value) ? value.join(', ') : '');
+
+// service_time (general offered hours) and service_area (coverage areas) are
+// required by the API on create, optional on update (omit to keep existing).
+export function validateServiceTimeArea({ serviceTime, serviceAreaText, isCreate }) {
+  const hasTime = serviceTime.start || serviceTime.end;
+  if (isCreate || hasTime) {
+    if (!serviceTime.start || !serviceTime.end) return 'Enter the start and end time for when this service is offered.';
+    if (serviceTime.start >= serviceTime.end) return 'Service hours start must be before the end time.';
+  }
+  if (isCreate || serviceAreaText.trim()) {
+    if (!textToList(serviceAreaText).length) return 'Enter at least one coverage area for this service.';
+  }
+  return '';
+}
+
 export const isBlankSubservice = (subservice) => !subservice.name.trim() && subservice.hours === '' && subservice.price === '';
 
 export function validateSubservices(subservices) {
