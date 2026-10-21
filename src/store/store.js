@@ -10,6 +10,7 @@ import servicesReducer from './servicesSlice';
 import ordersReducer from './ordersSlice';
 import bookingsReducer from './bookingsSlice';
 import wishlistReducer from './wishlistSlice';
+import callReducer from './callSlice';
 
 export const store = configureStore({
   reducer: {
@@ -24,5 +25,6 @@ export const store = configureStore({
     orders: ordersReducer,
     bookings: bookingsReducer,
     wishlist: wishlistReducer,
+    call: callReducer,
   },
 });
