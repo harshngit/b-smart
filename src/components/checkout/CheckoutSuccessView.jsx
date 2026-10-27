@@ -31,7 +31,7 @@ export default function CheckoutSuccessView({
   const formattedDate = Number.isNaN(safeDate.getTime())
     ? 'Today'
     : safeDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  const formattedPayment = paymentMethod === 'wallet' ? 'Wallet' : 'Razorpay';
+  const formattedPayment = paymentMethod === 'wallet' ? 'Wallet' : paymentMethod === 'hybrid' ? 'Coins + Razorpay' : 'Razorpay';
 
   const copyOrderId = async () => {
     if (!orderId || orderId === 'Processing') return;

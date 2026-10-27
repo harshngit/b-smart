@@ -85,7 +85,7 @@ export default function Cart() {
     </article>;
   };
 
-  return <div className="min-h-screen bg-gray-50 dark:bg-black w-full max-w-[1280px] ml-auto px-4 md:px-6 pt-6 pb-24">
+  return <div className="min-h-screen bg-gray-50 dark:bg-black w-full max-w-[1280px] mx-auto px-4 md:px-6 pt-6 pb-24">
     {items.length === 0 ? <>
       <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">My Cart</h1>
       <div className="flex flex-col items-center py-24 text-center">

@@ -192,7 +192,7 @@ const ProductDetail = () => {
     .map(({ product: item }) => item);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1300px] ml-auto px-4 md:px-6 pt-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-black pb-24 max-w-[1300px] mx-auto px-4 md:px-6 pt-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mb-5">
         <Link to={canUseStoreLinks ? '/market/my-store' : '/market'} className="hover:text-[#fa3f5e]">{canUseStoreLinks ? 'My Store' : 'Marketplace'}</Link>

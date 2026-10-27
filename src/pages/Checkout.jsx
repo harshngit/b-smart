@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   MapPin, Plus, Check, CreditCard, ChevronRight, Lock, X,
-  Home, Briefcase, Wallet, ShieldCheck, Package, Loader2,
+  Home, Briefcase, ShieldCheck, Package, Loader2,
 } from 'lucide-react';
 import { setCartItems } from '../store/cartSlice';
 import { placeOrder } from '../store/ordersSlice';
@@ -12,6 +12,7 @@ import { inputCls } from '../components/productForm/ProductFormFields';
 import checkoutService, { loadRazorpay } from '../services/checkoutService';
 import addressService from '../services/addressService';
 import CheckoutSuccessView from '../components/checkout/CheckoutSuccessView';
+import PaymentSplitSlider from '../components/PaymentSplitSlider';
 
 const panel = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm';
 const primary = 'rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-insta-pink focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed';
@@ -159,7 +160,7 @@ export default function Checkout() {
   const [addressesLoading, setAddressesLoading] = useState(true);
   const [addressActionId, setAddressActionId] = useState('');
   const [addressOpen, setAddressOpen] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState('wallet');
+  const [coinsToUse, setCoinsToUse] = useState(0);
   const [sameBilling, setSameBilling] = useState(true);
   const [billing, setBilling] = useState('');
   const [placed, setPlaced] = useState(false);
@@ -170,12 +171,13 @@ export default function Checkout() {
 
   const address = addresses.find((entry) => entry.id === selectedAddress) || blankAddress;
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const discount = 0;
   const total = subtotal;
+  const coinsApplied = Math.max(0, Math.min(coinsToUse, balance, total));
+  const discount = coinsApplied;
+  const razorpayAmount = Math.max(0, total - coinsApplied);
   const payment = step === 'Payment';
   const hasSelectedAddress = Boolean(addresses.find((entry) => entry.id === selectedAddress));
   const hasCompleteAddress = hasSelectedAddress && ['name', 'phone', 'address_line1', 'city', 'state', 'pincode'].every((key) => String(address?.[key] || '').trim());
-  const walletInsufficient = payment && paymentMethod === 'wallet' && balance < total;
 
   const loadAddresses = useCallback(async ({ keepSelected = true } = {}) => {
     setAddressesLoading(true);
@@ -283,7 +285,7 @@ export default function Checkout() {
         image: item.image,
       })),
       amount: apiOrder?.amount ?? apiOrder?.total_amount ?? total,
-      paymentMethod,
+      paymentMethod: apiOrder?.payment_method || (coinsApplied >= total ? 'wallet' : coinsApplied > 0 ? 'hybrid' : 'razorpay'),
       paymentStatus,
       status,
       address: {
@@ -306,8 +308,6 @@ export default function Checkout() {
       continueToPayment();
       return;
     }
-    if (walletInsufficient) return;
-
     const shippingAddress = buildShippingAddress();
     if (Object.values(shippingAddress).some((value) => !String(value).trim())) {
       setCheckoutError('Please complete the delivery address.');
@@ -317,16 +317,16 @@ export default function Checkout() {
     setCheckingOut(true);
     setCheckoutError('');
     try {
-      const result = await checkoutService.checkout({ paymentMethod, shippingAddress });
+      const result = await checkoutService.checkout({ coinsToUse: coinsApplied, shippingAddress });
       const apiOrder = result?.order || result?.data?.order || result?.data;
       const backendOrderId = apiOrder?._id || apiOrder?.id || apiOrder?.order_id || result?.id || result?._id;
 
-      if (paymentMethod === 'wallet') {
+      if (apiOrder?.payment_status === 'paid') {
         const localOrder = recordLocalOrder(apiOrder, shippingAddress, 'Confirmed', 'Paid');
         setConfirmedOrder(localOrder);
         dispatch(setCartItems([]));
         dispatch(fetchWallet());
-        setOrderMessage('Your wallet payment is confirmed and the cart has been cleared.');
+        setOrderMessage('Your payment is confirmed and the cart has been cleared.');
         setPlaced(true);
         return;
       }
@@ -362,6 +362,7 @@ export default function Checkout() {
             const localOrder = recordLocalOrder(verifiedOrder, shippingAddress, 'Confirmed', 'Paid');
             setConfirmedOrder(localOrder);
             dispatch(setCartItems([]));
+            dispatch(fetchWallet());
             setOrderMessage('Payment verified. Your order is confirmed and the cart has been cleared.');
             setPlaced(true);
           } catch (err) {
@@ -420,7 +421,7 @@ export default function Checkout() {
   }));
   const successOrderId = confirmedOrder?.apiOrderId || confirmedOrder?.id || 'Processing';
   const successDate = confirmedOrder?.createdAt ? new Date(confirmedOrder.createdAt) : new Date();
-  const successPaymentMethod = confirmedOrder?.paymentMethod || paymentMethod;
+  const successPaymentMethod = confirmedOrder?.paymentMethod || (coinsApplied > 0 ? 'hybrid' : 'razorpay');
   const successTotal = confirmedOrder?.amount ?? total;
 
   if (placed) {
@@ -444,7 +445,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 dark:bg-black w-full max-w-[1300px] ml-auto px-4 md:px-6 pt-4 pb-12 text-gray-900 dark:text-white grid gap-4 items-start ${addressOpen && !payment ? 'lg:grid-cols-[minmax(0,1fr)_280px]' : 'grid-cols-1'}`}>
+    <div className={`min-h-screen bg-gray-50 dark:bg-black w-full max-w-[1300px] mx-auto px-4 md:px-6 pt-4 pb-12 text-gray-900 dark:text-white grid gap-4 items-start ${addressOpen && !payment ? 'lg:grid-cols-[minmax(0,1fr)_280px]' : 'grid-cols-1'}`}>
       <div className="min-w-0">
         <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -512,7 +513,7 @@ export default function Checkout() {
                 <section className={`${panel} p-3`}>
                   <button type="button" onClick={() => continueToPayment()} className="flex items-center gap-3 w-full text-xs pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
                     <CreditCard size={20} className="text-[#fa3f5e]" />
-                    <span className="flex-1 text-left">{paymentMethod === 'wallet' ? 'Wallet coins' : 'Razorpay'}</span>
+                    <span className="flex-1 text-left">{coinsApplied > 0 ? `Coins ${money(coinsApplied)} + Razorpay ${money(razorpayAmount)}` : 'Razorpay'}</span>
                     <ChevronRight size={16} />
                   </button>
                   {billingControl}
@@ -520,30 +521,16 @@ export default function Checkout() {
               </>
             ) : (
               <>
-                <h2 className="text-lg font-semibold">Choose payment method</h2>
-                <div role="radiogroup" aria-label="Payment method" className="space-y-3">
-                  {[
-                    ['wallet', 'Wallet coins', Wallet],
-                    ['razorpay', 'Razorpay', CreditCard],
-                  ].map(([id, label, Icon]) => (
-                    <div key={id}>
-                      <label className={`${panel} flex items-center gap-3 px-3 py-2.5 min-h-[64px] cursor-pointer ${paymentMethod === id ? '!border-[#fa3f5e]' : ''}`}>
-                        <input type="radio" name="payment-method" value={id} checked={paymentMethod === id} onChange={() => setPaymentMethod(id)} className="w-4 h-4 shrink-0 accent-[#fa3f5e]" />
-                        <span className="w-12 h-10 shrink-0 rounded-lg border border-gray-100 dark:border-gray-800 flex items-center justify-center text-gray-700 dark:text-gray-300">{React.createElement(Icon, { size: 23 })}</span>
-                        <span className="flex-1 min-w-0 text-sm font-semibold">{label}</span>
-                        {paymentMethod === id ? <span className="rounded bg-[#fa3f5e] text-white px-2 py-1 text-[10px]">Selected</span> : <ChevronRight size={17} className="text-gray-400" />}
-                      </label>
-                      {id === 'wallet' && paymentMethod === id && <p className="px-4 pt-2 text-xs text-gray-400">{balance.toLocaleString('en-IN')} coins available{walletInsufficient ? ' - insufficient balance for this order.' : ''}</p>}
-                      {id === 'razorpay' && paymentMethod === id && <p className="px-4 pt-2 text-xs text-gray-400">Opens Razorpay Checkout. Stock and cart update after payment verification.</p>}
-                    </div>
-                  ))}
-                </div>
+                <h2 className="text-lg font-semibold">How to pay</h2>
+                <section className={`${panel} p-4`}>
+                  <PaymentSplitSlider totalAmount={total} walletBalance={balance} value={coinsToUse} onChange={setCoinsToUse} />
+                </section>
                 <section className={`${panel} p-3`}>{billingControl}</section>
                 <div className="flex items-start gap-3 px-2 py-2">
                   <ShieldCheck size={30} className="text-[#fa3f5e] shrink-0" />
                   <div>
                     <h3 className="text-xs font-semibold">Secure payment</h3>
-                    <p className="text-xs text-gray-400 mt-1">Wallet orders are confirmed immediately. Razorpay orders stay pending until verified.</p>
+                    <p className="text-xs text-gray-400 mt-1">Orders fully covered by coins are confirmed immediately. Any remaining amount goes through Razorpay, and stays pending until verified.</p>
                   </div>
                 </div>
               </>
@@ -555,14 +542,19 @@ export default function Checkout() {
             <dl className="space-y-4 text-xs text-gray-500 dark:text-gray-400 pb-5 border-b border-gray-100 dark:border-gray-800">
               <div className="flex justify-between gap-3"><dt>Subtotal</dt><dd>{money(subtotal)}</dd></div>
               {!payment && <div className="flex justify-between gap-3"><dt>Delivery</dt><dd className="text-[#fa3f5e] font-semibold">Free</dd></div>}
-              <div className="flex justify-between gap-3 text-insta-purple"><dt>Wallet discount</dt><dd>{money(discount)}</dd></div>
+              {payment && coinsApplied > 0 && <div className="flex justify-between gap-3 text-insta-purple"><dt>Paid with coins</dt><dd>-{money(coinsApplied)}</dd></div>}
+              {payment && razorpayAmount > 0 && <div className="flex justify-between gap-3"><dt>Via Razorpay</dt><dd>{money(razorpayAmount)}</dd></div>}
             </dl>
-            <div className="flex justify-between items-center py-3 gap-3"><span className="text-sm font-semibold">{payment ? 'Amount due' : 'Total'}</span><strong className="text-xl text-[#fa3f5e]">{money(total)}</strong></div>
+            <div className="flex justify-between items-center py-3 gap-3"><span className="text-sm font-semibold">{payment ? 'Order total' : 'Total'}</span><strong className="text-xl text-[#fa3f5e]">{money(total)}</strong></div>
             {checkoutError && <p role="alert" className="text-xs text-red-500 mb-3">{checkoutError}</p>}
             {payment ? (
               <>
-                <button type="submit" disabled={checkingOut || walletInsufficient} className={`${primary} w-full py-3 flex items-center justify-center gap-2`}>
-                  {checkingOut ? <><Loader2 size={16} className="animate-spin" />Processing</> : <><Lock size={16} />Pay {money(total)}</>}
+                <button type="submit" disabled={checkingOut} className={`${primary} w-full py-3 flex items-center justify-center gap-2`}>
+                  {checkingOut
+                    ? <><Loader2 size={16} className="animate-spin" />Processing</>
+                    : razorpayAmount > 0
+                      ? <><Lock size={16} />Pay {money(razorpayAmount)} via Razorpay</>
+                      : <><Lock size={16} />Place order</>}
                 </button>
                 <p className="text-[10px] text-gray-400 text-center mt-3"><Lock size={11} className="inline mr-1" />Secure checkout</p>
               </>
