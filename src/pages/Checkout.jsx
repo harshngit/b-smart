@@ -431,6 +431,7 @@ export default function Checkout() {
         orderDate={successDate}
         paymentMethod={successPaymentMethod}
         total={successTotal}
+        discount={confirmedOrder?.coinsDiscount ?? discount}
         items={successItems.map((item) => ({
           ...products.find((product) => String(product.id) === String(item.productId)),
           ...item,
