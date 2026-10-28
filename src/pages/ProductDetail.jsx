@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ChevronRight, ChevronDown, Heart, Star, Minus, Plus,
-  ShoppingCart, Package, Loader2, ShieldCheck, Zap, Truck, RotateCcw, BadgeCheck,
+  ShoppingCart, Package, Loader2, ShieldCheck, Zap, Truck, RotateCcw,
 } from 'lucide-react';
 import { addItem } from '../store/cartSlice';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
@@ -272,28 +272,6 @@ const ProductDetail = () => {
 
         {/* Info */}
         <div className="min-w-0 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
-          {!canUseStoreLinks && (
-            <div className="flex items-center justify-between gap-3 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="w-10 h-10 shrink-0 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center text-sm font-bold text-[#fa3f5e]">
-                  {product.vendor.charAt(0).toUpperCase()}
-                </span>
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1 text-sm font-bold text-gray-900 dark:text-white truncate">
-                    {product.vendor}
-                    {product.seller?.is_verified && <BadgeCheck size={14} className="text-[#fa3f5e] shrink-0" />}
-                  </p>
-                  {product.vendorRating > 0 && (
-                    <p className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                      <Star size={11} className="fill-amber-400 text-amber-400" /> {product.vendorRating} vendor rating
-                    </p>
-                  )}
-                </div>
-              </div>
-              <button type="button" className="shrink-0 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#fa3f5e]">Follow</button>
-            </div>
-          )}
-
           <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${text}`}>{product.category}</p>
           <h1 className="text-2xl lg:text-3xl font-bold leading-tight text-gray-900 dark:text-white mb-3 break-words">{product.name}</h1>
           <div className="flex flex-wrap items-center gap-3 mb-4">

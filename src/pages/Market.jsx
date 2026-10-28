@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { CheckCircle2, Heart, Star, BadgeCheck, Store, ShoppingCart, Package, UserRound, ReceiptText, Search, SlidersHorizontal, X, Sparkles, ArrowRight, LayoutGrid, List, ChevronDown, ChevronLeft, ChevronRight, Briefcase, Check } from 'lucide-react';
+import { CheckCircle2, Heart, Star, BadgeCheck, ShoppingCart, Package, UserRound, Search, SlidersHorizontal, X, Sparkles, ArrowRight, LayoutGrid, List, ChevronDown, ChevronLeft, ChevronRight, Briefcase, Check } from 'lucide-react';
 import { addItem } from '../store/cartSlice';
 import ServiceIcon from '../myStore/components/ServiceIcon';
 import { servicePrice } from '../myStore/data/serviceFields';
@@ -10,7 +10,6 @@ import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import influencerProductService from '../services/influencerProductService';
 import influencerServiceService from '../services/influencerServiceService';
-import InfluencerSwitchModal from '../components/InfluencerSwitchModal';
 
 const FILTERS = ['All', 'Products', 'Services', 'Persons'];
 
@@ -209,18 +208,13 @@ const Market = () => {
   const [maxPrice, setMaxPrice] = useState('');
   const [viewMode, setViewMode] = useState('grid');
   const [page, setPage] = useState(1);
-  const [updatedLabel, setUpdatedLabel] = useState('');
   const PAGE_SIZE = 8;
   const { isSaved, toggle } = useMarketplaceWishlist();
   const mockProducts = useSelector((state) => state.products.items);
   const mockServices = useSelector((state) => state.services.items);
   const user = useSelector((state) => state.auth.userObject);
   const cartItems = useSelector((state) => state.cart.items);
-  const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
-  const isInfluencer = user?.role === 'influencer';
-  const [showInfluencerModal, setShowInfluencerModal] = useState(false);
   const [wishlistPopup, setWishlistPopup] = useState('');
-  const cartIconRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -229,7 +223,6 @@ const Market = () => {
         if (!alive) return;
         setApiProducts(items);
         setProductsError('');
-        setUpdatedLabel('just now');
       })
       .catch((err) => {
         if (!alive) return;
@@ -254,7 +247,6 @@ const Market = () => {
         if (!alive) return;
         setApiServices(items);
         setServicesError('');
-        setUpdatedLabel('just now');
       })
       .catch((err) => {
         if (!alive) return;
@@ -332,7 +324,7 @@ const Market = () => {
     applyMaxPrice('');
   };
   const animateProductToCart = (sourceImage) => {
-    const cartTarget = cartIconRef.current;
+    const cartTarget = document.getElementById('marketplace-cart-icon');
     if (!sourceImage || !cartTarget || typeof sourceImage.getBoundingClientRect !== 'function') return;
     const sourceRect = sourceImage.getBoundingClientRect();
     const targetRect = cartTarget.getBoundingClientRect();
@@ -397,49 +389,6 @@ const Market = () => {
           {wishlistPopup}
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-end gap-2 mb-4">
-        <Link
-          to="/market/wishlist"
-          className="flex items-center gap-1.5 px-3 h-10 rounded-full border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
-        >
-          <Heart size={16} /> Wishlist
-        </Link>
-        <Link
-          to="/market/my-orders"
-          className="flex items-center gap-1.5 px-3 h-10 rounded-full border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
-        >
-          <ReceiptText size={16} /> My Orders
-        </Link>
-        {isInfluencer ? (
-          <Link
-            to="/market/my-store"
-            className="flex items-center gap-1.5 px-3 h-10 rounded-full border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
-          >
-            <Store size={16} /> My Store
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowInfluencerModal(true)}
-            className="flex items-center gap-1.5 px-3 h-10 rounded-full text-sm font-semibold text-white bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange"
-          >
-            <Store size={16} /> Create Store
-          </button>
-        )}
-        <Link
-          to="/cart"
-          ref={cartIconRef}
-          className="relative w-10 h-10 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
-        >
-          <ShoppingCart size={18} />
-          {cartCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#fa3f5e] text-white text-[10px] font-bold flex items-center justify-center leading-none">
-              {cartCount > 99 ? '99+' : cartCount}
-            </span>
-          )}
-        </Link>
-      </div>
-
       {/* Hero banner */}
       <section className="relative mb-14">
         <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#962fbf] via-[#d62976] to-[#fa7e1e] px-6 py-10 sm:px-10 sm:py-12 shadow-lg">
@@ -620,15 +569,6 @@ const Market = () => {
             ? `${productsError || servicesError} Showing local fallback listings where needed.`
             : `Showing ${totalItems} drop${totalItems === 1 ? '' : 's'} from verified creators`}
         </p>
-        {updatedLabel && (
-          <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            Live drops updated {updatedLabel}
-          </span>
-        )}
       </div>
 
       <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'grid grid-cols-1 gap-4'}>
@@ -748,8 +688,6 @@ const Market = () => {
           </aside>
         </div>
       )}
-
-      <InfluencerSwitchModal isOpen={showInfluencerModal} onClose={() => setShowInfluencerModal(false)} />
     </div>
   );
 };

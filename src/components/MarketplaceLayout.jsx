@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { ArrowLeft, Store, LayoutGrid, ClipboardList, ChevronDown, UserRound, Settings, LogOut, Sun, Moon, Bell, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Store, LayoutGrid, ClipboardList, ChevronDown, UserRound, Settings, LogOut, Sun, Moon, Bell, ShoppingCart, Heart } from 'lucide-react';
 import bsmartLogo from '../assets/bsmart.png';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import { logoutUser } from '../store/authSlice';
@@ -85,7 +85,7 @@ const MarketplaceLayout = () => {
                   {Object.entries(CATEGORY_STYLE).map(([name, { icon: CatIcon, text, bg }]) => (
                     <Link
                       key={name}
-                      to={`/market?category=${encodeURIComponent(name)}`}
+                      to={`/market/category/${encodeURIComponent(name)}`}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                     >
                       <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${bg}`}>
@@ -136,7 +136,15 @@ const MarketplaceLayout = () => {
               )}
             </button>
             <Link
+              to="/market/wishlist"
+              aria-label="Wishlist"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+            >
+              <Heart size={18} />
+            </Link>
+            <Link
               to="/cart"
+              id="marketplace-cart-icon"
               aria-label="Cart"
               className="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
             >
