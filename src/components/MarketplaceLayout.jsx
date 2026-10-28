@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { ArrowLeft, Store, LayoutGrid, ClipboardList, ChevronDown, UserRound, Settings, LogOut, Sun, Moon, Bell, ShoppingCart, Heart } from 'lucide-react';
+import { ArrowLeft, Store, LayoutGrid, ClipboardList, ChevronDown, UserRound, Settings, LogOut, Sun, Moon, Bell, ShoppingCart, Heart, Package, Briefcase } from 'lucide-react';
 import bsmartLogo from '../assets/bsmart.png';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import { logoutUser } from '../store/authSlice';
@@ -11,8 +11,8 @@ import { useNotificationSocket } from '../hooks/useNotificationSocket';
 const NAV_LINKS = [
   { label: 'Home', to: '/', match: (path) => path === '/' },
   { label: 'Marketplace', to: '/market', match: (path) => path === '/market' },
-  { label: 'My Store', to: '/market/my-store', match: (path) => path.startsWith('/market/my-store') },
-  { label: 'My Orders', to: '/market/my-orders', match: (path) => path.startsWith('/market/my-orders') },
+  { label: 'Products', to: '/market/products', match: (path) => path === '/market/products' },
+  { label: 'Services', to: '/market/services', match: (path) => path === '/market/services' },
 ];
 
 // Layout for buyer-facing Marketplace pages (browse, product/service detail,
@@ -100,16 +100,16 @@ const MarketplaceLayout = () => {
           </nav>
 
           <div className="flex items-center gap-1 ml-auto">
-            {/* Mobile: compact icon-only shortcuts */}
+            {/* Mobile: compact icon-only shortcut */}
             <div className="flex md:hidden items-center gap-1">
               <Link to="/market" aria-label="Marketplace" className={`flex h-9 w-9 items-center justify-center rounded-full ${location.pathname === '/market' ? 'bg-[#fa3f5e] text-white' : 'text-gray-500 dark:text-gray-400'}`}>
                 <LayoutGrid size={17} />
               </Link>
-              <Link to="/market/my-store" aria-label="My Store" className={`flex h-9 w-9 items-center justify-center rounded-full ${location.pathname.startsWith('/market/my-store') ? 'bg-[#fa3f5e] text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-                <Store size={17} />
+              <Link to="/market/products" aria-label="Products" className={`flex h-9 w-9 items-center justify-center rounded-full ${location.pathname === '/market/products' ? 'bg-[#fa3f5e] text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                <Package size={17} />
               </Link>
-              <Link to="/market/my-orders" aria-label="My Orders" className={`flex h-9 w-9 items-center justify-center rounded-full ${location.pathname.startsWith('/market/my-orders') ? 'bg-[#fa3f5e] text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-                <ClipboardList size={17} />
+              <Link to="/market/services" aria-label="Services" className={`flex h-9 w-9 items-center justify-center rounded-full ${location.pathname === '/market/services' ? 'bg-[#fa3f5e] text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                <Briefcase size={17} />
               </Link>
             </div>
 
@@ -183,6 +183,13 @@ const MarketplaceLayout = () => {
                 <Link to="/profile" onClick={() => setProfileOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <UserRound size={16} /> Profile
                 </Link>
+                <Link to="/market/my-store" onClick={() => setProfileOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <Store size={16} /> My Store
+                </Link>
+                <Link to="/market/my-orders" onClick={() => setProfileOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <ClipboardList size={16} /> My Orders
+                </Link>
+                <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
                 <Link to="/settings/account" onClick={() => setProfileOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <Settings size={16} /> Settings
                 </Link>
@@ -212,6 +219,13 @@ const MarketplaceLayout = () => {
                 <Link to="/profile" onClick={() => setProfileOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <UserRound size={16} /> Profile
                 </Link>
+                <Link to="/market/my-store" onClick={() => setProfileOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <Store size={16} /> My Store
+                </Link>
+                <Link to="/market/my-orders" onClick={() => setProfileOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <ClipboardList size={16} /> My Orders
+                </Link>
+                <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
                 <Link to="/settings/account" onClick={() => setProfileOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <Settings size={16} /> Settings
                 </Link>

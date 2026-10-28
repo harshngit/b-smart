@@ -23,11 +23,20 @@ const serviceCartSlice = createSlice({
       const { localId, changes } = action.payload;
       state.items = state.items.map((item) => (item.localId === localId ? { ...item, ...changes } : item));
     },
+    toggleSaved: (state, action) => {
+      const item = state.items.find((entry) => entry.localId === action.payload);
+      if (item) item.saved = !item.saved;
+    },
+    // Called after a successful checkout — drops the bookings that were just
+    // paid for but keeps anything the buyer set aside with "Save for later".
+    checkoutActive: (state) => {
+      state.items = state.items.filter((item) => item.saved);
+    },
     clearCart: (state) => {
       state.items = [];
     },
   },
 });
 
-export const { addItem, removeItem, updateItem, clearCart } = serviceCartSlice.actions;
+export const { addItem, removeItem, updateItem, toggleSaved, checkoutActive, clearCart } = serviceCartSlice.actions;
 export default serviceCartSlice.reducer;

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { CheckCircle2, Heart, Star, BadgeCheck, ShoppingCart, Package, UserRound, Search, SlidersHorizontal, X, Sparkles, ArrowRight, LayoutGrid, List, ChevronDown, ChevronLeft, ChevronRight, Briefcase, Check } from 'lucide-react';
+import { CheckCircle2, Heart, Star, BadgeCheck, ShoppingCart, Package, UserRound, Search, SlidersHorizontal, X, Sparkles, ArrowRight, LayoutGrid, List, ChevronDown, ChevronLeft, ChevronRight, Briefcase, Check, Clock, Video, MapPin, Store } from 'lucide-react';
 import { addItem } from '../store/cartSlice';
 import ServiceIcon from '../myStore/components/ServiceIcon';
 import { servicePrice } from '../myStore/data/serviceFields';
@@ -29,6 +29,8 @@ const MarketCardSkeleton = () => (
   </div>
 );
 
+const METHOD_ICON = { Online: Video, 'At customer location': MapPin, 'At my location': Store };
+
 export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantity = 0, showType = false, onFlyToCart }) => {
   const dispatch = useDispatch();
   const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
@@ -36,6 +38,9 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
   const vendorAvatar = product.seller?.avatar_url || product.seller?.profile_picture;
   const [adding, setAdding] = useState(false);
   const imageRef = useRef(null);
+  const hasDiscount = product.mrp > product.price;
+  const discountPercent = hasDiscount ? Math.round((1 - product.price / product.mrp) * 100) : 0;
+  const lowStock = product.stockQuantity > 0 && product.stockQuantity <= 5;
 
   const handleAddToCart = async () => {
     if (adding) return;
@@ -57,43 +62,38 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
       saved: false,
     }));
     onFlyToCart?.(imageRef.current);
-    window.setTimeout(() => setAdding(false), 250);
+    window.setTimeout(() => setAdding(false), 900);
   };
 
   return (
-    <div className="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
-        <div className={`relative aspect-[4/3] flex items-center justify-center overflow-hidden ${bg}`}>
-          <Link to={`/market/product/${product.id}`} state={{ product }} aria-label={`View ${product.name}`} className="absolute inset-0 flex items-center justify-center">
-            {image
-              ? <img ref={imageRef} src={image} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-              : <Icon size={48} className={`${text} opacity-70`} />}
-          </Link>
-          <span className={`absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/95 dark:bg-gray-900/95 text-[10px] font-bold tracking-wide uppercase ${text}`}>
-            <Icon size={11} /> {showType ? `Product · ${product.category}` : product.category}
-          </span>
-          <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200">
-            <button
-              type="button"
-              aria-label={`${isFavorite ? 'Remove' : 'Add'} ${product.name} ${isFavorite ? 'from' : 'to'} wishlist`}
-              aria-pressed={isFavorite}
-              onClick={onToggleFavorite}
-              className="w-9 h-9 rounded-full bg-white dark:bg-gray-800 shadow-md flex items-center justify-center hover:scale-110 transition-transform"
-            >
-              <Heart size={16} className={isFavorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-500'} />
-            </button>
-            <button
-              type="button"
-              aria-label={cartQuantity > 0 ? `Added to cart, add another ${product.name}` : `Add ${product.name} to cart`}
-              onClick={handleAddToCart}
-              disabled={adding}
-              className="w-9 h-9 rounded-full bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange shadow-md flex items-center justify-center text-white hover:scale-110 transition-transform disabled:opacity-70"
-            >
-              {cartQuantity > 0 ? <Check size={16} /> : <ShoppingCart size={15} />}
-            </button>
-          </div>
-        </div>
+    <div className="flex flex-col bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg transition-shadow duration-200 overflow-hidden">
+      <div className={`relative aspect-[4/3] flex items-center justify-center overflow-hidden ${bg}`}>
+        <Link to={`/market/product/${product.id}`} state={{ product }} aria-label={`View ${product.name}`} className="absolute inset-0 flex items-center justify-center">
+          {image
+            ? <img ref={imageRef} src={image} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" />
+            : <Icon size={44} className={`${text} opacity-70`} />}
+        </Link>
+        <span className={`absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/95 dark:bg-gray-900/95 text-[10px] font-bold tracking-wide uppercase ${text}`}>
+          <Icon size={11} /> {showType ? `Product · ${product.category}` : product.category}
+        </span>
+        <button
+          type="button"
+          aria-label={`${isFavorite ? 'Remove' : 'Add'} ${product.name} ${isFavorite ? 'from' : 'to'} wishlist`}
+          aria-pressed={isFavorite}
+          onClick={onToggleFavorite}
+          className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 dark:bg-gray-900/95 shadow-sm hover:scale-110 transition-transform"
+        >
+          <Heart size={15} className={isFavorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-500'} />
+        </button>
+        {hasDiscount && (
+          <span className="absolute bottom-3 left-3 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">SAVE {discountPercent}%</span>
+        )}
+        {lowStock && (
+          <span className="absolute bottom-3 right-3 rounded-full bg-[#fa3f5e] px-2 py-0.5 text-[10px] font-bold uppercase text-white">Only {product.stockQuantity} left</span>
+        )}
+      </div>
 
-      <div className="p-4">
+      <div className="flex flex-1 flex-col p-4">
         <div className="flex items-center gap-1.5 mb-2 min-w-0">
           {vendorAvatar
             ? <img src={vendorAvatar} alt={product.vendor} className="w-5 h-5 rounded-full object-cover shrink-0" />
@@ -106,13 +106,25 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
             {product.name}
           </h3>
         </Link>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-xs">
-            <Star size={13} className="fill-amber-400 text-amber-400" />
-            <span className="font-semibold text-gray-700 dark:text-gray-300">{product.rating > 0 ? product.rating : 'New'}</span>
-            {product.reviews > 0 && <span className="text-gray-400 dark:text-gray-500">({product.reviews})</span>}
+        <div className="flex items-center gap-1 text-xs mb-3">
+          <Star size={13} className="fill-amber-400 text-amber-400" />
+          <span className="font-semibold text-gray-700 dark:text-gray-300">{product.rating > 0 ? product.rating : 'New'}</span>
+          {product.reviews > 0 && <span className="text-gray-400 dark:text-gray-500">({product.reviews})</span>}
+        </div>
+        <div className="mt-auto flex items-center justify-between gap-3">
+          <div>
+            <p className="font-extrabold text-gray-900 dark:text-white text-base leading-none">₹{product.price.toFixed(2)}</p>
+            {hasDiscount && <p className="text-xs text-gray-400 line-through">₹{product.mrp.toFixed(2)}</p>}
           </div>
-          <p className="font-extrabold text-[#fa3f5e] text-base">₹{product.price.toFixed(2)}</p>
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            disabled={adding}
+            aria-label={cartQuantity > 0 ? `Added to cart, add another ${product.name}` : `Add ${product.name} to cart`}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fa3f5e] text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-70"
+          >
+            {cartQuantity > 0 || adding ? <Check size={16} /> : <ShoppingCart size={15} />}
+          </button>
         </div>
       </div>
     </div>
@@ -122,43 +134,64 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
 export const ServiceCard = ({ service, isFavorite, onToggleFavorite, showType = false }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const vendorAvatar = service.seller?.avatar_url || service.seller?.profile_picture;
+  const MethodIcon = METHOD_ICON[service.method] || MapPin;
+
   return (
-    <div className="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
+    <div className="flex flex-col bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg transition-shadow duration-200 overflow-hidden">
       <div className="relative aspect-[4/3] flex items-center justify-center overflow-hidden bg-pink-50 dark:bg-gray-800">
         <Link to={`/market/service/${service.id}`} aria-label={`View ${service.name}`} className="absolute inset-0 flex items-center justify-center">
-          {service.images?.[0] && !imageFailed ? <img src={service.images[0]} alt={service.name} onError={() => setImageFailed(true)} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" /> : <ServiceIcon size={48} className="text-[#fa3f5e] opacity-70" />}
+          {service.images?.[0] && !imageFailed
+            ? <img src={service.images[0]} alt={service.name} onError={() => setImageFailed(true)} className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" />
+            : <ServiceIcon size={44} className="text-[#fa3f5e] opacity-70" />}
         </Link>
         <span className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/95 dark:bg-gray-900/95 text-[10px] font-bold tracking-wide uppercase text-[#fa3f5e]">
           <ServiceIcon size={11} /> {showType ? `Service · ${service.category || 'Service'}` : service.category || 'Service'}
+        </span>
+        <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/95 dark:bg-gray-900/95 text-[10px] font-bold text-gray-600 dark:text-gray-300">
+          <MethodIcon size={11} /> {service.method}
         </span>
         <button
           type="button"
           aria-label={`${isFavorite ? 'Remove' : 'Add'} ${service.name} ${isFavorite ? 'from' : 'to'} wishlist`}
           aria-pressed={isFavorite}
           onClick={onToggleFavorite}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white dark:bg-gray-800 shadow-md flex items-center justify-center opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:scale-110 transition-all duration-200"
+          className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 dark:bg-gray-900/95 shadow-sm hover:scale-110 transition-transform"
         >
-          <Heart size={16} className={isFavorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-500'} />
+          <Heart size={15} className={isFavorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-500'} />
         </button>
       </div>
-    <div className="p-4">
-      <div className="flex items-center gap-1.5 mb-2 min-w-0">
-        {vendorAvatar
-          ? <img src={vendorAvatar} alt={service.provider} className="w-5 h-5 rounded-full object-cover shrink-0" />
-          : <span className="w-5 h-5 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center shrink-0"><UserRound size={11} className="text-[#fa3f5e]" /></span>}
-        <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 truncate">{service.provider || 'Creator'}</span>
-        {service.seller?.is_verified && <BadgeCheck size={13} className="text-[#fa3f5e] shrink-0" />}
-      </div>
-      <Link to={`/market/service/${service.id}`}><h3 className="font-bold text-gray-900 dark:text-white text-sm mb-2 line-clamp-2 leading-snug hover:text-[#fa3f5e] transition-colors" title={service.name}>{service.name}</h3></Link>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 text-xs">
-          <Star size={13} className="fill-amber-400 text-amber-400" />
-          <span className="font-semibold text-gray-700 dark:text-gray-300">{service.rating > 0 ? service.rating : 'New'}</span>
-          <span className="text-gray-400 dark:text-gray-500">· {service.duration || '1 hour'}</span>
+
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-center gap-1.5 mb-2 min-w-0">
+          {vendorAvatar
+            ? <img src={vendorAvatar} alt={service.provider} className="w-5 h-5 rounded-full object-cover shrink-0" />
+            : <span className="w-5 h-5 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center shrink-0"><UserRound size={11} className="text-[#fa3f5e]" /></span>}
+          <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 truncate">{service.provider || 'Creator'}</span>
+          {service.seller?.is_verified && <BadgeCheck size={13} className="text-[#fa3f5e] shrink-0" />}
         </div>
-        <p className="font-extrabold text-[#fa3f5e] text-base">{servicePrice(service)}</p>
+
+        <Link to={`/market/service/${service.id}`}>
+          <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-2 line-clamp-2 leading-snug hover:text-[#fa3f5e] transition-colors" title={service.name}>{service.name}</h3>
+        </Link>
+
+        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mb-3">
+          <span className="flex items-center gap-1"><Clock size={12} /> {service.duration || '1 hour'}</span>
+          <span className="flex items-center gap-1"><Star size={12} className="fill-amber-400 text-amber-400" /> {service.rating > 0 ? service.rating : 'New'}{service.reviews > 0 && <span className="text-gray-400">({service.reviews})</span>}</span>
+        </div>
+
+        <div className="mt-auto flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{service.rateType}</p>
+            <p className="font-extrabold text-gray-900 dark:text-white text-base leading-none">{servicePrice(service)}</p>
+          </div>
+          <Link
+            to={`/market/service/${service.id}`}
+            className="flex h-10 shrink-0 items-center rounded-full bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange px-4 text-xs font-bold text-white hover:opacity-90 transition-opacity"
+          >
+            View &amp; Book
+          </Link>
+        </div>
       </div>
-    </div>
     </div>
   );
 };

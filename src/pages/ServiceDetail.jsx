@@ -142,7 +142,7 @@ function BookingPage({ service }) {
     time_slot: { start: time, end: slotEnd(time) },
     selected_subservices: selectedSubservices.map((name) => ({ name })),
     ...(atCustomer ? { customer_address: address } : {}),
-    ...(note.trim() ? { note: note.trim() } : {}),
+    ...(note.trim() ? { notes: note.trim() } : {}),
   });
 
   const addToCart = () => {
