@@ -8,6 +8,8 @@ import { servicePrice } from '../myStore/data/serviceFields';
 import { getProfilePath } from '../utils/profilePath';
 import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
+import { MARKETPLACE_BANNER_IMAGES, CATEGORY_IMAGE } from '../data/marketplaceBannerImages';
+import MarketplaceBanner from '../components/MarketplaceBanner';
 import influencerProductService from '../services/influencerProductService';
 import influencerServiceService from '../services/influencerServiceService';
 
@@ -424,8 +426,8 @@ const Market = () => {
       )}
       {/* Hero banner */}
       <section className="relative mb-14">
-        <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#962fbf] via-[#d62976] to-[#fa7e1e] px-6 py-10 sm:px-10 sm:py-12 shadow-lg">
-          <div className="relative z-10 max-w-xl">
+        <MarketplaceBanner images={MARKETPLACE_BANNER_IMAGES} className="px-6 py-10 sm:px-10 sm:py-12 shadow-lg">
+          <div className="max-w-xl">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
               <Sparkles size={12} /> Direct creator economy drop
             </span>
@@ -447,7 +449,7 @@ const Market = () => {
               </span>
             </div>
           </div>
-        </div>
+        </MarketplaceBanner>
 
         <div className="absolute inset-x-4 sm:inset-x-10 -bottom-7 z-20">
           <div className="flex items-center gap-1 rounded-full bg-white p-1.5 shadow-xl ring-1 ring-black/5">
@@ -566,13 +568,14 @@ const Market = () => {
                 : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 hover:-translate-y-0.5'
             }`}
           >
-            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-insta-purple via-insta-pink to-insta-orange flex items-center justify-center shrink-0">
-              <LayoutGrid size={16} className="text-white" />
+            <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-insta-purple via-insta-pink to-insta-orange flex items-center justify-center shrink-0">
+              <LayoutGrid size={18} className="text-white" />
             </span>
             <span className={`text-sm font-semibold ${categoryFilter === 'All categories' ? 'text-[#fa3f5e]' : 'text-gray-700 dark:text-gray-300'}`}>All</span>
           </button>
           {Object.entries(CATEGORY_STYLE).map(([name, { icon: CatIcon, text, bg }]) => {
             const active = categoryFilter === name;
+            const image = CATEGORY_IMAGE[name];
             return (
               <button
                 key={name}
@@ -584,9 +587,9 @@ const Market = () => {
                     : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 hover:-translate-y-0.5'
                 }`}
               >
-                <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
-                  <CatIcon size={17} className={text} />
-                </span>
+                {image
+                  ? <img src={image} alt="" aria-hidden="true" className="w-11 h-11 rounded-xl object-cover shrink-0" />
+                  : <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${bg}`}><CatIcon size={18} className={text} /></span>}
                 <span className={`text-sm font-semibold ${active ? 'text-[#fa3f5e]' : 'text-gray-700 dark:text-gray-300'}`}>{name}</span>
               </button>
             );

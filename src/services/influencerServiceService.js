@@ -24,6 +24,20 @@ const prepareServiceImages = async (images) => {
   ));
 };
 
+// Each subservice optionally carries one image, in the same {file, url,
+// fileName} shape useMediaUploader produces for the main gallery. Batches
+// every new file into a single upload request, same as prepareServiceImages.
+const prepareSubserviceImages = async (subservices) => {
+  const newFiles = subservices.filter((s) => s.image?.file).map((s) => s.image.file);
+  const uploaded = await uploadInfluencerServiceImages(newFiles);
+  let uploadIndex = 0;
+  return subservices.map((s) => {
+    if (!s.image) return { ...s, image: null };
+    if (s.image.file) return { ...s, image: uploaded[uploadIndex++] };
+    return { ...s, image: { fileName: normalizeUploadPath(s.image.fileName || s.image.url) } };
+  });
+};
+
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const RATE_TO_API = {
@@ -94,12 +108,16 @@ export const normalizeInfluencerService = (service = {}) => {
     price: Number(service.price || 0),
     rateType: RATE_FROM_API[service.rate_type] || service.rateType || 'Starting from',
     duration: service.duration || '1 hour',
+    hasVariants: Boolean(service.has_variants),
+    allowMultiple: Boolean(service.allow_multiple),
     subservices: (service.subservices || []).map((item, index) => ({
       id: item.id || item._id || `${id || 'sub'}-${index}`,
       name: item.name || '',
       hours: item.hours ?? '',
       price: item.price ?? '',
       sqft: item.sqft ?? '',
+      allowMultiple: Boolean(item.allow_multiple),
+      image: item.image ? resolveProductImageUrl(item.image) : '',
     })),
     method: METHOD_FROM_API[service.service_method] || service.method || 'At customer location',
     serviceTime: service.service_time?.start && service.service_time?.end
@@ -118,7 +136,7 @@ export const normalizeInfluencerService = (service = {}) => {
   };
 };
 
-export const serviceFormToApiPayload = ({ form, highlights, subservices, availability, images, draft, serviceTime, serviceArea }) => ({
+export const serviceFormToApiPayload = ({ form, highlights, subservices, availability, images, draft, serviceTime, serviceArea, hasVariants, allowMultiple }) => ({
   images,
   name: form.name.trim(),
   category: form.category,
@@ -128,11 +146,17 @@ export const serviceFormToApiPayload = ({ form, highlights, subservices, availab
   price: Number(form.price) || 0,
   rate_type: RATE_TO_API[form.rateType] || 'starting_from',
   duration: form.duration,
+  has_variants: Boolean(hasVariants),
+  allow_multiple: Boolean(allowMultiple),
   subservices: subservices.map((item) => ({
     name: item.name.trim(),
     hours: Number(item.hours) || 0,
     price: Number(item.price) || 0,
     sqft: Number(item.sqft) || 0,
+    allow_multiple: Boolean(item.allowMultiple),
+    // Expected to already be prepared via prepareSubserviceImages (file ->
+    // {fileName}) before this is called — see ServiceForm.jsx's save().
+    image: item.image?.fileName ? { fileName: item.image.fileName } : null,
   })),
   service_method: METHOD_TO_API[form.method] || 'at_customer_location',
   weekly_availability: availabilityToApi(availability),
@@ -145,6 +169,7 @@ export const serviceFormToApiPayload = ({ form, highlights, subservices, availab
 
 const influencerServiceService = {
   prepareImages: prepareServiceImages,
+  prepareSubserviceImages,
   list: async (params = {}) => {
     const { data } = await api.get('/influencer-services', { params });
     return firstArray(data).map(normalizeInfluencerService);

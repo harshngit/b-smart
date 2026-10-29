@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Store, ChevronRight, ChevronLeft, Package, Search, SlidersHorizontal, X, BadgeCheck, ShieldCheck } from 'lucide-react';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
+import { PRODUCT_BANNER_IMAGES } from '../data/marketplaceBannerImages';
+import MarketplaceBanner from '../components/MarketplaceBanner';
 import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import influencerProductService from '../services/influencerProductService';
 import { ProductCard } from './Market';
@@ -111,23 +113,25 @@ export default function ProductsPage() {
         <span className="font-semibold text-gray-700 dark:text-gray-300">Products</span>
       </div>
 
-      <section className="rounded-[28px] border border-gray-100 dark:border-gray-800 p-5 sm:p-6 mb-5">
-        <div className="flex flex-wrap items-center justify-between gap-5">
-          <div className="flex items-center gap-4">
-            <span className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 bg-pink-50 dark:bg-gray-800">
-              <Package size={28} className="text-[#fa3f5e]" />
-            </span>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Products</h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {listedProducts.length} product{listedProducts.length === 1 ? '' : 's'} from verified creator stores
-              </p>
+      <section className="mb-5">
+        <MarketplaceBanner images={PRODUCT_BANNER_IMAGES} className="p-5 sm:p-6 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <span className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+                <Package size={28} className="text-white" />
+              </span>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Products</h1>
+                <p className="mt-1 text-sm text-white/85">
+                  {listedProducts.length} product{listedProducts.length === 1 ? '' : 's'} from verified creator stores
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-white/85">
+              <ShieldCheck size={14} className="text-emerald-300" /> Real stock &amp; pricing from live creator listings
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
-            <ShieldCheck size={14} className="text-emerald-500" /> Real stock &amp; pricing from live creator listings
-          </div>
-        </div>
+        </MarketplaceBanner>
       </section>
 
       {/* Category tabs */}

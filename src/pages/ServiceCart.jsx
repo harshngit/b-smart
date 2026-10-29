@@ -60,6 +60,7 @@ export default function ServiceCart() {
             {service.category && <span className={badge}>{service.category}</span>}
             {service.method && <span className={badge}><MethodIcon size={11} /> {service.method}</span>}
             {service.duration && <span className={badge}><Clock size={11} /> {service.duration}</span>}
+            {item.base_quantity > 1 && <span className={badge}>Qty ×{item.base_quantity}</span>}
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -72,7 +73,7 @@ export default function ServiceCart() {
                 const match = service.subservices?.find((s) => s.name === sub.name);
                 return (
                   <span key={sub.name} className="rounded-full bg-pink-50 dark:bg-pink-900/10 px-2 py-0.5 text-[11px] font-semibold text-[#fa3f5e]">
-                    {sub.name}{match?.price ? ` · ₹${match.price}` : ''}
+                    {sub.name}{sub.quantity > 1 ? ` ×${sub.quantity}` : ''}{match?.price ? ` · ₹${match.price}` : ''}
                   </span>
                 );
               })}

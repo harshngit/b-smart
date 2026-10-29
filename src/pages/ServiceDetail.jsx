@@ -47,7 +47,8 @@ function BookingPage({ service }) {
   const [addressesLoading, setAddressesLoading] = useState(false);
   const [note, setNote] = useState('');
   const [coinsToUse, setCoinsToUse] = useState(0);
-  const [selectedSubservices, setSelectedSubservices] = useState([]);
+  const [selectedSubservices, setSelectedSubservices] = useState({}); // { [name]: quantity }
+  const [baseQuantity, setBaseQuantity] = useState(1);
   const [reviewing, setReviewing] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -66,11 +67,15 @@ function BookingPage({ service }) {
   const dates = Array.from({ length: 5 }, (_, index) => { const value = new Date(`${date || firstDate}T12:00:00`); value.setDate(value.getDate() + index); return localDate(value); });
   const chosenDay = new Date(`${date}T12:00:00`);
   const addressText = [address.address_line1, address.city, address.pincode].filter(Boolean).join(', ');
-  const subservicesTotal = selectedSubservices.reduce((sum, name) => {
+  // Base (non-variant) quantity only applies when the service has no variants
+  // and the seller enabled allow_multiple on the base price itself.
+  const baseAllowMultiple = !service.hasVariants && service.allowMultiple;
+  const effectiveBaseQuantity = baseAllowMultiple ? baseQuantity : 1;
+  const subservicesTotal = Object.entries(selectedSubservices).reduce((sum, [name, quantity]) => {
     const match = service.subservices?.find((item) => item.name === name);
-    return sum + (match ? Number(match.price) || 0 : 0);
+    return sum + (match ? (Number(match.price) || 0) * quantity : 0);
   }, 0);
-  const totalAmount = (Number(service.price) || 0) + subservicesTotal;
+  const totalAmount = (Number(service.price) || 0) * effectiveBaseQuantity + subservicesTotal;
 
   useEffect(() => {
     dispatch(fetchWallet());
@@ -132,15 +137,20 @@ function BookingPage({ service }) {
     const total = hours * 60 + minutes + durationMinutes(service.duration);
     return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
   };
-  const toggleSubservice = (name) => {
-    setSelectedSubservices((current) => current.includes(name) ? current.filter((item) => item !== name) : [...current, name]);
-  };
+  const setSubserviceQty = (name, quantity) => setSelectedSubservices((current) => {
+    const next = { ...current };
+    if (quantity > 0) next[name] = quantity;
+    else delete next[name];
+    return next;
+  });
+  const toggleSubservice = (name) => setSubserviceQty(name, selectedSubservices[name] > 0 ? 0 : 1);
 
   const buildItemPayload = () => ({
     service_id: service.id,
     booking_date: date,
     time_slot: { start: time, end: slotEnd(time) },
-    selected_subservices: selectedSubservices.map((name) => ({ name })),
+    selected_subservices: Object.entries(selectedSubservices).map(([name, quantity]) => ({ name, quantity })),
+    ...(baseAllowMultiple ? { base_quantity: baseQuantity } : {}),
     ...(atCustomer ? { customer_address: address } : {}),
     ...(note.trim() ? { notes: note.trim() } : {}),
   });
@@ -271,14 +281,29 @@ function BookingPage({ service }) {
           </div>
         ) : (
         <form onSubmit={submit} className="space-y-4"><h2 className="text-base font-bold text-gray-900 dark:text-white">{reviewing ? 'Review your booking' : 'Select availability'}</h2>
-          {reviewing ? <div className="space-y-3 text-sm text-gray-500"><p className="font-semibold text-gray-900 dark:text-white">{service.name}</p><p>{chosenDay.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - {bookingTime(time)}</p><p>{service.duration}</p><p className="break-words">{atCustomer ? addressText : service.method === 'Online' ? 'Online' : service.address}</p>{selectedSubservices.length > 0 && <p>Selected: {selectedSubservices.join(', ')}</p>}<p className="font-semibold text-[#fa3f5e]">₹{totalAmount.toLocaleString()}</p><p className="text-xs">{coinsToUse > 0 ? `Coins ₹${Math.min(coinsToUse, walletBalance, totalAmount).toLocaleString()} + Razorpay ₹${Math.max(0, totalAmount - Math.min(coinsToUse, walletBalance, totalAmount)).toLocaleString()}` : 'Paid fully via Razorpay'}</p><button type="button" onClick={() => setReviewing(false)} className="text-xs text-[#fa3f5e]">Edit booking</button></div> : <>
+          {reviewing ? <div className="space-y-3 text-sm text-gray-500"><p className="font-semibold text-gray-900 dark:text-white">{service.name}</p><p>{chosenDay.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - {bookingTime(time)}</p><p>{service.duration}</p><p className="break-words">{atCustomer ? addressText : service.method === 'Online' ? 'Online' : service.address}</p>{Object.keys(selectedSubservices).length > 0 && <p>Selected: {Object.entries(selectedSubservices).map(([name, quantity]) => quantity > 1 ? `${name} ×${quantity}` : name).join(', ')}</p>}{baseAllowMultiple && baseQuantity > 1 && <p>Quantity: {baseQuantity}</p>}<p className="font-semibold text-[#fa3f5e]">₹{totalAmount.toLocaleString()}</p><p className="text-xs">{coinsToUse > 0 ? `Coins ₹${Math.min(coinsToUse, walletBalance, totalAmount).toLocaleString()} + Razorpay ₹${Math.max(0, totalAmount - Math.min(coinsToUse, walletBalance, totalAmount)).toLocaleString()}` : 'Paid fully via Razorpay'}</p><button type="button" onClick={() => setReviewing(false)} className="text-xs text-[#fa3f5e]">Edit booking</button></div> : <>
             <div className="flex items-center gap-2"><div className="grid grid-cols-5 gap-1 flex-1 min-w-0">{dates.map((value) => { const day = new Date(`${value}T12:00:00`); return <button type="button" key={value} onClick={() => selectDate(value)} aria-pressed={date === value} className={`rounded-lg border py-2 text-center ${date === value ? 'border-[#fa3f5e] text-[#fa3f5e] bg-pink-50/30 dark:bg-pink-900/10' : 'border-gray-100 dark:border-gray-800 text-gray-500'}`}><span className="block text-[10px]">{day.toLocaleDateString('en-US', { weekday: 'short' })}</span><strong className="block text-sm mt-1">{day.getDate()}</strong><span className="block text-[10px] mt-1">{day.toLocaleDateString('en-US', { month: 'short' })}</span></button>; })}</div><button type="button" aria-label="Choose another date" aria-expanded={calendarOpen} onClick={() => setCalendarOpen(!calendarOpen)} className="rounded-lg border border-gray-100 dark:border-gray-800 p-2 text-gray-500"><CalendarDays size={18} /></button></div>
             {calendarOpen && <label className="block text-xs text-gray-500">Choose another date<input type="date" required min={localDate()} value={date} onChange={(event) => selectDate(event.target.value)} className={`${inputCls} mt-1`} /></label>}
             <h3 className="text-sm font-bold text-gray-900 dark:text-white">{Number.isNaN(chosenDay.getTime()) ? 'Choose a date' : chosenDay.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</h3>
             {['Morning', 'Afternoon'].map((period) => { const periodTimes = times.filter((slot) => period === 'Morning' ? slot < '12:00' : slot >= '12:00'); return periodTimes.length > 0 && <fieldset key={period}><legend className="text-xs text-insta-purple mb-2">{period}</legend><div className="grid grid-cols-3 gap-2">{(showAllTimes ? periodTimes : periodTimes.slice(0, 3)).map((slot) => <button type="button" key={slot} aria-pressed={time === slot} onClick={() => { setTime(slot); setError(''); }} className={`rounded-lg border py-2 text-[11px] ${time === slot ? 'bg-[#fa3f5e] border-[#fa3f5e] text-white' : 'border-gray-100 dark:border-gray-800 text-gray-500'}`}>{bookingTime(slot)}</button>)}</div></fieldset>; })}
             {(times.filter((slot) => slot < '12:00').length > 3 || times.filter((slot) => slot >= '12:00').length > 3) && <button type="button" onClick={() => setShowAllTimes(!showAllTimes)} className="text-[11px] text-[#fa3f5e]">{showAllTimes ? 'Show fewer times' : 'More available times'}</button>}{!times.length && <p className="text-xs text-gray-500">No available times on this date. Choose another day.</p>}
             <div className="flex items-center gap-2 rounded-lg border border-gray-100 dark:border-gray-800 p-3 text-xs"><Clock size={16} className="text-gray-500" />{service.duration}</div>
-            {service.subservices?.length > 0 && <fieldset className="space-y-2"><legend className="text-sm font-bold text-gray-900 dark:text-white">Subservices</legend>{service.subservices.map((item) => <label key={item.name} className="flex items-center gap-2 text-sm text-gray-500"><input type="checkbox" checked={selectedSubservices.includes(item.name)} onChange={() => toggleSubservice(item.name)} className="accent-[#fa3f5e]" />{item.name}{item.sqft ? ` · ${item.sqft} sqft` : ''} — ₹{item.price}</label>)}</fieldset>}
+            {baseAllowMultiple && <div className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-800 p-3 text-xs"><span className="text-gray-500">Quantity</span><span className="flex items-center gap-2"><button type="button" aria-label="Decrease quantity" onClick={() => setBaseQuantity((qty) => Math.max(1, qty - 1))} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">−</button><span className="w-5 text-center text-xs font-semibold text-gray-900 dark:text-white">{baseQuantity}</span><button type="button" aria-label="Increase quantity" onClick={() => setBaseQuantity((qty) => qty + 1)} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">+</button></span></div>}
+            {service.subservices?.length > 0 && <fieldset className="space-y-2"><legend className="text-sm font-bold text-gray-900 dark:text-white">Subservices</legend>{service.subservices.map((item) => { const qty = selectedSubservices[item.name] || 0; return (
+              <div key={item.name} className="flex items-center gap-2 text-sm text-gray-500">
+                <span className="w-8 h-8 rounded overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">{item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <ServiceIcon size={16} className="text-[#fa3f5e]/60" />}</span>
+                <span className="flex-1 min-w-0 truncate">{item.name}{item.sqft ? ` · ${item.sqft} sqft` : ''} — ₹{item.price}</span>
+                {item.allowMultiple ? (
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <button type="button" aria-label={`Decrease ${item.name} quantity`} onClick={() => setSubserviceQty(item.name, Math.max(0, qty - 1))} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">−</button>
+                    <span className="w-5 text-center text-xs font-semibold text-gray-900 dark:text-white">{qty}</span>
+                    <button type="button" aria-label={`Increase ${item.name} quantity`} onClick={() => setSubserviceQty(item.name, qty + 1)} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">+</button>
+                  </span>
+                ) : (
+                  <input type="checkbox" aria-label={`Select ${item.name}`} checked={qty > 0} onChange={() => toggleSubservice(item.name)} className="accent-[#fa3f5e] shrink-0" />
+                )}
+              </div>
+            ); })}</fieldset>}
             {atCustomer ? <div><button type="button" onClick={() => setAddressOpen(!addressOpen)} aria-expanded={addressOpen} className="w-full flex items-center gap-2 p-3 rounded-lg border border-gray-100 dark:border-gray-800 text-left"><MapPin size={17} className="text-gray-500 shrink-0" /><span className="flex-1 min-w-0 text-[11px] text-gray-500">Service address<span className="block truncate text-xs text-gray-900 dark:text-white mt-0.5">{addressesLoading ? 'Loading saved addresses...' : addressText || 'Add your address'}</span></span><ChevronRight size={16} /></button>{addressOpen && <div className="space-y-2">{savedAddresses.length > 0 && <label className="block text-xs text-gray-500">Saved address<select value={selectedSavedAddress} onChange={(event) => chooseSavedAddress(event.target.value)} className={`${inputCls} mt-1`}><option value="">Choose saved address</option>{savedAddresses.map((entry) => <option key={entry.id} value={entry.id}>{entry.label} - {entry.city}, {entry.pincode}</option>)}</select></label>}<label className="block text-xs text-gray-500">Address line<input required value={address.address_line1} onChange={(event) => updateAddress('address_line1', event.target.value)} className={`${inputCls} mt-1`} /></label><label className="block text-xs text-gray-500">City<input required value={address.city} onChange={(event) => updateAddress('city', event.target.value)} className={`${inputCls} mt-1`} /></label><label className="block text-xs text-gray-500">Pincode<input required value={address.pincode} onChange={(event) => updateAddress('pincode', event.target.value)} className={`${inputCls} mt-1`} /></label></div>}</div> : <p className="text-xs flex gap-2 text-gray-500"><MapPin size={16} />{service.method === 'Online' ? 'Joining details will be arranged with the provider.' : service.address || 'Contact the provider for the location.'}</p>}
             <div><h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">How to pay</h3><PaymentSplitSlider totalAmount={totalAmount} walletBalance={walletBalance} value={coinsToUse} onChange={setCoinsToUse} /></div>
             <details><summary className="text-[11px] text-gray-500 cursor-pointer">Add a note (optional)</summary><label className="block text-xs text-gray-500 mt-2">Note for the provider<textarea value={note} onChange={(event) => setNote(event.target.value)} className={`${inputCls} mt-1`} rows={2} /></label></details>

@@ -39,12 +39,16 @@ export function validateSubservices(subservices) {
   return '';
 }
 
-export function validateService(form, availability, draft = false, subservices = []) {
+export function validateService(form, availability, draft = false, subservices = [], hasVariants = false) {
   if (!draft) {
     if (!form.name.trim() || !form.description.trim()) return 'Enter a service name and description.';
-    if (form.price === '' || !Number.isFinite(Number(form.price)) || Number(form.price) < 0) return 'Enter a valid price of zero or more.';
-    const subserviceError = validateSubservices(subservices);
-    if (subserviceError) return subserviceError;
+    if (hasVariants) {
+      if (!subservices.some((s) => !isBlankSubservice(s))) return 'Add at least one subservice with a price.';
+      const subserviceError = validateSubservices(subservices);
+      if (subserviceError) return subserviceError;
+    } else if (form.price === '' || !Number.isFinite(Number(form.price)) || Number(form.price) < 0) {
+      return 'Enter a valid price of zero or more.';
+    }
     if (!availability.some((day) => day.slots.length)) return 'Add at least one availability slot.';
     if (form.method === 'At my location' && !form.address.trim()) return 'Enter your service address.';
   }

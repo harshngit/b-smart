@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Briefcase, ChevronRight, ChevronLeft, Download, Package, Search, SlidersHorizontal, Store, X } from 'lucide-react';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
+import { MARKETPLACE_BANNER_IMAGES } from '../data/marketplaceBannerImages';
+import MarketplaceBanner from '../components/MarketplaceBanner';
 import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import influencerProductService from '../services/influencerProductService';
 import influencerServiceService from '../services/influencerServiceService';
@@ -120,10 +122,7 @@ export default function CategoryPage() {
     applySortBy('Recommended');
   };
 
-  const style = CATEGORY_STYLE[category];
-  const CategoryIcon = style?.icon || Briefcase;
-  const iconText = style?.text || 'text-[#fa3f5e]';
-  const iconBg = style?.bg || 'bg-pink-50 dark:bg-gray-800';
+  const CategoryIcon = CATEGORY_STYLE[category]?.icon || Briefcase;
 
   const exportCsv = () => {
     const rows = [
@@ -150,41 +149,43 @@ export default function CategoryPage() {
       </div>
 
       {/* Header */}
-      <section className="rounded-[28px] border border-gray-100 dark:border-gray-800 p-5 sm:p-6 mb-5">
-        <div className="flex flex-wrap items-center justify-between gap-5">
-          <div className="flex items-center gap-4">
-            <span className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${iconBg}`}>
-              <CategoryIcon size={28} className={iconText} />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">{category}</h1>
-                <span className="rounded-full bg-gray-50 dark:bg-gray-800 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Category</span>
+      <section className="mb-5">
+        <MarketplaceBanner images={MARKETPLACE_BANNER_IMAGES} className="p-5 sm:p-6 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <span className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+                <CategoryIcon size={28} className="text-white" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-white">{category}</h1>
+                  <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">Category</span>
+                </div>
+                <p className="mt-1 text-sm text-white/85">
+                  {categoryProducts.length} product{categoryProducts.length === 1 ? '' : 's'} · {categoryServices.length} service{categoryServices.length === 1 ? '' : 's'} in {category}
+                </p>
               </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {categoryProducts.length} product{categoryProducts.length === 1 ? '' : 's'} · {categoryServices.length} service{categoryServices.length === 1 ? '' : 's'} in {category}
-              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-white/70">Switch:</span>
+              {Object.entries(CATEGORY_STYLE).map(([name, entry]) => {
+                const Icon = entry.icon;
+                const active = normalize(name) === normalize(category);
+                return (
+                  <Link
+                    key={name}
+                    to={`/market/category/${encodeURIComponent(name)}`}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      active ? 'bg-white text-gray-900' : 'bg-white/15 text-white hover:bg-white/25'
+                    }`}
+                  >
+                    <Icon size={13} /> {name}
+                  </Link>
+                );
+              })}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Switch:</span>
-            {Object.entries(CATEGORY_STYLE).map(([name, entry]) => {
-              const Icon = entry.icon;
-              const active = normalize(name) === normalize(category);
-              return (
-                <Link
-                  key={name}
-                  to={`/market/category/${encodeURIComponent(name)}`}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    active ? 'bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white' : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <Icon size={13} /> {name}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+        </MarketplaceBanner>
       </section>
 
       {/* Toolbar */}
