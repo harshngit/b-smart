@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Briefcase, ChevronRight, ChevronLeft, Download, Package, Search, SlidersHorizontal, Store, X } from 'lucide-react';
+import { Briefcase, ChevronRight, ChevronLeft, Download, Package, Search, SlidersHorizontal, Store, X, LayoutGrid, List } from 'lucide-react';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import { MARKETPLACE_BANNER_IMAGES } from '../data/marketplaceBannerImages';
 import MarketplaceBanner from '../components/MarketplaceBanner';
@@ -32,6 +32,7 @@ export default function CategoryPage() {
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
 
@@ -236,6 +237,27 @@ export default function CategoryPage() {
         <button type="button" onClick={exportCsv} className="flex h-11 items-center gap-1.5 rounded-full border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-gray-200 dark:hover:border-gray-700 transition-colors">
           <Download size={14} /> Export CSV
         </button>
+
+        <div className="flex items-center gap-0.5 rounded-full border border-gray-200 dark:border-gray-700 p-1">
+          <button
+            type="button"
+            aria-label="Grid view"
+            aria-pressed={viewMode === 'grid'}
+            onClick={() => setViewMode('grid')}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${viewMode === 'grid' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+          >
+            <LayoutGrid size={14} />
+          </button>
+          <button
+            type="button"
+            aria-label="List view"
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${viewMode === 'list' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+          >
+            <List size={14} />
+          </button>
+        </div>
       </div>
 
       {activeFilters.length > 0 && (
@@ -276,11 +298,11 @@ export default function CategoryPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'grid grid-cols-1 gap-4'}>
             {pageItems.map(({ type, data }) => (
               type === 'product'
-                ? <ProductCard key={`product-${data.id}`} product={data} showType isFavorite={isSaved('product', data.id)} onToggleFavorite={() => toggle('product', data.id, data)} />
-                : <ServiceCard key={`service-${data.id}`} service={data} showType isFavorite={isSaved('service', data.id)} onToggleFavorite={() => toggle('service', data.id)} />
+                ? <ProductCard key={`product-${data.id}`} product={data} showType isFavorite={isSaved('product', data.id)} onToggleFavorite={() => toggle('product', data.id, data)} layout={viewMode} />
+                : <ServiceCard key={`service-${data.id}`} service={data} showType isFavorite={isSaved('service', data.id)} onToggleFavorite={() => toggle('service', data.id)} layout={viewMode} />
             ))}
           </div>
 

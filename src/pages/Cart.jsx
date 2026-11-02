@@ -74,7 +74,6 @@ export default function Cart() {
     const mrp = Number(catalogProduct?.mrp || 0);
     return mrp > item.price ? sum + (mrp - item.price) * item.qty : sum;
   }, 0);
-  const rewardCoins = Math.round(subtotal * 10);
   const groups = active.reduce((result, item) => {
     const name = item.storeName || (ownerName ? `${ownerName}'s Personal Store` : 'Your Personal Store');
     (result[name] ||= []).push(item);
@@ -186,9 +185,8 @@ export default function Cart() {
           )}
           <div className="flex justify-between gap-3"><dt>Delivery</dt><dd className="font-semibold text-[#fa3f5e]">Free</dd></div>
         </dl>
-        <div className="flex justify-between items-center gap-3 py-5"><span className="text-sm font-semibold text-gray-900 dark:text-white">Total</span><span className="text-xl font-bold text-[#fa3f5e]">{money(subtotal)}</span></div>
-        <div className="flex items-center gap-2.5 border-t border-gray-100 dark:border-gray-800 pt-3 pb-4 text-xs text-gray-500 dark:text-gray-400"><span className="w-7 h-7 shrink-0 rounded-full bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white flex items-center justify-center text-lg font-bold">b</span><span>You will earn <span className="font-semibold text-[#fa3f5e]">{rewardCoins.toLocaleString('en-IN')} bCoins</span></span></div>
-        <button type="button" disabled={!selected.length || checkingOut} onClick={proceedToCheckout} className="w-full py-3.5 rounded-full text-sm font-bold text-white bg-gradient-to-r from-[#9f1239] to-[#fa3f5e] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">{checkingOut ? <span className="inline-flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />Checking cart...</span> : <>Proceed to Checkout <ArrowRight size={16} /></>}</button>
+        <div className="flex justify-between items-center gap-3 py-5 border-b border-gray-100 dark:border-gray-800"><span className="text-sm font-semibold text-gray-900 dark:text-white">Total</span><span className="text-xl font-bold text-[#fa3f5e]">{money(subtotal)}</span></div>
+        <button type="button" disabled={!selected.length || checkingOut} onClick={proceedToCheckout} className="mt-4 w-full py-3.5 rounded-full text-sm font-bold text-white bg-gradient-to-r from-[#9f1239] to-[#fa3f5e] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">{checkingOut ? <span className="inline-flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />Checking cart...</span> : <>Proceed to Checkout <ArrowRight size={16} /></>}</button>
         <div className="mt-4 flex items-start gap-2 text-[11px] leading-5 text-gray-400 dark:text-gray-500">
           <ShieldCheck size={14} className="shrink-0 mt-0.5 text-green-500" />
           Secure payments via Razorpay — UPI, cards, netbanking &amp; wallets.

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { CheckCircle2, Heart, Star, BadgeCheck, ShoppingCart, Package, UserRound, Search, SlidersHorizontal, X, Sparkles, ArrowRight, LayoutGrid, List, ChevronDown, ChevronLeft, ChevronRight, Briefcase, Check, Clock, Video, MapPin, Store } from 'lucide-react';
+import { CheckCircle2, Heart, Star, BadgeCheck, ShoppingCart, Package, UserRound, Search, SlidersHorizontal, X, Sparkles, ArrowRight, LayoutGrid, List, ChevronLeft, ChevronRight, Briefcase, Check, Clock, Video, MapPin, Store } from 'lucide-react';
 import { addItem } from '../store/cartSlice';
 import ServiceIcon from '../myStore/components/ServiceIcon';
 import { servicePrice } from '../myStore/data/serviceFields';
@@ -10,10 +10,11 @@ import useMarketplaceWishlist from '../hooks/useMarketplaceWishlist';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import { MARKETPLACE_BANNER_IMAGES, CATEGORY_IMAGE } from '../data/marketplaceBannerImages';
 import MarketplaceBanner from '../components/MarketplaceBanner';
+import { Dropdown } from '../components/productForm/ProductFormFields';
 import influencerProductService from '../services/influencerProductService';
 import influencerServiceService from '../services/influencerServiceService';
 
-const FILTERS = ['All', 'Products', 'Services', 'Persons'];
+const FILTERS = ['All', 'Products', 'Services'];
 
 const MarketCardSkeleton = () => (
   <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -33,7 +34,7 @@ const MarketCardSkeleton = () => (
 
 const METHOD_ICON = { Online: Video, 'At customer location': MapPin, 'At my location': Store };
 
-export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantity = 0, showType = false, onFlyToCart }) => {
+export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantity = 0, showType = false, onFlyToCart, layout = 'grid' }) => {
   const dispatch = useDispatch();
   const { icon: Icon, text, bg } = CATEGORY_STYLE[product.category] || { icon: Package, text: 'text-[#fa3f5e]', bg: 'bg-gray-50 dark:bg-gray-800' };
   const image = product.images?.[0];
@@ -66,6 +67,72 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
     onFlyToCart?.(imageRef.current);
     window.setTimeout(() => setAdding(false), 900);
   };
+
+  if (layout === 'list') {
+    return (
+      <div className="flex gap-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg transition-shadow duration-200 p-3 sm:p-4">
+        <Link to={`/market/product/${product.id}`} state={{ product }} aria-label={`View ${product.name}`} className={`relative w-24 h-24 sm:w-36 sm:h-36 shrink-0 rounded-xl overflow-hidden flex items-center justify-center ${bg}`}>
+          {image ? <img ref={imageRef} src={image} alt={product.name} className="w-full h-full object-cover" /> : <Icon size={36} className={`${text} opacity-70`} />}
+        </Link>
+        <div className="flex flex-1 min-w-0 flex-col justify-between py-0.5">
+          <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide ${text}`}>
+                  <Icon size={11} /> {showType ? `Product · ${product.category}` : product.category}
+                </span>
+                <Link to={`/market/product/${product.id}`} state={{ product }}>
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base mt-1 line-clamp-2 leading-snug hover:text-[#fa3f5e] transition-colors" title={product.name}>
+                    {product.name}
+                  </h3>
+                </Link>
+              </div>
+              <button
+                type="button"
+                aria-label={`${isFavorite ? 'Remove' : 'Add'} ${product.name} ${isFavorite ? 'from' : 'to'} wishlist`}
+                aria-pressed={isFavorite}
+                onClick={onToggleFavorite}
+                className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 dark:border-gray-800 hover:scale-110 transition-transform"
+              >
+                <Heart size={15} className={isFavorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-500'} />
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5 mt-2 min-w-0">
+              {vendorAvatar
+                ? <img src={vendorAvatar} alt={product.vendor} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                : <span className="w-5 h-5 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center shrink-0"><UserRound size={11} className="text-[#fa3f5e]" /></span>}
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 truncate">{product.vendor}</span>
+              {product.seller?.is_verified && <BadgeCheck size={13} className="text-[#fa3f5e] shrink-0" />}
+            </div>
+            <div className="flex items-center gap-2 text-xs mt-1.5">
+              <span className="flex items-center gap-1">
+                <Star size={13} className="fill-amber-400 text-amber-400" />
+                <span className="font-semibold text-gray-700 dark:text-gray-300">{product.rating > 0 ? product.rating : 'New'}</span>
+                {product.reviews > 0 && <span className="text-gray-400 dark:text-gray-500">({product.reviews})</span>}
+              </span>
+              {lowStock && <span className="rounded-full bg-[#fa3f5e] px-2 py-0.5 text-[10px] font-bold uppercase text-white">Only {product.stockQuantity} left</span>}
+            </div>
+          </div>
+          <div className="flex items-end justify-between gap-3 mt-3">
+            <div className="flex items-baseline gap-2">
+              <p className="font-extrabold text-gray-900 dark:text-white text-lg leading-none">₹{product.price.toFixed(2)}</p>
+              {hasDiscount && <p className="text-xs text-gray-400 line-through">₹{product.mrp.toFixed(2)}</p>}
+              {hasDiscount && <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">SAVE {discountPercent}%</span>}
+            </div>
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={adding}
+              aria-label={cartQuantity > 0 ? `Added to cart, add another ${product.name}` : `Add ${product.name} to cart`}
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#fa3f5e] px-4 text-xs font-bold text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-70"
+            >
+              {cartQuantity > 0 || adding ? <Check size={14} /> : <ShoppingCart size={13} />} Add to Cart
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg transition-shadow duration-200 overflow-hidden">
@@ -133,10 +200,69 @@ export const ProductCard = ({ product, isFavorite, onToggleFavorite, cartQuantit
   );
 };
 
-export const ServiceCard = ({ service, isFavorite, onToggleFavorite, showType = false }) => {
+export const ServiceCard = ({ service, isFavorite, onToggleFavorite, showType = false, layout = 'grid' }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const vendorAvatar = service.seller?.avatar_url || service.seller?.profile_picture;
   const MethodIcon = METHOD_ICON[service.method] || MapPin;
+
+  if (layout === 'list') {
+    return (
+      <div className="flex gap-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg transition-shadow duration-200 p-3 sm:p-4">
+        <Link to={`/market/service/${service.id}`} aria-label={`View ${service.name}`} className="relative w-24 h-24 sm:w-36 sm:h-36 shrink-0 rounded-xl overflow-hidden bg-pink-50 dark:bg-gray-800 flex items-center justify-center">
+          {service.images?.[0] && !imageFailed
+            ? <img src={service.images[0]} alt={service.name} onError={() => setImageFailed(true)} className="w-full h-full object-cover" />
+            : <ServiceIcon size={36} className="text-[#fa3f5e] opacity-70" />}
+        </Link>
+        <div className="flex flex-1 min-w-0 flex-col justify-between py-0.5">
+          <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-[#fa3f5e]">
+                  <ServiceIcon size={11} /> {showType ? `Service · ${service.category || 'Service'}` : service.category || 'Service'}
+                </span>
+                <Link to={`/market/service/${service.id}`}>
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base mt-1 line-clamp-2 leading-snug hover:text-[#fa3f5e] transition-colors" title={service.name}>{service.name}</h3>
+                </Link>
+              </div>
+              <button
+                type="button"
+                aria-label={`${isFavorite ? 'Remove' : 'Add'} ${service.name} ${isFavorite ? 'from' : 'to'} wishlist`}
+                aria-pressed={isFavorite}
+                onClick={onToggleFavorite}
+                className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 dark:border-gray-800 hover:scale-110 transition-transform"
+              >
+                <Heart size={15} className={isFavorite ? 'fill-[#fa3f5e] text-[#fa3f5e]' : 'text-gray-500'} />
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5 mt-2 min-w-0">
+              {vendorAvatar
+                ? <img src={vendorAvatar} alt={service.provider} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                : <span className="w-5 h-5 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center shrink-0"><UserRound size={11} className="text-[#fa3f5e]" /></span>}
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 truncate">{service.provider || 'Creator'}</span>
+              {service.seller?.is_verified && <BadgeCheck size={13} className="text-[#fa3f5e] shrink-0" />}
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+              <span className="flex items-center gap-1"><Clock size={12} /> {service.duration || '1 hour'}</span>
+              <span className="flex items-center gap-1"><Star size={12} className="fill-amber-400 text-amber-400" /> {service.rating > 0 ? service.rating : 'New'}{service.reviews > 0 && <span className="text-gray-400">({service.reviews})</span>}</span>
+              <span className="flex items-center gap-1"><MethodIcon size={12} /> {service.method}</span>
+            </div>
+          </div>
+          <div className="flex items-end justify-between gap-3 mt-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{service.rateType}</p>
+              <p className="font-extrabold text-gray-900 dark:text-white text-lg leading-none">{servicePrice(service)}</p>
+            </div>
+            <Link
+              to={`/market/service/${service.id}`}
+              className="flex h-9 shrink-0 items-center rounded-full bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange px-4 text-xs font-bold text-white hover:opacity-90 transition-opacity"
+            >
+              View &amp; Book
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg transition-shadow duration-200 overflow-hidden">
@@ -503,19 +629,12 @@ const Market = () => {
             {activeFilters.length > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#fa3f5e] px-1.5 text-[10px] font-bold text-white">{activeFilters.length}</span>}
           </button>
 
-          <div className="relative">
-            <select
-              aria-label="Sort by"
-              value={sortBy}
-              onChange={(event) => applySortBy(event.target.value)}
-              className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-9 text-sm font-semibold text-gray-700 outline-none focus:border-[#fa3f5e] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-            >
-              {['Recommended', 'Price: Low to high', 'Price: High to low', 'Top rated'].map((option) => (
-                <option key={option} value={option}>Sort: {option}</option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          </div>
+          <Dropdown
+            className="w-44"
+            value={`Sort: ${sortBy}`}
+            options={['Recommended', 'Price: Low to high', 'Price: High to low', 'Top rated'].map((option) => `Sort: ${option}`)}
+            onChange={(option) => applySortBy(option.replace('Sort: ', ''))}
+          />
 
           <div className="flex items-center gap-0.5 rounded-full border border-gray-200 dark:border-gray-700 p-1">
             <button
@@ -555,47 +674,35 @@ const Market = () => {
         </div>
       )}
 
-      {/* Explore categories */}
-      <div className="mb-6">
-        <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Explore Categories</h2>
-        <div className="flex flex-wrap gap-2.5">
-          <button
-            type="button"
-            onClick={() => applyCategoryFilter('All categories')}
-            className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 transition-all duration-150 ${
-              categoryFilter === 'All categories'
-                ? 'border-[#fa3f5e] bg-pink-50 dark:bg-pink-900/10 shadow-sm'
-                : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 hover:-translate-y-0.5'
-            }`}
-          >
-            <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-insta-purple via-insta-pink to-insta-orange flex items-center justify-center shrink-0">
-              <LayoutGrid size={18} className="text-white" />
-            </span>
-            <span className={`text-sm font-semibold ${categoryFilter === 'All categories' ? 'text-[#fa3f5e]' : 'text-gray-700 dark:text-gray-300'}`}>All</span>
-          </button>
-          {Object.entries(CATEGORY_STYLE).map(([name, { icon: CatIcon, text, bg }]) => {
-            const active = categoryFilter === name;
-            const image = CATEGORY_IMAGE[name];
-            return (
-              <button
-                key={name}
-                type="button"
-                onClick={() => applyCategoryFilter(active ? 'All categories' : name)}
-                className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 transition-all duration-150 ${
-                  active
-                    ? 'border-[#fa3f5e] bg-pink-50 dark:bg-pink-900/10 shadow-sm'
-                    : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 hover:-translate-y-0.5'
-                }`}
-              >
-                {image
-                  ? <img src={image} alt="" aria-hidden="true" className="w-11 h-11 rounded-xl object-cover shrink-0" />
-                  : <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${bg}`}><CatIcon size={18} className={text} /></span>}
-                <span className={`text-sm font-semibold ${active ? 'text-[#fa3f5e]' : 'text-gray-700 dark:text-gray-300'}`}>{name}</span>
-              </button>
-            );
-          })}
+      {/* Explore categories — product categories only, not shown on the Services tab */}
+      {activeFilter !== 'Services' && (
+        <div className="mb-6">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Explore Categories</h2>
+          <div className="flex flex-wrap gap-2.5">
+            {Object.entries(CATEGORY_STYLE).map(([name, { icon: CatIcon, text, bg }]) => {
+              const active = categoryFilter === name;
+              const image = CATEGORY_IMAGE[name];
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => applyCategoryFilter(active ? 'All categories' : name)}
+                  className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 transition-all duration-150 ${
+                    active
+                      ? 'border-[#fa3f5e] bg-pink-50 dark:bg-pink-900/10 shadow-sm'
+                      : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 hover:-translate-y-0.5'
+                  }`}
+                >
+                  {image
+                    ? <img src={image} alt="" aria-hidden="true" className="w-11 h-11 rounded-xl object-cover shrink-0" />
+                    : <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${bg}`}><CatIcon size={18} className={text} /></span>}
+                  <span className={`text-sm font-semibold ${active ? 'text-[#fa3f5e]' : 'text-gray-700 dark:text-gray-300'}`}>{name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-gray-400 dark:text-gray-500">
@@ -619,11 +726,12 @@ const Market = () => {
                 onToggleFavorite={() => toggleProductWishlist(item.data)}
                 onFlyToCart={animateProductToCart}
                 cartQuantity={cartItems.find((cartItem) => String(cartItem.productId || cartItem.id) === String(item.data.id))?.qty || 0}
+                layout={viewMode}
               />
             );
           }
           if (item.type === 'service') {
-            return <ServiceCard key={item.key} service={item.data} isFavorite={isSaved('service', item.data.id)} onToggleFavorite={() => toggle('service', item.data.id)} />;
+            return <ServiceCard key={item.key} service={item.data} isFavorite={isSaved('service', item.data.id)} onToggleFavorite={() => toggle('service', item.data.id)} layout={viewMode} />;
           }
           return <PersonCard key={item.key} user={item.data} productCount={listedProducts.length} serviceCount={listedServices.length} />;
         })}

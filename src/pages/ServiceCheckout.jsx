@@ -22,6 +22,7 @@ export default function ServiceCheckout() {
   const walletBalance = useSelector((state) => state.wallet.balance) || 0;
   const user = useSelector((state) => state.auth.userObject);
   const [coinsToUse, setCoinsToUse] = useState(0);
+  const [coinsAutoApplied, setCoinsAutoApplied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [placed, setPlaced] = useState(false);
@@ -30,6 +31,16 @@ export default function ServiceCheckout() {
   useEffect(() => { dispatch(fetchWallet()); }, [dispatch]);
 
   const total = items.reduce((sum, item) => sum + (Number(item.itemTotal) || 0), 0);
+
+  // Apply wallet balance by default (up to the total) so Razorpay only opens
+  // for what's left — the slider still lets the buyer dial it back.
+  useEffect(() => {
+    if (!coinsAutoApplied && walletBalance > 0 && total > 0) {
+      setCoinsToUse(Math.min(walletBalance, total));
+      setCoinsAutoApplied(true);
+    }
+  }, [walletBalance, total, coinsAutoApplied]);
+
   const coins = Math.max(0, Math.min(coinsToUse, walletBalance, total));
   const razorpayAmount = Math.max(0, total - coins);
   const hasAtCustomerItems = items.some((item) => item.customer_address);

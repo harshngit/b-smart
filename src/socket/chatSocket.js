@@ -35,6 +35,12 @@ const subscribers = {
   'call:ended': new Set(),
   'call:missed': new Set(),
   'call:peer-ready': new Set(),
+  'call:escalated': new Set(),
+  'group-call:ringing': new Set(),
+  'group-call:participant-joined': new Set(),
+  'group-call:participant-left': new Set(),
+  'group-call:peer-ready': new Set(),
+  'group-call:missed': new Set(),
 };
 
 const attachAllListeners = () => {
@@ -71,6 +77,12 @@ export const initChatSocket = (token, callbacks = {}, registeredUserId = null) =
     onCallEnded: 'call:ended',
     onCallMissed: 'call:missed',
     onCallPeerReady: 'call:peer-ready',
+    onCallEscalated: 'call:escalated',
+    onGroupCallRinging: 'group-call:ringing',
+    onGroupCallParticipantJoined: 'group-call:participant-joined',
+    onGroupCallParticipantLeft: 'group-call:participant-left',
+    onGroupCallPeerReady: 'group-call:peer-ready',
+    onGroupCallMissed: 'group-call:missed',
   };
 
   Object.entries(callbackMap).forEach(([key, eventName]) => {
@@ -132,6 +144,12 @@ export const removeChatSocketCallbacks = (callbacks = {}) => {
     onCallEnded: 'call:ended',
     onCallMissed: 'call:missed',
     onCallPeerReady: 'call:peer-ready',
+    onCallEscalated: 'call:escalated',
+    onGroupCallRinging: 'group-call:ringing',
+    onGroupCallParticipantJoined: 'group-call:participant-joined',
+    onGroupCallParticipantLeft: 'group-call:participant-left',
+    onGroupCallPeerReady: 'group-call:peer-ready',
+    onGroupCallMissed: 'group-call:missed',
   };
   Object.entries(callbackMap).forEach(([key, eventName]) => {
     if (typeof callbacks[key] === 'function') {
@@ -223,4 +241,37 @@ export const emitCallEnd = (callId, reason) => {
 // check whether BOTH sides are ready and tell both to pull.
 export const emitCallTrackPublished = (callId) => {
   if (socket) socket.emit('call:track-published', { callId });
+};
+
+// ── Group voice/video call signaling ─────────────────────────────────────────
+// Mirrors the 1:1 call:* emits above — see src/sockets/groupCallSignaling.js.
+export const emitGroupCallInitiate = (conversationId, callType, ack) => {
+  if (socket) socket.emit('group-call:initiate', { conversationId, callType }, ack);
+};
+
+export const emitGroupCallJoin = (groupCallId, ack) => {
+  if (socket) socket.emit('group-call:join', { groupCallId }, ack);
+};
+
+export const emitGroupCallDecline = (groupCallId) => {
+  if (socket) socket.emit('group-call:decline', { groupCallId });
+};
+
+export const emitGroupCallLeave = (groupCallId, reason) => {
+  if (socket) socket.emit('group-call:leave', { groupCallId, reason });
+};
+
+export const emitGroupCallTrackPublished = (groupCallId) => {
+  if (socket) socket.emit('group-call:track-published', { groupCallId });
+};
+
+// Adds new people to an already-active group call.
+export const emitGroupCallInvite = (groupCallId, userIds, ack) => {
+  if (socket) socket.emit('group-call:invite', { groupCallId, userIds }, ack);
+};
+
+// Escalates a live 1:1 call into a group call by adding people to it — both
+// original parties receive 'call:escalated' once this succeeds.
+export const emitCallEscalateToGroup = (callId, userIds, ack) => {
+  if (socket) socket.emit('call:escalate-to-group', { callId, userIds }, ack);
 };

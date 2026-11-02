@@ -12,6 +12,7 @@ import {
   SquarePen,
   Sticker,
   UserMinus,
+  Video,
   X,
 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
@@ -22,7 +23,11 @@ import VoiceMessageBubble from '../components/VoiceMessageBubble';
 import VoiceRecorder from '../components/VoiceRecorder';
 import PostDetailModal from '../components/PostDetailModal';
 import CallOverlay from '../components/CallOverlay';
+import GroupCallOverlay from '../components/GroupCallOverlay';
+import CallHistoryList from '../components/CallHistoryList';
 import * as chatService from '../services/chatService';
+import * as callService from '../services/callService';
+import * as groupCallService from '../services/groupCallService';
 import { getFollowing } from '../services/followService';
 import api from '../lib/api';
 import {
@@ -918,6 +923,7 @@ export default function ChatPage() {
   const fetchedSharedReelIdsRef = useRef(new Set());
   const autoDownloadImagesRef = useRef(false);
   const callOverlayRef = useRef(null);
+  const groupCallOverlayRef = useRef(null);
 
   const [search, setSearch] = useState('');
   const [input, setInput] = useState('');
@@ -930,6 +936,14 @@ export default function ChatPage() {
   const [reactionPickerFor, setReactionPickerFor] = useState(null);
   const [hoveredMessageId, setHoveredMessageId] = useState(null);
   const [conversationType, setConversationType] = useState('normal');
+  const [callHistory, setCallHistory] = useState([]);
+  const [callHistoryLoading, setCallHistoryLoading] = useState(false);
+  const [callHistoryPage, setCallHistoryPage] = useState(1);
+  const [callHistoryHasMore, setCallHistoryHasMore] = useState(false);
+  const [groupCallHistory, setGroupCallHistory] = useState([]);
+  const [groupCallHistoryLoading, setGroupCallHistoryLoading] = useState(false);
+  const [groupCallHistoryPage, setGroupCallHistoryPage] = useState(1);
+  const [groupCallHistoryHasMore, setGroupCallHistoryHasMore] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState([]);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showManageGroupModal, setShowManageGroupModal] = useState(false);
@@ -947,6 +961,35 @@ export default function ChatPage() {
     dispatch(setMessages([]));
     navigate('/messages');
   }, [dispatch, navigate]);
+
+  const loadCallHistory = useCallback(async (page = 1) => {
+    setCallHistoryLoading(true);
+    try {
+      const data = await callService.getCallHistory(page, 20);
+      setCallHistory((current) => (page === 1 ? (data.calls || []) : [...current, ...(data.calls || [])]));
+      setCallHistoryPage(data.page || page);
+      setCallHistoryHasMore((data.page || page) < (data.totalPages || 1));
+    } catch (err) {
+      console.error('[ChatPage] call history fetch failed:', err);
+    } finally {
+      setCallHistoryLoading(false);
+    }
+  }, []);
+
+  const loadGroupCallHistory = useCallback(async (page = 1) => {
+    setGroupCallHistoryLoading(true);
+    try {
+      const data = await groupCallService.getGroupCallHistory(page, 20);
+      const tagged = (data.calls || []).map((call) => ({ ...call, is_group: true }));
+      setGroupCallHistory((current) => (page === 1 ? tagged : [...current, ...tagged]));
+      setGroupCallHistoryPage(data.page || page);
+      setGroupCallHistoryHasMore((data.page || page) < (data.totalPages || 1));
+    } catch (err) {
+      console.error('[ChatPage] group call history fetch failed:', err);
+    } finally {
+      setGroupCallHistoryLoading(false);
+    }
+  }, []);
 
   const {
     conversations, activeConversation, messages, page, hasMore,
@@ -984,6 +1027,7 @@ export default function ChatPage() {
   const activeConversationIsRequestForMe = isConversationRequestForMe(activeConversation, currentUserId);
   const activeConversationIsGroupAdmin = String(activeConversation?.groupAdmin?._id || activeConversation?.groupAdmin || '') === String(currentUserId);
   const isRequestsView = conversationType === 'requests';
+  const isCallsView = conversationType === 'calls';
   const requestCount = conversations.length;
   const totalUnreadMessages = Object.values(unreadCounts).reduce((sum, count) => sum + Number(count || 0), 0);
 
@@ -991,6 +1035,11 @@ export default function ChatPage() {
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { unreadCountsRef.current = unreadCounts; }, [unreadCounts]);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
+  useEffect(() => {
+    if (!isCallsView) return;
+    loadCallHistory(1);
+    loadGroupCallHistory(1);
+  }, [isCallsView, loadCallHistory, loadGroupCallHistory]);
 
   const filteredConversations = useMemo(() => {
     const withoutSelf = conversations.filter((conversation) => {
@@ -1015,6 +1064,27 @@ export default function ChatPage() {
       ].filter(Boolean).some((value) => value.toLowerCase().includes(query));
     });
   }, [conversations, currentUserId, search]);
+
+  // Both call histories are fetched/paginated independently (two different
+  // collections server-side) and merged here into one chronological feed —
+  // simplest correct way to combine two already-paginated sources without a
+  // backend cross-collection cursor.
+  const combinedCallHistory = useMemo(() => (
+    [...callHistory, ...groupCallHistory].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  ), [callHistory, groupCallHistory]);
+
+  const filteredCallHistory = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return combinedCallHistory;
+    return combinedCallHistory.filter((call) => {
+      if (call.is_group) {
+        return (call.conversation_id?.groupName || '').toLowerCase().includes(query);
+      }
+      const isOutgoing = String(call.caller_id?._id || call.caller_id) === String(currentUserId);
+      const peer = isOutgoing ? call.receiver_id : call.caller_id;
+      return [peer?.full_name, peer?.username].filter(Boolean).some((value) => value.toLowerCase().includes(query));
+    });
+  }, [combinedCallHistory, currentUserId, search]);
 
   const onlineConversations = useMemo(() => (
     conversations.filter((conversation) => {
@@ -1137,6 +1207,9 @@ export default function ChatPage() {
     if (fetchConversationsPromiseRef.current) {
       return fetchConversationsPromiseRef.current;
     }
+
+    // No conversations to load for the Calls tab — it has its own history loader (loadCallHistory).
+    if (conversationType === 'calls') return [];
 
     const request = (async () => {
       dispatch(setIsLoadingConversations(true));
@@ -2461,6 +2534,7 @@ export default function ChatPage() {
               {[
                 { key: 'normal', label: 'Messages', count: totalUnreadMessages },
                 { key: 'requests', label: 'Requests', count: incomingRequestsCount },
+                { key: 'calls', label: 'Calls', count: 0 },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -2540,7 +2614,18 @@ export default function ChatPage() {
           ) : null}
 
           <div className="flex-1 overflow-y-auto px-2 pb-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {isLoadingConversations ? (
+            {isCallsView ? (
+              <CallHistoryList
+                calls={filteredCallHistory}
+                loading={callHistoryLoading || groupCallHistoryLoading}
+                hasMore={callHistoryHasMore || groupCallHistoryHasMore}
+                onLoadMore={() => { loadCallHistory(callHistoryPage + 1); loadGroupCallHistory(groupCallHistoryPage + 1); }}
+                currentUserId={currentUserId}
+                onCallBack={(peer, callType) => callOverlayRef.current?.startCall(peer.id, peer, callType)}
+                onGroupCallBack={(conversationId, callType) => groupCallOverlayRef.current?.startGroupCall(conversationId, callType)}
+                emptyMessage={search.trim() ? 'No calls found.' : 'No calls yet.'}
+              />
+            ) : isLoadingConversations ? (
               <div className="space-y-1 px-2 pt-2">
                 {Array.from({ length: 7 }).map((_, index) => (
                   <div key={index} className="flex animate-pulse items-center gap-3 rounded-2xl px-3 py-3">
@@ -2674,25 +2759,29 @@ export default function ChatPage() {
         {/* ═══════════════════════════════════════════════════════════
             CHAT SECTION — unchanged, same as original
             ═══════════════════════════════════════════════════════════ */}
-        <section className={`${!activeId && !isRequestsView ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col bg-white dark:bg-black overflow-hidden relative md:flex`}>
+        <section className={`${!activeId && !isRequestsView && !isCallsView ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col bg-white dark:bg-black overflow-hidden relative md:flex`}>
           {!activeConversation ? (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center animate-in fade-in duration-500">
               <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-gray-100 bg-gray-50/50 shadow-sm dark:border-white/10 dark:bg-[#0a0a0a]">
                 {isRequestsView ? (
                   <UserMinus size={42} className="text-gray-300 dark:text-gray-700" />
+                ) : isCallsView ? (
+                  <Phone size={42} className="text-gray-300 dark:text-gray-700" />
                 ) : (
                   <MessageCircle size={42} className="text-gray-300 dark:text-gray-700" />
                 )}
               </div>
               <h2 className="mt-6 text-2xl font-bold tracking-tight">
-                {isRequestsView ? 'Message requests' : 'Your messages'}
+                {isRequestsView ? 'Message requests' : isCallsView ? 'Call history' : 'Your messages'}
               </h2>
               <p className="mt-2 max-w-xs text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                 {isRequestsView
                   ? "These messages are from people you don't follow yet. They won't know you've seen them until you accept."
+                  : isCallsView
+                  ? 'Your voice and video calls with people you follow show up here.'
                   : 'Send private photos and messages to a friend or group.'}
               </p>
-              {!isRequestsView ? (
+              {!isRequestsView && !isCallsView ? (
                 <button onClick={handleOpenGroupModal} className="mt-6 rounded-full bg-[#7C3AED] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition hover:bg-[#6d28d9] hover:scale-105 active:scale-95">Send message</button>
               ) : null}
             </div>
@@ -2748,10 +2837,41 @@ export default function ChatPage() {
                     >
                       <Phone size={16} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => callOverlayRef.current?.startCall(otherUserId, {
+                        id: otherUserId,
+                        name: activeConversationTitle,
+                        avatar: otherUser?.avatar_url || otherUser?.avatar,
+                      }, 'video')}
+                      className="flex-shrink-0 rounded-full border border-gray-200 p-2 text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
+                      aria-label="Video call"
+                      title="Video call"
+                    >
+                      <Video size={16} />
+                    </button>
                   </>
                 )}
                 {activeConversation?.isGroup ? (
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => groupCallOverlayRef.current?.startGroupCall(activeConversation._id, 'voice')}
+                      className="rounded-full border border-gray-200 p-2 text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
+                      aria-label="Voice call"
+                      title="Voice call"
+                    >
+                      <Phone size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => groupCallOverlayRef.current?.startGroupCall(activeConversation._id, 'video')}
+                      className="rounded-full border border-gray-200 p-2 text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
+                      aria-label="Video call"
+                      title="Video call"
+                    >
+                      <Video size={16} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => setShowTopbarLeaveConfirm(true)}
@@ -3164,6 +3284,7 @@ export default function ChatPage() {
         onClose={() => setSharedDetailItem(null)}
       />
       <CallOverlay ref={callOverlayRef} currentUserId={currentUserId} token={token} />
+      <GroupCallOverlay ref={groupCallOverlayRef} currentUserId={currentUserId} token={token} />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import ordersReducer from './ordersSlice';
 import bookingsReducer from './bookingsSlice';
 import wishlistReducer from './wishlistSlice';
 import callReducer from './callSlice';
+import groupCallReducer from './groupCallSlice';
 import serviceCartReducer from './serviceCartSlice';
 
 export const store = configureStore({
@@ -27,6 +28,7 @@ export const store = configureStore({
     bookings: bookingsReducer,
     wishlist: wishlistReducer,
     call: callReducer,
+    groupCall: groupCallReducer,
     serviceCart: serviceCartReducer,
   },
 });

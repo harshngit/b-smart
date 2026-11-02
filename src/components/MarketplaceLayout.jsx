@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { ArrowLeft, Store, LayoutGrid, ClipboardList, ChevronDown, UserRound, Settings, LogOut, Sun, Moon, Bell, ShoppingCart, Heart, Package, Briefcase } from 'lucide-react';
+import { ArrowLeft, Store, LayoutGrid, ClipboardList, ChevronDown, UserRound, Settings, LogOut, Sun, Moon, Bell, ShoppingCart, Heart, Package, Briefcase, Wallet } from 'lucide-react';
 import bsmartLogo from '../assets/bsmart.png';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import { logoutUser } from '../store/authSlice';
 import { toggleTheme } from '../store/themeSlice';
+import { fetchWallet } from '../store/walletSlice';
 import { useNotificationSocket } from '../hooks/useNotificationSocket';
 
 const NAV_LINKS = [
@@ -28,9 +29,16 @@ const MarketplaceLayout = () => {
   const { mode } = useSelector((state) => state.theme);
   const cartItems = useSelector((state) => state.cart.items);
   const cartCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
+  const walletBalance = useSelector((state) => state.wallet.balance);
   const { unreadCount } = useNotificationSocket({ limit: 10 });
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchWallet());
+    const interval = window.setInterval(() => dispatch(fetchWallet()), 30000);
+    return () => window.clearInterval(interval);
+  }, [dispatch]);
 
   const handleLogout = () => {
     setProfileOpen(false);
@@ -238,6 +246,28 @@ const MarketplaceLayout = () => {
         </div>
       </div>
       <Outlet />
+
+      {/* Floating Wallet — same badge as the main app, balance from Redux wallet slice */}
+      <Link
+        to="/wallet"
+        className="hidden md:flex fixed bottom-8 right-8 z-50 bg-white dark:bg-[#262626] rounded-full shadow-lg p-1 pr-4 items-center gap-2 border border-gray-100 dark:border-gray-800 hover:scale-105 transition-transform cursor-pointer"
+      >
+        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-white">
+          <Wallet size={18} />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Balance</span>
+          <span className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block flex-shrink-0" style={{ verticalAlign: '-0.1em' }}>
+              <circle cx="12" cy="12" r="10" fill="#F59E0B" />
+              <circle cx="12" cy="12" r="8" fill="#FBBF24" />
+              <circle cx="12" cy="12" r="6.5" fill="none" stroke="#D97706" strokeWidth="0.8" />
+              <text x="12" y="16" textAnchor="middle" fontSize="9" fontWeight="bold" fill="#92400E" fontFamily="serif">&#8377;</text>
+            </svg>
+            {walletBalance != null ? Number(walletBalance).toLocaleString('en-IN') : '—'}
+          </span>
+        </div>
+      </Link>
     </div>
   );
 };

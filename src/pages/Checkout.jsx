@@ -156,6 +156,7 @@ export default function Checkout() {
   const [addressesLoading, setAddressesLoading] = useState(true);
   const [addressActionId, setAddressActionId] = useState('');
   const [coinsToUse, setCoinsToUse] = useState(0);
+  const [coinsAutoApplied, setCoinsAutoApplied] = useState(false);
   const [sameBilling, setSameBilling] = useState(true);
   const [billing, setBilling] = useState('');
   const [placed, setPlaced] = useState(false);
@@ -192,6 +193,20 @@ export default function Checkout() {
   useEffect(() => {
     loadAddresses({ keepSelected: false });
   }, [loadAddresses]);
+
+  useEffect(() => {
+    dispatch(fetchWallet());
+  }, [dispatch]);
+
+  // Apply the buyer's wallet balance toward the order by default (up to the
+  // total) so Razorpay only opens for what's left — the slider still lets
+  // them dial it back if they'd rather pay more via Razorpay and keep coins.
+  useEffect(() => {
+    if (!coinsAutoApplied && balance > 0 && total > 0) {
+      setCoinsToUse(Math.min(balance, total));
+      setCoinsAutoApplied(true);
+    }
+  }, [balance, total, coinsAutoApplied]);
 
   const saveAddress = async (entry, editingId = '') => {
     setAddressActionId(editingId || 'new');
@@ -246,19 +261,6 @@ export default function Checkout() {
     pincode: address.pincode || address.zip || '',
   });
 
-  const continueToPayment = (addressId = selectedAddress) => {
-    const chosenAddress = addresses.find((entry) => entry.id === addressId);
-    const complete = chosenAddress && ['name', 'phone', 'address_line1', 'city', 'state', 'pincode'].every((key) => String(chosenAddress?.[key] || '').trim());
-    if (!complete) {
-      setCheckoutError('Please select or add a complete delivery address before continuing.');
-      return false;
-    }
-    setSelectedAddress(addressId);
-    setCheckoutError('');
-    setStep('Payment');
-    return true;
-  };
-
   const recordLocalOrder = (apiOrder, shippingAddress, status = 'Pending', paymentStatus = 'Pending') => {
     const customer = shippingAddress.name || user?.name || user?.full_name || user?.username || 'Customer';
     const action = placeOrder({
@@ -294,13 +296,10 @@ export default function Checkout() {
     return action.payload;
   };
 
-  const submit = async (event) => {
-    event.preventDefault();
-    if (!sameBilling && !billing.trim()) return;
-    if (!payment) {
-      continueToPayment();
-      return;
-    }
+  // Creates the order and opens Razorpay (or confirms instantly if coins
+  // cover the whole total). Only ever called from the Payment step's submit
+  // button — wallet balance never skips or auto-triggers this.
+  const processPayment = async () => {
     const shippingAddress = buildShippingAddress();
     if (Object.values(shippingAddress).some((value) => !String(value).trim())) {
       setCheckoutError('Please complete the delivery address.');
@@ -376,6 +375,29 @@ export default function Checkout() {
       setCheckoutError(err?.response?.data?.message || err.message || 'Checkout failed. Please try again.');
       setCheckingOut(false);
     }
+  };
+
+  const continueToPayment = (addressId = selectedAddress) => {
+    const chosenAddress = addresses.find((entry) => entry.id === addressId);
+    const complete = chosenAddress && ['name', 'phone', 'address_line1', 'city', 'state', 'pincode'].every((key) => String(chosenAddress?.[key] || '').trim());
+    if (!complete) {
+      setCheckoutError('Please select or add a complete delivery address before continuing.');
+      return false;
+    }
+    setSelectedAddress(addressId);
+    setCheckoutError('');
+    setStep('Payment');
+    return true;
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!sameBilling && !billing.trim()) return;
+    if (!payment) {
+      continueToPayment();
+      return;
+    }
+    await processPayment();
   };
 
   const itemList = (

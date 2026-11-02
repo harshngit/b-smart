@@ -15,10 +15,11 @@ export const checkCanCall = async (userId) => {
   return response.data;
 };
 
-// Publishes my local audio track (from my WebRTC offer) to Cloudflare
-// Realtime. Returns { success, sdpAnswer }.
-export const publishTrack = async (callId, sdpOffer, mid) => {
-  const response = await api.post(`/calls/${callId}/webrtc/publish`, { sdpOffer, mid });
+// Publishes my local track(s) (from my WebRTC offer) to Cloudflare
+// Realtime. `tracks` is [{ mid, kind }] — one entry for a voice call, two
+// (audio + video) for a video call. Returns { success, sdpAnswer }.
+export const publishTrack = async (callId, sdpOffer, tracks) => {
+  const response = await api.post(`/calls/${callId}/webrtc/publish`, { sdpOffer, tracks });
   return response.data;
 };
 

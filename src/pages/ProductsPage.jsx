@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Store, ChevronRight, ChevronLeft, Package, Search, SlidersHorizontal, X, BadgeCheck, ShieldCheck } from 'lucide-react';
+import { Store, ChevronRight, ChevronLeft, Package, Search, SlidersHorizontal, X, BadgeCheck, ShieldCheck, LayoutGrid, List } from 'lucide-react';
 import { CATEGORY_STYLE } from '../data/marketplaceCategoryStyle';
 import { PRODUCT_BANNER_IMAGES } from '../data/marketplaceBannerImages';
 import MarketplaceBanner from '../components/MarketplaceBanner';
@@ -29,6 +29,7 @@ export default function ProductsPage() {
   const [maxPrice, setMaxPrice] = useState('');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
 
@@ -189,6 +190,27 @@ export default function ProductsPage() {
         </button>
 
         <Dropdown className="w-40" value={sortBy} options={SORT_OPTIONS.map((o) => (o === 'Recommended' ? 'Sort: Recommended' : o))} onChange={(option) => applySortBy(option === 'Sort: Recommended' ? 'Recommended' : option)} />
+
+        <div className="flex items-center gap-0.5 rounded-full border border-gray-200 dark:border-gray-700 p-1">
+          <button
+            type="button"
+            aria-label="Grid view"
+            aria-pressed={viewMode === 'grid'}
+            onClick={() => setViewMode('grid')}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${viewMode === 'grid' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+          >
+            <LayoutGrid size={14} />
+          </button>
+          <button
+            type="button"
+            aria-label="List view"
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${viewMode === 'list' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+          >
+            <List size={14} />
+          </button>
+        </div>
       </div>
 
       {activeFilters.length > 0 && (
@@ -228,7 +250,7 @@ export default function ProductsPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'grid grid-cols-1 gap-4'}>
             {pageItems.map((product) => (
               <ProductCard
                 key={product.id}
@@ -236,6 +258,7 @@ export default function ProductsPage() {
                 isFavorite={isSaved('product', product.id)}
                 onToggleFavorite={() => toggle('product', product.id, product)}
                 cartQuantity={cartItems.find((cartItem) => String(cartItem.productId || cartItem.id) === String(product.id))?.qty || 0}
+                layout={viewMode}
               />
             ))}
           </div>
