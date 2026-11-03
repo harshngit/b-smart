@@ -80,6 +80,9 @@ import Search from './pages/Search';
 import ChatPage from './pages/ChatPage';
 import Suggestions from './pages/Suggestions';
 import GlobalLoader from './components/GlobalLoader';
+import CallOverlay from './components/CallOverlay';
+import GroupCallOverlay from './components/GroupCallOverlay';
+import { callOverlayRef, groupCallOverlayRef } from './utils/callRefs';
 
 import VendorLayout from './components/VendorLayout';
 import VendorDashboard from './pages/vendor-pages/Dashboard';
@@ -93,7 +96,9 @@ import VendorSettings from './pages/vendor-pages/Settings';
 function App() {
   const dispatch = useDispatch();
   const { mode } = useSelector((state) => state.theme);
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { isAuthenticated, userObject } = useSelector((state) => state.auth);
+  const currentUserId = userObject?._id || userObject?.id || '';
+  const token = localStorage.getItem('token');
 
   // ── Theme ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -144,6 +149,12 @@ function App() {
   return (
     <BrowserRouter>
       <GlobalLoader />
+      {isAuthenticated && token ? (
+        <>
+          <CallOverlay ref={callOverlayRef} currentUserId={currentUserId} token={token} />
+          <GroupCallOverlay ref={groupCallOverlayRef} currentUserId={currentUserId} token={token} />
+        </>
+      ) : null}
       <Routes>
         <Route path="/login"              element={<Login />} />
           <Route path="/signup"             element={<Signup />} />

@@ -47,3 +47,57 @@ export const playRingChime = (ctx) => {
     });
   });
 };
+
+// Incoming-call attention-grabbers for when the tab is backgrounded or
+// minimized — the ringtone itself keeps playing in a background tab (browsers
+// don't mute inactive tabs), but there's otherwise no visual cue the user
+// would notice without looking directly at the tab.
+
+// Ask once per app load; safe to call from multiple components since the
+// browser just no-ops if permission was already granted/denied.
+export const requestNotificationPermission = () => {
+  if (typeof Notification === 'undefined') return;
+  if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+};
+
+// Shows a system notification for an incoming call, only if permission is
+// already granted and the tab isn't the focused one (no need to interrupt
+// someone already looking at the ringing screen).
+export const showIncomingCallNotification = (title, body) => {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return null;
+  if (typeof document !== 'undefined' && !document.hidden) return null;
+  try {
+    const notification = new Notification(title, { body, tag: 'bsmart-incoming-call', renotify: true });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+    return notification;
+  } catch {
+    return null;
+  }
+};
+
+// Flashes the browser tab's title between the real title and `flashText`
+// so an incoming call is noticeable even in a background/minimized tab.
+let titleFlashInterval = null;
+let originalTitle = null;
+export const startTitleFlash = (flashText) => {
+  if (titleFlashInterval || typeof document === 'undefined') return;
+  originalTitle = document.title;
+  let showingFlash = false;
+  titleFlashInterval = setInterval(() => {
+    document.title = showingFlash ? originalTitle : flashText;
+    showingFlash = !showingFlash;
+  }, 1000);
+};
+export const stopTitleFlash = () => {
+  if (titleFlashInterval) {
+    clearInterval(titleFlashInterval);
+    titleFlashInterval = null;
+  }
+  if (originalTitle !== null && typeof document !== 'undefined') {
+    document.title = originalTitle;
+    originalTitle = null;
+  }
+};

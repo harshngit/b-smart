@@ -22,7 +22,15 @@ import {
   startOutgoingGroupCall,
   upsertGroupCallParticipant,
 } from '../store/groupCallSlice';
-import { RING_INTERVAL_MS, playRingChime, waitForIceGatheringComplete } from '../utils/callMedia';
+import {
+  RING_INTERVAL_MS,
+  playRingChime,
+  requestNotificationPermission,
+  showIncomingCallNotification,
+  startTitleFlash,
+  stopTitleFlash,
+  waitForIceGatheringComplete,
+} from '../utils/callMedia';
 
 // Same STUN-only ICE config as the 1:1 overlay — Cloudflare Realtime's SFU
 // is itself the relay, no TURN needed.
@@ -35,24 +43,26 @@ const ICE_SERVERS = [{ urls: 'stun:stun.cloudflare.com:3478' }];
 function Tile({ name, avatar, isSelf, isVideoCall, micMuted, cameraOff, videoRef, audioRef }) {
   const label = isSelf ? 'You' : (name || 'Unknown');
   return (
-    <div className="relative aspect-square overflow-hidden rounded-xl bg-white/10">
+    <div className="relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-lg">
       {isVideoCall && !cameraOff && (
         <video ref={videoRef} autoPlay playsInline muted={isSelf} className="h-full w-full object-cover" />
       )}
       {(!isVideoCall || cameraOff) && (
-        <div className="flex h-full w-full items-center justify-center">
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/[0.06] to-transparent">
           {avatar ? (
-            <img src={avatar} alt={label} className="h-12 w-12 rounded-full object-cover" />
+            <img src={avatar} alt={label} className="h-12 w-12 rounded-full object-cover ring-2 ring-white/10" />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#7C3AED] text-lg font-bold">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#7C3AED] text-lg font-bold ring-2 ring-white/10">
               {label.charAt(0).toUpperCase()}
             </div>
           )}
         </div>
       )}
       {!isSelf && <audio ref={audioRef} autoPlay playsInline />}
-      <span className="absolute bottom-1 left-1.5 rounded bg-black/50 px-1.5 py-0.5 text-[11px] font-medium">
-        {label}{micMuted ? ' · Muted' : ''}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/60 to-transparent" />
+      <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[11px] font-medium drop-shadow">
+        {label}
+        {micMuted && <MicOff size={11} className="text-white/80" />}
       </span>
     </div>
   );
@@ -142,9 +152,10 @@ const GroupCallOverlay = forwardRef(({ currentUserId, token }, ref) => {
       window.removeEventListener('keydown', unlock);
     };
   }, [getAudioContext]);
+  useEffect(() => { requestNotificationPermission(); }, []);
   useEffect(() => {
     if (groupCall.status === 'incoming-ringing') startRingtone();
-    else stopRingtone();
+    else { stopRingtone(); stopTitleFlash(); }
   }, [groupCall.status, startRingtone, stopRingtone]);
   useEffect(() => () => stopRingtone(), [stopRingtone]);
 
@@ -273,6 +284,11 @@ const GroupCallOverlay = forwardRef(({ currentUserId, token }, ref) => {
           groupCallId, conversationId, conversationTitle, conversationAvatar, callType,
           initiator: { id: initiatorId, name: initiatorName, avatar: initiatorAvatar },
         }));
+        showIncomingCallNotification(
+          `${initiatorName || 'Someone'} is calling ${conversationTitle ? `"${conversationTitle}"` : 'the group'}`,
+          callType === 'video' ? 'Incoming group video call' : 'Incoming group voice call',
+        );
+        startTitleFlash('📞 Incoming call…');
       },
       onGroupCallParticipantJoined: ({ groupCallId, userId, name, avatar }) => {
         if (String(groupCallId) !== String(groupCallIdRef.current)) return;
@@ -407,33 +423,37 @@ const GroupCallOverlay = forwardRef(({ currentUserId, token }, ref) => {
 
   if (groupCall.status === 'incoming-ringing') {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/80 text-white backdrop-blur-sm">
-        {groupCall.conversationAvatar ? (
-          <img src={groupCall.conversationAvatar} alt={conversationTitle} className="h-24 w-24 rounded-full object-cover ring-4 ring-white/10" />
-        ) : (
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#7C3AED] text-3xl font-bold ring-4 ring-white/10">
-            {conversationTitle.charAt(0).toUpperCase()}
-          </div>
-        )}
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-[#1b1030] via-[#120a22] to-black text-white">
+        <div className="relative flex items-center justify-center">
+          <span className="absolute h-28 w-28 animate-ping rounded-full bg-[#7C3AED]/30" />
+          <span className="absolute h-28 w-28 rounded-full bg-[#7C3AED]/10" />
+          {groupCall.conversationAvatar ? (
+            <img src={groupCall.conversationAvatar} alt={conversationTitle} className="relative h-24 w-24 rounded-full object-cover ring-4 ring-white/10" />
+          ) : (
+            <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-[#7C3AED] text-3xl font-bold ring-4 ring-white/10">
+              {conversationTitle.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
         <p className="text-xl font-bold">{conversationTitle}</p>
         <p className="text-sm text-gray-300">
           {groupCall.initiator?.name || 'Someone'} is starting a {isVideoCall ? 'video' : 'voice'} call
         </p>
         {groupCall.error ? <p className="text-xs text-red-400">{groupCall.error}</p> : null}
-        <div className="mt-6 flex items-center gap-6">
+        <div className="mt-6 flex items-center gap-5">
           <button
             onClick={handleDecline}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 transition hover:scale-105 active:scale-95"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 shadow-lg shadow-red-500/30 transition hover:scale-105 active:scale-95"
             aria-label="Decline"
           >
-            <PhoneOff size={24} />
+            <PhoneOff size={26} />
           </button>
           <button
             onClick={handleAccept}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500 transition hover:scale-105 active:scale-95"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 shadow-lg shadow-green-500/30 transition hover:scale-105 active:scale-95"
             aria-label="Join"
           >
-            <Phone size={24} />
+            <Phone size={26} />
           </button>
         </div>
       </div>
@@ -441,17 +461,17 @@ const GroupCallOverlay = forwardRef(({ currentUserId, token }, ref) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/90 text-white backdrop-blur-sm">
-      <div className="flex items-center justify-between px-4 py-3">
+    <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-[#1b1030] via-[#120a22] to-black text-white">
+      <div className="flex items-center justify-between px-5 pb-3 pt-5">
         <div className="min-w-0">
-          <p className="truncate font-bold">{conversationTitle}</p>
-          <p className="text-xs text-gray-300">{formatElapsed(elapsedSeconds)} · {joinedParticipants.length + 1} in call</p>
+          <p className="truncate text-sm font-bold drop-shadow">{conversationTitle}</p>
+          <p className="text-xs text-white/60">{formatElapsed(elapsedSeconds)} · {joinedParticipants.length + 1} in call</p>
         </div>
         {groupCall.error ? <p className="text-xs text-red-400">{groupCall.error}</p> : null}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="flex-1 overflow-y-auto px-3 pb-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           <Tile isSelf name="You" isVideoCall={isVideoCall} micMuted={isMuted} cameraOff={cameraOff} videoRef={localVideoRef} />
           {joinedParticipants.map(([userId, p]) => (
             <Tile
@@ -464,7 +484,7 @@ const GroupCallOverlay = forwardRef(({ currentUserId, token }, ref) => {
             />
           ))}
           {!joinedParticipants.length && (
-            <div className="col-span-full flex flex-col items-center justify-center gap-2 py-10 text-gray-400">
+            <div className="col-span-full flex flex-col items-center justify-center gap-2 py-10 text-white/50">
               <UserRound size={28} />
               <p className="text-sm">Waiting for others to join…</p>
             </div>
@@ -472,37 +492,39 @@ const GroupCallOverlay = forwardRef(({ currentUserId, token }, ref) => {
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-6 py-6">
-        <button
-          onClick={toggleMute}
-          className={`flex h-14 w-14 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${isMuted ? 'bg-white text-black' : 'bg-white/10'}`}
-          aria-label={isMuted ? 'Unmute' : 'Mute'}
-        >
-          {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
-        </button>
-        {isVideoCall && (
+      <div className="flex items-center justify-center pb-10 pt-4">
+        <div className="flex items-center gap-3 rounded-full bg-white/10 px-4 py-3 backdrop-blur-xl">
           <button
-            onClick={toggleCamera}
-            className={`flex h-14 w-14 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${cameraOff ? 'bg-white text-black' : 'bg-white/10'}`}
-            aria-label={cameraOff ? 'Turn camera on' : 'Turn camera off'}
+            onClick={toggleMute}
+            className={`flex h-14 w-14 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${isMuted ? 'bg-white text-black' : 'bg-white/10'}`}
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
           >
-            {cameraOff ? <VideoOff size={22} /> : <Video size={22} />}
+            {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
-        )}
-        <button
-          onClick={() => setShowAddPeople(true)}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 transition hover:scale-105 active:scale-95"
-          aria-label="Add people"
-        >
-          <UserPlus size={22} />
-        </button>
-        <button
-          onClick={() => leaveActiveCall('hangup')}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 transition hover:scale-105 active:scale-95"
-          aria-label="Leave call"
-        >
-          <PhoneOff size={24} />
-        </button>
+          {isVideoCall && (
+            <button
+              onClick={toggleCamera}
+              className={`flex h-14 w-14 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${cameraOff ? 'bg-white text-black' : 'bg-white/10'}`}
+              aria-label={cameraOff ? 'Turn camera on' : 'Turn camera off'}
+            >
+              {cameraOff ? <VideoOff size={20} /> : <Video size={20} />}
+            </button>
+          )}
+          <button
+            onClick={() => setShowAddPeople(true)}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 transition hover:scale-105 active:scale-95"
+            aria-label="Add people"
+          >
+            <UserPlus size={20} />
+          </button>
+          <button
+            onClick={() => leaveActiveCall('hangup')}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 shadow-lg shadow-red-500/30 transition hover:scale-105 active:scale-95"
+            aria-label="Leave call"
+          >
+            <PhoneOff size={22} />
+          </button>
+        </div>
       </div>
       <AddCallPeopleModal
         isOpen={showAddPeople}

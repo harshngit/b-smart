@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Mic, MicOff, Phone, PhoneOff, UserPlus, Video, VideoOff } from 'lucide-react';
+import { Maximize2, Mic, MicOff, Minimize2, Phone, PhoneOff, UserPlus, Video, VideoOff } from 'lucide-react';
 import {
   emitCallAccept,
   emitCallEnd,
@@ -21,7 +21,15 @@ import {
   setCallError,
   startOutgoingCall,
 } from '../store/callSlice';
-import { RING_INTERVAL_MS, playRingChime, waitForIceGatheringComplete } from '../utils/callMedia';
+import {
+  RING_INTERVAL_MS,
+  playRingChime,
+  requestNotificationPermission,
+  showIncomingCallNotification,
+  startTitleFlash,
+  stopTitleFlash,
+  waitForIceGatheringComplete,
+} from '../utils/callMedia';
 
 // Cloudflare Realtime's SFU is reachable via a public STUN-only ICE
 // candidate — no TURN needed since the SFU itself is the relay endpoint.
@@ -36,11 +44,71 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showAddPeople, setShowAddPeople] = useState(false);
 
+  // Default view is a small draggable widget anchored bottom-right; the user
+  // can expand it to the classic full-screen call UI and back at any time.
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isWidgetHovered, setIsWidgetHovered] = useState(false);
+  const dragStateRef = useRef(null);
+
+  const handleDragMove = useCallback((event) => {
+    if (!dragStateRef.current) return;
+    if (event.cancelable) event.preventDefault();
+    const point = event.touches ? event.touches[0] : event;
+    const { startX, startY, originX, originY } = dragStateRef.current;
+    setDragOffset({ x: originX + (point.clientX - startX), y: originY + (point.clientY - startY) });
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    dragStateRef.current = null;
+    setIsDragging(false);
+    window.removeEventListener('mousemove', handleDragMove);
+    window.removeEventListener('mouseup', handleDragEnd);
+    window.removeEventListener('touchmove', handleDragMove);
+    window.removeEventListener('touchend', handleDragEnd);
+  }, [handleDragMove]);
+
+  const handleDragStart = useCallback((event) => {
+    if (isFullScreen || event.target.closest('button')) return;
+    const point = event.touches ? event.touches[0] : event;
+    dragStateRef.current = { startX: point.clientX, startY: point.clientY, originX: dragOffset.x, originY: dragOffset.y };
+    setIsDragging(true);
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('touchmove', handleDragMove, { passive: false });
+    window.addEventListener('touchend', handleDragEnd);
+  }, [isFullScreen, dragOffset, handleDragMove, handleDragEnd]);
+
+  useEffect(() => () => handleDragEnd(), [handleDragEnd]);
+
+  // Re-attach any live media streams after switching between the compact
+  // widget and full-screen — their audio/video elements are different DOM
+  // nodes, so a fresh element needs its srcObject set again.
+  useEffect(() => {
+    if (remoteAudioRef.current && remoteStreamsRef.current.audio) {
+      remoteAudioRef.current.srcObject = remoteStreamsRef.current.audio;
+      remoteAudioRef.current.play().catch(() => {});
+    }
+    if (remoteVideoRef.current && remoteStreamsRef.current.video) {
+      remoteVideoRef.current.srcObject = remoteStreamsRef.current.video;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [isFullScreen]);
+
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
+  // Toggling compact <-> full-screen unmounts/remounts the audio/video
+  // elements (they live in two different JSX branches), which would drop
+  // srcObject on the old node. Cache the live streams so they can be
+  // reattached to whichever element is mounted after the switch.
+  const remoteStreamsRef = useRef({ audio: null, video: null });
   const hasPublishedRef = useRef(false);
   const hasPulledRef = useRef(false);
   const callIdRef = useRef(null);
@@ -94,9 +162,13 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
     };
   }, [getAudioContext]);
 
+  // Ask once per app load — lets an incoming call show a system notification
+  // if this tab is backgrounded when it rings.
+  useEffect(() => { requestNotificationPermission(); }, []);
+
   useEffect(() => {
     if (call.status === 'incoming-ringing') startRingtone();
-    else stopRingtone();
+    else { stopRingtone(); stopTitleFlash(); }
   }, [call.status, startRingtone, stopRingtone]);
 
   useEffect(() => () => stopRingtone(), [stopRingtone]);
@@ -113,6 +185,7 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    remoteStreamsRef.current = { audio: null, video: null };
     hasPublishedRef.current = false;
     hasPulledRef.current = false;
     if (timerRef.current) {
@@ -142,6 +215,7 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
       pcRef.current = pc;
       pc.ontrack = (event) => {
         console.log(`[Call] ontrack fired — remote ${event.track.kind} received`, event.streams[0]);
+        remoteStreamsRef.current[event.track.kind] = event.streams[0];
         const sink = event.track.kind === 'video' ? remoteVideoRef.current : remoteAudioRef.current;
         if (sink) {
           sink.srcObject = event.streams[0];
@@ -218,6 +292,8 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
           peer: { id: callerId, name: callerName, avatar: callerAvatar },
           callType,
         }));
+        showIncomingCallNotification(`${callerName || 'Someone'} is calling you`, callType === 'video' ? 'Incoming video call' : 'Incoming voice call');
+        startTitleFlash('📞 Incoming call…');
       },
       onCallAccepted: ({ callId }) => {
         console.log('[Call] socket event call:accepted received — starting negotiation (caller side)');
@@ -244,6 +320,15 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
     if (call.status === 'idle') callIdRef.current = null;
     else callIdRef.current = call.callId;
   }, [call.status, call.callId]);
+
+  // Reset the widget back to its default (compact, bottom-right) position
+  // and size once a call ends, so the next call doesn't inherit it.
+  useEffect(() => {
+    if (call.status === 'idle') {
+      setIsFullScreen(false);
+      setDragOffset({ x: 0, y: 0 });
+    }
+  }, [call.status]);
 
   // Auto-dismiss the idle-state error toast (a failed call:initiate never
   // creates a call, so nothing else clears `error` in that state).
@@ -327,93 +412,263 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
   const peerAvatar = call.peer?.avatar;
   const isVideoCall = call.callType === 'video';
   const showVideoSurface = isVideoCall && (call.status === 'connecting' || call.status === 'active');
+  const isRinging = ['outgoing-ringing', 'incoming-ringing', 'connecting'].includes(call.status);
+  const statusLabel = call.status === 'outgoing-ringing' ? (isVideoCall ? 'Calling (video)…' : 'Calling…')
+    : call.status === 'incoming-ringing' ? (isVideoCall ? 'Incoming video call' : 'Incoming voice call')
+    : call.status === 'connecting' ? 'Connecting…'
+    : call.status === 'active' ? formatElapsed(elapsedSeconds)
+    : '';
+
+  if (!isFullScreen) {
+    const widgetScale = isDragging ? 1 : isWidgetHovered ? 1.03 : 1;
+    return (
+      <>
+        <div
+          onMouseDown={handleDragStart}
+          onTouchStart={handleDragStart}
+          onMouseEnter={() => setIsWidgetHovered(true)}
+          onMouseLeave={() => setIsWidgetHovered(false)}
+          style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) scale(${widgetScale})` }}
+          className="fixed bottom-6 right-6 z-50 w-72 cursor-grab select-none overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-900 shadow-2xl transition-transform duration-200 active:cursor-grabbing dark:border-white/10 dark:bg-gradient-to-b dark:from-[#1b1030] dark:via-[#120a22] dark:to-black dark:text-white"
+        >
+          <audio ref={remoteAudioRef} autoPlay playsInline />
+
+          {isVideoCall && showVideoSurface && (
+            <div className="relative h-36 w-full bg-black">
+              <video ref={remoteVideoRef} autoPlay playsInline className="h-full w-full object-cover" />
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`absolute bottom-2 right-2 h-14 w-10 rounded-lg border border-white/20 object-cover ${cameraOff ? 'hidden' : ''}`}
+              />
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsFullScreen(true)}
+            aria-label="Full screen"
+            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/5 text-gray-600 transition hover:bg-black/10 dark:bg-black/40 dark:text-white/80 dark:hover:bg-black/60"
+          >
+            <Maximize2 size={13} />
+          </button>
+
+          <div className="flex items-center gap-3 p-3">
+            {(!isVideoCall || !showVideoSurface) && (
+              peerAvatar
+                ? <img src={peerAvatar} alt={peerName} className="h-11 w-11 shrink-0 rounded-full object-cover" />
+                : <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#7C3AED] text-sm font-bold text-white">{peerName.charAt(0).toUpperCase()}</div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{peerName}</p>
+              <p className="truncate text-xs text-gray-500 dark:text-white/60">{statusLabel}</p>
+            </div>
+          </div>
+
+          {call.error ? <p className="px-3 pb-1 text-[11px] text-red-500 dark:text-red-400">{call.error}</p> : null}
+
+          <div className="flex items-center justify-center gap-2.5 px-3 pb-3">
+            {call.status === 'incoming-ringing' ? (
+              <>
+                <button onClick={handleReject} aria-label="Decline" className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 transition hover:scale-105 active:scale-95">
+                  <PhoneOff size={18} />
+                </button>
+                <button onClick={handleAccept} aria-label="Accept" className="flex h-11 w-11 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition hover:scale-105 active:scale-95">
+                  <Phone size={18} />
+                </button>
+              </>
+            ) : (
+              <>
+                {call.status === 'active' && (
+                  <button
+                    onClick={toggleMute}
+                    aria-label={isMuted ? 'Unmute' : 'Mute'}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${isMuted ? 'bg-white text-black ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-white'}`}
+                  >
+                    {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
+                  </button>
+                )}
+                {call.status === 'active' && isVideoCall && (
+                  <button
+                    onClick={toggleCamera}
+                    aria-label={cameraOff ? 'Turn camera on' : 'Turn camera off'}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${cameraOff ? 'bg-white text-black ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-white'}`}
+                  >
+                    {cameraOff ? <VideoOff size={16} /> : <Video size={16} />}
+                  </button>
+                )}
+                {call.status === 'active' && (
+                  <button
+                    onClick={() => setShowAddPeople(true)}
+                    aria-label="Add people"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:scale-105 active:scale-95 dark:bg-white/10 dark:text-white"
+                  >
+                    <UserPlus size={16} />
+                  </button>
+                )}
+                <button
+                  onClick={() => endActiveCall('hangup')}
+                  aria-label="End call"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 transition hover:scale-105 active:scale-95"
+                >
+                  <PhoneOff size={16} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <AddCallPeopleModal
+          isOpen={showAddPeople}
+          onClose={() => setShowAddPeople(false)}
+          currentUserId={currentUserId}
+          excludeUserIds={[currentUserId, call.peer?.id].filter(Boolean)}
+          onConfirm={handleAddPeople}
+        />
+      </>
+    );
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-gradient-to-b from-white via-gray-50 to-gray-100 dark:from-[#1b1030] dark:via-[#120a22] dark:to-black">
+      <button
+        type="button"
+        onClick={() => setIsFullScreen(false)}
+        aria-label="Minimize"
+        className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/5 text-gray-700 backdrop-blur-sm transition hover:bg-black/10 dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/20"
+      >
+        <Minimize2 size={16} />
+      </button>
       <audio ref={remoteAudioRef} autoPlay playsInline />
-      {isVideoCall && (
-        <video ref={remoteVideoRef} autoPlay playsInline className={`absolute inset-0 h-full w-full object-cover ${showVideoSurface ? '' : 'hidden'}`} />
-      )}
-      {isVideoCall && (
-        <video ref={localVideoRef} autoPlay playsInline muted className={`absolute bottom-32 right-4 h-36 w-24 rounded-xl object-cover ring-2 ring-white/20 ${showVideoSurface && !cameraOff ? '' : 'hidden'}`} />
-      )}
-      <div className={`relative z-10 flex flex-col items-center gap-4 text-white ${showVideoSurface ? 'mt-auto pb-6' : ''}`}>
-        {!showVideoSurface && (
-          peerAvatar ? (
-            <img src={peerAvatar} alt={peerName} className="h-24 w-24 rounded-full object-cover ring-4 ring-white/10" />
-          ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#7C3AED] text-3xl font-bold ring-4 ring-white/10">
-              {peerName.charAt(0).toUpperCase()}
-            </div>
-          )
-        )}
-        <p className={showVideoSurface ? 'text-sm font-semibold drop-shadow' : 'text-xl font-bold'}>{peerName}</p>
-        <p className="text-sm text-gray-300 drop-shadow">
-          {call.status === 'outgoing-ringing' && (isVideoCall ? 'Calling (video)…' : 'Calling…')}
-          {call.status === 'incoming-ringing' && (isVideoCall ? 'Incoming video call' : 'Incoming voice call')}
-          {call.status === 'connecting' && 'Connecting…'}
-          {call.status === 'active' && formatElapsed(elapsedSeconds)}
-        </p>
-        {call.error ? <p className="text-xs text-red-400">{call.error}</p> : null}
 
-        <div className="mt-6 flex items-center gap-6">
+      {isVideoCall && (
+        <>
+          {/* Connecting shimmer — covered by the video once real frames arrive */}
+          {call.status === 'connecting' && (
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f0f1e]" />
+          )}
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className={`absolute inset-0 h-full w-full object-cover ${showVideoSurface ? '' : 'hidden'}`}
+          />
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`absolute bottom-28 right-4 z-20 h-36 w-24 rounded-2xl border border-white/15 object-cover shadow-2xl sm:h-44 sm:w-28 ${showVideoSurface && !cameraOff ? '' : 'hidden'}`}
+          />
+        </>
+      )}
+
+      {showVideoSurface && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-28 bg-gradient-to-b from-black/60 to-transparent" />
+      )}
+      {showVideoSurface && (
+        <div className="relative z-10 flex items-center gap-2 px-5 pt-5 text-white">
+          <span className="truncate text-sm font-semibold drop-shadow-md">{peerName}</span>
+          <span className="text-xs text-white/60">·</span>
+          <span className="text-xs text-white/70 drop-shadow-md">
+            {call.status === 'connecting' ? 'Connecting…' : formatElapsed(elapsedSeconds)}
+          </span>
+        </div>
+      )}
+
+      <div className={`relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-6 text-gray-900 dark:text-white ${showVideoSurface ? 'pointer-events-none' : ''}`}>
+        {!showVideoSurface && (
+          <div className="relative flex items-center justify-center">
+            {isRinging && (
+              <>
+                <span className="absolute h-28 w-28 animate-ping rounded-full bg-[#7C3AED]/30" />
+                <span className="absolute h-28 w-28 rounded-full bg-[#7C3AED]/10" />
+              </>
+            )}
+            {peerAvatar ? (
+              <img src={peerAvatar} alt={peerName} className="relative h-24 w-24 rounded-full object-cover ring-4 ring-black/5 dark:ring-white/10" />
+            ) : (
+              <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-[#7C3AED] text-3xl font-bold text-white ring-4 ring-black/5 dark:ring-white/10">
+                {peerName.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+        )}
+        {!showVideoSurface && <p className="text-xl font-bold">{peerName}</p>}
+        {!showVideoSurface && (
+          <p className="text-sm text-gray-500 dark:text-gray-300">
+            {call.status === 'outgoing-ringing' && (isVideoCall ? 'Calling (video)…' : 'Calling…')}
+            {call.status === 'incoming-ringing' && (isVideoCall ? 'Incoming video call' : 'Incoming voice call')}
+            {call.status === 'connecting' && 'Connecting…'}
+            {call.status === 'active' && formatElapsed(elapsedSeconds)}
+          </p>
+        )}
+        {call.error ? <p className="text-xs text-red-500 dark:text-red-400">{call.error}</p> : null}
+      </div>
+
+      <div className="relative z-10 pb-10 pt-8">
+        {showVideoSurface && <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-black/70 to-transparent" />}
+        <div className="flex items-center justify-center gap-5">
           {call.status === 'incoming-ringing' ? (
             <>
               <button
                 onClick={handleReject}
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 transition hover:scale-105 active:scale-95"
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 transition hover:scale-105 active:scale-95"
                 aria-label="Decline"
               >
-                <PhoneOff size={24} />
+                <PhoneOff size={26} />
               </button>
               <button
                 onClick={handleAccept}
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500 transition hover:scale-105 active:scale-95"
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition hover:scale-105 active:scale-95"
                 aria-label="Accept"
               >
-                <Phone size={24} />
+                <Phone size={26} />
               </button>
             </>
           ) : (
-            <>
+            <div className="flex items-center gap-3 rounded-full bg-black/5 px-4 py-3 backdrop-blur-xl dark:bg-white/10">
               {call.status === 'active' ? (
                 <button
                   onClick={toggleMute}
-                  className={`flex h-14 w-14 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${isMuted ? 'bg-white text-black' : 'bg-white/10'}`}
+                  className={`flex h-14 w-14 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${isMuted ? 'bg-white text-black ring-1 ring-gray-200' : 'bg-black/5 text-gray-700 dark:bg-white/10 dark:text-white'}`}
                   aria-label={isMuted ? 'Unmute' : 'Mute'}
                 >
-                  {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
+                  {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
                 </button>
               ) : null}
               {call.status === 'active' && isVideoCall ? (
                 <button
                   onClick={toggleCamera}
-                  className={`flex h-14 w-14 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${cameraOff ? 'bg-white text-black' : 'bg-white/10'}`}
+                  className={`flex h-14 w-14 items-center justify-center rounded-full transition hover:scale-105 active:scale-95 ${cameraOff ? 'bg-white text-black ring-1 ring-gray-200' : 'bg-black/5 text-gray-700 dark:bg-white/10 dark:text-white'}`}
                   aria-label={cameraOff ? 'Turn camera on' : 'Turn camera off'}
                 >
-                  {cameraOff ? <VideoOff size={22} /> : <Video size={22} />}
+                  {cameraOff ? <VideoOff size={20} /> : <Video size={20} />}
                 </button>
               ) : null}
               {call.status === 'active' ? (
                 <button
                   onClick={() => setShowAddPeople(true)}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 transition hover:scale-105 active:scale-95"
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-black/5 text-gray-700 transition hover:scale-105 active:scale-95 dark:bg-white/10 dark:text-white"
                   aria-label="Add people"
                 >
-                  <UserPlus size={22} />
+                  <UserPlus size={20} />
                 </button>
               ) : null}
               <button
                 onClick={() => endActiveCall('hangup')}
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 transition hover:scale-105 active:scale-95"
+                className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 transition hover:scale-105 active:scale-95"
                 aria-label="End call"
               >
-                <PhoneOff size={24} />
+                <PhoneOff size={22} />
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
+
       <AddCallPeopleModal
         isOpen={showAddPeople}
         onClose={() => setShowAddPeople(false)}

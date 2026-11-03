@@ -22,8 +22,10 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import VoiceMessageBubble from '../components/VoiceMessageBubble';
 import VoiceRecorder from '../components/VoiceRecorder';
 import PostDetailModal from '../components/PostDetailModal';
-import CallOverlay from '../components/CallOverlay';
-import GroupCallOverlay from '../components/GroupCallOverlay';
+// CallOverlay/GroupCallOverlay are mounted once, globally, in App.jsx (so
+// incoming calls ring on every page, not just here) — this page reaches
+// them via the shared refs to trigger outgoing calls.
+import { callOverlayRef, groupCallOverlayRef } from '../utils/callRefs';
 import CallHistoryList from '../components/CallHistoryList';
 import * as chatService from '../services/chatService';
 import * as callService from '../services/callService';
@@ -922,8 +924,6 @@ export default function ChatPage() {
   const activatingConversationRef = useRef({ conversationId: '', promise: null });
   const fetchedSharedReelIdsRef = useRef(new Set());
   const autoDownloadImagesRef = useRef(false);
-  const callOverlayRef = useRef(null);
-  const groupCallOverlayRef = useRef(null);
 
   const [search, setSearch] = useState('');
   const [input, setInput] = useState('');
@@ -3283,8 +3283,6 @@ export default function ChatPage() {
         post={sharedDetailItem}
         onClose={() => setSharedDetailItem(null)}
       />
-      <CallOverlay ref={callOverlayRef} currentUserId={currentUserId} token={token} />
-      <GroupCallOverlay ref={groupCallOverlayRef} currentUserId={currentUserId} token={token} />
     </div>
   );
 }
