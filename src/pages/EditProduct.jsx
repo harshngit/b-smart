@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertCircle, Loader2, Star, Truck } from 'lucide-react';
 import useMediaUploader from '../hooks/useMediaUploader';
-import influencerProductService, { prepareProductImages, productFormToApiPayload } from '../services/influencerProductService';
+import influencerProductService, { prepareProductImages, prepareVariantImages, productFormToApiPayload } from '../services/influencerProductService';
 import {
   CATEGORIES, STATUS_OPTIONS, RETURN_POLICY_OPTIONS, WARRANTY_OPTIONS, COUNTRY_OPTIONS,
   MAX_IMAGES, MAX_HIGHLIGHTS, inputCls, labelCls,
@@ -81,7 +81,7 @@ const EditProduct = () => {
         setProduct(item);
         setForm(productToForm(item));
         setHighlights(item.highlights?.length ? item.highlights : ['', '', '']);
-        setVariants(item.variants?.length ? item.variants : [emptyVariant()]);
+        setVariants(item.variants?.length ? item.variants.map((v) => ({ ...v, image: v.image ? { url: v.image } : null })) : [emptyVariant()]);
         setImages((item.images || []).map((url, index) => ({ id: `${item.id || productId}-${index}`, url, existing: true })));
         setError('');
       })
@@ -143,7 +143,8 @@ const EditProduct = () => {
     setError('');
     try {
       const uploadedImages = await prepareProductImages(images);
-      const payload = productFormToApiPayload({ form, highlights, variants, images: uploadedImages, status });
+      const uploadedVariants = await prepareVariantImages(variants);
+      const payload = productFormToApiPayload({ form, highlights, variants: uploadedVariants, images: uploadedImages, status });
       await influencerProductService.update(product.id, payload);
       navigate('/market/my-store/products');
     } catch (err) {

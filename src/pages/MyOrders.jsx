@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { BadgeCheck, Briefcase, Calendar, CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Copy, Download, HelpCircle, KeyRound, Loader2, MessageCircle, Package, ReceiptText, RefreshCw, Search, ShoppingBag, Truck, UserRound, Wallet, XCircle } from 'lucide-react';
+import { BadgeCheck, Briefcase, Calendar, CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Copy, Download, HelpCircle, KeyRound, Loader2, MessageCircle, Package, ReceiptText, RefreshCw, Search, ShoppingBag, Truck, UserRound, Wallet, XCircle } from 'lucide-react';
 import { money } from '../myStore/data/orderFilters';
 import orderService from '../services/orderService';
 import serviceBookingService from '../services/serviceBookingService';
@@ -122,6 +122,7 @@ export default function MyOrders() {
   const productCount = orders.filter((order) => order.type === 'product').length;
   const serviceCount = orders.filter((order) => order.type === 'service').length;
   const activeCount = orders.filter((order) => ACTIVE_STATUSES.includes(order.record.status)).length;
+  const completedCount = orders.filter((order) => ['Delivered', 'Completed'].includes(order.record.status)).length;
   const totalSpent = orders.reduce((sum, order) => sum + orderTotal(order), 0);
   const statusOptions = ['All statuses', ...new Set(orders.map((order) => order.record.status).filter(Boolean))];
   const query = search.trim().toLowerCase();
@@ -234,33 +235,55 @@ export default function MyOrders() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-black pb-24 max-w-[1300px] mx-auto px-4 pt-6">
-      {/* Hero */}
-      <section className="relative mb-6 overflow-hidden rounded-[28px] bg-gradient-to-r from-pink-50 via-purple-50/70 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 px-6 py-7 sm:px-8 sm:py-8">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="min-w-0 max-w-lg">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 dark:bg-white/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-[#9f1239] dark:text-[#fb7185]">
-              <ClipboardList size={13} /> Buyer Center
-            </span>
-            <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">My Orders &amp; Purchases</h1>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Track, manage, and review every product order and service booking you've made on the Marketplace.</p>
-            <button type="button" onClick={fetchOrders} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#9f1239] dark:text-[#fb7185]"><RefreshCw size={13} />Refresh</button>
-          </div>
-          <div className="flex flex-wrap gap-2.5">
-            <div className="flex items-center gap-2.5 rounded-2xl bg-white dark:bg-gray-900 shadow-sm px-4 py-3">
-              <span className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-[#9f1239] dark:text-[#fb7185] flex items-center justify-center shrink-0"><ShoppingBag size={17} /></span>
-              <div><p className="text-sm font-bold text-gray-900 dark:text-white leading-tight">{orders.length} Total</p><p className="text-[11px] text-gray-500 dark:text-gray-400">Purchases made</p></div>
-            </div>
-            <div className="flex items-center gap-2.5 rounded-2xl bg-white dark:bg-gray-900 shadow-sm px-4 py-3">
-              <span className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-insta-purple flex items-center justify-center shrink-0"><Briefcase size={17} /></span>
-              <div><p className="text-sm font-bold text-gray-900 dark:text-white leading-tight">{activeCount} Active</p><p className="text-[11px] text-gray-500 dark:text-gray-400">Bookings &amp; orders</p></div>
-            </div>
-            <div className="flex items-center gap-2.5 rounded-2xl bg-white dark:bg-gray-900 shadow-sm px-4 py-3">
-              <span className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 flex items-center justify-center shrink-0"><Wallet size={17} /></span>
-              <div><p className="text-sm font-bold text-gray-900 dark:text-white leading-tight">{money(totalSpent)}</p><p className="text-[11px] text-gray-500 dark:text-gray-400">Total spent</p></div>
-            </div>
-          </div>
+      {/* Header — same style as the My Store seller dashboard */}
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Orders &amp; Purchases</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Track, manage, and review every product order and service booking you've made on the Marketplace.</p>
         </div>
-      </section>
+        <div className="flex items-center gap-2 shrink-0">
+          <button type="button" onClick={fetchOrders} className="flex items-center gap-1.5 rounded-full border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:border-gray-200 dark:hover:border-gray-700 transition-colors">
+            <RefreshCw size={14} /> Refresh
+          </button>
+          <button type="button" onClick={exportCsv} className="flex items-center gap-1.5 rounded-full border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:border-gray-200 dark:hover:border-gray-700 transition-colors">
+            <Download size={14} /> Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Stat cards — same grid/card style as the My Store seller dashboard */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 shadow-sm min-w-0">
+          <div className="flex items-center gap-2 mb-2"><span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-rose-50 dark:bg-rose-900/20 text-[#9f1239] dark:text-[#fb7185]"><ShoppingBag size={15} /></span><p className="text-xs text-gray-500 dark:text-gray-400 truncate">Total orders</p></div>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{orders.length}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">All time</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 shadow-sm min-w-0">
+          <div className="flex items-center gap-2 mb-2"><span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-50 dark:bg-blue-900/20 text-blue-600"><Truck size={15} /></span><p className="text-xs text-gray-500 dark:text-gray-400 truncate">Active</p></div>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{activeCount}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">In progress</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 shadow-sm min-w-0">
+          <div className="flex items-center gap-2 mb-2"><span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-amber-50 dark:bg-amber-900/20 text-amber-600"><Wallet size={15} /></span><p className="text-xs text-gray-500 dark:text-gray-400 truncate">Total spent</p></div>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{money(totalSpent)}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Across all orders</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 shadow-sm min-w-0">
+          <div className="flex items-center gap-2 mb-2"><span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-purple-50 dark:bg-purple-900/20 text-purple-600"><Package size={15} /></span><p className="text-xs text-gray-500 dark:text-gray-400 truncate">Products</p></div>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{productCount}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Orders</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 shadow-sm min-w-0">
+          <div className="flex items-center gap-2 mb-2"><span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-teal-50 dark:bg-teal-900/20 text-teal-600"><Briefcase size={15} /></span><p className="text-xs text-gray-500 dark:text-gray-400 truncate">Services</p></div>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{serviceCount}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Bookings</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 shadow-sm min-w-0">
+          <div className="flex items-center gap-2 mb-2"><span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-green-50 dark:bg-green-900/20 text-green-600"><CheckCircle2 size={15} /></span><p className="text-xs text-gray-500 dark:text-gray-400 truncate">Completed</p></div>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{completedCount}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Delivered / done</p>
+        </div>
+      </div>
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2.5 mb-4">

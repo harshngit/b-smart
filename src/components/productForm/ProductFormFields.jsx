@@ -322,7 +322,35 @@ export const emptyVariant = () => ({
   size: '',
   stock: '',
   price: '',
+  image: null,
 });
+
+// Single-image picker for a variant row. Mirrors ServiceForm.jsx's
+// SubserviceImagePicker — {file, url} for a new upload, {url} for an
+// already-saved image, so prepareVariantImages can handle both the same
+// way the main product gallery's prepareProductImages does.
+function VariantImagePicker({ image, onChange, label }) {
+  const inputRef = useRef(null);
+  const handleFile = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    onChange({ file, url: URL.createObjectURL(file) });
+  };
+  return (
+    <div className="relative h-11 w-11">
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" aria-label={label} onChange={handleFile} />
+      <button type="button" onClick={() => inputRef.current?.click()} className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 text-gray-400 hover:border-[#fa3f5e] dark:border-gray-800 dark:bg-gray-900">
+        {image?.url ? <img src={image.url} alt="" className="h-full w-full object-cover" /> : <ImagePlus size={15} />}
+      </button>
+      {image?.url && (
+        <button type="button" aria-label={`Remove ${label}`} onClick={() => onChange(null)} className="absolute -right-1.5 -top-1.5 rounded-full border border-gray-200 bg-white p-0.5 text-gray-400 hover:text-red-500 dark:border-gray-700 dark:bg-gray-900">
+          <X size={10} />
+        </button>
+      )}
+    </div>
+  );
+}
 
 // ─── Variants pricing table (Price & Inventory section) ────────────────────────
 export const VariantsPricingTable = ({ variants, onChange, onRemove, onAdd }) => (
@@ -332,6 +360,7 @@ export const VariantsPricingTable = ({ variants, onChange, onRemove, onAdd }) =>
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 dark:bg-gray-900 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
+            <th className="p-2.5">Image</th>
             <th className="p-2.5">Color</th>
             <th className="p-2.5">Size</th>
             <th className="p-2.5">Stock Quantity</th>
@@ -340,8 +369,11 @@ export const VariantsPricingTable = ({ variants, onChange, onRemove, onAdd }) =>
           </tr>
         </thead>
         <tbody>
-          {variants.map((v) => (
+          {variants.map((v, index) => (
               <tr key={v.id} className="border-t border-gray-100 dark:border-gray-800">
+                <td className="p-2.5">
+                  <VariantImagePicker image={v.image} onChange={(image) => onChange(v.id, { image })} label={`Variant ${index + 1} image`} />
+                </td>
                 <td className="p-2.5">
                   <ColorPicker value={v.color} onChange={(color) => onChange(v.id, { color })} />
                 </td>

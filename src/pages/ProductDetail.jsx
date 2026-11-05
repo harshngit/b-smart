@@ -331,10 +331,15 @@ const ProductDetail = () => {
                         key={variant.id || index}
                         type="button"
                         onClick={() => setSelectedVariant(index)}
-                        className={`text-left rounded-xl border-2 p-3 transition-colors ${selectedVariant === index ? 'border-[#fa3f5e] bg-pink-50/50 dark:bg-pink-900/10' : 'border-gray-100 dark:border-gray-800'}`}
+                        className={`flex items-center gap-2.5 text-left rounded-xl border-2 p-3 transition-colors ${selectedVariant === index ? 'border-[#fa3f5e] bg-pink-50/50 dark:bg-pink-900/10' : 'border-gray-100 dark:border-gray-800'}`}
                       >
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">{[variant.color, variant.size].filter(Boolean).join(' / ') || `Option ${index + 1}`}</p>
-                        {variant.price && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">₹{Number(variant.price).toFixed(2)}</p>}
+                        {variant.image && (
+                          <img src={variant.image} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 dark:text-white">{[variant.color, variant.size].filter(Boolean).join(' / ') || `Option ${index + 1}`}</p>
+                          {variant.price && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">₹{Number(variant.price).toFixed(2)}</p>}
+                        </div>
                       </button>
                     ))}
                   </div>

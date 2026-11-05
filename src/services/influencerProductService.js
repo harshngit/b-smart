@@ -85,6 +85,7 @@ export const normalizeInfluencerProduct = (product = {}) => {
       size: variant.size || '',
       stock: String(variant.stock_quantity ?? variant.stock ?? ''),
       price: String(variant.price ?? ''),
+      image: variant.image ? resolveProductImageUrl(variant.image) : '',
     })),
     rating: Number(product.rating ?? 0),
     reviews: Number(product.reviews ?? product.reviews_count ?? 0),
@@ -115,6 +116,9 @@ export const productFormToApiPayload = ({ form, highlights, variants, images, st
       size: variant.size || 'One Size',
       stock_quantity: Number(variant.stock) || 0,
       price: Number(variant.price) || Number(form.sellingPrice) || 0,
+      // Expected to already be prepared via prepareVariantImages (file ->
+      // {fileName}) before this is called — see AddProduct/EditProduct's submit().
+      image: variant.image?.fileName ? { fileName: variant.image.fileName } : null,
     })),
   package_weight: Number(form.packageWeight) || 0,
   weight_unit: form.weightUnit || 'kg',
@@ -154,6 +158,21 @@ export const prepareProductImages = async (images) => {
   return images.map((img) => (
     img.file ? uploaded[uploadIndex++] : { fileName: normalizeUploadPath(img.fileName || img.url) }
   ));
+};
+
+// Each variant optionally carries one image, in the same {file, url,
+// fileName} shape useMediaUploader/prepareProductImages use. Batches every
+// new file into a single upload request via the same generic product-image
+// upload endpoint — no separate endpoint needed for variant images.
+export const prepareVariantImages = async (variants) => {
+  const newFiles = variants.filter((v) => v.image?.file).map((v) => v.image.file);
+  const uploaded = await uploadInfluencerProductImages(newFiles);
+  let uploadIndex = 0;
+  return variants.map((v) => {
+    if (!v.image) return { ...v, image: null };
+    if (v.image.file) return { ...v, image: uploaded[uploadIndex++] };
+    return { ...v, image: { fileName: normalizeUploadPath(v.image.fileName || v.image.url) } };
+  });
 };
 
 const influencerProductService = {

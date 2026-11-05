@@ -11,8 +11,12 @@ import { fetchWallet } from '../store/walletSlice';
 
 const STEPS = ['Service Cart', 'Confirm Details', 'Payment', 'Confirmation'];
 
-const toOrderItem = ({ service_id, booking_date, time_slot, selected_subservices, customer_address, notes }) => ({
-  service_id, booking_date, time_slot, selected_subservices, customer_address, notes,
+// base_quantity must be carried through — dropping it silently re-prices
+// the order at quantity 1 server-side (see base_quantity handling in
+// serviceBooking.controller.js's prepareOrderItem), which would undercharge
+// a quantity-N booking of a flat-price, allow-multiple service.
+const toOrderItem = ({ service_id, booking_date, time_slot, selected_subservices, base_quantity, customer_address, notes }) => ({
+  service_id, booking_date, time_slot, selected_subservices, base_quantity, customer_address, notes,
 });
 
 export default function ServiceCheckout() {

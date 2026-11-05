@@ -17,12 +17,27 @@ export default function ServiceCart() {
   const [catalog, setCatalog] = useState({});
 
   useEffect(() => {
+    // Fetch only the services actually in the cart, by id — the list
+    // endpoint paginates (default limit 20), so once more than a page's
+    // worth of services exist platform-wide, a cart item referencing one
+    // outside that first page would silently show blank provider/category/
+    // subservice info here.
+    const serviceIds = [...new Set(items.map((item) => item.service_id).filter(Boolean))];
+    if (!serviceIds.length) return undefined;
     let alive = true;
-    influencerServiceService.list()
-      .then((list) => { if (alive) setCatalog(Object.fromEntries(list.map((s) => [s.id, s]))); })
-      .catch(() => {});
+    Promise.all(serviceIds.map((id) => influencerServiceService.get(id).catch(() => null)))
+      .then((results) => {
+        if (!alive) return;
+        setCatalog((current) => {
+          const next = { ...current };
+          results.forEach((service, index) => {
+            if (service) next[serviceIds[index]] = service;
+          });
+          return next;
+        });
+      });
     return () => { alive = false; };
-  }, []);
+  }, [items]);
 
   const active = items.filter((item) => !item.saved);
   const saved = items.filter((item) => item.saved);

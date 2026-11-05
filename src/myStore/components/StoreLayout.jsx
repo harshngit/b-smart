@@ -4,7 +4,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { ArrowLeft, LayoutDashboard, ClipboardList, Package, Calendar, UserRound } from 'lucide-react';
 import StoreSidebar from './StoreSidebar';
-import StoreSubscriptionCard from '../../components/StoreSubscriptionCard';
+import StoreTopbar from './StoreTopbar';
 import listingSubscriptionService from '../../services/listingSubscriptionService';
 
 const MOBILE_NAV_ITEMS = [
@@ -81,10 +81,8 @@ const StoreLayout = () => {
         </div>
       </div>
 
-      <div className="md:ml-20 pb-16 md:pb-4">
-        <div className="max-w-[1280px] ml-auto px-4 md:px-8 pt-4">
-          <StoreSubscriptionCard />
-        </div>
+      <div className="md:ml-64 pb-16 md:pb-4">
+        <StoreTopbar />
         <Outlet />
       </div>
     </div>

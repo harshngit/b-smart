@@ -102,6 +102,21 @@ export default function ServiceForm({ service }) {
   const step3Ref = useRef(null);
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const set = (field) => (event) => setField(field, event.target.value);
+  // mainImageIndex is positional, not tied to a particular image's id — if
+  // an image before the current cover photo is removed, every later index
+  // shifts down by one and mainImageIndex would silently start pointing at
+  // a different photo (or the removed cover photo itself) unless adjusted
+  // here to track the same removal.
+  const handleRemoveImage = (id) => {
+    const removedIndex = images.findIndex((img) => img.id === id);
+    uploader.removeImage(id);
+    if (removedIndex === -1) return;
+    setMainImageIndex((current) => {
+      if (removedIndex < current) return current - 1;
+      if (removedIndex === current) return 0;
+      return current;
+    });
+  };
   const updateSubservice = (id, changes) => setSubservices((current) => current.map((item) => item.id === id ? { ...item, ...changes } : item));
   const removeSubservice = (id) => setSubservices((current) => {
     const next = current.filter((item) => item.id !== id);
@@ -185,7 +200,7 @@ export default function ServiceForm({ service }) {
         <div className="space-y-4 min-w-0">
           <SectionCard ref={step1Ref} step={1} title="Service Details">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <ImageGallery label="Service Images" images={images} mainIndex={mainIndex} onSetMain={setMainImageIndex} onAdd={uploader.handleFileInput} onRemove={uploader.removeImage} fileInputRef={uploader.fileInputRef} onDrop={uploader.handleDrop} onDragOver={uploader.handleDragOver} onDragLeave={uploader.handleDragLeave} isDragging={uploader.isDragging} />
+              <ImageGallery label="Service Images" images={images} mainIndex={mainIndex} onSetMain={setMainImageIndex} onAdd={uploader.handleFileInput} onRemove={handleRemoveImage} fileInputRef={uploader.fileInputRef} onDrop={uploader.handleDrop} onDragOver={uploader.handleDragOver} onDragLeave={uploader.handleDragLeave} isDragging={uploader.isDragging} />
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5"><label htmlFor="service-name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Service Name *</label><span className="text-xs text-gray-400">{form.name.length}/150</span></div>

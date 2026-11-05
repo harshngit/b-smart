@@ -5,10 +5,12 @@ import { useDispatch } from 'react-redux';
 import { MoreVertical, Pencil, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useFloating, autoUpdate, offset, flip, shift } from '@floating-ui/react-dom';
 import { deleteService, updateService } from '../../store/servicesSlice';
+import ConfirmDialog from './ConfirmDialog';
 
 export default function ServiceActions({ service }) {
   const dispatch = useDispatch();
   const [open, setOpen] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
   const { refs, floatingStyles } = useFloating({
@@ -37,10 +39,18 @@ export default function ServiceActions({ service }) {
           {service.status === 'Published' && <button type="button" className={itemCls} onClick={() => { dispatch(updateService({ id: service.id, visible: !service.visible })); setOpen(false); }}>{service.visible ? <EyeOff size={13} /> : <Eye size={13} />}{service.visible ? 'Hide service' : 'Show service'}</button>}
           <button type="button" className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => {
             setOpen(false);
-            if (window.confirm(`Remove "${service.name}" from your store?`)) dispatch(deleteService(service.id));
+            setShowDelete(true);
           }}><Trash2 size={13} /> Delete</button>
         </div>, document.body,
       )}
+      <ConfirmDialog
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        title="Remove this service?"
+        description={`"${service.name}" will be removed from your store. This can't be undone.`}
+        confirmLabel="Remove"
+        onConfirm={() => { setShowDelete(false); dispatch(deleteService(service.id)); }}
+      />
     </>
   );
 }

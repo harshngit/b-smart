@@ -71,10 +71,13 @@ function BookingPage({ service }) {
   // and the seller enabled allow_multiple on the base price itself.
   const baseAllowMultiple = !service.hasVariants && service.allowMultiple;
   const effectiveBaseQuantity = baseAllowMultiple ? baseQuantity : 1;
-  const subservicesTotal = Object.entries(selectedSubservices).reduce((sum, [name, quantity]) => {
+  // Subservices only price/display when the service actually uses variant
+  // pricing — a flat-price service shouldn't let stale/leftover subservice
+  // data (e.g. from before a seller switched variants off) add extra charges.
+  const subservicesTotal = service.hasVariants ? Object.entries(selectedSubservices).reduce((sum, [name, quantity]) => {
     const match = service.subservices?.find((item) => item.name === name);
     return sum + (match ? (Number(match.price) || 0) * quantity : 0);
-  }, 0);
+  }, 0) : 0;
   const totalAmount = (Number(service.price) || 0) * effectiveBaseQuantity + subservicesTotal;
 
   useEffect(() => {
@@ -289,7 +292,7 @@ function BookingPage({ service }) {
             {(times.filter((slot) => slot < '12:00').length > 3 || times.filter((slot) => slot >= '12:00').length > 3) && <button type="button" onClick={() => setShowAllTimes(!showAllTimes)} className="text-[11px] text-[#fa3f5e]">{showAllTimes ? 'Show fewer times' : 'More available times'}</button>}{!times.length && <p className="text-xs text-gray-500">No available times on this date. Choose another day.</p>}
             <div className="flex items-center gap-2 rounded-lg border border-gray-100 dark:border-gray-800 p-3 text-xs"><Clock size={16} className="text-gray-500" />{service.duration}</div>
             {baseAllowMultiple && <div className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-800 p-3 text-xs"><span className="text-gray-500">Quantity</span><span className="flex items-center gap-2"><button type="button" aria-label="Decrease quantity" onClick={() => setBaseQuantity((qty) => Math.max(1, qty - 1))} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">−</button><span className="w-5 text-center text-xs font-semibold text-gray-900 dark:text-white">{baseQuantity}</span><button type="button" aria-label="Increase quantity" onClick={() => setBaseQuantity((qty) => qty + 1)} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">+</button></span></div>}
-            {service.subservices?.length > 0 && <fieldset className="space-y-2"><legend className="text-sm font-bold text-gray-900 dark:text-white">Subservices</legend>{service.subservices.map((item) => { const qty = selectedSubservices[item.name] || 0; return (
+            {service.hasVariants && service.subservices?.length > 0 && <fieldset className="space-y-2"><legend className="text-sm font-bold text-gray-900 dark:text-white">Subservices</legend>{service.subservices.map((item) => { const qty = selectedSubservices[item.name] || 0; return (
               <div key={item.name} className="flex items-center gap-2 text-sm text-gray-500">
                 <span className="w-8 h-8 rounded overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">{item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <ServiceIcon size={16} className="text-[#fa3f5e]/60" />}</span>
                 <span className="flex-1 min-w-0 truncate">{item.name}{item.sqft ? ` · ${item.sqft} sqft` : ''} — ₹{item.price}</span>

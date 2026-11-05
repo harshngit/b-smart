@@ -5,12 +5,14 @@ export const bookingTime = (time) => {
   return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
 };
 export const bookingStatus = (status) => ({ New: 'New request', Proposed: 'New time proposed', Confirmed: 'Confirmed', 'In Progress': 'In progress', Completed: 'Completed', Cancelled: 'Cancelled', Declined: 'Declined' }[status] || status);
-export const BOOKING_TABS = ['Requests', 'Confirmed', 'Completed'];
-export function filterBookings(bookings, { tab = 'Requests', search = '', date = '' } = {}) {
-  const statuses = { Requests: ['New', 'Proposed'], Confirmed: ['Confirmed', 'In Progress'], Completed: ['Completed', 'Cancelled', 'Declined'] }[tab] || ['New', 'Proposed'];
-  return bookings.filter((booking) => statuses.includes(booking.status)
-    && `${booking.service} ${booking.customer} ${booking.id}`.toLowerCase().includes(search.trim().toLowerCase())
-    && (!date || booking.date === date)).sort((a, b) => a.date.localeCompare(b.date));
+export const BOOKING_TABS = ['Requests', 'Confirmed', 'Completed', 'All Bookings'];
+const TAB_STATUSES = { Requests: ['New', 'Proposed'], Confirmed: ['Confirmed', 'In Progress'], Completed: ['Completed', 'Cancelled', 'Declined'], 'All Bookings': null };
+export function filterBookings(bookings, { tab = 'Requests', search = '', date = '', oldest = true } = {}) {
+  const statuses = tab in TAB_STATUSES ? TAB_STATUSES[tab] : TAB_STATUSES.Requests;
+  return bookings.filter((booking) => (!statuses || statuses.includes(booking.status))
+    && `${booking.service} ${booking.customer} ${booking.id} ${booking.booking_number || ''}`.toLowerCase().includes(search.trim().toLowerCase())
+    && (!date || booking.date === date))
+    .sort((a, b) => oldest ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
 }
 export function validProposal(date, time, now = new Date()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return false;
