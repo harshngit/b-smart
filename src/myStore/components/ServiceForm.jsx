@@ -5,7 +5,7 @@ import useMediaUploader from '../../hooks/useMediaUploader';
 import influencerServiceService, { serviceFormToApiPayload } from '../../services/influencerServiceService';
 import {
   Stepper, SectionCard, ImageGallery, Dropdown, HighlightsList, CompletenessCard, Checkbox,
-  inputCls, labelCls, MAX_IMAGES, MAX_HIGHLIGHTS,
+  inputCls, labelCls, MAX_IMAGES, MAX_HIGHLIGHTS, Req, NumberStepper, TimePicker,
 } from '../../components/productForm/ProductFormFields';
 import { SERVICE_CATEGORIES, RATE_TYPES, DURATIONS, METHODS, defaultAvailability, servicePrice, isBlankSubservice, validateService, validateSubservices, validateServiceTimeArea, textToList, listToText } from '../data/serviceFields';
 
@@ -129,9 +129,10 @@ export default function ServiceForm({ service }) {
   };
   const completeness = useMemo(() => [
     { label: 'Service Details', done: !!(form.name.trim() && form.category && form.description.trim()) },
-    { label: 'Pricing', done: hasVariants
-      ? subservices.some((item) => !isBlankSubservice(item)) && !validateSubservices(subservices)
-      : (form.price !== '' && Number.isFinite(Number(form.price)) && Number(form.price) >= 0 && !!form.duration) },
+    { label: 'Pricing', done: (
+      form.price !== '' && Number.isFinite(Number(form.price)) && Number(form.price) >= 0 && !!form.duration
+      && (!hasVariants || (subservices.some((item) => !isBlankSubservice(item)) && !validateSubservices(subservices)))
+    ) },
     { label: 'Availability & Publish', done: availability.some((day) => day.slots.length) && !validateService(form, availability, true) && (form.method !== 'At my location' || !!form.address.trim()) && !validateServiceTimeArea({ serviceTime, serviceAreaText: serviceArea, isCreate }) },
   ], [form, availability, subservices, serviceTime, serviceArea, isCreate, hasVariants]);
   const firstIncomplete = completeness.findIndex((section) => !section.done);
@@ -203,56 +204,53 @@ export default function ServiceForm({ service }) {
               <ImageGallery label="Service Images" images={images} mainIndex={mainIndex} onSetMain={setMainImageIndex} onAdd={uploader.handleFileInput} onRemove={handleRemoveImage} fileInputRef={uploader.fileInputRef} onDrop={uploader.handleDrop} onDragOver={uploader.handleDragOver} onDragLeave={uploader.handleDragLeave} isDragging={uploader.isDragging} />
               <div className="space-y-4">
                 <div>
-                  <div className="flex items-center justify-between mb-1.5"><label htmlFor="service-name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Service Name *</label><span className="text-xs text-gray-400">{form.name.length}/150</span></div>
+                  <div className="flex items-center justify-between mb-1.5"><label htmlFor="service-name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Service Name <Req /></label><span className="text-xs text-gray-400">{form.name.length}/150</span></div>
                   <input id="service-name" value={form.name} onChange={set('name')} maxLength={150} required placeholder="Home Cleaning" className={inputCls} />
                 </div>
                 <div><label htmlFor="service-provider" className={labelCls}>Provider (optional)</label><input id="service-provider" value={form.provider} onChange={set('provider')} placeholder="Your business name" className={inputCls} /></div>
                 <HighlightsList items={highlights} onChange={setHighlights} max={MAX_HIGHLIGHTS} placeholder="e.g. All equipment included" />
               </div>
               <div className="space-y-4">
-                <Dropdown label="Category *" value={form.category} options={SERVICE_CATEGORIES} onChange={(value) => setField('category', value)} />
+                <Dropdown label={<>Category <Req /></>} value={form.category} options={SERVICE_CATEGORIES} onChange={(value) => setField('category', value)} />
                 <div>
-                  <div className="flex items-center justify-between mb-1.5"><label htmlFor="service-description" className="text-sm font-medium text-gray-700 dark:text-gray-300">Short Description *</label><span className="text-xs text-gray-400">{form.description.length}/500</span></div>
+                  <div className="flex items-center justify-between mb-1.5"><label htmlFor="service-description" className="text-sm font-medium text-gray-700 dark:text-gray-300">Short Description <Req /></label><span className="text-xs text-gray-400">{form.description.length}/500</span></div>
                   <textarea id="service-description" value={form.description} onChange={set('description')} maxLength={500} rows={4} required placeholder="Describe your service..." className={inputCls} />
                 </div>
               </div>
             </div>
           </SectionCard>
           <SectionCard ref={step2Ref} step={2} title="Pricing">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div><label htmlFor="service-price" className={labelCls}>Price (₹) <Req /></label><NumberStepper id="service-price" value={form.price} onChange={(value) => setField('price', value)} min={0} step={1} prefix="₹" /></div>
+              <Dropdown label={<>Rate <Req /></>} value={form.rateType} options={RATE_TYPES} onChange={(value) => setField('rateType', value)} />
+              <Dropdown label={<>Duration <Req /></>} value={form.duration} options={DURATIONS} onChange={(value) => setField('duration', value)} />
+            </div>
+            <Checkbox checked={allowMultiple} onChange={setAllowMultiple} label="Allow customers to book more than one unit" />
             <Checkbox checked={hasVariants} onChange={setHasVariants} label="Do you have variants of Services" />
-            {hasVariants ? (
+            {hasVariants && (
               <SubservicesTable subservices={subservices} onChange={updateSubservice} onRemove={removeSubservice} onAdd={addSubservice} />
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div><label htmlFor="service-price" className={labelCls}>Price (₹) *</label><input id="service-price" type="number" min="0" step="0.01" value={form.price} onChange={set('price')} required placeholder="0" className={inputCls} /></div>
-                  <Dropdown label="Rate *" value={form.rateType} options={RATE_TYPES} onChange={(value) => setField('rateType', value)} />
-                  <Dropdown label="Duration *" value={form.duration} options={DURATIONS} onChange={(value) => setField('duration', value)} />
-                </div>
-                <Checkbox checked={allowMultiple} onChange={setAllowMultiple} label="Allow customers to book more than one unit" />
-              </>
             )}
           </SectionCard>
           <SectionCard ref={step3Ref} step={3} title="Availability & Publish">
             <div>
-              <label className={labelCls}>Service method *</label>
+              <label className={labelCls}>Service method <Req /></label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {METHODS.map((method) => <button key={method} type="button" aria-pressed={form.method === method} onClick={() => setField('method', method)} className={`flex flex-col items-center gap-2 px-3 py-3 rounded-lg border text-xs font-medium transition-colors ${form.method === method ? 'border-[#fa3f5e] bg-pink-50 dark:bg-pink-900/10 text-[#fa3f5e]' : 'border-gray-200 dark:border-gray-800 text-gray-500'}`}>{method === 'Online' ? <Globe size={18} /> : <MapPin size={18} />}{method}</button>)}
               </div>
             </div>
-            {form.method === 'At my location' && <div><label htmlFor="service-address" className={labelCls}>Service Address *</label><input id="service-address" value={form.address} onChange={set('address')} required placeholder="Where customers should visit" className={inputCls} /></div>}
+            {form.method === 'At my location' && <div><label htmlFor="service-address" className={labelCls}>Service Address <Req /></label><input id="service-address" value={form.address} onChange={set('address')} required placeholder="Where customers should visit" className={inputCls} /></div>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Service Hours {isCreate ? '*' : ''}</label>
+                <label className={labelCls}>Service Hours {isCreate && <Req />}</label>
                 <div className="flex items-center gap-2">
-                  <input type="time" aria-label="Service hours start" value={serviceTime.start} onChange={(event) => setServiceTime((current) => ({ ...current, start: event.target.value }))} className={inputCls} />
+                  <TimePicker ariaLabel="Service hours start" value={serviceTime.start} onChange={(value) => setServiceTime((current) => ({ ...current, start: value }))} />
                   <span className="text-gray-400">–</span>
-                  <input type="time" aria-label="Service hours end" value={serviceTime.end} onChange={(event) => setServiceTime((current) => ({ ...current, end: event.target.value }))} className={inputCls} />
+                  <TimePicker ariaLabel="Service hours end" value={serviceTime.end} onChange={(value) => setServiceTime((current) => ({ ...current, end: value }))} />
                 </div>
                 <p className="text-xs text-gray-400 mt-1">General hours this service is offered within — separate from weekly availability below.</p>
               </div>
               <div>
-                <label htmlFor="service-area" className={labelCls}>Coverage Areas {isCreate ? '*' : ''}</label>
+                <label htmlFor="service-area" className={labelCls}>Coverage Areas {isCreate && <Req />}</label>
                 <input id="service-area" value={serviceArea} onChange={(event) => setServiceArea(event.target.value)} placeholder="Malad, Andheri, Bandra" className={inputCls} />
                 <p className="text-xs text-gray-400 mt-1">Separate multiple areas with commas.</p>
               </div>
@@ -267,9 +265,9 @@ export default function ServiceForm({ service }) {
                       {!slots.length && <p className="py-2 text-sm text-gray-400">Unavailable</p>}
                       {slots.map((slot, index) => (
                         <div key={index} className="flex items-center gap-2">
-                          <input type="time" aria-label={`${day} start time ${index + 1}`} value={slot.start} onChange={(event) => changeSlots(day, (current) => current.map((item, i) => i === index ? { ...item, start: event.target.value } : item))} className={`${inputCls} min-w-0 px-2`} />
+                          <TimePicker ariaLabel={`${day} start time ${index + 1}`} value={slot.start} onChange={(value) => changeSlots(day, (current) => current.map((item, i) => i === index ? { ...item, start: value } : item))} />
                           <span className="text-gray-400">–</span>
-                          <input type="time" aria-label={`${day} end time ${index + 1}`} value={slot.end} onChange={(event) => changeSlots(day, (current) => current.map((item, i) => i === index ? { ...item, end: event.target.value } : item))} className={`${inputCls} min-w-0 px-2`} />
+                          <TimePicker ariaLabel={`${day} end time ${index + 1}`} value={slot.end} onChange={(value) => changeSlots(day, (current) => current.map((item, i) => i === index ? { ...item, end: value } : item))} />
                           <button type="button" aria-label={`Remove ${day} slot ${index + 1}`} onClick={() => changeSlots(day, (current) => current.filter((_, i) => i !== index))} className="p-1 text-gray-400 hover:text-red-500"><X size={16} /></button>
                         </div>
                       ))}

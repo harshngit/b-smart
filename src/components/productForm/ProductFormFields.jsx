@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useFloating, autoUpdate, offset, flip, shift } from '@floating-ui/react-dom';
 import { HexColorPicker } from 'react-colorful';
-import { ChevronDown, ChevronUp, ImagePlus, GripVertical, X, Plus, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, ImagePlus, GripVertical, X, Plus, Check, Clock } from 'lucide-react';
 
 export const CATEGORIES = ['Fashion', 'Tech', 'Home', 'Beauty'];
 export const STATUS_OPTIONS = ['Draft', 'Active', 'Out of Stock'];
@@ -25,6 +25,9 @@ export const SWATCHES = [
 // spin buttons — the field still only accepts numbers, just without the arrows.
 export const inputCls = "w-full px-3.5 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#fa3f5e]/20 focus:border-[#fa3f5e] dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 export const labelCls = "text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block";
+
+// ─── Required-field marker — every "*" next to a label renders through this ───
+export const Req = () => <span className="text-red-500">*</span>;
 
 // ─── Stepper ────────────────────────────────────────────────────────────────────
 export const Stepper = ({ steps, active, onStepClick }) => (
@@ -172,7 +175,7 @@ export const Checkbox = ({ checked, onChange, label }) => (
 // ─── Dimensions: Length x Width x Height, each with a "cm" unit ────────────────
 export const DimensionsInput = ({ length, width, height, onChange }) => (
   <div>
-    <label className={labelCls}>Dimensions (L x W x H) *</label>
+    <label className={labelCls}>Dimensions (L x W x H) <Req /></label>
     <div className="grid grid-cols-3 gap-2">
       {[
         { key: 'length', value: length, placeholder: 'L' },
@@ -261,7 +264,7 @@ export const Dropdown = ({ label, value, options, onChange, className = '', labe
 // ─── Package weight: number + selectable unit (kg / g / lb / oz) ──────────────
 export const WeightInput = ({ value, unit, onValueChange, onUnitChange }) => (
   <div>
-    <label className={labelCls}>Package Weight *</label>
+    <label className={labelCls}>Package Weight <Req /></label>
     <div className="flex gap-2">
       <input
         type="number" min="0" step="0.01"
@@ -285,7 +288,7 @@ export const HighlightsList = ({ items, onChange, max = MAX_HIGHLIGHTS, placehol
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <label className={labelCls.replace('mb-1.5 block', '')}>Key Highlights *</label>
+        <label className={labelCls.replace('mb-1.5 block', '')}>Key Highlights <Req /></label>
       </div>
       <div className="space-y-2">
         {items.map((h, i) => (
@@ -403,7 +406,7 @@ export const VariantsPricingTable = ({ variants, onChange, onRemove, onAdd }) =>
 );
 
 // ─── Product image gallery: main preview + thumbnail strip ─────────────────────
-export const ImageGallery = ({ images, mainIndex, onSetMain, onAdd, onRemove, fileInputRef, onDrop, onDragOver, onDragLeave, isDragging, label = 'Product Images *' }) => (
+export const ImageGallery = ({ images, mainIndex, onSetMain, onAdd, onRemove, fileInputRef, onDrop, onDragOver, onDragLeave, isDragging, label = <>Product Images <Req /></> }) => (
   <div>
     <label className={labelCls}>{label}</label>
     <div
@@ -484,6 +487,143 @@ export const CompletenessCard = ({ sections }) => {
         <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
           Great! Your listing is complete and ready to publish.
         </p>
+      )}
+    </div>
+  );
+};
+
+// ─── Number stepper — a plain number input with always-visible +/- arrows ─────
+export const NumberStepper = ({ id, value, onChange, min = 0, max, step = 1, placeholder = '0', prefix, className = '' }) => {
+  const clamp = (n) => {
+    let v = n;
+    if (min != null) v = Math.max(min, v);
+    if (max != null) v = Math.min(max, v);
+    return v;
+  };
+  const bump = (delta) => {
+    const base = value === '' || value == null || Number.isNaN(Number(value)) ? (min ?? 0) : Number(value);
+    const next = clamp(Math.round((base + delta) * 100) / 100);
+    onChange(String(next));
+  };
+  return (
+    <div className={`relative ${className}`}>
+      {prefix && <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">{prefix}</span>}
+      <input
+        id={id}
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`${inputCls} ${prefix ? 'pl-7' : ''} pr-9 font-semibold tabular-nums`}
+      />
+      <div className="absolute right-1 top-1 bottom-1 flex flex-col w-7">
+        <button type="button" aria-label="Increase value" onClick={() => bump(step)} className="flex-1 flex items-center justify-center rounded-t-md text-gray-400 hover:text-[#fa3f5e] hover:bg-pink-50 dark:hover:bg-gray-800">
+          <ChevronUp size={12} />
+        </button>
+        <button type="button" aria-label="Decrease value" onClick={() => bump(-step)} className="flex-1 flex items-center justify-center rounded-b-md text-gray-400 hover:text-[#fa3f5e] hover:bg-pink-50 dark:hover:bg-gray-800">
+          <ChevronDown size={12} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Time picker — 12-hour scroll-wheel clock popover; stores/emits "HH:MM" 24h ───
+const HOURS_12 = Array.from({ length: 12 }, (_, i) => i + 1);
+const MINUTES_60 = Array.from({ length: 60 }, (_, i) => i);
+
+const time24To12 = (hhmm) => {
+  if (!hhmm) return { h: 9, m: 0, period: 'AM' };
+  const [hStr, mStr] = hhmm.split(':');
+  let h = parseInt(hStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  const period = h >= 12 ? 'PM' : 'AM';
+  h %= 12;
+  if (h === 0) h = 12;
+  return { h, m, period };
+};
+
+const time12To24 = (h, m, period) => {
+  let hh = h % 12;
+  if (period === 'PM') hh += 12;
+  return `${String(hh).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+function TimeWheel({ values, value, format, onChange }) {
+  const activeRef = useRef(null);
+  useEffect(() => { activeRef.current?.scrollIntoView({ block: 'center' }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="h-48 w-16 overflow-y-auto py-[76px] [scrollbar-width:thin]">
+      {values.map((v) => (
+        <button
+          key={v}
+          ref={v === value ? activeRef : null}
+          type="button"
+          onClick={() => onChange(v)}
+          className={`w-full h-9 flex items-center justify-center text-sm font-semibold rounded-lg my-0.5 transition-colors ${
+            v === value ? 'bg-[#fa3f5e] text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-pink-50 dark:hover:bg-gray-800'
+          }`}
+        >
+          {format(v)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export const TimePicker = ({ value, onChange, ariaLabel }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const { h, m, period } = time24To12(value);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const set = (nh, nm, nperiod) => onChange(time12To24(nh, nm, nperiod));
+
+  return (
+    <div ref={ref} className="relative flex-1 min-w-0">
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 bg-white dark:bg-gray-900 border rounded-lg text-sm transition-all ${
+          open ? 'border-[#fa3f5e] ring-2 ring-[#fa3f5e]/20' : 'border-gray-200 dark:border-gray-800'
+        }`}
+      >
+        <span className="text-gray-900 dark:text-white font-medium tabular-nums">
+          {value ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}` : '--:-- --'}
+        </span>
+        <Clock size={15} className="text-gray-400 flex-shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-30 top-full left-0 mt-1.5 flex bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-xl overflow-hidden">
+          <TimeWheel values={HOURS_12} value={h} format={(v) => String(v).padStart(2, '0')} onChange={(nh) => set(nh, m, period)} />
+          <div className="border-l border-gray-100 dark:border-gray-800">
+            <TimeWheel values={MINUTES_60} value={m} format={(v) => String(v).padStart(2, '0')} onChange={(nm) => set(h, nm, period)} />
+          </div>
+          <div className="flex flex-col border-l border-gray-100 dark:border-gray-800 p-2 gap-1.5 justify-center">
+            {['AM', 'PM'].map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => set(h, m, p)}
+                className={`w-11 py-2 rounded-lg text-xs font-bold transition-colors ${
+                  p === period ? 'bg-[#fa3f5e] text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-pink-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

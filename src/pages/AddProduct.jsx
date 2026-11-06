@@ -5,7 +5,7 @@ import useMediaUploader from '../hooks/useMediaUploader';
 import influencerProductService, { prepareProductImages, prepareVariantImages, productFormToApiPayload } from '../services/influencerProductService';
 import {
   CATEGORIES, STATUS_OPTIONS, RETURN_POLICY_OPTIONS, WARRANTY_OPTIONS, COUNTRY_OPTIONS,
-  MAX_IMAGES, MAX_HIGHLIGHTS, inputCls, labelCls,
+  MAX_IMAGES, MAX_HIGHLIGHTS, inputCls, labelCls, Req, NumberStepper,
   Stepper, SectionCard, Checkbox, Dropdown, HighlightsList, DimensionsInput, WeightInput,
   VariantsPricingTable, ImageGallery, CompletenessCard,
   emptyVariant,
@@ -166,7 +166,7 @@ const AddProduct = () => {
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Product Name *</label>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Product Name <Req /></label>
                     <span className="text-xs text-gray-400">{form.name.length}/150</span>
                   </div>
                   <input value={form.name} onChange={set('name')} maxLength={150} required placeholder="Classic Brown Leather Tote" className={inputCls} />
@@ -179,10 +179,10 @@ const AddProduct = () => {
               </div>
 
               <div className="space-y-4">
-                <Dropdown label="Category *" value={form.category} options={CATEGORIES} onChange={(v) => setField('category', v)} />
+                <Dropdown label={<>Category <Req /></>} value={form.category} options={CATEGORIES} onChange={(v) => setField('category', v)} />
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Short Description *</label>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Short Description <Req /></label>
                     <span className="text-xs text-gray-400">{form.shortDescription.length}/500</span>
                   </div>
                   <textarea value={form.shortDescription} onChange={set('shortDescription')} maxLength={500} rows={4} required placeholder="Describe your product..." className={inputCls} />
@@ -194,12 +194,12 @@ const AddProduct = () => {
           <SectionCard ref={step2Ref} step={2} title="Price & Inventory">
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               <div>
-                <label className={labelCls}>MRP (₹) *</label>
-                <input type="number" min="0" step="1" value={form.mrp} onChange={set('mrp')} required placeholder="0" className={inputCls} />
+                <label className={labelCls}>MRP (₹) <Req /></label>
+                <NumberStepper value={form.mrp} onChange={(v) => setField('mrp', v)} min={0} step={1} prefix="₹" />
               </div>
               <div>
-                <label className={labelCls}>Selling Price (₹) *</label>
-                <input type="number" min="0" step="1" value={form.sellingPrice} onChange={set('sellingPrice')} required placeholder="0" className={inputCls} />
+                <label className={labelCls}>Selling Price (₹) <Req /></label>
+                <NumberStepper value={form.sellingPrice} onChange={(v) => setField('sellingPrice', v)} min={0} step={1} prefix="₹" />
               </div>
               <div>
                 <label className={labelCls}>Discount</label>
@@ -208,11 +208,11 @@ const AddProduct = () => {
                 </div>
               </div>
               <div>
-                <label className={labelCls}>Stock Quantity *</label>
+                <label className={labelCls}>Stock Quantity <Req /></label>
                 <input type="number" min="0" value={form.stockQuantity} onChange={set('stockQuantity')} required placeholder="0" className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Seller SKU *</label>
+                <label className={labelCls}>Seller SKU <Req /></label>
                 <input value={form.sku} onChange={set('sku')} required placeholder="SKU-001" className={inputCls} />
               </div>
             </div>
@@ -222,7 +222,7 @@ const AddProduct = () => {
                 <label className={labelCls}>Track Inventory</label>
                 <Checkbox checked={form.trackInventory} onChange={(v) => setField('trackInventory', v)} />
               </div>
-              <Dropdown className="flex-1 min-w-[180px]" label="Product Status *" value={form.status} options={STATUS_OPTIONS} onChange={(v) => setField('status', v)} />
+              <Dropdown className="flex-1 min-w-[180px]" label={<>Product Status <Req /></>} value={form.status} options={STATUS_OPTIONS} onChange={(v) => setField('status', v)} />
             </div>
 
             <VariantsPricingTable variants={variants} onChange={updateVariant} onRemove={removeVariant} onAdd={addVariant} />
@@ -243,7 +243,7 @@ const AddProduct = () => {
                 onChange={(key, value) => setField(key === 'length' ? 'dimLength' : key === 'width' ? 'dimWidth' : 'dimHeight', value)}
               />
               <div>
-                <label className={labelCls}>Dispatch Time *</label>
+                <label className={labelCls}>Dispatch Time <Req /></label>
                 <input value={form.dispatchTime} onChange={set('dispatchTime')} required placeholder="1-2 Days" className={inputCls} />
               </div>
               <div>
@@ -254,11 +254,11 @@ const AddProduct = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Dropdown label="Country of Origin *" value={form.countryOfOrigin} options={COUNTRY_OPTIONS} onChange={(v) => setField('countryOfOrigin', v)} />
+                <Dropdown label={<>Country of Origin <Req /></>} value={form.countryOfOrigin} options={COUNTRY_OPTIONS} onChange={(v) => setField('countryOfOrigin', v)} />
                 <Checkbox checked={form.useStoreDelivery} onChange={(v) => setField('useStoreDelivery', v)} label="Use store delivery settings" />
               </div>
               <div className="space-y-2">
-                <Dropdown label="Return Policy *" value={form.returnPolicy} options={RETURN_POLICY_OPTIONS} onChange={(v) => setField('returnPolicy', v)} />
+                <Dropdown label={<>Return Policy <Req /></>} value={form.returnPolicy} options={RETURN_POLICY_OPTIONS} onChange={(v) => setField('returnPolicy', v)} />
                 <Checkbox checked={form.useStoreReturnPolicy} onChange={(v) => setField('useStoreReturnPolicy', v)} label="Use store return policy" />
               </div>
             </div>
