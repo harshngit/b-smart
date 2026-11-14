@@ -2,6 +2,7 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  CornerUpLeft,
   Info,
   ImagePlus,
   MessageCircle,
@@ -142,13 +143,21 @@ const formatSeenAgo = (dateValue) => {
   return `Seen ${new Date(dateValue).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
 };
 
-const formatSeparator = (dateValue) =>
-  new Date(dateValue).toLocaleString('en-IN', {
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+// One separator per calendar day — "Today" / "Yesterday" / "11 Nov 2026".
+const formatDaySeparator = (dateValue) => {
+  const date = new Date(dateValue);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const formatMessageTime = (dateValue) => {
+  if (!dateValue) return '';
+  return new Date(dateValue).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
 
 const otherParticipant = (conversation, currentUserId) =>
   conversation?.participants?.find((item) => String(item?._id) !== String(currentUserId))
@@ -1097,12 +1106,12 @@ export default function ChatPage() {
 
   const groupedMessages = useMemo(() => {
     const result = [];
-    let lastLabel = '';
+    let lastDayKey = '';
     messages.forEach((message, index) => {
-      const label = formatSeparator(message.createdAt);
-      if (label !== lastLabel) {
-        result.push({ type: 'separator', id: `sep-${label}-${index}`, label });
-        lastLabel = label;
+      const dayKey = new Date(message.createdAt).toDateString();
+      if (dayKey !== lastDayKey) {
+        result.push({ type: 'separator', id: `sep-${dayKey}-${index}`, label: formatDaySeparator(message.createdAt) });
+        lastDayKey = dayKey;
       }
       result.push({ type: 'message', message });
     });
@@ -1124,6 +1133,18 @@ export default function ChatPage() {
       return !isSystemMessage;
     });
   }, [activeConversation?.isGroup, messages]);
+
+  // Switching tabs (Messages/Requests/Calls) only needs to swap the left-hand
+  // list and clear whatever conversation was open — re-clicking the tab
+  // that's already active would otherwise blank out the thread the user is
+  // currently reading for no reason.
+  const switchConversationType = useCallback((type) => {
+    if (type === conversationType) return;
+    setConversationType(type);
+    dispatch(setActiveConversation(null));
+    dispatch(setMessages([]));
+    navigate('/messages');
+  }, [conversationType, dispatch, navigate]);
 
   const setConversationAsActive = useCallback(async (conversation, options = {}) => {
     if (!conversation?._id || !currentUserId) return;
@@ -1603,6 +1624,7 @@ export default function ChatPage() {
       syncConversationPreview(activeConversation, enriched);
       dispatch(markConversationRead(activeConversation._id));
       setInput(''); setReplyTo(null); stopTyping();
+      if (inputRef.current) inputRef.current.style.height = 'auto';
     } catch (error) { console.error('Failed to send message:', error); }
     finally { setSending(false); }
   };
@@ -1617,14 +1639,20 @@ export default function ChatPage() {
         ? uploaded.media
         : (uploaded?.mediaUrl ? [{ mediaUrl: uploaded.mediaUrl, mediaType: uploaded.mediaType }] : []);
 
+      // The caption typed in the composer travels with the first uploaded
+      // file only — sending it again on every item in a multi-image upload
+      // would duplicate the same text across unrelated messages.
+      const caption = input.trim();
+      let captionUsed = false;
       for (const item of uploadedMedia) {
         if (!item?.mediaUrl || !item?.mediaType) continue;
         const created = await chatService.sendMessage(activeConversation._id, {
-          text: '',
+          text: captionUsed ? '' : caption,
           mediaUrl: item.mediaUrl,
           mediaType: item.mediaType,
           replyTo,
         });
+        captionUsed = true;
         const enriched = { ...created, replyTo: replyTo || null };
         dispatch(appendMessage(enriched));
         refreshConversationOrdering(activeConversation._id, enriched, enriched.createdAt);
@@ -1632,8 +1660,10 @@ export default function ChatPage() {
         dispatch(markConversationRead(activeConversation._id));
       }
 
+      setInput('');
       setReplyTo(null);
       stopTyping();
+      if (inputRef.current) inputRef.current.style.height = 'auto';
     } catch (error) { console.error('Failed to upload media:', error); }
     finally { setUploading(false); event.target.value = ''; }
   };
@@ -1974,8 +2004,8 @@ export default function ChatPage() {
       ? 'bg-[#7C3AED] rounded-[22px] rounded-br-md shadow-sm'
       : 'bg-gray-100 dark:bg-[#262626] rounded-[22px] rounded-bl-md border border-gray-200 dark:border-white/5 shadow-sm';
     const mediaFrameClass = mine
-      ? 'overflow-hidden rounded-[22px] rounded-br-md shadow-sm bg-transparent'
-      : 'overflow-hidden rounded-[22px] rounded-bl-md shadow-sm bg-transparent';
+      ? 'overflow-hidden rounded-[22px] rounded-br-md shadow-sm bg-transparent max-w-[200px] sm:max-w-[230px]'
+      : 'overflow-hidden rounded-[22px] rounded-bl-md shadow-sm bg-transparent max-w-[200px] sm:max-w-[230px]';
 
     const resolveSharedContentRoute = () => {
       if (sharedContentType === 'reel') {
@@ -2088,11 +2118,14 @@ export default function ChatPage() {
           </p>
         ) : null}
         {hasReplyContent(message.replyTo) ? (
-          <div className={`mb-1 rounded-2xl border px-3 py-2 text-xs ${mine ? 'bg-[#672ec3] border-white/10' : 'bg-gray-200/50 dark:bg-[#1a1a1a] border-gray-300 dark:border-white/10'}`}>
-            <p className={`mb-1 font-semibold ${mine ? 'text-white/80' : 'text-gray-900 dark:text-white/80'}`}>
-              {mine ? 'You replied' : `${getUserName(sender) || message.replyTo.senderName || 'User'} replied`}
-            </p>
-            <p className={`line-clamp-2 ${mine ? 'text-white/70' : 'text-gray-600 dark:text-white/70'}`}>{message.replyTo.text || 'Attachment'}</p>
+          <div className={`mb-1 flex items-start gap-1.5 rounded-xl border-l-[3px] pl-2.5 pr-3 py-1.5 text-xs ${mine ? 'border-white/50 bg-white/10' : 'border-[#7C3AED] bg-gray-100 dark:bg-white/5'}`}>
+            <CornerUpLeft size={11} className={`mt-0.5 shrink-0 ${mine ? 'text-white/70' : 'text-[#7C3AED]'}`} />
+            <div className="min-w-0 flex-1">
+              <p className={`mb-0.5 font-semibold ${mine ? 'text-white/85' : 'text-[#7C3AED] dark:text-[#a78bfa]'}`}>
+                {mine ? 'You replied' : `${getUserName(sender) || message.replyTo.senderName || 'User'} replied`}
+              </p>
+              <p className={`line-clamp-2 ${mine ? 'text-white/70' : 'text-gray-500 dark:text-white/60'}`}>{message.replyTo.text || 'Attachment'}</p>
+            </div>
           </div>
         ) : null}
 
@@ -2334,8 +2367,8 @@ export default function ChatPage() {
             ) : (
               <div className={mediaFrameClass}>
                 {message.mediaType === 'video' || isVideoUrl(message.mediaUrl)
-                  ? <video src={message.mediaUrl} controls className="block max-h-80 w-full object-cover outline-none border-0 ring-0 shadow-none" />
-                  : <img src={message.mediaUrl} alt="attachment" className="block max-h-80 w-full object-cover outline-none border-0 ring-0 shadow-none" />}
+                  ? <video src={message.mediaUrl} controls className="block max-h-64 w-full object-cover outline-none border-0 ring-0 shadow-none" />
+                  : <img src={message.mediaUrl} alt="attachment" className="block max-h-64 w-full object-cover outline-none border-0 ring-0 shadow-none" />}
               </div>
             )}
             {hasMessageText ? (
@@ -2539,12 +2572,7 @@ export default function ChatPage() {
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => {
-                    setConversationType(tab.key);
-                    dispatch(setActiveConversation(null));
-                    dispatch(setMessages([]));
-                    navigate('/messages');
-                  }}
+                  onClick={() => switchConversationType(tab.key)}
                   className={`flex items-center gap-1.5 text-[15px] font-bold transition md:text-[15px] ${
                     conversationType === tab.key
                       ? 'text-gray-900 dark:text-white'
@@ -2569,7 +2597,7 @@ export default function ChatPage() {
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => { setConversationType('normal'); dispatch(setActiveConversation(null)); dispatch(setMessages([])); navigate('/messages'); }}
+                    onClick={() => switchConversationType('normal')}
                     className="flex h-9 w-9 items-center justify-center rounded-full text-gray-900 dark:text-white transition hover:bg-gray-100 dark:hover:bg-white/10"
                     aria-label="Back to messages"
                   >
@@ -2583,7 +2611,7 @@ export default function ChatPage() {
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => { setConversationType('normal'); dispatch(setActiveConversation(null)); dispatch(setMessages([])); navigate('/messages'); }}
+                    onClick={() => switchConversationType('normal')}
                     className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-white/5 dark:hover:text-white"
                     aria-label="Back to messages"
                   >
@@ -3075,11 +3103,15 @@ export default function ChatPage() {
                                   />
                                 )}
                               </div>
-                              {showSeen && (
+                              {showSeen ? (
                                 <span className="mt-1.5 px-2 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                                   {formatSeenAgo(message.seenAt)}
                                 </span>
-                              )}
+                              ) : !sameNext && !message.isDeleted ? (
+                                <span className="mt-1 px-2 text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                                  {formatMessageTime(message.createdAt)}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         );
@@ -3092,12 +3124,13 @@ export default function ChatPage() {
 
               {replyTo && (
                 <div className="border-t border-gray-100 dark:border-white/10 bg-white dark:bg-[#050505] px-4 py-3 animate-in slide-in-from-bottom-2 duration-200">
-                  <div className="flex items-center justify-between rounded-2xl bg-gray-50 dark:bg-[#121212] border border-gray-100 dark:border-white/5 px-4 py-2.5">
-                    <div className="min-w-0">
+                  <div className="flex items-center gap-3 rounded-2xl border-l-[3px] border-[#7C3AED] bg-gray-50 dark:bg-[#121212] px-4 py-2.5">
+                    <CornerUpLeft size={16} className="shrink-0 text-[#7C3AED]" />
+                    <div className="min-w-0 flex-1">
                       <p className="text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider">Replying to {replyTo.senderName}</p>
                       <p className="truncate text-sm text-gray-500 dark:text-gray-400 mt-0.5">{replyTo.text || 'Attachment'}</p>
                     </div>
-                    <button onClick={() => setReplyTo(null)} className="rounded-full p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                    <button onClick={() => setReplyTo(null)} className="shrink-0 rounded-full p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
                       <X size={16} />
                     </button>
                   </div>
@@ -3132,7 +3165,7 @@ export default function ChatPage() {
                       />
                     </div>
                   )}
-                  <div className="flex items-center gap-2 rounded-[28px] bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/5 px-3 py-2 min-h-[52px] shadow-sm focus-within:shadow-md focus-within:border-gray-300 dark:focus-within:border-white/20 transition-all">
+                  <div className="flex items-end gap-2 rounded-[28px] bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/5 px-3 py-2 min-h-[52px] shadow-sm focus-within:shadow-md focus-within:border-gray-300 dark:focus-within:border-white/20 transition-all">
                     {!isRecording ? (
                       <>
                         <button
@@ -3143,17 +3176,24 @@ export default function ChatPage() {
                         >
                           <Smile size={20} />
                         </button>
-                        <input
+                        <textarea
                           ref={inputRef}
                           value={input}
+                          rows={1}
                           disabled={!activeConversationCanSend || messagingPrivacyBlocked}
-                          onChange={(event) => handleInputChange(event.target.value)}
+                          onChange={(event) => {
+                            handleInputChange(event.target.value);
+                            const el = event.target;
+                            el.style.height = 'auto';
+                            el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+                          }}
                           onKeyDown={(event) => {
                             if (event.key === 'Escape' && showEmojiPicker) { setShowEmojiPicker(false); return; }
-                            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleSend(); }
+                            // Enter inserts a newline (default textarea behavior); Ctrl/Cmd+Enter sends.
+                            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); handleSend(); }
                           }}
                           placeholder={messagingPrivacyBlocked ? 'Messaging is disabled' : activeConversationCanSend ? 'Message...' : 'Accept request to reply'}
-                          className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-white min-w-0 px-1"
+                          className="flex-1 resize-none bg-transparent text-[15px] leading-snug outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-white min-w-0 px-1 py-1.5 max-h-[120px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                         />
                         <button onClick={() => fileInputRef.current?.click()} disabled={uploading || !activeConversationCanSend} className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"><ImagePlus size={20} /></button>
                         <button className="rounded-full p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors hidden sm:block"><Sticker size={20} /></button>

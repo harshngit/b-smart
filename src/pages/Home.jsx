@@ -12,6 +12,7 @@ import StoryRail from '../components/StoryRail';
 import StoryViewer from '../components/StoryViewer';
 import LocationSelector from '../components/LocationSelector';
 import LoginPromptModal from '../components/LoginPromptModal';
+import GoogleAdUnit from '../components/ads/GoogleAdUnit';
 import { getProfilePath } from '../utils/profilePath';
 import api from '../lib/api';
 import bsmartLogo from '../assets/bsmart.png';
@@ -589,6 +590,10 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
               );
             })}
           </div>
+
+          <div className="mt-6">
+            <GoogleAdUnit />
+          </div>
         </div>
       </aside>
 
@@ -634,7 +639,9 @@ const Footer = () => (
 );
 
 // Feed order is determined by the API. Frontend only injects the mobile
-// suggested-users card once at position 2 (a UI-only widget, not content).
+// suggested-users card once at position 2 (a UI-only widget, not content),
+// plus one Google Ad slot after every 5 real content items (UI-only cards
+// don't count toward that 5, so an ad can't land right next to another).
 const injectSuggestionCard = (posts, suggestedUsers) => {
   const feed = [...posts];
   if (suggestedUsers.length > 0 && feed.length > 2) {
@@ -642,6 +649,25 @@ const injectSuggestionCard = (posts, suggestedUsers) => {
   }
   return feed;
 };
+
+const AD_INTERVAL = 5;
+
+const injectAdSlots = (feed) => {
+  const result = [];
+  let contentCount = 0;
+  feed.forEach((item) => {
+    result.push(item);
+    const isUiOnly = item.item_type === 'mobile_suggestion' || item.item_type === 'mobile_reels_suggestion';
+    if (isUiOnly) return;
+    contentCount += 1;
+    if (contentCount % AD_INTERVAL === 0) {
+      result.push({ item_type: 'google_ad', _adKey: `ad-${contentCount}` });
+    }
+  });
+  return result;
+};
+
+const buildFeed = (posts, suggestedUsers) => injectAdSlots(injectSuggestionCard(posts, suggestedUsers));
 
 // ── Home ──────────────────────────────────────────────────────────────────────
 const Home = () => {
@@ -822,13 +848,13 @@ const Home = () => {
     });
     setPosts(enriched);
     setSuggestedUsers(fetchedUsers);
-    setFeed(injectSuggestionCard(enriched, fetchedUsers));
+    setFeed(buildFeed(enriched, fetchedUsers));
     setLoading(false);
   }, [fetchPosts, fetchSuggestedUsers, fetchSavedPostIds, fetchSavedPromoteReelIds, fetchSavedAdIds, userObject]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
   useEffect(() => {
-    setFeed(injectSuggestionCard(posts, suggestedUsers));
+    setFeed(buildFeed(posts, suggestedUsers));
   }, [activeTab, posts, suggestedUsers]);
 
   useEffect(() => {
@@ -915,6 +941,9 @@ const Home = () => {
                 }
                 if (item.item_type === 'mobile_reels_suggestion') {
                   return <MobileSuggestedReelsCard key={`reels-${idx}`} reels={item.reels} />;
+                }
+                if (item.item_type === 'google_ad') {
+                  return <GoogleAdUnit key={item._adKey || `ad-${idx}`} className="my-4 rounded-2xl overflow-hidden" />;
                 }
                 if (item.item_type === 'promote_reel') {
                   return (
