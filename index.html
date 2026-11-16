@@ -11,8 +11,11 @@
     <meta name="keywords" content="B-Smart, social commerce, marketplace, vendor, member, shopping, social networking" />
     <meta name="theme-color" content="#e3304b" />
 
-    <!-- Google AdSense is loaded conditionally from Layout.jsx, only on pages
-         that actually render content — never on auth/thin screens. -->
+    <!-- AdSense requires this script statically present in <head> on every
+         page for site-ownership verification to succeed — a JS-injected
+         <script> tag (added after mount) isn't reliably seen by the
+         verification crawler. -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=%VITE_ADSENSE_CLIENT_ID%" crossorigin="anonymous"></script>
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />

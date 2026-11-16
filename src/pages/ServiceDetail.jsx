@@ -20,6 +20,15 @@ import PaymentSplitSlider from '../components/PaymentSplitSlider';
 const panel = 'rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm';
 const primary = 'rounded-lg bg-gradient-to-r from-insta-purple via-insta-pink to-insta-orange text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed';
 
+const formatHours = (value) => {
+  const hours = Number(value);
+  if (!Number.isFinite(hours) || hours <= 0) return '';
+  const whole = Math.floor(hours);
+  const minutes = Math.round((hours - whole) * 60);
+  if (!minutes) return `${whole} hr${whole === 1 ? '' : 's'}`;
+  return `${whole ? `${whole} hr${whole === 1 ? '' : 's'} ` : ''}${minutes} min`;
+};
+
 function BookingPage({ service }) {
   const [params] = useSearchParams();
   const fromServices = params.get('from') === 'services';
@@ -265,6 +274,46 @@ function BookingPage({ service }) {
           <Link to="/messages" className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-semibold shadow-sm"><MessageCircle size={14} />Message</Link>
         </section>
         <details className={`${panel} p-4 group`}><summary className="flex items-center gap-3 cursor-pointer list-none text-sm font-semibold text-gray-900 dark:text-white"><ShieldCheck size={20} className="text-gray-500" /><span className="flex-1">Cancellation policy</span><ChevronRight size={17} className="group-open:rotate-90" /></summary><p className="text-sm leading-6 text-gray-500 mt-3">{service.cancellationPolicy || 'Contact the provider to confirm cancellation terms before booking.'}</p></details>
+        {!canUseStoreLinks && service.hasVariants && service.subservices?.length > 0 && (
+          <section className={`${panel} p-4`}>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">Choose options</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {service.subservices.map((item) => {
+                const qty = selectedSubservices[item.name] || 0;
+                const hoursLabel = formatHours(item.hours);
+                return (
+                  <div key={item.name} className="rounded-xl border border-gray-100 dark:border-gray-800 p-3 flex gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white break-words">{item.name}</h3>
+                      <p className="text-sm font-semibold text-[#fa3f5e] mt-1">₹{Number(item.price || 0).toLocaleString()}</p>
+                      {(item.sqft || hoursLabel) && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{[item.sqft ? `${item.sqft} sqft` : '', hoursLabel].filter(Boolean).join(' · ')}</p>
+                      )}
+                    </div>
+                    <div className="w-20 shrink-0 flex flex-col items-center gap-2">
+                      <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                        {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <ServiceIcon size={22} className="text-[#fa3f5e]/60" />}
+                      </div>
+                      {item.allowMultiple ? (
+                        qty > 0 ? (
+                          <span className="flex items-center gap-1.5">
+                            <button type="button" aria-label={`Decrease ${item.name} quantity`} onClick={() => setSubserviceQty(item.name, Math.max(0, qty - 1))} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">−</button>
+                            <span className="w-5 text-center text-xs font-semibold text-gray-900 dark:text-white">{qty}</span>
+                            <button type="button" aria-label={`Increase ${item.name} quantity`} onClick={() => setSubserviceQty(item.name, qty + 1)} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">+</button>
+                          </span>
+                        ) : (
+                          <button type="button" onClick={() => setSubserviceQty(item.name, 1)} className="rounded-full border border-[#fa3f5e] text-[#fa3f5e] text-xs font-bold px-3 py-1">Add</button>
+                        )
+                      ) : (
+                        <button type="button" aria-pressed={qty > 0} onClick={() => toggleSubservice(item.name)} className={`rounded-full text-xs font-bold px-3 py-1 border ${qty > 0 ? 'bg-[#fa3f5e] border-[#fa3f5e] text-white' : 'border-[#fa3f5e] text-[#fa3f5e]'}`}>{qty > 0 ? 'Added' : 'Add'}</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </main>
       <aside className={`${panel} p-4 lg:sticky lg:top-6 min-w-0`}>
         {canUseStoreLinks ? (
@@ -292,21 +341,6 @@ function BookingPage({ service }) {
             {(times.filter((slot) => slot < '12:00').length > 3 || times.filter((slot) => slot >= '12:00').length > 3) && <button type="button" onClick={() => setShowAllTimes(!showAllTimes)} className="text-[11px] text-[#fa3f5e]">{showAllTimes ? 'Show fewer times' : 'More available times'}</button>}{!times.length && <p className="text-xs text-gray-500">No available times on this date. Choose another day.</p>}
             <div className="flex items-center gap-2 rounded-lg border border-gray-100 dark:border-gray-800 p-3 text-xs"><Clock size={16} className="text-gray-500" />{service.duration}</div>
             {baseAllowMultiple && <div className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-800 p-3 text-xs"><span className="text-gray-500">Quantity</span><span className="flex items-center gap-2"><button type="button" aria-label="Decrease quantity" onClick={() => setBaseQuantity((qty) => Math.max(1, qty - 1))} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">−</button><span className="w-5 text-center text-xs font-semibold text-gray-900 dark:text-white">{baseQuantity}</span><button type="button" aria-label="Increase quantity" onClick={() => setBaseQuantity((qty) => qty + 1)} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">+</button></span></div>}
-            {service.hasVariants && service.subservices?.length > 0 && <fieldset className="space-y-2"><legend className="text-sm font-bold text-gray-900 dark:text-white">Subservices</legend>{service.subservices.map((item) => { const qty = selectedSubservices[item.name] || 0; return (
-              <div key={item.name} className="flex items-center gap-2 text-sm text-gray-500">
-                <span className="w-8 h-8 rounded overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">{item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <ServiceIcon size={16} className="text-[#fa3f5e]/60" />}</span>
-                <span className="flex-1 min-w-0 truncate">{item.name}{item.sqft ? ` · ${item.sqft} sqft` : ''} — ₹{item.price}</span>
-                {item.allowMultiple ? (
-                  <span className="flex items-center gap-1.5 shrink-0">
-                    <button type="button" aria-label={`Decrease ${item.name} quantity`} onClick={() => setSubserviceQty(item.name, Math.max(0, qty - 1))} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">−</button>
-                    <span className="w-5 text-center text-xs font-semibold text-gray-900 dark:text-white">{qty}</span>
-                    <button type="button" aria-label={`Increase ${item.name} quantity`} onClick={() => setSubserviceQty(item.name, qty + 1)} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">+</button>
-                  </span>
-                ) : (
-                  <input type="checkbox" aria-label={`Select ${item.name}`} checked={qty > 0} onChange={() => toggleSubservice(item.name)} className="accent-[#fa3f5e] shrink-0" />
-                )}
-              </div>
-            ); })}</fieldset>}
             {atCustomer ? <div><button type="button" onClick={() => setAddressOpen(!addressOpen)} aria-expanded={addressOpen} className="w-full flex items-center gap-2 p-3 rounded-lg border border-gray-100 dark:border-gray-800 text-left"><MapPin size={17} className="text-gray-500 shrink-0" /><span className="flex-1 min-w-0 text-[11px] text-gray-500">Service address<span className="block truncate text-xs text-gray-900 dark:text-white mt-0.5">{addressesLoading ? 'Loading saved addresses...' : addressText || 'Add your address'}</span></span><ChevronRight size={16} /></button>{addressOpen && <div className="space-y-2">{savedAddresses.length > 0 && <label className="block text-xs text-gray-500">Saved address<select value={selectedSavedAddress} onChange={(event) => chooseSavedAddress(event.target.value)} className={`${inputCls} mt-1`}><option value="">Choose saved address</option>{savedAddresses.map((entry) => <option key={entry.id} value={entry.id}>{entry.label} - {entry.city}, {entry.pincode}</option>)}</select></label>}<label className="block text-xs text-gray-500">Address line<input required value={address.address_line1} onChange={(event) => updateAddress('address_line1', event.target.value)} className={`${inputCls} mt-1`} /></label><label className="block text-xs text-gray-500">City<input required value={address.city} onChange={(event) => updateAddress('city', event.target.value)} className={`${inputCls} mt-1`} /></label><label className="block text-xs text-gray-500">Pincode<input required value={address.pincode} onChange={(event) => updateAddress('pincode', event.target.value)} className={`${inputCls} mt-1`} /></label></div>}</div> : <p className="text-xs flex gap-2 text-gray-500"><MapPin size={16} />{service.method === 'Online' ? 'Joining details will be arranged with the provider.' : service.address || 'Contact the provider for the location.'}</p>}
             <div><h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">How to pay</h3><PaymentSplitSlider totalAmount={totalAmount} walletBalance={walletBalance} value={coinsToUse} onChange={setCoinsToUse} /></div>
             <details><summary className="text-[11px] text-gray-500 cursor-pointer">Add a note (optional)</summary><label className="block text-xs text-gray-500 mt-2">Note for the provider<textarea value={note} onChange={(event) => setNote(event.target.value)} className={`${inputCls} mt-1`} rows={2} /></label></details>

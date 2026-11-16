@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Mic, MicOff, Phone, PhoneOff, UserPlus, UserRound, Video, VideoOff } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, UserPlus, UserRound, Video, VideoOff, X } from 'lucide-react';
 import {
   emitGroupCallDecline,
   emitGroupCallInitiate,
@@ -339,12 +339,6 @@ const GroupCallOverlay = forwardRef(({ currentUserId, token }, ref) => {
     else groupCallIdRef.current = groupCall.groupCallId;
   }, [groupCall.status, groupCall.groupCallId]);
 
-  useEffect(() => {
-    if (groupCall.status !== 'idle' || !groupCall.error) return undefined;
-    const t = setTimeout(() => dispatch(endGroupCall()), 4000);
-    return () => clearTimeout(t);
-  }, [groupCall.status, groupCall.error, dispatch]);
-
   useImperativeHandle(ref, () => ({
     // Also doubles as "join" — if a call is already active for this
     // conversation, the server joins me to it instead of starting a new one.
@@ -411,8 +405,16 @@ const GroupCallOverlay = forwardRef(({ currentUserId, token }, ref) => {
   if (groupCall.status === 'idle') {
     if (!groupCall.error) return null;
     return (
-      <div className="fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+      <div className="fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-red-500 pl-4 pr-2 py-2 text-sm font-semibold text-white shadow-lg">
         {groupCall.error}
+        <button
+          type="button"
+          onClick={() => dispatch(endGroupCall())}
+          aria-label="Dismiss"
+          className="rounded-full p-1 hover:bg-white/20 transition-colors"
+        >
+          <X size={14} />
+        </button>
       </div>
     );
   }

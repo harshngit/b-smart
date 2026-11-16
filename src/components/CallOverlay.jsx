@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Maximize2, Mic, MicOff, Minimize2, Phone, PhoneOff, UserPlus, Video, VideoOff } from 'lucide-react';
+import { Maximize2, Mic, MicOff, Minimize2, Phone, PhoneOff, UserPlus, Video, VideoOff, X } from 'lucide-react';
 import {
   emitCallAccept,
   emitCallEnd,
@@ -330,14 +330,6 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
     }
   }, [call.status]);
 
-  // Auto-dismiss the idle-state error toast (a failed call:initiate never
-  // creates a call, so nothing else clears `error` in that state).
-  useEffect(() => {
-    if (call.status !== 'idle' || !call.error) return undefined;
-    const t = setTimeout(() => dispatch(endCall()), 4000);
-    return () => clearTimeout(t);
-  }, [call.status, call.error, dispatch]);
-
   useImperativeHandle(ref, () => ({
     startCall: (receiverId, peer, callType = 'voice') => {
       emitCallInitiate(receiverId, callType, (ack) => {
@@ -398,12 +390,21 @@ const CallOverlay = forwardRef(({ currentUserId, token }, ref) => {
 
   // A failed call:initiate (e.g. "not registered", "must follow each other")
   // only sets `error` — status stays 'idle' since no call was ever created.
-  // Surface it as a brief toast instead of silently doing nothing.
+  // Surface it as a toast the user has to dismiss themselves, rather than
+  // auto-hiding it after a few seconds where it's easy to miss entirely.
   if (call.status === 'idle') {
     if (!call.error) return null;
     return (
-      <div className="fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+      <div className="fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-red-500 pl-4 pr-2 py-2 text-sm font-semibold text-white shadow-lg">
         {call.error}
+        <button
+          type="button"
+          onClick={() => dispatch(endCall())}
+          aria-label="Dismiss"
+          className="rounded-full p-1 hover:bg-white/20 transition-colors"
+        >
+          <X size={14} />
+        </button>
       </div>
     );
   }
