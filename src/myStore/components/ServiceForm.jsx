@@ -7,12 +7,14 @@ import {
   Stepper, SectionCard, ImageGallery, Dropdown, HighlightsList, CompletenessCard, Checkbox,
   inputCls, labelCls, MAX_IMAGES, MAX_HIGHLIGHTS, Req, NumberStepper, TimePicker,
 } from '../../components/productForm/ProductFormFields';
+import DateOverridesEditor from './DateOverridesEditor';
 import { SERVICE_CATEGORIES, RATE_TYPES, DURATIONS, METHODS, defaultAvailability, servicePrice, isBlankSubservice, validateService, validateSubservices, validateServiceTimeArea, textToList, listToText } from '../data/serviceFields';
 
 const STEPS = [
   { label: 'Service Details', subtitle: 'Add basic information' },
   { label: 'Pricing', subtitle: 'Set your rate and duration' },
   { label: 'Availability & Publish', subtitle: 'Location, schedule & publish' },
+  { label: 'Time Off', subtitle: 'Block dates if needed' },
 ];
 
 const emptySubservice = () => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: '', hours: '', price: '', sqft: '', allowMultiple: false, image: null });
@@ -91,6 +93,7 @@ export default function ServiceForm({ service }) {
     image: item.image ? { url: item.image } : null,
   })) : [emptySubservice()]);
   const [availability, setAvailability] = useState(() => service?.availability ? structuredClone(service.availability) : defaultAvailability());
+  const [dateOverrides, setDateOverrides] = useState(() => service?.dateOverrides ? structuredClone(service.dateOverrides) : []);
   const isCreate = !service?.id;
   const [serviceTime, setServiceTime] = useState(() => (service?.serviceTime?.start && service?.serviceTime?.end ? { ...service.serviceTime } : { start: '', end: '' }));
   const [serviceArea, setServiceArea] = useState(() => listToText(service?.serviceArea));
@@ -100,6 +103,7 @@ export default function ServiceForm({ service }) {
   const step1Ref = useRef(null);
   const step2Ref = useRef(null);
   const step3Ref = useRef(null);
+  const step4Ref = useRef(null);
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const set = (field) => (event) => setField(field, event.target.value);
   // mainImageIndex is positional, not tied to a particular image's id — if
@@ -125,7 +129,7 @@ export default function ServiceForm({ service }) {
   const addSubservice = () => setSubservices((current) => [...current, emptySubservice()]);
   const goToStep = (step) => {
     setActiveStep(step);
-    [step1Ref, step2Ref, step3Ref][step - 1].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    [step1Ref, step2Ref, step3Ref, step4Ref][step - 1].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const completeness = useMemo(() => [
     { label: 'Service Details', done: !!(form.name.trim() && form.category && form.description.trim()) },
@@ -164,6 +168,7 @@ export default function ServiceForm({ service }) {
         highlights,
         subservices: uploadedSubservices,
         availability,
+        dateOverrides,
         images: uploadedImages,
         draft,
         serviceTime,
@@ -278,6 +283,9 @@ export default function ServiceForm({ service }) {
               </div>
             </div>
             <Checkbox checked={form.visible} onChange={(value) => setField('visible', value)} label="Visible to customers when published" />
+          </SectionCard>
+          <SectionCard ref={step4Ref} step={4} title="Special Dates / Time Off">
+            <DateOverridesEditor dateOverrides={dateOverrides} setDateOverrides={setDateOverrides} />
           </SectionCard>
         </div>
         <div className="space-y-4 lg:sticky lg:top-6">

@@ -92,6 +92,44 @@ const availabilityToApi = (availability = []) => DAYS.reduce((acc, day) => {
   return acc;
 }, {});
 
+export const REASON_OPTIONS = ['Unavailable', 'Fully Booked / Seats Full', 'On Leave', 'Custom Reason'];
+const REASON_TO_API = {
+  Unavailable: 'unavailable',
+  'Fully Booked / Seats Full': 'fully_booked',
+  'On Leave': 'on_leave',
+  'Custom Reason': 'custom',
+};
+const REASON_FROM_API = {
+  unavailable: 'Unavailable',
+  fully_booked: 'Fully Booked / Seats Full',
+  on_leave: 'On Leave',
+  custom: 'Custom Reason',
+};
+
+// One-off per-date exceptions to weekly_availability — each entry blocks a
+// specific date entirely (mode: 'entire') or just certain hours on it (mode:
+// 'specific'), independent of the recurring weekly schedule.
+const dateOverridesFromApi = (value = []) => (Array.isArray(value) ? value : []).map((entry, index) => {
+  const hasSlots = Array.isArray(entry.slots) && entry.slots.length > 0;
+  return {
+    id: entry._id || `${String(entry.date).slice(0, 10)}-${index}`,
+    date: String(entry.date || '').slice(0, 10),
+    mode: hasSlots ? 'specific' : 'entire',
+    slots: hasSlots ? entry.slots.map((s) => ({ start: s.start, end: s.end })) : [{ start: '', end: '' }],
+    reason: REASON_FROM_API[entry.reason] || 'Unavailable',
+    customReason: entry.custom_reason || '',
+  };
+});
+
+export const dateOverridesToApi = (overrides = []) => overrides.map((entry) => ({
+  date: entry.date,
+  slots: entry.mode === 'specific'
+    ? (entry.slots || []).filter((s) => s.start && s.end).map((s) => ({ start: s.start, end: s.end }))
+    : [],
+  reason: REASON_TO_API[entry.reason] || 'unavailable',
+  custom_reason: entry.reason === 'Custom Reason' ? (entry.customReason || '').trim() : '',
+}));
+
 export const normalizeInfluencerService = (service = {}) => {
   const id = service._id || service.id;
   const seller = service.user_id || service.user || service.influencer || service.owner || {};
@@ -125,6 +163,7 @@ export const normalizeInfluencerService = (service = {}) => {
       : { start: '', end: '' },
     serviceArea: Array.isArray(service.service_area) ? service.service_area : [],
     availability: availabilityFromApi(service.weekly_availability || service.availability),
+    dateOverrides: dateOverridesFromApi(service.date_overrides),
     visible: service.visible_to_customers ?? service.visible ?? true,
     status: service.status === 'draft' || service.status === 'Draft' ? 'Draft' : 'Published',
     bookings: Number(service.bookings || service.bookings_count || 0),
@@ -136,7 +175,7 @@ export const normalizeInfluencerService = (service = {}) => {
   };
 };
 
-export const serviceFormToApiPayload = ({ form, highlights, subservices, availability, images, draft, serviceTime, serviceArea, hasVariants, allowMultiple }) => ({
+export const serviceFormToApiPayload = ({ form, highlights, subservices, availability, dateOverrides, images, draft, serviceTime, serviceArea, hasVariants, allowMultiple }) => ({
   images,
   name: form.name.trim(),
   category: form.category,
@@ -160,6 +199,7 @@ export const serviceFormToApiPayload = ({ form, highlights, subservices, availab
   })),
   service_method: METHOD_TO_API[form.method] || 'at_customer_location',
   weekly_availability: availabilityToApi(availability),
+  date_overrides: dateOverridesToApi(dateOverrides || []),
   visible_to_customers: Boolean(form.visible),
   status: draft ? 'draft' : 'active',
   // Required on create, optional on update — omit when blank so a PATCH keeps the existing value.

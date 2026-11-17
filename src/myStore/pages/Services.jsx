@@ -1,7 +1,7 @@
 import ServiceIcon from '../components/ServiceIcon';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AlertCircle, Plus, Search, Pencil, Calendar, Trash2, Eye, EyeOff, Download, Briefcase, CalendarCheck, Receipt, Trophy, Star, Video, MapPin } from 'lucide-react';
+import { AlertCircle, Plus, Search, Pencil, Calendar, CalendarOff, Trash2, Eye, EyeOff, Download, Briefcase, CalendarCheck, Receipt, Trophy, Star, Video, MapPin } from 'lucide-react';
 import { Dropdown } from '../../components/productForm/ProductFormFields';
 import { SERVICE_CATEGORIES, servicePrice } from '../data/serviceFields';
 import influencerServiceService from '../../services/influencerServiceService';
@@ -10,6 +10,7 @@ import { money } from '../data/orderFilters';
 import RowActionsMenu from '../components/RowActionsMenu';
 import CatalogRowSkeleton from '../components/CatalogRowSkeleton';
 import ConfirmDialog from '../components/ConfirmDialog';
+import BlockDatesModal from '../components/BlockDatesModal';
 
 const PAGE_SIZE = 7;
 const TABS = ['Published', 'Draft', 'All'];
@@ -65,6 +66,7 @@ export default function StoreServices() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [blockDatesTarget, setBlockDatesTarget] = useState(null); // { ids, names } | null
 
   const confirmDeleteService = async () => {
     if (!deleteTarget) return;
@@ -199,6 +201,7 @@ export default function StoreServices() {
         <div className="flex flex-wrap items-center gap-3 mb-3 rounded-xl bg-pink-50 dark:bg-pink-900/10 px-4 py-2.5">
           <p className="text-xs font-semibold text-[#fa3f5e]">{selected.length} service{selected.length === 1 ? '' : 's'} selected</p>
           <div className="flex items-center gap-2 ml-auto">
+            <button type="button" onClick={() => setBlockDatesTarget({ ids: selected, names: services.filter((s) => selected.includes(s.id)).map((s) => s.name) })} className="flex items-center gap-1.5 rounded-full border border-[#fa3f5e]/30 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-semibold text-[#fa3f5e]"><CalendarOff size={12} /> Block dates</button>
             <button type="button" onClick={() => exportCsv(services.filter((s) => selected.includes(s.id)))} className="flex items-center gap-1.5 rounded-full border border-[#fa3f5e]/30 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-semibold text-[#fa3f5e]"><Download size={12} /> Export selected</button>
             <button type="button" onClick={() => setSelected([])} className="text-xs font-semibold text-gray-500 dark:text-gray-400 underline">Clear</button>
           </div>
@@ -266,6 +269,9 @@ export default function StoreServices() {
                             {visible ? <EyeOff size={13} /> : <Eye size={13} />}{visible ? 'Hide' : 'Show'}
                           </button>
                         )}
+                        <button type="button" role="menuitem" onClick={() => { close(); setBlockDatesTarget({ ids: [service.id], names: [service.name] }); }} className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-[#fa3f5e] dark:text-gray-300 dark:hover:bg-gray-800">
+                          <CalendarOff size={13} /> Block dates
+                        </button>
                         <button type="button" role="menuitem" onClick={() => { close(); setDeleteTarget(service); }} className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
                           <Trash2 size={13} /> Delete
                         </button>
@@ -296,6 +302,21 @@ export default function StoreServices() {
         loading={deleting}
         onConfirm={confirmDeleteService}
       />
+      {blockDatesTarget && (
+        <BlockDatesModal
+          serviceIds={blockDatesTarget.ids}
+          serviceNames={blockDatesTarget.names}
+          onClose={() => setBlockDatesTarget(null)}
+          onSaved={async () => {
+            const refreshed = await Promise.all(blockDatesTarget.ids.map((id) => influencerServiceService.get(id).catch(() => null)));
+            setServices((items) => items.map((item) => {
+              const match = refreshed.find((r) => r && String(r.id) === String(item.id));
+              return match ? { ...item, ...match } : item;
+            }));
+            setSelected((current) => current.filter((id) => !blockDatesTarget.ids.includes(id)));
+          }}
+        />
+      )}
     </div>
   );
 }

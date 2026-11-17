@@ -646,7 +646,13 @@ const CommentsBottomSheet = ({ reel, onClose, userObject }) => (
 );
 
 // ─── Main Reels Component ─────────────────────────────────────────────────────
-const Reels = () => {
+// `embedded` lets this same component be dropped into a modal (e.g. a
+// profile's bSparks tab) instead of only ever being the full /reels page:
+// - `scopeUserId` restricts the fetched list to one author's reels.
+// - `initialReelId` opens on that specific reel instead of the first one.
+// - `onClose` replaces the page's "navigate back" behavior.
+// When none of these are passed, behavior is identical to before.
+const Reels = ({ embedded = false, scopeUserId = null, initialReelId = null, onClose = null } = {}) => {
   const navigate       = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [reels,            setReels]            = useState([]);
@@ -823,8 +829,11 @@ const Reels = () => {
           return;
         }
 
+        const reelsUrl = scopeUserId
+          ? `${BASE_URL}/posts/reels?userId=${encodeURIComponent(scopeUserId)}`
+          : `${BASE_URL}/posts/reels`;
         const [reelsRes, savedRes] = await Promise.all([
-          fetch(`${BASE_URL}/posts/reels`, { headers: authHeaders() }),
+          fetch(reelsUrl, { headers: authHeaders() }),
           fetch(`${BASE_URL}/saved/posts`, { headers: authHeaders() }).catch(() => null),
         ]);
         if (!reelsRes.ok) throw new Error('Failed to fetch reels');
@@ -878,13 +887,14 @@ const Reels = () => {
       finally { setLoading(false); }
     };
     fetchReels();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, scopeUserId]);
 
   // Shared /reels?reel=<id> links only work if the target reel happens to be
   // within the first loaded page — self-fetch it directly when it isn't, so a
   // copied link reliably opens that exact reel in a fresh browser/session.
   const requestedReelFetchRef = useRef(null);
   useEffect(() => {
+    if (embedded) return; // modal mode has its own deep-link effect below, not URL-driven
     const targetReelId = String(searchParams.get('reel') || '').trim();
     if (!targetReelId) return;
 
@@ -928,7 +938,40 @@ const Reels = () => {
     })();
 
     return () => { cancelled = true; };
-  }, [reels, searchParams, setSearchParams, loading]);
+  }, [embedded, reels, searchParams, setSearchParams, loading]);
+
+  // Modal-mode equivalent of the deep-link effect above — driven by the
+  // `initialReelId` prop instead of the page's URL, and never touches
+  // searchParams (there's no real navigation to reflect in a modal).
+  const initialReelAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!embedded || !initialReelId || initialReelAppliedRef.current) return;
+
+    const targetIndex = reels.findIndex((item) => String(item?._id || item?.post_id || '') === String(initialReelId));
+    if (targetIndex >= 0) {
+      setCurrentIndex(targetIndex);
+      initialReelAppliedRef.current = true;
+      return;
+    }
+
+    if (loading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/posts/reels/${initialReelId}`, { headers: authHeaders() });
+        if (!res.ok || cancelled) return;
+        const fetchedReel = await res.json();
+        if (cancelled || !fetchedReel?._id) return;
+        setReels((prev) => [
+          fetchedReel,
+          ...prev.filter((item) => String(item._id || item.post_id || '') !== String(fetchedReel._id)),
+        ]);
+        setCurrentIndex(0);
+        initialReelAppliedRef.current = true;
+      } catch { /* modal just opens on the first reel instead */ }
+    })();
+    return () => { cancelled = true; };
+  }, [embedded, initialReelId, reels, loading]);
 
   useEffect(() => {
     setReelProgress(0);
@@ -1024,7 +1067,7 @@ const Reels = () => {
     return reel.user_id?.avatar_url || null;
   };
 
-  const pageHeightClass = 'h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]';
+  const pageHeightClass = embedded ? 'h-[100dvh]' : 'h-[calc(100dvh-4rem)] md:h-[calc(100dvh-1rem)]';
 
   const handleReelMore = (reel) => {
     const reelOwnerId = reel?.user_id?._id || reel?.user_id?.id || reel?.user_id;
@@ -1064,8 +1107,8 @@ const Reels = () => {
       <div className={`w-full ${pageHeightClass} overflow-hidden max-w-[1100px] mx-auto  flex flex-col dark:bg-black bg-white`}>
         {/* ── Top bar ── */}
         <div className="shrink-0 relative flex items-center px-3 py-2 md:px-4 md:py-2 bg-white dark:bg-black overflow-visible w-full">
-          <button onClick={() => navigate(-1)} className={`p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1 shrink-0 transition-all duration-300 ${searchOpen ? 'opacity-0 w-0 overflow-hidden mr-0 p-0' : 'opacity-100'}`}>
-            <ChevronLeft size={16} />
+          <button onClick={() => embedded ? onClose?.() : navigate(-1)} className={`p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 mr-1 shrink-0 transition-all duration-300 ${searchOpen ? 'opacity-0 w-0 overflow-hidden mr-0 p-0' : 'opacity-100'}`}>
+            {embedded ? <X size={16} /> : <ChevronLeft size={16} />}
           </button>
 
           {!searchOpen && (
@@ -1091,11 +1134,11 @@ const Reels = () => {
                 }
                 <button onClick={handleSearchClose} className="text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white ml-1 shrink-0">Cancel</button>
               </div>
-            ) : (
+            ) : !embedded ? (
               <button onClick={handleSearchOpen} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 transition-colors">
                 <Search size={18} className="text-gray-900 dark:text-white" />
               </button>
-            )}
+            ) : null}
 
             {searchOpen && searchDropdownVisible && (
               <div className="absolute left-0 right-0 top-full mt-1 mx-4 bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 z-[60] max-h-96 overflow-y-auto">

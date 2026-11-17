@@ -8,6 +8,7 @@ import api from '../lib/api';
 import PostCard from '../components/PostCard';
 import PromoteCard from '../components/PromoteCard';
 import PostDetailModal from '../components/PostDetailModal';
+import Reels from './Reels';
 import AvatarCropModal from '../components/AvatarCropModal';
 import FollowersModal from '../components/FollowersModal';
 import FollowingModal from '../components/FollowingModal';
@@ -188,6 +189,7 @@ const Profile = () => {
     const isOwnProfile = !userId || (currentUser && (userId === currentUser.id || userId === currentUser._id));
 
     const [activeTab, setActiveTab] = useState(null);
+    const [reelsModalReelId, setReelsModalReelId] = useState(null);
     const [userPosts, setUserPosts] = useState([]);
     const [userTweets, setUserTweets] = useState([]);
     const [userPromoteReels, setUserPromoteReels] = useState([]);
@@ -247,8 +249,12 @@ const Profile = () => {
     const profileRewardTickRef = useRef(null);
     const profileRewardSentRef = useRef(false);
 
-    const onlyPosts = userPosts.filter(p => p.type !== 'reel');
+    // "Moments" is image-only — a non-reel post can still carry video media,
+    // which doesn't belong in this tab's image grid/strip.
+    const isImageOnlyPost = (post) => !(post.media || []).some((m) => m?.type === 'video' || m?.media_type === 'video');
+    const onlyPosts = userPosts.filter(p => p.type !== 'reel' && isImageOnlyPost(p));
     const onlyReels = userPosts.filter(p => p.type === 'reel');
+    const topImagePosts = [...onlyPosts].sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0)).slice(0, 10);
     const displayedPosts =
         activeTab === 'reels' ? onlyReels :
         activeTab === 'posts' ? onlyPosts :
@@ -807,7 +813,7 @@ const Profile = () => {
     const handlePostClick = (post) => {
         const id = post._id || post.id;
         if (post.type === 'reel') {
-            navigate(`/reels?id=${id}`);
+            setReelsModalReelId(id);
             return;
         }
         if (window.innerWidth < 768 && id) navigate(`/post/${id}`);
@@ -1084,7 +1090,13 @@ const Profile = () => {
         if (activeTab === 'ads') return <AdsGrid containerClass="" />;
         if (activeTab === 'tweets') return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Tweets are private." /> : <TweetsGrid containerClass="" />;
         if (activeTab === 'promote_reels') return privacyRestricted.pulse ? <PrivacyRestrictedPlaceholder message="Reels are private." /> : <PromoteReelsGrid containerClass="" />;
-        return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Posts are private." /> : <PostGrid containerClass="" />;
+        if (privacyRestricted.posts) return <PrivacyRestrictedPlaceholder message="Posts are private." />;
+        return (
+            <>
+                {activeTab === 'posts' && <MomentsThumbnailStrip />}
+                <PostGrid containerClass="" />
+            </>
+        );
     };
 
     const AdsGrid = ({ containerClass = '' }) => (
@@ -1141,6 +1153,26 @@ const Profile = () => {
             )}
         </div>
     );
+
+    // Quick-access strip of this user's own most-liked image posts — clicking
+    // one opens it the same way clicking it in the grid below would.
+    const MomentsThumbnailStrip = () => {
+        if (!topImagePosts.length) return null;
+        return (
+            <div className="flex gap-2 overflow-x-auto px-3 py-3 bg-white dark:bg-black [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {topImagePosts.map((post) => (
+                    <button
+                        key={post._id || post.id}
+                        type="button"
+                        onClick={() => handlePostClick(post)}
+                        className="shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800"
+                    >
+                        <img src={getPostThumbnail(post)} alt="" className="w-full h-full object-cover" />
+                    </button>
+                ))}
+            </div>
+        );
+    };
 
     const PostGrid = ({ containerClass = '' }) => (
         <div className={`grid grid-cols-3 gap-[1px] bg-gray-200 dark:bg-gray-800 ${containerClass}`}>
@@ -1590,7 +1622,17 @@ const Profile = () => {
         }
         if (activeTab === 'tweets') return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Tweets are private." /> : <TweetsFeedCards />;
         if (activeTab === 'promote_reels') return privacyRestricted.pulse ? <PrivacyRestrictedPlaceholder message="Reels are private." /> : <PromoteReelsFeedCards />;
-        return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Posts are private." /> : <PostsFeedCards />;
+        if (privacyRestricted.posts) return <PrivacyRestrictedPlaceholder message="Posts are private." />;
+        return (
+            <>
+                {activeTab === 'posts' && (
+                    <div className="mb-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden">
+                        <MomentsThumbnailStrip />
+                    </div>
+                )}
+                <PostsFeedCards />
+            </>
+        );
     };
 
     // ── Follower mutual avatars (small stack shown under username) ────────────
@@ -2154,6 +2196,16 @@ const Profile = () => {
             {/* Modals */}
             <PostDetailModal isOpen={!!selectedPost} post={selectedPost} onClose={() => setSelectedPost(null)} />
             <PostDetailModal isOpen={!!selectedAd} post={selectedAd} onClose={() => setSelectedAd(null)} />
+            {reelsModalReelId && (
+                <div className="fixed inset-0 z-[9999]">
+                    <Reels
+                        embedded
+                        scopeUserId={profileTargetUserId}
+                        initialReelId={reelsModalReelId}
+                        onClose={() => setReelsModalReelId(null)}
+                    />
+                </div>
+            )}
             {selectedTweet && (
                 <TweetDetailModal
                     isOpen={!!selectedTweet}

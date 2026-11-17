@@ -34,7 +34,7 @@ const sameDay = (a, b) =>
 // Rendered through a portal so it can never be clipped by an ancestor's
 // overflow:hidden, and repositions itself (flipping above the field when
 // there isn't room below) so it always renders in full.
-const CalendarDatePicker = ({ value, onChange, placeholder = 'Select date', maxDate, minDate, className = '' }) => {
+const CalendarDatePicker = ({ value, onChange, placeholder = 'Select date', maxDate, minDate, className = '', isDateDisabled, dateStatus, renderTrigger, forceOpenDown = false, centered = false }) => {
   const selected = parseDateStr(value);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const max = maxDate || today;
@@ -51,7 +51,7 @@ const CalendarDatePicker = ({ value, onChange, placeholder = 'Select date', maxD
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const spaceBelow = window.innerHeight - rect.bottom;
-    const openUpward = spaceBelow < PANEL_HEIGHT && rect.top > PANEL_HEIGHT;
+    const openUpward = !forceOpenDown && spaceBelow < PANEL_HEIGHT && rect.top > PANEL_HEIGHT;
     const top = openUpward ? rect.top - PANEL_HEIGHT - 8 : rect.bottom + 8;
     const maxLeft = window.innerWidth - PANEL_WIDTH - 12;
     const left = Math.min(Math.max(12, rect.left), Math.max(12, maxLeft));
@@ -59,9 +59,15 @@ const CalendarDatePicker = ({ value, onChange, placeholder = 'Select date', maxD
   };
 
   const openPicker = () => {
-    setViewDate(selected || max);
+    // With nothing selected, prefer showing today's month over max — max is
+    // only meant as the upper bound, not a "default view" date. It only ever
+    // coincided with today before callers could pass a maxDate far in the
+    // future (e.g. blocking a date up to 2 years out), which otherwise opens
+    // the calendar on that distant month instead of the current one.
+    const defaultView = today >= min && today <= max ? today : max;
+    setViewDate(selected || defaultView);
     setViewMode('days');
-    computePosition();
+    if (!centered) computePosition();
     setOpen(true);
   };
 
@@ -69,7 +75,7 @@ const CalendarDatePicker = ({ value, onChange, placeholder = 'Select date', maxD
 
   // Keep the panel anchored to the trigger while open
   useEffect(() => {
-    if (!open) return;
+    if (!open || centered) return;
     const reposition = () => computePosition();
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
@@ -96,7 +102,7 @@ const CalendarDatePicker = ({ value, onChange, placeholder = 'Select date', maxD
     closePicker();
   };
 
-  const isDisabled = (date) => date > max || date < min;
+  const isDisabled = (date) => date > max || date < min || !!isDateDisabled?.(date);
 
   const year  = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -124,139 +130,180 @@ const CalendarDatePicker = ({ value, onChange, placeholder = 'Select date', maxD
   // ── Years grid (12-year page) ──
   const decadeStart = Math.floor(year / 12) * 12;
 
-  return (
-    <div className={`relative w-full ${className}`}>
-      <button type="button" ref={triggerRef} onClick={openPicker}
-        className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-left outline-none focus:ring-2 focus:ring-[#fa3f5e]/20 focus:border-[#fa3f5e] transition-all">
-        <span className={selected ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-400 dark:text-gray-600'}>
-          {selected ? formatDisplay(selected) : placeholder}
-        </span>
-        <CalendarIcon size={15} className="text-gray-400 shrink-0" />
-      </button>
+  const panelBody = (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <button type="button" onClick={() => {
+          if (viewMode === 'days') setViewDate(new Date(year, month - 1, 1));
+          else if (viewMode === 'months') setViewDate(new Date(year - 1, month, 1));
+          else setViewDate(new Date(year - 12, month, 1));
+        }} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors">
+          <ChevronLeft size={15} />
+        </button>
 
-      {open && coords && createPortal(
+        <button type="button" onClick={() => setViewMode(viewMode === 'days' ? 'months' : 'years')}
+          className="text-sm font-bold text-gray-900 dark:text-white hover:text-[#fa3f5e] transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+          {viewMode === 'days' ? `${MONTHS[month]} ${year}` : viewMode === 'months' ? String(year) : `${decadeStart} – ${decadeStart + 11}`}
+        </button>
+
+        <button type="button" onClick={() => {
+          if (viewMode === 'days') setViewDate(new Date(year, month + 1, 1));
+          else if (viewMode === 'months') setViewDate(new Date(year + 1, month, 1));
+          else setViewDate(new Date(year + 12, month, 1));
+        }} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors">
+          <ChevronRight size={15} />
+        </button>
+      </div>
+
+      {/* Days view */}
+      {viewMode === 'days' && (
         <>
-          {/* Backdrop — closes the popover on outside click */}
-          <div className="fixed inset-0 z-[299]" onClick={closePicker} />
-          <div
-            ref={panelRef}
-            style={{ position: 'fixed', top: coords.top, left: coords.left, width: PANEL_WIDTH }}
-            className="bg-white dark:bg-[#1c1c1c] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 z-[300] p-3"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-2">
-              <button type="button" onClick={() => {
-                if (viewMode === 'days') setViewDate(new Date(year, month - 1, 1));
-                else if (viewMode === 'months') setViewDate(new Date(year - 1, month, 1));
-                else setViewDate(new Date(year - 12, month, 1));
-              }} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors">
-                <ChevronLeft size={15} />
-              </button>
-
-              <button type="button" onClick={() => setViewMode(viewMode === 'days' ? 'months' : 'years')}
-                className="text-sm font-bold text-gray-900 dark:text-white hover:text-[#fa3f5e] transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                {viewMode === 'days' ? `${MONTHS[month]} ${year}` : viewMode === 'months' ? String(year) : `${decadeStart} – ${decadeStart + 11}`}
-              </button>
-
-              <button type="button" onClick={() => {
-                if (viewMode === 'days') setViewDate(new Date(year, month + 1, 1));
-                else if (viewMode === 'months') setViewDate(new Date(year + 1, month, 1));
-                else setViewDate(new Date(year + 12, month, 1));
-              }} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors">
-                <ChevronRight size={15} />
-              </button>
-            </div>
-
-            {/* Days view */}
-            {viewMode === 'days' && (
-              <>
-                <div className="grid grid-cols-7 mb-1">
-                  {WEEKDAYS.map(w => (
-                    <div key={w} className="text-[10px] font-bold text-gray-400 text-center py-1">{w}</div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-0.5">
-                  {cells.map(({ date, outside }, i) => {
-                    const disabled   = isDisabled(date);
-                    const isSelected = sameDay(date, selected);
-                    const isToday    = sameDay(date, today);
-                    return (
-                      <button key={i} type="button" disabled={disabled}
-                        onClick={() => pickDay(date)}
-                        className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                          isSelected ? 'bg-[#fa3f5e] text-white shadow-sm' :
-                          disabled ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed' :
-                          outside ? 'text-gray-300 dark:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800' :
-                          isToday ? 'text-[#fa3f5e] border border-[#fa3f5e]/40 hover:bg-[#fa3f5e]/10' :
-                          'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
-                        }`}>
-                        {date.getDate()}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            {/* Months view */}
-            {viewMode === 'months' && (
-              <div className="grid grid-cols-3 gap-1.5">
-                {MONTHS_SHORT.map((m, i) => {
-                  const disabled        = new Date(year, i + 1, 0) < min || new Date(year, i, 1) > max;
-                  const isSelectedMonth = selected && selected.getFullYear() === year && selected.getMonth() === i;
-                  return (
-                    <button key={m} type="button" disabled={disabled}
-                      onClick={() => { setViewDate(new Date(year, i, 1)); setViewMode('days'); }}
-                      className={`py-2.5 rounded-xl text-xs font-bold transition-colors ${
-                        isSelectedMonth ? 'bg-[#fa3f5e] text-white' :
-                        disabled ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed' :
-                        'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      }`}>
-                      {m}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Years view */}
-            {viewMode === 'years' && (
-              <div className="grid grid-cols-3 gap-1.5">
-                {Array.from({ length: 12 }, (_, i) => decadeStart + i).map((y) => {
-                  const disabled       = y < min.getFullYear() || y > max.getFullYear();
-                  const isSelectedYear = selected && selected.getFullYear() === y;
-                  return (
-                    <button key={y} type="button" disabled={disabled}
-                      onClick={() => { setViewDate(new Date(y, month, 1)); setViewMode('months'); }}
-                      className={`py-2.5 rounded-xl text-xs font-bold transition-colors ${
-                        isSelectedYear ? 'bg-[#fa3f5e] text-white' :
-                        disabled ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed' :
-                        'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      }`}>
-                      {y}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Footer */}
-            {viewMode === 'days' && (
-              <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                <button type="button" onClick={() => pickDay(today)} disabled={isDisabled(today)}
-                  className="text-[11px] font-bold text-[#fa3f5e] hover:underline disabled:opacity-40 disabled:no-underline">
-                  Today
-                </button>
-                {selected && (
-                  <button type="button" onClick={() => { onChange(''); closePicker(); }}
-                    className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                    Clear
-                  </button>
-                )}
-              </div>
-            )}
+          <div className="grid grid-cols-7 mb-1">
+            {WEEKDAYS.map(w => (
+              <div key={w} className="text-[10px] font-bold text-gray-400 text-center py-1">{w}</div>
+            ))}
           </div>
-        </>,
+          <div className="grid grid-cols-7 gap-0.5">
+            {cells.map(({ date, outside }, i) => {
+              const disabled   = isDisabled(date);
+              const isSelected = sameDay(date, selected);
+              const isToday    = sameDay(date, today);
+              const status     = !outside && dateStatus ? dateStatus(date) : null;
+              return (
+                <div key={i} className="relative group">
+                  <button type="button" disabled={disabled}
+                    onClick={() => pickDay(date)}
+                    className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                      isSelected ? 'bg-[#fa3f5e] text-white shadow-sm' :
+                      disabled ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed' :
+                      outside ? 'text-gray-300 dark:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800' :
+                      isToday ? 'text-[#fa3f5e] border border-[#fa3f5e]/40 hover:bg-[#fa3f5e]/10' :
+                      'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}>
+                    {date.getDate()}
+                  </button>
+                  {status && !isSelected && (
+                    <span className={`pointer-events-none absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${status.dotClassName || 'bg-[#fa3f5e]'}`} />
+                  )}
+                  {status && (
+                    <span className="pointer-events-none absolute left-1/2 bottom-full z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 dark:bg-gray-700">
+                      {status.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Months view */}
+      {viewMode === 'months' && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {MONTHS_SHORT.map((m, i) => {
+            const disabled        = new Date(year, i + 1, 0) < min || new Date(year, i, 1) > max;
+            const isSelectedMonth = selected && selected.getFullYear() === year && selected.getMonth() === i;
+            return (
+              <button key={m} type="button" disabled={disabled}
+                onClick={() => { setViewDate(new Date(year, i, 1)); setViewMode('days'); }}
+                className={`py-2.5 rounded-xl text-xs font-bold transition-colors ${
+                  isSelectedMonth ? 'bg-[#fa3f5e] text-white' :
+                  disabled ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed' :
+                  'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}>
+                {m}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Years view */}
+      {viewMode === 'years' && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {Array.from({ length: 12 }, (_, i) => decadeStart + i).map((y) => {
+            const disabled       = y < min.getFullYear() || y > max.getFullYear();
+            const isSelectedYear = selected && selected.getFullYear() === y;
+            return (
+              <button key={y} type="button" disabled={disabled}
+                onClick={() => { setViewDate(new Date(y, month, 1)); setViewMode('months'); }}
+                className={`py-2.5 rounded-xl text-xs font-bold transition-colors ${
+                  isSelectedYear ? 'bg-[#fa3f5e] text-white' :
+                  disabled ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed' :
+                  'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}>
+                {y}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Footer */}
+      {viewMode === 'days' && (
+        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+          <button type="button" onClick={() => pickDay(today)} disabled={isDisabled(today)}
+            className="text-[11px] font-bold text-[#fa3f5e] hover:underline disabled:opacity-40 disabled:no-underline">
+            Today
+          </button>
+          {selected && (
+            <button type="button" onClick={() => { onChange(''); closePicker(); }}
+              className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <div className={`relative ${className || 'w-full'}`}>
+      {renderTrigger ? (
+        // Intentional: handing the ref object itself to the render-prop so it
+        // can attach `ref={triggerRef}` to its own custom trigger markup —
+        // nothing here reads triggerRef.current during render.
+        // eslint-disable-next-line react-hooks/refs
+        renderTrigger({ triggerRef, onClick: openPicker })
+      ) : (
+        <button type="button" ref={triggerRef} onClick={openPicker}
+          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-left outline-none focus:ring-2 focus:ring-[#fa3f5e]/20 focus:border-[#fa3f5e] transition-all">
+          <span className={selected ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-400 dark:text-gray-600'}>
+            {selected ? formatDisplay(selected) : placeholder}
+          </span>
+          <CalendarIcon size={15} className="text-gray-400 shrink-0" />
+        </button>
+      )}
+
+      {open && (centered || coords) && createPortal(
+        centered ? (
+          // z-index comfortably above any modal (e.g. z-[9999]) that might
+          // host this picker — a lower value here gets visually buried under
+          // the modal's own backdrop even though it's technically "open".
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/50" onClick={closePicker}>
+            <div
+              ref={panelRef}
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: PANEL_WIDTH }}
+              className="bg-white dark:bg-[#1c1c1c] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 p-3"
+            >
+              {panelBody}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Backdrop — closes the popover on outside click */}
+            <div className="fixed inset-0 z-[10000]" onClick={closePicker} />
+            <div
+              ref={panelRef}
+              style={{ position: 'fixed', top: coords.top, left: coords.left, width: PANEL_WIDTH }}
+              className="bg-white dark:bg-[#1c1c1c] rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 z-[10001] p-3"
+            >
+              {panelBody}
+            </div>
+          </>
+        ),
         document.body
       )}
     </div>

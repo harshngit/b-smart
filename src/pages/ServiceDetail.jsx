@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  BadgeCheck, CalendarDays, CheckCircle2, ChevronRight, Clock, Globe, Home,
+  BadgeCheck, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe, Home,
   Loader2, MapPin, MessageCircle, ShieldCheck, Star, UserRound,
 } from 'lucide-react';
 import ServiceIcon from '../myStore/components/ServiceIcon';
 import { inputCls } from '../components/productForm/ProductFormFields';
+import CalendarDatePicker from '../components/CalendarDatePicker';
 import { servicePrice } from '../myStore/data/serviceFields';
 import { availableTimes, durationMinutes } from '../myStore/data/serviceBooking';
 import { bookingTime, localDate } from '../myStore/data/bookingHelpers';
@@ -46,8 +47,8 @@ function BookingPage({ service }) {
     return localDate();
   });
   const [date, setDate] = useState(firstDate);
+  const [windowStart, setWindowStart] = useState(firstDate);
   const [time, setTime] = useState(() => availableTimes(service, firstDate)[0] || '');
-  const [calendarOpen, setCalendarOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
   const [showAllTimes, setShowAllTimes] = useState(false);
   const [address, setAddress] = useState({ address_line1: '', city: '', pincode: '' });
@@ -73,8 +74,10 @@ function BookingPage({ service }) {
   const provider = service.provider || user?.name || user?.full_name || user?.username || 'Service provider';
   const providerAvatar = service.providerAvatar || (!service.provider ? user?.profile_picture || user?.avatar : null);
   const providerVerified = service.providerVerified ?? (!service.provider && !!user?.is_verified);
-  const dates = Array.from({ length: 5 }, (_, index) => { const value = new Date(`${date || firstDate}T12:00:00`); value.setDate(value.getDate() + index); return localDate(value); });
+  const dates = Array.from({ length: 5 }, (_, index) => { const value = new Date(`${windowStart || firstDate}T12:00:00`); value.setDate(value.getDate() + index); return localDate(value); });
   const chosenDay = new Date(`${date}T12:00:00`);
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const maxBookableDate = new Date(today0); maxBookableDate.setFullYear(maxBookableDate.getFullYear() + 1);
   const addressText = [address.address_line1, address.city, address.pincode].filter(Boolean).join(', ');
   // Base (non-variant) quantity only applies when the service has no variants
   // and the seller enabled allow_multiple on the base price itself.
@@ -125,11 +128,20 @@ function BookingPage({ service }) {
 
   const selectDate = (value) => {
     setDate(value);
+    setWindowStart(value);
     setTime(availableTimes(service, value)[0] || '');
     setReviewing(false);
     setShowAllTimes(false);
     setError('');
   };
+  // Lets the visible 5-day strip slide forward/back a day at a time without
+  // changing which date is actually selected.
+  const shiftWindow = (deltaDays) => setWindowStart((current) => {
+    const base = new Date(`${current || firstDate}T12:00:00`);
+    base.setDate(base.getDate() + deltaDays);
+    const next = localDate(base);
+    return next < localDate() ? localDate() : next;
+  });
   const updateAddress = (key, value) => setAddress((current) => ({ ...current, [key]: value }));
   const chooseSavedAddress = (id) => {
     setSelectedSavedAddress(id);
@@ -332,10 +344,40 @@ function BookingPage({ service }) {
             </Link>
           </div>
         ) : (
-        <form onSubmit={submit} className="space-y-4"><h2 className="text-base font-bold text-gray-900 dark:text-white">{reviewing ? 'Review your booking' : 'Select availability'}</h2>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">{reviewing ? 'Review your booking' : 'Select availability'}</h2>
+            {!reviewing && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button type="button" aria-label="Earlier dates" disabled={windowStart <= localDate()} onClick={() => shiftWindow(-1)} className="rounded-lg border border-gray-100 dark:border-gray-800 p-1.5 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed">
+                  <ChevronLeft size={14} />
+                </button>
+                <button type="button" aria-label="Later dates" onClick={() => shiftWindow(1)} className="rounded-lg border border-gray-100 dark:border-gray-800 p-1.5 text-gray-500">
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </div>
           {reviewing ? <div className="space-y-3 text-sm text-gray-500"><p className="font-semibold text-gray-900 dark:text-white">{service.name}</p><p>{chosenDay.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - {bookingTime(time)}</p><p>{service.duration}</p><p className="break-words">{atCustomer ? addressText : service.method === 'Online' ? 'Online' : service.address}</p>{Object.keys(selectedSubservices).length > 0 && <p>Selected: {Object.entries(selectedSubservices).map(([name, quantity]) => quantity > 1 ? `${name} ×${quantity}` : name).join(', ')}</p>}{baseAllowMultiple && baseQuantity > 1 && <p>Quantity: {baseQuantity}</p>}<p className="font-semibold text-[#fa3f5e]">₹{totalAmount.toLocaleString()}</p><p className="text-xs">{coinsToUse > 0 ? `Coins ₹${Math.min(coinsToUse, walletBalance, totalAmount).toLocaleString()} + Razorpay ₹${Math.max(0, totalAmount - Math.min(coinsToUse, walletBalance, totalAmount)).toLocaleString()}` : 'Paid fully via Razorpay'}</p><button type="button" onClick={() => setReviewing(false)} className="text-xs text-[#fa3f5e]">Edit booking</button></div> : <>
-            <div className="flex items-center gap-2"><div className="grid grid-cols-5 gap-1 flex-1 min-w-0">{dates.map((value) => { const day = new Date(`${value}T12:00:00`); return <button type="button" key={value} onClick={() => selectDate(value)} aria-pressed={date === value} className={`rounded-lg border py-2 text-center ${date === value ? 'border-[#fa3f5e] text-[#fa3f5e] bg-pink-50/30 dark:bg-pink-900/10' : 'border-gray-100 dark:border-gray-800 text-gray-500'}`}><span className="block text-[10px]">{day.toLocaleDateString('en-US', { weekday: 'short' })}</span><strong className="block text-sm mt-1">{day.getDate()}</strong><span className="block text-[10px] mt-1">{day.toLocaleDateString('en-US', { month: 'short' })}</span></button>; })}</div><button type="button" aria-label="Choose another date" aria-expanded={calendarOpen} onClick={() => setCalendarOpen(!calendarOpen)} className="rounded-lg border border-gray-100 dark:border-gray-800 p-2 text-gray-500"><CalendarDays size={18} /></button></div>
-            {calendarOpen && <label className="block text-xs text-gray-500">Choose another date<input type="date" required min={localDate()} value={date} onChange={(event) => selectDate(event.target.value)} className={`${inputCls} mt-1`} /></label>}
+            <div className="flex items-center gap-1.5">
+              <div className="grid grid-cols-5 gap-1 flex-1 min-w-0">
+                {dates.map((value) => { const day = new Date(`${value}T12:00:00`); const unavailable = availableTimes(service, value).length === 0; return <button type="button" key={value} disabled={unavailable} onClick={() => selectDate(value)} aria-pressed={date === value} aria-disabled={unavailable} title={unavailable ? 'Unavailable' : undefined} className={`group relative rounded-lg border py-2 text-center disabled:cursor-not-allowed ${unavailable ? 'border-gray-100 dark:border-gray-800 text-gray-300 dark:text-gray-600' : date === value ? 'border-[#fa3f5e] text-[#fa3f5e] bg-pink-50/30 dark:bg-pink-900/10' : 'border-gray-100 dark:border-gray-800 text-gray-500'}`}><span className={`block text-[10px] ${unavailable ? 'line-through' : ''}`}>{day.toLocaleDateString('en-US', { weekday: 'short' })}</span><strong className={`block text-sm mt-1 ${unavailable ? 'line-through' : ''}`}>{day.getDate()}</strong><span className="block text-[10px] mt-1">{!unavailable && day.toLocaleDateString('en-US', { month: 'short' })}</span>{unavailable && <span className="pointer-events-none absolute left-1/2 bottom-full z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 dark:bg-gray-700">Unavailable</span>}</button>; })}
+              </div>
+              <CalendarDatePicker
+                value={date}
+                minDate={today0}
+                maxDate={maxBookableDate}
+                isDateDisabled={(d) => availableTimes(service, localDate(d)).length === 0}
+                onChange={(value) => { if (value) selectDate(value); }}
+                centered
+                className="w-auto shrink-0"
+                renderTrigger={({ triggerRef, onClick }) => (
+                  <button type="button" ref={triggerRef} aria-label="Choose another date" onClick={onClick} className="rounded-lg border border-gray-100 dark:border-gray-800 p-2 text-gray-500">
+                    <CalendarDays size={18} />
+                  </button>
+                )}
+              />
+            </div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-white">{Number.isNaN(chosenDay.getTime()) ? 'Choose a date' : chosenDay.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</h3>
             {['Morning', 'Afternoon'].map((period) => { const periodTimes = times.filter((slot) => period === 'Morning' ? slot < '12:00' : slot >= '12:00'); return periodTimes.length > 0 && <fieldset key={period}><legend className="text-xs text-insta-purple mb-2">{period}</legend><div className="grid grid-cols-3 gap-2">{(showAllTimes ? periodTimes : periodTimes.slice(0, 3)).map((slot) => <button type="button" key={slot} aria-pressed={time === slot} onClick={() => { setTime(slot); setError(''); }} className={`rounded-lg border py-2 text-[11px] ${time === slot ? 'bg-[#fa3f5e] border-[#fa3f5e] text-white' : 'border-gray-100 dark:border-gray-800 text-gray-500'}`}>{bookingTime(slot)}</button>)}</div></fieldset>; })}
             {(times.filter((slot) => slot < '12:00').length > 3 || times.filter((slot) => slot >= '12:00').length > 3) && <button type="button" onClick={() => setShowAllTimes(!showAllTimes)} className="text-[11px] text-[#fa3f5e]">{showAllTimes ? 'Show fewer times' : 'More available times'}</button>}{!times.length && <p className="text-xs text-gray-500">No available times on this date. Choose another day.</p>}
