@@ -16,6 +16,10 @@ const Layout = () => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { userObject, dailyReward } = useSelector((state) => state.auth);
+  const chatConversations = useSelector((state) => state.chat?.conversations || []);
+  const chatUnreadCount = useSelector((state) =>
+    Object.values(state.chat?.unreadCounts || {}).reduce((sum, count) => sum + Number(count || 0), 0)
+  );
   const isMessagesPage = location.pathname.startsWith('/messages');
   const isProfilePage = location.pathname.startsWith('/profile');
   const isSettingsPage = location.pathname.startsWith('/settings');
@@ -23,14 +27,20 @@ const Layout = () => {
   const isFullScreenPage = ['/reels', '/promote', '/ads'].includes(location.pathname);
   const showTopBar = !isExcludedPage && !isFullScreenPage;
 
+  const currentUserId = userObject?._id || userObject?.id;
+  const recentConversations = useMemo(() => (
+    [...chatConversations]
+      .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0))
+      .slice(0, 3)
+  ), [chatConversations]);
+
 
   // The AdSense script itself is now loaded statically from index.html's
   // <head> on every page (required for AdSense's site-ownership
   // verification to see it) — no need to inject it from here anymore.
 
-  const [walletCoins, setWalletCoins] = useState(null);
-
-  // Direct /wallet/me call — also syncs Redux so TopBar stays live
+  // Direct /wallet/me call — syncs Redux so TopBar and the Home search bar's
+  // wallet chip stay live.
   const loadWallet = useCallback(async () => {
     try {
       const res = await api.get('/wallet/me');
@@ -42,9 +52,7 @@ const Layout = () => {
         data?.data?.balance ??
         null;
       if (bal !== null && bal !== undefined) {
-        const balance = Math.floor(Number(bal));
-        setWalletCoins(balance);
-        dispatch(setWalletBalance(balance));
+        dispatch(setWalletBalance(Math.floor(Number(bal))));
       }
     } catch {
       // silent — keep last known value
@@ -376,34 +384,36 @@ const Layout = () => {
         </div>
       )}
 
-      {/* Floating Wallet for Desktop — balance from Redux wallet slice */}
-      {!isExcludedPage && !/^\/(cart|checkout)\/?$/.test(location.pathname) && !location.pathname.startsWith('/market/service/') && (
+      {/* Floating Messages shortcut for Desktop — real recent conversations
+          from the chat slice (kept live app-wide by Sidebar's socket sync). */}
+      {!isExcludedPage && recentConversations.length > 0 && (
         <Link
-          to="/wallet"
-          data-tour="wallet"
-          className="hidden md:flex fixed bottom-8 right-8 z-50 bg-white dark:bg-[#262626] rounded-full shadow-lg p-1 pr-4 items-center gap-2 border border-gray-100 dark:border-gray-800 animate-fade-in hover:scale-105 transition-transform cursor-pointer"
+          to="/messages"
+          className="hidden md:flex fixed bottom-8 right-8 z-50 bg-white dark:bg-[#262626] rounded-full shadow-lg py-2 pl-2 pr-4 items-center gap-2 border border-gray-100 dark:border-gray-800 animate-fade-in hover:scale-105 transition-transform cursor-pointer"
         >
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-insta-yellow via-insta-orange to-insta-pink flex items-center justify-center text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-              <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-              <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-            </svg>
+          <div className="flex -space-x-2">
+            {recentConversations.map((conversation) => {
+              const person = !conversation.isGroup
+                ? (conversation.participants || []).find((p) => String(p?._id) !== String(currentUserId)) || conversation.participants?.[0]
+                : null;
+              const avatar = person ? (person.avatar_url || person.avatar || person.profile_picture) : null;
+              const label = person ? (person.username || person.full_name || 'U') : (conversation.groupName || 'Group');
+              return (
+                <div key={conversation._id} className="w-8 h-8 rounded-full border-2 border-white dark:border-[#262626] overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-500 dark:text-gray-300">
+                  {avatar ? <img src={avatar} alt={label} className="w-full h-full object-cover" /> : label[0]?.toUpperCase()}
+                </div>
+              );
+            })}
           </div>
-          <div className="flex flex-col">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Balance</span>
-            <span className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block flex-shrink-0" style={{ verticalAlign: '-0.1em' }}>
-                <circle cx="12" cy="12" r="10" fill="#F59E0B" />
-                <circle cx="12" cy="12" r="8" fill="#FBBF24" />
-                <circle cx="12" cy="12" r="6.5" fill="none" stroke="#D97706" strokeWidth="0.8" />
-                <text x="12" y="16" textAnchor="middle" fontSize="9" fontWeight="bold" fill="#92400E" fontFamily="serif">&#8377;</text>
-              </svg>
-              {walletCoins != null ? Number(walletCoins).toLocaleString('en-IN') : '—'}
+          <span className="text-sm font-bold text-gray-900 dark:text-white">Messages</span>
+          {chatUnreadCount > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center leading-none">
+              {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
             </span>
-          </div>
+          )}
         </Link>
       )}
+
 
       <OnboardingTour />
     </div>

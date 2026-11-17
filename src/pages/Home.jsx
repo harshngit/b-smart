@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchUserStory } from '../store/storySlice';
-import { X, MoreHorizontal, Search } from 'lucide-react';
+import { X, MoreHorizontal, Search, Wallet } from 'lucide-react';
 import PostCard from '../components/PostCard';
 import PostDetailModal from '../components/PostDetailModal';
 import TweetDetailModal from '../components/TweetDetailModal';
@@ -201,12 +201,31 @@ const DesktopFollowButton = ({ targetUserId }) => {
 // ── Location Bar — logo + search + location ───────────────────────────────────
 const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const walletBalance = useSelector((state) => state.wallet.balance);
+  const currentUser = useSelector((state) => state.auth.userObject);
+  const authLoading = useSelector((state) => state.auth.loading);
+  const storyMap = useSelector((state) => state.story?.storyMap ?? {});
+  const currentUserId = currentUser?._id || currentUser?.id;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [viewerStory, setViewerStory] = useState(null);
   useEffect(() => {
     const handler = (e) => setSidebarOpen(e.detail.isOpen);
     window.addEventListener('sidebar:toggle', handler);
     return () => window.removeEventListener('sidebar:toggle', handler);
   }, []);
+  useEffect(() => {
+    if (!currentUserId) return;
+    dispatch(fetchUserStory(currentUserId, {
+      avatarUrl: normalizeAssetUrl(currentUser?.avatar_url || currentUser?.avatar) || '',
+      username: currentUser?.username || '',
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+  const ownStory = storyMap[currentUserId];
+  const hasOwnStory = !!ownStory;
+  const currentAvatar = normalizeAssetUrl(currentUser?.avatar_url || currentUser?.avatar);
+  const currentName = currentUser?.full_name || currentUser?.username || 'User';
   return (
     <div className="hidden md:block fixed top-0 left-0 right-0 h-14 z-[55] bg-white dark:bg-black">
       <div className="h-full flex items-center px-4 gap-4">
@@ -273,12 +292,66 @@ const LocationBar = ({ searchQuery, onSearchChange, searchLoading, searchResults
           </div>
         </div>
 
+        <Link
+          to="/wallet"
+          data-tour="wallet"
+          className="hidden lg:flex items-center gap-1.5 bg-gray-100 dark:bg-gray-900 px-2.5 py-1.5 rounded-full border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-colors shrink-0"
+        >
+          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] flex items-center justify-center text-white flex-shrink-0">
+            <Wallet size={11} />
+          </div>
+          <span className="text-[11px] font-bold text-gray-900 dark:text-white leading-none">
+            {walletBalance != null ? Number(walletBalance).toLocaleString('en-IN') : '—'}
+          </span>
+        </Link>
+
         <div className="hidden xl:flex items-center">
           <div className="w-[300px]" data-tour="location">
             <LocationSelector />
           </div>
         </div>
+
+        {authLoading ? (
+          <div className="hidden lg:flex items-center gap-2.5 shrink-0 animate-pulse">
+            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-800" />
+            <div className="space-y-1.5">
+              <div className="h-2.5 w-20 rounded bg-gray-200 dark:bg-gray-800" />
+              <div className="h-2.5 w-14 rounded bg-gray-100 dark:bg-gray-900" />
+            </div>
+          </div>
+        ) : currentUser && (
+          <div className="hidden lg:flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => hasOwnStory ? setViewerStory(ownStory) : navigate(`/profile/${currentUserId}`)}
+              className="shrink-0"
+            >
+              <div className={`rounded-full p-[2px] ${hasOwnStory ? 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-600' : 'bg-transparent'}`}>
+                <div className={`rounded-full p-[1.5px] ${hasOwnStory ? 'bg-white dark:bg-black' : ''}`}>
+                  {currentAvatar ? (
+                    <img src={currentAvatar} alt={currentName} className="w-8 h-8 rounded-full object-cover block" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center text-white font-bold text-sm">
+                      {currentName[0]?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </button>
+            <button type="button" onClick={() => navigate(`/profile/${currentUserId}`)} className="min-w-0 text-left">
+              <p className="text-[12px] font-semibold text-gray-900 dark:text-white truncate max-w-[140px]">{currentUser.username || currentName}</p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[140px]">{currentName}</p>
+            </button>
+          </div>
+        )}
       </div>
+      {viewerStory && (
+        <StoryViewer
+          initialStoryIndex={0}
+          stories={[viewerStory]}
+          onClose={() => setViewerStory(null)}
+        />
+      )}
     </div>
   );
 };
@@ -490,52 +563,10 @@ const DesktopSuggestionsRail = ({ currentUser, suggestedUsers }) => {
 
   if (!currentUser || visibleUsers.length === 0) return null;
 
-  const currentAvatar = normalizeAssetUrl(currentUser.avatar_url || currentUser.avatar);
-  const currentName = currentUser.full_name || currentUser.username || 'User';
-
   return (
     <>
       <aside className="hidden xl:flex xl:flex-col w-[350px] shrink-0 z-0">
         <div className="h-full overflow-y-auto pt-6 pb-20 scrollbar-hide">
-          <div className="mb-6">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* Avatar — orange ring if current user has a story */}
-              {(() => {
-                const ownStory = storyMap[currentUserId];
-                const hasStory = !!ownStory;
-                return (
-                  <button
-                    type="button"
-                    onClick={() => hasStory ? setViewerStory(ownStory) : navigate(`/profile/${currentUserId}`)}
-                    className="shrink-0"
-                  >
-                    <div className={`rounded-full p-[2px] ${hasStory ? 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-pink-600' : 'bg-transparent'}`}>
-                      <div className={`rounded-full p-[1.5px] ${hasStory ? 'bg-white dark:bg-black' : ''}`}>
-                        {currentAvatar ? (
-                          <img src={currentAvatar} alt={currentName} className="w-10 h-10 rounded-full object-cover block" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-pink-600 flex items-center justify-center text-white font-bold">
-                            {currentName[0]?.toUpperCase() || 'U'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })()}
-              <button
-                type="button"
-                onClick={() => navigate(`/profile/${currentUserId}`)}
-                className="min-w-0 text-left"
-              >
-                <div className="min-w-0 leading-tight">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{currentUser.username || currentName}</p>
-                  <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400 truncate">{currentName}</p>
-                </div>
-              </button>
-            </div>
-          </div>
-
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Suggested for you</p>
             <button
