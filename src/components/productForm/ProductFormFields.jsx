@@ -454,6 +454,16 @@ export const ImageGallery = ({ images, mainIndex, onSetMain, onAdd, onRemove, fi
             </button>
           </div>
         ))}
+        {images.length < MAX_IMAGES && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Add more images"
+            className="w-14 h-14 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-400 hover:border-[#fa3f5e] hover:text-[#fa3f5e] transition-colors flex-shrink-0"
+          >
+            <Plus size={20} />
+          </button>
+        )}
       </div>
     )}
   </div>

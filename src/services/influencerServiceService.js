@@ -24,18 +24,20 @@ const prepareServiceImages = async (images) => {
   ));
 };
 
-// Each subservice optionally carries one image, in the same {file, url,
-// fileName} shape useMediaUploader produces for the main gallery. Batches
-// every new file into a single upload request, same as prepareServiceImages.
+// Each subservice optionally carries multiple images, each in the same
+// {file, url, fileName} shape useMediaUploader produces for the main
+// gallery. Batches every new file (across every subservice) into a single
+// upload request, same as prepareServiceImages.
 const prepareSubserviceImages = async (subservices) => {
-  const newFiles = subservices.filter((s) => s.image?.file).map((s) => s.image.file);
+  const newFiles = subservices.flatMap((s) => (s.images || []).filter((img) => img?.file).map((img) => img.file));
   const uploaded = await uploadInfluencerServiceImages(newFiles);
   let uploadIndex = 0;
-  return subservices.map((s) => {
-    if (!s.image) return { ...s, image: null };
-    if (s.image.file) return { ...s, image: uploaded[uploadIndex++] };
-    return { ...s, image: { fileName: normalizeUploadPath(s.image.fileName || s.image.url) } };
-  });
+  return subservices.map((s) => ({
+    ...s,
+    images: (s.images || []).map((img) => (
+      img.file ? uploaded[uploadIndex++] : { fileName: normalizeUploadPath(img.fileName || img.url) }
+    )),
+  }));
 };
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -151,11 +153,15 @@ export const normalizeInfluencerService = (service = {}) => {
     subservices: (service.subservices || []).map((item, index) => ({
       id: item.id || item._id || `${id || 'sub'}-${index}`,
       name: item.name || '',
+      description: item.description || '',
       hours: item.hours ?? '',
       price: item.price ?? '',
       sqft: item.sqft ?? '',
       allowMultiple: Boolean(item.allow_multiple),
-      image: item.image ? resolveProductImageUrl(item.image) : '',
+      // Back-compat: older saved services may still carry the old singular
+      // `image` field instead of the `images` array.
+      images: (Array.isArray(item.images) && item.images.length ? item.images : (item.image ? [item.image] : []))
+        .map(resolveProductImageUrl).filter(Boolean),
     })),
     method: METHOD_FROM_API[service.service_method] || service.method || 'At customer location',
     serviceTime: service.service_time?.start && service.service_time?.end
@@ -189,13 +195,14 @@ export const serviceFormToApiPayload = ({ form, highlights, subservices, availab
   allow_multiple: Boolean(allowMultiple),
   subservices: subservices.map((item) => ({
     name: item.name.trim(),
-    hours: Number(item.hours) || 0,
+    description: (item.description || '').trim().slice(0, 200),
+    hours: item.hours === '' ? 0 : Number(item.hours) || 0,
     price: Number(item.price) || 0,
     sqft: Number(item.sqft) || 0,
     allow_multiple: Boolean(item.allowMultiple),
-    // Expected to already be prepared via prepareSubserviceImages (file ->
-    // {fileName}) before this is called — see ServiceForm.jsx's save().
-    image: item.image?.fileName ? { fileName: item.image.fileName } : null,
+    // Expected to already be prepared via prepareSubserviceImages (files ->
+    // [{fileName}]) before this is called — see ServiceForm.jsx's save().
+    images: (item.images || []).filter((img) => img?.fileName).map((img) => ({ fileName: img.fileName })),
   })),
   service_method: METHOD_TO_API[form.method] || 'at_customer_location',
   weekly_availability: availabilityToApi(availability),

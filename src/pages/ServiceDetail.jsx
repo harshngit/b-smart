@@ -301,10 +301,11 @@ function BookingPage({ service }) {
                       {(item.sqft || hoursLabel) && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{[item.sqft ? `${item.sqft} sqft` : '', hoursLabel].filter(Boolean).join(' · ')}</p>
                       )}
+                      {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{item.description}</p>}
                     </div>
                     <div className="w-20 shrink-0 flex flex-col items-center gap-2">
                       <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                        {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <ServiceIcon size={22} className="text-[#fa3f5e]/60" />}
+                        {item.images?.[0] ? <img src={item.images[0]} alt={item.name} className="w-full h-full object-cover" /> : <ServiceIcon size={22} className="text-[#fa3f5e]/60" />}
                       </div>
                       {item.allowMultiple ? (
                         qty > 0 ? (

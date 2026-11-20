@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, ImagePlus, MapPin, Globe, Plus, X, Star, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Globe, Plus, X, Star, Loader2 } from 'lucide-react';
 import useMediaUploader from '../../hooks/useMediaUploader';
 import influencerServiceService, { serviceFormToApiPayload } from '../../services/influencerServiceService';
 import {
@@ -17,26 +17,34 @@ const STEPS = [
   { label: 'Time Off', subtitle: 'Block dates if needed' },
 ];
 
-const emptySubservice = () => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: '', hours: '', price: '', sqft: '', allowMultiple: false, image: null });
+const emptySubservice = () => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: '', description: '', hours: '', price: '', sqft: '', allowMultiple: false, images: [] });
 
-// Single-image picker for a subservice row. Mirrors useMediaUploader's
+// Multi-image picker for a subservice row. Mirrors useMediaUploader's
 // {file, url} / {url} shapes so prepareSubserviceImages can handle both
 // new and pre-existing images the same way the main gallery does.
-function SubserviceImagePicker({ image, onChange, label }) {
+function SubserviceImagesPicker({ images, onChange, label }) {
   const inputRef = useRef(null);
-  const handleFile = (event) => {
-    const file = event.target.files?.[0];
+  const handleFiles = (event) => {
+    const files = Array.from(event.target.files || []);
     event.target.value = '';
-    if (!file) return;
-    onChange({ file, url: URL.createObjectURL(file) });
+    if (!files.length) return;
+    onChange([...images, ...files.map((file) => ({ file, url: URL.createObjectURL(file) }))]);
   };
+  const removeAt = (index) => onChange(images.filter((_, i) => i !== index));
   return (
-    <div className="relative w-11 h-11">
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" aria-label={label} onChange={handleFile} />
-      <button type="button" onClick={() => inputRef.current?.click()} className="w-11 h-11 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-400 hover:border-[#fa3f5e]">
-        {image?.url ? <img src={image.url} alt="" className="w-full h-full object-cover" /> : <ImagePlus size={15} />}
+    <div className="flex flex-wrap gap-1.5 w-28">
+      {images.map((image, index) => (
+        <div key={index} className="relative w-11 h-11">
+          <div className="w-11 h-11 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden bg-gray-50 dark:bg-gray-900">
+            {image.url && <img src={image.url} alt="" className="w-full h-full object-cover" />}
+          </div>
+          <button type="button" aria-label={`Remove ${label} ${index + 1}`} onClick={() => removeAt(index)} className="absolute -top-1.5 -right-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full p-0.5 text-gray-400 hover:text-red-500"><X size={10} /></button>
+        </div>
+      ))}
+      <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" aria-label={`Add ${label}`} onChange={handleFiles} />
+      <button type="button" onClick={() => inputRef.current?.click()} className="w-11 h-11 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-400 hover:border-[#fa3f5e] hover:text-[#fa3f5e]">
+        <Plus size={15} />
       </button>
-      {image?.url && <button type="button" aria-label={`Remove ${label}`} onClick={() => onChange(null)} className="absolute -top-1.5 -right-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full p-0.5 text-gray-400 hover:text-red-500"><X size={10} /></button>}
     </div>
   );
 }
@@ -47,14 +55,15 @@ function SubservicesTable({ subservices, onChange, onRemove, onAdd }) {
       <label className={labelCls}>Subservices</label>
       <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
         <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 dark:bg-gray-900 text-left text-xs font-semibold text-gray-500 dark:text-gray-400"><th className="p-2.5">Image</th><th className="p-2.5">Service Name</th><th className="p-2.5">Sqft</th><th className="p-2.5">Hr</th><th className="p-2.5">Price (₹)</th><th className="p-2.5">Allow Multiple</th><th className="p-2.5" /></tr></thead>
+          <thead><tr className="bg-gray-50 dark:bg-gray-900 text-left text-xs font-semibold text-gray-500 dark:text-gray-400"><th className="p-2.5">Images</th><th className="p-2.5">Service Name</th><th className="p-2.5">Description</th><th className="p-2.5">Sqft</th><th className="p-2.5">Hr</th><th className="p-2.5">Price (₹)</th><th className="p-2.5">Allow Multiple</th><th className="p-2.5" /></tr></thead>
           <tbody>
             {subservices.map((subservice, index) => (
               <tr key={subservice.id} className="border-t border-gray-100 dark:border-gray-800">
-                <td className="p-2.5"><SubserviceImagePicker image={subservice.image} onChange={(image) => onChange(subservice.id, { image })} label={`Subservice ${index + 1} image`} /></td>
+                <td className="p-2.5"><SubserviceImagesPicker images={subservice.images} onChange={(images) => onChange(subservice.id, { images })} label={`Subservice ${index + 1} image`} /></td>
                 <td className="p-2.5 min-w-[180px]"><input aria-label={`Subservice ${index + 1} name`} value={subservice.name} onChange={(event) => onChange(subservice.id, { name: event.target.value })} maxLength={150} placeholder="Service name" className={inputCls} /></td>
+                <td className="p-2.5 min-w-[200px]"><input aria-label={`Subservice ${index + 1} description`} value={subservice.description} onChange={(event) => onChange(subservice.id, { description: event.target.value })} maxLength={200} placeholder="Optional" className={inputCls} /></td>
                 <td className="p-2.5 min-w-[100px]"><input aria-label={`Subservice ${index + 1} sqft`} type="number" min="0" step="1" value={subservice.sqft} onChange={(event) => onChange(subservice.id, { sqft: event.target.value })} placeholder="Sqft" className={inputCls} /></td>
-                <td className="p-2.5 min-w-[100px]"><input aria-label={`Subservice ${index + 1} hours`} type="number" min="0.01" step="any" value={subservice.hours} onChange={(event) => onChange(subservice.id, { hours: event.target.value })} placeholder="Hr" className={inputCls} /></td>
+                <td className="p-2.5 min-w-[100px]"><input aria-label={`Subservice ${index + 1} hours`} type="number" min="0" step="any" value={subservice.hours} onChange={(event) => onChange(subservice.id, { hours: event.target.value })} placeholder="Hr" className={inputCls} /></td>
                 <td className="p-2.5 min-w-[120px]"><input aria-label={`Subservice ${index + 1} price`} type="number" min="0" step="0.01" value={subservice.price} onChange={(event) => onChange(subservice.id, { price: event.target.value })} placeholder="0" className={inputCls} /></td>
                 <td className="p-2.5 text-center"><input type="checkbox" aria-label={`Subservice ${index + 1} allow multiple`} checked={!!subservice.allowMultiple} onChange={(event) => onChange(subservice.id, { allowMultiple: event.target.checked })} className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-[#fa3f5e] accent-[#fa3f5e] focus:ring-2 focus:ring-[#fa3f5e]/30" /></td>
                 <td className="p-2.5"><button type="button" aria-label={`Remove subservice ${index + 1}`} onClick={() => onRemove(subservice.id)} className="text-gray-400 hover:text-red-500"><X size={16} /></button></td>
@@ -87,10 +96,11 @@ export default function ServiceForm({ service }) {
   const [allowMultiple, setAllowMultiple] = useState(service?.allowMultiple ?? false);
   const [subservices, setSubservices] = useState(() => service?.subservices?.length ? service.subservices.map((item) => ({
     id: item.id || emptySubservice().id,
-    name: item.name || '', hours: item.hours == null ? '' : String(item.hours), price: item.price == null ? '' : String(item.price),
+    name: item.name || '', description: item.description || '',
+    hours: item.hours == null || item.hours === 0 ? '' : String(item.hours), price: item.price == null ? '' : String(item.price),
     sqft: item.sqft == null || item.sqft === 0 ? '' : String(item.sqft),
     allowMultiple: Boolean(item.allowMultiple),
-    image: item.image ? { url: item.image } : null,
+    images: (item.images || []).map((url) => ({ url })),
   })) : [emptySubservice()]);
   const [availability, setAvailability] = useState(() => service?.availability ? structuredClone(service.availability) : defaultAvailability());
   const [dateOverrides, setDateOverrides] = useState(() => service?.dateOverrides ? structuredClone(service.dateOverrides) : []);
@@ -134,7 +144,7 @@ export default function ServiceForm({ service }) {
   const completeness = useMemo(() => [
     { label: 'Service Details', done: !!(form.name.trim() && form.category && form.description.trim()) },
     { label: 'Pricing', done: (
-      form.price !== '' && Number.isFinite(Number(form.price)) && Number(form.price) >= 0 && !!form.duration
+      form.price !== '' && Number.isFinite(Number(form.price)) && Number(form.price) >= 0
       && (!hasVariants || (subservices.some((item) => !isBlankSubservice(item)) && !validateSubservices(subservices)))
     ) },
     { label: 'Availability & Publish', done: availability.some((day) => day.slots.length) && !validateService(form, availability, true) && (form.method !== 'At my location' || !!form.address.trim()) && !validateServiceTimeArea({ serviceTime, serviceAreaText: serviceArea, isCreate }) },
@@ -228,7 +238,7 @@ export default function ServiceForm({ service }) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div><label htmlFor="service-price" className={labelCls}>Price (₹) <Req /></label><NumberStepper id="service-price" value={form.price} onChange={(value) => setField('price', value)} min={0} step={1} prefix="₹" /></div>
               <Dropdown label={<>Rate <Req /></>} value={form.rateType} options={RATE_TYPES} onChange={(value) => setField('rateType', value)} />
-              <Dropdown label={<>Duration <Req /></>} value={form.duration} options={DURATIONS} onChange={(value) => setField('duration', value)} />
+              <Dropdown label="Duration (optional)" value={form.duration} options={DURATIONS} onChange={(value) => setField('duration', value)} />
             </div>
             <Checkbox checked={allowMultiple} onChange={setAllowMultiple} label="Allow customers to book more than one unit" />
             <Checkbox checked={hasVariants} onChange={setHasVariants} label="Do you have variants of Services" />
