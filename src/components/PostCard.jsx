@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal,
   ChevronLeft, ChevronRight, X,
-  Volume2, VolumeX, UserPlus, UserCheck, ShoppingBag, Loader2
+  Volume2, VolumeX, UserPlus, UserCheck, ShoppingBag, Loader2, Pin
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSelector } from 'react-redux';
@@ -767,6 +767,23 @@ const PostCard = ({ post, onCommentClick, onDelete, mediaMaxHeight }) => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isPinning, setIsPinning] = useState(false);
+
+  // ── Pin/unpin post (Moments tab only — image-only posts, not ads/reels/videos) ─
+  const isImageOnlyPost = !(post.media || []).some((m) => m?.type === 'video' || m?.media_type === 'video');
+  const canPin = !isAd && post.type !== 'reel' && isImageOnlyPost;
+  const isPinned = !!post?.pinned_at;
+  const handleTogglePin = async () => {
+    if (!postId || isPinning) return;
+    setIsPinning(true);
+    try {
+      await api.patch(`/posts/${postId}/${isPinned ? 'unpin' : 'pin'}`);
+      window.location.reload();
+    } catch (err) {
+      alert(err?.response?.data?.message || `Failed to ${isPinned ? 'unpin' : 'pin'} post`);
+      setIsPinning(false);
+    }
+  };
 
   // ── Time formatting ────────────────────────────────────────────────────────
   const [nowTs, setNowTs] = useState(0);
@@ -1155,6 +1172,9 @@ const PostCard = ({ post, onCommentClick, onDelete, mediaMaxHeight }) => {
               setShowDeleteModal(true);
             }}
             onUpdated={() => window.location.reload()}
+            onPin={canPin ? handleTogglePin : undefined}
+            isPinned={isPinned}
+            isPinning={isPinning}
           />
           <EditContentModal
             isOpen={showEditModal}
@@ -1184,7 +1204,14 @@ const PostCard = ({ post, onCommentClick, onDelete, mediaMaxHeight }) => {
           contentUrl={reportContentUrl}
         />
       )}
-      <MediaRenderer mediaItems={mediaItems} isAdType={isAd} peopleTags={peopleTags} {...(mediaMaxHeight ? { maxHeight: mediaMaxHeight } : {})} />
+      <div className="relative">
+        {isPinned && (
+          <div className="absolute top-1.5 left-1.5 z-10 rounded-full bg-black/60 p-1" title="Pinned">
+            <Pin size={12} className="text-white" fill="white" />
+          </div>
+        )}
+        <MediaRenderer mediaItems={mediaItems} isAdType={isAd} peopleTags={peopleTags} {...(mediaMaxHeight ? { maxHeight: mediaMaxHeight } : {})} />
+      </div>
 
       {/* ── Action Bar ────────────────────────────────────────────────────── */}
       <div className="px-3 pt-2">

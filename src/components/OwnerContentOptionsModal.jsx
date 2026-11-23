@@ -8,6 +8,9 @@ export default function OwnerContentOptionsModal({
   onEdit,
   onDelete,
   contentUrl = '',
+  onPin,
+  isPinned = false,
+  isPinning = false,
 }) {
   const itemId = item?._id || item?.post_id || item?.id;
 
@@ -54,6 +57,11 @@ export default function OwnerContentOptionsModal({
         <button className={actionClass} onClick={onEdit}>
           Edit
         </button>
+        {onPin && (
+          <button className={actionClass} onClick={onPin} disabled={isPinning}>
+            {isPinning ? 'Please wait...' : isPinned ? 'Unpin from Moments' : 'Pin to Moments'}
+          </button>
+        )}
         <button className={actionClass} onClick={handleShare}>
           Share to...
         </button>

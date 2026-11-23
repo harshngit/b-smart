@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning, Bookmark, Store } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Pin, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning, Bookmark, Store } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
 import api from '../lib/api';
 import PostCard from '../components/PostCard';
-import PromoteCard from '../components/PromoteCard';
 import PostDetailModal from '../components/PostDetailModal';
 import Reels from './Reels';
 import AvatarCropModal from '../components/AvatarCropModal';
@@ -252,9 +251,20 @@ const Profile = () => {
     // "Moments" is image-only — a non-reel post can still carry video media,
     // which doesn't belong in this tab's image grid/strip.
     const isImageOnlyPost = (post) => !(post.media || []).some((m) => m?.type === 'video' || m?.media_type === 'video');
-    const onlyPosts = userPosts.filter(p => p.type !== 'reel' && isImageOnlyPost(p));
+    // Pinned posts float to the top of Moments; everything else keeps the
+    // order the API already returned (most recent first).
+    const onlyPosts = userPosts
+        .filter(p => p.type !== 'reel' && isImageOnlyPost(p))
+        .slice()
+        .sort((a, b) => {
+            const aPinned = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+            const bPinned = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+            return bPinned - aPinned;
+        });
     const onlyReels = userPosts.filter(p => p.type === 'reel');
-    const topImagePosts = [...onlyPosts].sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0)).slice(0, 10);
+    // Moments strip = only the user's pinned posts (up to 3) — onlyPosts is
+    // already sorted pinned-first, most-recently-pinned first.
+    const topImagePosts = onlyPosts.filter((p) => p.pinned_at);
     const displayedPosts =
         activeTab === 'reels' ? onlyReels :
         activeTab === 'posts' ? onlyPosts :
@@ -774,9 +784,12 @@ const Profile = () => {
         };
     }, [profileUser?._id, profileUser?.id, profileUser?.role, currentUser?.role, isOwnProfile]);
 
+    // Returns null when a video has no real thumbnail yet — callers must show
+    // a placeholder instead of pointing an <img> at the raw video file, which
+    // browsers can't render as an image.
     const getPostThumbnail = (post) => {
         const media = post.media?.[0];
-        if (!media) return 'https://via.placeholder.com/300';
+        if (!media) return null;
         const isVideo = media.type === 'video' || media.media_type === 'video' || post.type === 'reel';
         if (isVideo) {
             const rawThumb = media.thumbnail;
@@ -785,16 +798,13 @@ const Profile = () => {
             const thumbFromStr = typeof rawThumb === 'string' ? rawThumb : null;
             const thumbFromThumbnails = media.thumbnails?.[0]?.fileUrl || media.thumbnails?.[0]?.fileName;
             const thumbUrl = thumbFromArr || thumbFromObj || thumbFromStr || thumbFromThumbnails || media.thumbnail_url;
-            if (thumbUrl) {
-                if (thumbUrl.startsWith('http')) return thumbUrl;
-                return `${BASE_URL}/uploads/${thumbUrl}`;
-            }
+            if (thumbUrl) return thumbUrl.startsWith('http') ? thumbUrl : `${BASE_URL}/uploads/${thumbUrl}`;
+            return null;
         }
         if (media.fileUrl) {
-            if (media.fileUrl.startsWith('http')) return media.fileUrl;
-            return `${BASE_URL}/uploads/${media.fileUrl}`;
+            return media.fileUrl.startsWith('http') ? media.fileUrl : `${BASE_URL}/uploads/${media.fileUrl}`;
         }
-        return media.image || 'https://via.placeholder.com/300';
+        return media.image || null;
     };
 
     const getAdThumbnail = (ad) => {
@@ -1154,8 +1164,8 @@ const Profile = () => {
         </div>
     );
 
-    // Quick-access strip of this user's own most-liked image posts — clicking
-    // one opens it the same way clicking it in the grid below would.
+    // Quick-access strip of this user's own pinned posts — clicking one opens
+    // it the same way clicking it in the grid below would.
     const MomentsThumbnailStrip = () => {
         if (!topImagePosts.length) return null;
         return (
@@ -1178,7 +1188,7 @@ const Profile = () => {
         <div className={`grid grid-cols-3 gap-[1px] bg-gray-200 dark:bg-gray-800 ${containerClass}`}>
             {loadingPosts ? (
                 Array(9).fill(null).map((_, i) => (
-                    <div key={i} className="aspect-square bg-gray-100 dark:bg-gray-900 animate-pulse" />
+                    <div key={i} className={`${activeTab === 'reels' ? 'aspect-[3/4]' : 'aspect-square'} bg-gray-100 dark:bg-gray-900 animate-pulse`} />
                 ))
             ) : displayedPosts.length === 0 ? (
                 <div className="col-span-3 bg-white dark:bg-black py-16 text-center">
@@ -1204,14 +1214,30 @@ const Profile = () => {
             ) : (
                 displayedPosts.map((post) => (
                     <div key={post._id || post.id}
-                        className="aspect-square bg-gray-100 dark:bg-gray-900 relative group cursor-pointer overflow-hidden"
+                        className={`${activeTab === 'reels' ? 'aspect-[3/4]' : 'aspect-square'} bg-gray-100 dark:bg-gray-900 relative group cursor-pointer overflow-hidden`}
                         onClick={() => handlePostClick(post)}>
-                        {post.type === 'reel' && (
-                            <div className="absolute top-1.5 right-1.5 z-10">
-                                <Video size={15} className="text-white drop-shadow" fill="white" />
+                        {post.pinned_at && (
+                            <div className="absolute top-1.5 left-1.5 z-10 rounded-full bg-black/60 p-1" title="Pinned">
+                                <Pin size={12} className="text-white" fill="white" />
                             </div>
                         )}
-                        <img src={getPostThumbnail(post)} alt="Post" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200" />
+                        {post.type === 'reel' && (
+                            <>
+                                <div className="absolute top-1.5 right-1.5 z-10">
+                                    <Video size={15} className="text-white drop-shadow" fill="white" />
+                                </div>
+                                <div className="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 text-white text-[11px] font-semibold drop-shadow">
+                                    <Eye size={13} /> {fmt(post.views_count || post.unique_views_count || 0)}
+                                </div>
+                            </>
+                        )}
+                        {getPostThumbnail(post) ? (
+                            <img src={getPostThumbnail(post)} alt="Post" className={`w-full h-full group-hover:scale-[1.03] transition-transform duration-200 ${post.type === 'reel' ? 'object-cover' : 'object-contain'}`} />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700">
+                                {post.type === 'reel' ? <Zap size={28} className="text-gray-400 dark:text-gray-500" /> : <Image size={28} className="text-gray-400 dark:text-gray-500" />}
+                            </div>
+                        )}
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-5 text-white font-bold">
                             <div className="flex items-center gap-1.5"><Heart fill="white" size={18} /> {post.likes_count || 0}</div>
                             <div className="flex items-center gap-1.5"><MessageCircle fill="white" size={18} /> {post.comments_count || 0}</div>
@@ -1318,14 +1344,22 @@ const Profile = () => {
                     {userPromoteReels.map((reel) => {
                         const reelId = reel._id || reel.id;
                         const firstMedia = reel.media?.[0];
-                        const thumbFile = firstMedia?.thumbnail?.fileName || firstMedia?.thumbnails?.[0]?.fileName || firstMedia?.fileName;
-                        const thumbUrl = thumbFile
-                            ? (thumbFile.startsWith('http') ? thumbFile : `${BASE_URL}/uploads/${thumbFile}`)
-                            : null;
                         const isVideo = firstMedia?.type === 'video';
+                        // For videos, only a real thumbnail counts — never fall back to the
+                        // raw video file as an <img> src, which just renders broken.
+                        const rawThumb = firstMedia?.thumbnail;
+                        const thumbFromArr = Array.isArray(rawThumb) ? (rawThumb[0]?.fileUrl || rawThumb[0]?.fileName) : null;
+                        const thumbFromObj = rawThumb && typeof rawThumb === 'object' && !Array.isArray(rawThumb) ? (rawThumb.fileUrl || rawThumb.fileName) : null;
+                        const thumbFromStr = typeof rawThumb === 'string' ? rawThumb : null;
+                        const thumbFile = isVideo
+                            ? (thumbFromArr || thumbFromObj || thumbFromStr || firstMedia?.thumbnails?.[0]?.fileUrl || firstMedia?.thumbnails?.[0]?.fileName || firstMedia?.thumbnail_url)
+                            : (firstMedia?.fileName || firstMedia?.fileUrl);
+                        const thumbUrl = thumbFile
+                            ? (String(thumbFile).startsWith('http') ? thumbFile : `${BASE_URL}/uploads/${thumbFile}`)
+                            : null;
                         return (
                             <div key={reelId}
-                                className="aspect-square bg-gray-100 dark:bg-gray-900 relative group cursor-pointer overflow-hidden"
+                                className="aspect-[3/4] bg-gray-100 dark:bg-gray-900 relative group cursor-pointer overflow-hidden"
                                 onClick={() => setSelectedPromoteReel(reel)}>
                                 <div className="absolute top-1.5 left-1.5 z-10">
                                     <span className="text-[9px] font-bold bg-purple-500 text-white px-1.5 py-0.5 rounded-full">PROMO</span>
@@ -1574,41 +1608,6 @@ const Profile = () => {
         );
     };
 
-    const PromoteReelsFeedCards = () => {
-        if (loadingPosts) {
-            return (
-                <div className="flex flex-col items-center py-16 gap-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl">
-                    <Loader2 className="w-7 h-7 animate-spin text-orange-500" />
-                    <span className="text-sm text-gray-400">Loading promoted reels…</span>
-                </div>
-            );
-        }
-        if (userPromoteReels.length === 0) {
-            return (
-                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl py-16 text-center">
-                    <div className="w-16 h-16 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Megaphone size={30} className="text-gray-300 dark:text-gray-600" />
-                    </div>
-                    <h3 className="font-bold text-base text-gray-900 dark:text-white mb-1">No Promoted Reels Yet</h3>
-                    {isOwnProfile && (
-                        <Link to="/promote" className="text-[#fa3f5e] text-sm font-semibold mt-1 inline-block">Promote now</Link>
-                    )}
-                </div>
-            );
-        }
-        return (
-            <div>
-                {userPromoteReels.map((reel) => (
-                    <PromoteCard
-                        key={reel._id || reel.id}
-                        item={reel}
-                        onOpenDetail={(pr) => setSelectedPromoteReel(pr)}
-                    />
-                ))}
-            </div>
-        );
-    };
-
     const renderDesktopContent = () => {
         if (isBlocked) return <BlockedContentWall />;
         if (contentLocked) return <PrivateProfileWall />;
@@ -1621,18 +1620,35 @@ const Profile = () => {
             );
         }
         if (activeTab === 'tweets') return privacyRestricted.posts ? <PrivacyRestrictedPlaceholder message="Tweets are private." /> : <TweetsFeedCards />;
-        if (activeTab === 'promote_reels') return privacyRestricted.pulse ? <PrivacyRestrictedPlaceholder message="Reels are private." /> : <PromoteReelsFeedCards />;
+        if (activeTab === 'promote_reels') {
+            if (privacyRestricted.pulse) return <PrivacyRestrictedPlaceholder message="Reels are private." />;
+            return (
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden">
+                    <PromoteReelsGrid />
+                </div>
+            );
+        }
         if (privacyRestricted.posts) return <PrivacyRestrictedPlaceholder message="Posts are private." />;
-        return (
-            <>
-                {activeTab === 'posts' && (
+        if (activeTab === 'reels') {
+            return (
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden">
+                    <PostGrid />
+                </div>
+            );
+        }
+        if (activeTab === 'posts') {
+            return (
+                <>
                     <div className="mb-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden">
                         <MomentsThumbnailStrip />
                     </div>
-                )}
-                <PostsFeedCards />
-            </>
-        );
+                    <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden">
+                        <PostGrid />
+                    </div>
+                </>
+            );
+        }
+        return <PostsFeedCards />;
     };
 
     // ── Follower mutual avatars (small stack shown under username) ────────────
@@ -2194,7 +2210,15 @@ const Profile = () => {
             </div>
 
             {/* Modals */}
-            <PostDetailModal isOpen={!!selectedPost} post={selectedPost} onClose={() => setSelectedPost(null)} />
+            <PostDetailModal
+                isOpen={!!selectedPost}
+                post={selectedPost}
+                onClose={() => setSelectedPost(null)}
+                onPostUpdated={(updated) => {
+                    const id = updated._id || updated.id;
+                    setUserPosts((prev) => prev.map((p) => (p._id || p.id) === id ? { ...p, ...updated } : p));
+                }}
+            />
             <PostDetailModal isOpen={!!selectedAd} post={selectedAd} onClose={() => setSelectedAd(null)} />
             {reelsModalReelId && (
                 <div className="fixed inset-0 z-[9999]">
