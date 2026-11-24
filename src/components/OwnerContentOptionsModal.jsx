@@ -4,13 +4,13 @@ export default function OwnerContentOptionsModal({
   isOpen,
   onClose,
   item,
-  contentType = 'post',
   onEdit,
   onDelete,
   contentUrl = '',
   onPin,
   isPinned = false,
   isPinning = false,
+  onViewInsights,
 }) {
   const itemId = item?._id || item?.post_id || item?.id;
 
@@ -54,12 +54,19 @@ export default function OwnerContentOptionsModal({
         <button className={`${actionClass} text-[#ff4d67] font-semibold`} onClick={onDelete}>
           Delete
         </button>
-        <button className={actionClass} onClick={onEdit}>
-          Edit
-        </button>
+        {onEdit && (
+          <button className={actionClass} onClick={onEdit}>
+            Edit
+          </button>
+        )}
         {onPin && (
           <button className={actionClass} onClick={onPin} disabled={isPinning}>
             {isPinning ? 'Please wait...' : isPinned ? 'Unpin from Moments' : 'Pin to Moments'}
+          </button>
+        )}
+        {onViewInsights && (
+          <button className={actionClass} onClick={onViewInsights}>
+            View Insights
           </button>
         )}
         <button className={actionClass} onClick={handleShare}>

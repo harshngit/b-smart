@@ -43,6 +43,9 @@ import VendorAds from './pages/VendorAds';
 import AdPublicDetail from './pages/AdPublicDetail';
 import VendorPublicProfile from './pages/VendorPublicProfile';
 import Profile from './pages/Profile';
+import PostInsights from './pages/PostInsights';
+import UserInsights from './pages/UserInsights';
+import PromoteReelInsights from './pages/PromoteReelInsights';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -181,6 +184,9 @@ function App() {
             <Route path="/vendor-ads"       element={<ProtectedRoute><VendorAds /></ProtectedRoute>} />
             <Route path="/profile"          element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/profile/:userId"  element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/profile/:userId/insights" element={<ProtectedRoute><UserInsights /></ProtectedRoute>} />
+            <Route path="/post/:postId/insights" element={<ProtectedRoute><PostInsights /></ProtectedRoute>} />
+            <Route path="/promote-reel/:promoteReelId/insights" element={<ProtectedRoute><PromoteReelInsights /></ProtectedRoute>} />
             <Route path="/edit-profile"     element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
             <Route path="/wallet"           element={<ProtectedRoute><WalletDetails /></ProtectedRoute>} />
             <Route path="/gift-cards"       element={<ProtectedRoute><GiftCards /></ProtectedRoute>} />

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import {
   checkFollowStatus, followUser, unfollowUser, cancelFollowRequest,
@@ -500,6 +500,7 @@ const ModalMediaPanel = ({ post, isAd }) => {
 // ── Main Modal Component ───────────────────────────────────────────────────────
 const PostDetailModal = ({ post: initialPost, isOpen, onClose, onPostUpdated }) => {
   const { userObject } = useSelector(s => s.auth);
+  const navigate = useNavigate();
   const [post, setPost] = useState(initialPost);
   const isAd = isAdItem(initialPost);
   const isTweet = isTweetItem(initialPost);
@@ -948,6 +949,7 @@ const PostDetailModal = ({ post: initialPost, isOpen, onClose, onPostUpdated }) 
                 onPin={canPin ? handleTogglePin : undefined}
                 isPinned={isPinned}
                 isPinning={isPinning}
+                onViewInsights={!isAd ? () => { setShowOptions(false); onClose(); navigate(`/post/${postId}/insights`); } : undefined}
               />
               <EditContentModal
                 isOpen={showEditModal}

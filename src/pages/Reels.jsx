@@ -671,10 +671,21 @@ const Reels = ({ embedded = false, scopeUserId = null, initialReelId = null, onC
   const [reelProgress,     setReelProgress]     = useState(0);
   const isAnimatingRef  = useRef(false);
   const videoRefs       = useRef({});
+  // Per-reel-id set of watch-progress checkpoints already reported this
+  // session, so a looping/re-watched video doesn't spam the server.
+  const progressReportedRef = useRef({});
   const actionPanelRef  = useRef(null);
   const [actionPanelRight, setActionPanelRight] = useState(100);
 
   const { userObject, isAuthenticated }  = useSelector((state) => state.auth);
+  const currentReelIdForTracking = reels[currentIndex]?._id || reels[currentIndex]?.post_id || null;
+  // Mark a view the moment a reel becomes the one on screen — previously
+  // nothing called this at all, so reel view counts were always zero.
+  useEffect(() => {
+    if (!currentReelIdForTracking || !isAuthenticated) return;
+    progressReportedRef.current[currentReelIdForTracking] = new Set();
+    api.post('/views', { postId: currentReelIdForTracking }).catch(() => {});
+  }, [currentReelIdForTracking, isAuthenticated]);
   const currentUserId   = userObject?._id || userObject?.id || null;
   const [, setWalletBalance] = useState(
     userObject?.wallet?.balance ? Math.floor(Number(userObject.wallet.balance)) : 0
@@ -1287,7 +1298,26 @@ const Reels = ({ embedded = false, scopeUserId = null, initialReelId = null, onC
                             onTimeUpdate={e => {
                               if (!isCurrent) return;
                               const vid = e.target;
-                              if (vid.duration > 0) setReelProgress((vid.currentTime / vid.duration) * 100);
+                              if (vid.duration > 0) {
+                                const fraction = vid.currentTime / vid.duration;
+                                setReelProgress(fraction * 100);
+
+                                if (isAuthenticated) {
+                                  const sent = progressReportedRef.current[reelId] || (progressReportedRef.current[reelId] = new Set());
+                                  for (const threshold of [0.1, 0.25, 0.5, 0.75, 0.9]) {
+                                    if (fraction >= threshold && !sent.has(threshold)) {
+                                      sent.add(threshold);
+                                      api.post('/views/progress', { postId: reelId, fraction: threshold }).catch(() => {});
+                                    }
+                                  }
+                                  // loop-ing <video> never fires `ended`, so treat "very close to the
+                                  // end" as the completion signal instead (also triggers the view reward).
+                                  if (fraction >= 0.95 && !sent.has('completed')) {
+                                    sent.add('completed');
+                                    api.post('/views/complete', { postId: reelId, watchTimeMs: Math.round(vid.currentTime * 1000) }).catch(() => {});
+                                  }
+                                }
+                              }
                             }}
                           />
                         ) : (

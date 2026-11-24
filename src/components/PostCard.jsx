@@ -731,6 +731,7 @@ const TagMentions = ({ tags }) => {
 // ─── PostCard ──────────────────────────────────────────────────────────────────
 const PostCard = ({ post, onCommentClick, onDelete, mediaMaxHeight }) => {
   const { userObject } = useSelector(s => s.auth);
+  const navigate = useNavigate();
   const isAd = isAdItem(post);
   const isTweet = isTweetItem(post);
 
@@ -1175,6 +1176,7 @@ const PostCard = ({ post, onCommentClick, onDelete, mediaMaxHeight }) => {
             onPin={canPin ? handleTogglePin : undefined}
             isPinned={isPinned}
             isPinning={isPinning}
+            onViewInsights={!isAd ? () => { setShowOptions(false); navigate(`/post/${postId}/insights`); } : undefined}
           />
           <EditContentModal
             isOpen={showEditModal}

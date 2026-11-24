@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StoryViewer from '../components/StoryViewer';
-import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Pin, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning, Bookmark, Store } from 'lucide-react';
+import { Settings, Video, Menu, Grid, Plus, Heart, MessageCircle, ArrowLeft, MoreHorizontal, Megaphone, Rocket, Loader2, Eye, Building2, FileText, Hash, Calendar, Briefcase, Share2, Star, Pin, Lock, Clock, Play, Image, ChevronLeft, ChevronRight, Wallet, UserX, CirclePlay, Zap, CloudLightning, Bookmark, Store, TrendingUp } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '../lib/supabase';
@@ -1825,6 +1825,9 @@ const Profile = () => {
                                                 aria-label="View interests">
                                                 <Star size={18} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                             </button>
+                                            <Link to={`/profile/${profileTargetUserId}/insights`} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="View insights">
+                                                <TrendingUp size={18} />
+                                            </Link>
                                             {canMessage && (
                                                 <button type="button" onClick={handleOpenMessages} className="flex-1 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-900 dark:text-white shadow-sm" aria-label="Chat">
                                                     <MessageCircle size={18} />
@@ -2058,6 +2061,11 @@ const Profile = () => {
                                 <button type="button" onClick={handleStarClick} className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-all ${showInterestsSection ? 'border-orange-300 bg-orange-50 text-orange-500 dark:border-orange-900/20 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`} aria-label="View interests">
                                     <Star size={16} fill={showInterestsSection ? 'currentColor' : 'none'} />
                                 </button>
+                                {isOwnProfile && (
+                                    <Link to={`/profile/${profileTargetUserId}/insights`} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" aria-label="View insights">
+                                        <TrendingUp size={16} />
+                                    </Link>
+                                )}
                                 {(isOwnProfile || canMessage) && (
                                     <button type="button" onClick={handleOpenMessages} disabled={messageLoading} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" aria-label="Message">
                                         <MessageCircle size={16} />

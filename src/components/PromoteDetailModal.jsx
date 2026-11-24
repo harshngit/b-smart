@@ -7,7 +7,7 @@ import {
   Loader2, Zap, Bookmark
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import {
   checkFollowStatus, followUser, unfollowUser, cancelFollowRequest,
@@ -18,6 +18,7 @@ import Avatar from './Avatar';
 import LocationLink from './LocationLink';
 import ShareContentModal from './ShareContentModal';
 import ContentReportModal from './ContentReportModal';
+import OwnerContentOptionsModal from './OwnerContentOptionsModal';
 
 const BASE_URL = 'https://bsmart-backend-dev.bsmart.workers.dev';
 
@@ -380,6 +381,7 @@ const ModalMediaPanel = ({ item }) => {
 
 const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
   const { userObject } = useSelector(s => s.auth);
+  const navigate = useNavigate();
   const currentUserId = userObject?._id || userObject?.id || null;
 
   const [item, setItem] = useState(initialItem);
@@ -406,6 +408,7 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -660,12 +663,20 @@ const PromoteDetailModal = ({ promoteReel: initialItem, isOpen, onClose }) => {
               </div>
             </div>
             <button
-              onClick={() => { if (isOwner) { setShowDeleteModal(true); return; } setShowReportModal(true); }}
+              onClick={() => { if (isOwner) { setShowOptions(true); return; } setShowReportModal(true); }}
               className="text-gray-900 dark:text-white hover:opacity-50 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <MoreHorizontal size={20} />
             </button>
           </div>
 
+          <OwnerContentOptionsModal
+            isOpen={showOptions && isOwner}
+            onClose={() => setShowOptions(false)}
+            item={item}
+            contentUrl={`${window.location.origin}/promote-reels/${id}`}
+            onDelete={() => { setShowOptions(false); setShowDeleteModal(true); }}
+            onViewInsights={() => { setShowOptions(false); onClose(); navigate(`/promote-reel/${id}/insights`); }}
+          />
           <DeleteModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleDelete} isDeleting={isDeleting} />
           <ContentReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)}
             contentType="promote_reel" contentId={id} ownerUsername={username}
