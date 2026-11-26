@@ -97,7 +97,7 @@ const StoreSidebar = () => {
           ) : (
             <span className="text-xs font-bold text-[#fa3f5e]">{getInitials(displayName)}</span>
           )}
-        </span>
+        </span> 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-gray-900 dark:text-white">{displayStoreName}</p>
           <p className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">

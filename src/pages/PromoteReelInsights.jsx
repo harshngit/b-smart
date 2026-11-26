@@ -11,27 +11,19 @@ const SEQ_BLUE = '#2a78d6';
 
 const GENDER_LABELS = { male: 'Male', female: 'Female', other: 'Other', unknown: 'Unknown' };
 
-const StatCard = ({ label, value, color = 'blue', icon: Icon }) => {
-  const colors = {
-    blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400',
-    pink: 'bg-pink-50 text-[#fa3f5e] dark:bg-pink-900/20 dark:text-pink-400',
-    green: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400',
-    orange: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400',
-  };
-  return (
-    <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colors[color]}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-0.5">{value}</div>
-      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
+const StatCard = ({ label, value, icon: Icon }) => (
+  <div className="p-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+    <div className="flex items-center gap-1.5 mb-2.5 text-gray-400 dark:text-gray-500">
+      <Icon size={13} strokeWidth={2} />
+      <span className="text-[10.5px] font-semibold uppercase tracking-wider">{label}</span>
     </div>
-  );
-};
+    <div className="text-xl font-bold text-gray-900 dark:text-white tabular-nums">{value}</div>
+  </div>
+);
 
 const ChartCard = ({ title, children }) => (
-  <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
-    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">{title}</h3>
+  <div className="p-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+    <h3 className="text-[13px] font-semibold text-gray-900 dark:text-white mb-3">{title}</h3>
     {children}
   </div>
 );
@@ -80,7 +72,7 @@ export default function PromoteReelInsights() {
         <ArrowLeft size={16} /> Back
       </button>
       <div className="flex items-center gap-2 mb-1">
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-orange-400 to-pink-500 text-white">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           <Zap size={10} /> Promoted
         </span>
         {stats.created_at && (
@@ -89,20 +81,20 @@ export default function PromoteReelInsights() {
           </span>
         )}
       </div>
-      <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Promoted Reel Insights</h1>
+      <h1 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Promoted Reel Insights</h1>
       {stats.caption && <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{stats.caption}</p>}
-      <div className="flex items-start gap-2 mb-5 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-xs text-blue-700 dark:text-blue-300">
+      <div className="flex items-start gap-2 mb-5 p-3 rounded-lg border border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">
         <Info size={14} className="shrink-0 mt-0.5" />
         <span>Watch-time retention and location breakdowns aren&rsquo;t tracked for promoted reels yet — only regular reels have that level of detail right now.</span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        <StatCard label="Views" value={stats.views.total.toLocaleString()} color="blue" icon={Eye} />
-        <StatCard label="Unique viewers" value={stats.views.unique.toLocaleString()} color="blue" icon={Eye} />
-        <StatCard label="Completion rate" value={`${completionRate}%`} color="green" icon={CheckCircle2} />
-        <StatCard label="Completed views" value={stats.views.completed.toLocaleString()} color="green" icon={CheckCircle2} />
-        <StatCard label="Likes" value={stats.likes.total.toLocaleString()} color="pink" icon={Heart} />
-        <StatCard label="Comments" value={stats.comments.total.toLocaleString()} color="orange" icon={MessageCircle} />
+        <StatCard label="Views" value={stats.views.total.toLocaleString()} icon={Eye} />
+        <StatCard label="Unique viewers" value={stats.views.unique.toLocaleString()} icon={Eye} />
+        <StatCard label="Completion rate" value={`${completionRate}%`} icon={CheckCircle2} />
+        <StatCard label="Completed views" value={stats.views.completed.toLocaleString()} icon={CheckCircle2} />
+        <StatCard label="Likes" value={stats.likes.total.toLocaleString()} icon={Heart} />
+        <StatCard label="Comments" value={stats.comments.total.toLocaleString()} icon={MessageCircle} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -139,8 +131,8 @@ export default function PromoteReelInsights() {
         </ChartCard>
       </div>
 
-      <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
-        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Recent comments</h3>
+      <div className="p-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+        <h3 className="text-[13px] font-semibold text-gray-900 dark:text-white mb-3">Recent comments</h3>
         {stats.comments.recent.length === 0 ? (
           <p className="text-xs text-gray-400 py-4 text-center">No comments yet.</p>
         ) : (

@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase';
 import api from '../lib/api';
 import PostCard from '../components/PostCard';
 import PostDetailModal from '../components/PostDetailModal';
-import Reels from './Reels';
 import AvatarCropModal from '../components/AvatarCropModal';
 import FollowersModal from '../components/FollowersModal';
 import FollowingModal from '../components/FollowingModal';
@@ -188,7 +187,6 @@ const Profile = () => {
     const isOwnProfile = !userId || (currentUser && (userId === currentUser.id || userId === currentUser._id));
 
     const [activeTab, setActiveTab] = useState(null);
-    const [reelsModalReelId, setReelsModalReelId] = useState(null);
     const [userPosts, setUserPosts] = useState([]);
     const [userTweets, setUserTweets] = useState([]);
     const [userPromoteReels, setUserPromoteReels] = useState([]);
@@ -822,10 +820,6 @@ const Profile = () => {
 
     const handlePostClick = (post) => {
         const id = post._id || post.id;
-        if (post.type === 'reel') {
-            setReelsModalReelId(id);
-            return;
-        }
         if (window.innerWidth < 768 && id) navigate(`/post/${id}`);
         else setSelectedPost(post);
     };
@@ -2228,16 +2222,6 @@ const Profile = () => {
                 }}
             />
             <PostDetailModal isOpen={!!selectedAd} post={selectedAd} onClose={() => setSelectedAd(null)} />
-            {reelsModalReelId && (
-                <div className="fixed inset-0 z-[9999]">
-                    <Reels
-                        embedded
-                        scopeUserId={profileTargetUserId}
-                        initialReelId={reelsModalReelId}
-                        onClose={() => setReelsModalReelId(null)}
-                    />
-                </div>
-            )}
             {selectedTweet && (
                 <TweetDetailModal
                     isOpen={!!selectedTweet}
